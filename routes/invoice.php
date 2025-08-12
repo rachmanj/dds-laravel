@@ -4,29 +4,35 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceAttachmentController;
 use Illuminate\Support\Facades\Route;
 
-// Invoices data endpoint (define before resource to avoid shadowing by {invoice})
-Route::get('/invoices/data', [InvoiceController::class, 'data'])->name('invoices.data');
 
-// Invoice validation endpoint
-Route::post('/invoices/validate-invoice-number', [InvoiceController::class, 'validateInvoiceNumber'])->name('invoices.validate-invoice-number');
+Route::prefix('invoices')->name('invoices.')->group(function () {
+    // Invoices data endpoint (define before resource to avoid shadowing by {invoice})
+    Route::get('/data', [InvoiceController::class, 'data'])->name('data');
 
-// Session check endpoint
-Route::get('/invoices/check-session', [InvoiceController::class, 'checkSession'])->name('invoices.check-session');
+    // Invoice validation endpoint
+    Route::post('/validate-invoice-number', [InvoiceController::class, 'validateInvoiceNumber'])->name('validate-invoice-number');
 
-// Optional dashboard redirect within invoices section
-Route::get('/invoices/dashboard', function () {
-    return redirect()->route('invoices.index');
-})->name('invoices.dashboard');
+    // Session check endpoint
+    Route::get('/check-session', [InvoiceController::class, 'checkSession'])->name('check-session');
 
-// Invoice attachment routes
-Route::get('/invoices/attachments', [InvoiceAttachmentController::class, 'index'])->name('invoices.attachments.index');
-Route::get('/invoices/attachments/data', [InvoiceAttachmentController::class, 'data'])->name('invoices.attachments.data');
-Route::post('/invoices/{invoice}/attachments', [InvoiceAttachmentController::class, 'store'])->name('invoices.attachments.store');
-Route::get('/invoices/attachments/{attachment}/show', [InvoiceAttachmentController::class, 'show'])->name('invoices.attachments.show');
-Route::put('/invoices/attachments/{attachment}', [InvoiceAttachmentController::class, 'update'])->name('invoices.attachments.update');
-Route::get('/invoices/attachments/{attachment}/download', [InvoiceAttachmentController::class, 'download'])->name('invoices.attachments.download');
-Route::delete('/invoices/attachments/{attachment}', [InvoiceAttachmentController::class, 'destroy'])->name('invoices.attachments.destroy');
+    // Optional dashboard redirect within invoices section
+    Route::get('/dashboard', function () {
+        return redirect()->route('invoices.index');
+    })->name('dashboard');
 
+    Route::post('/{invoice}/attachments', [InvoiceAttachmentController::class, 'store'])->name('attachments.store');
+
+    // Invoice attachment routes
+    Route::prefix('attachments')->group(function () {
+        Route::get('/{invoice}/show', [InvoiceAttachmentController::class, 'show'])->name('attachments.show');
+        Route::get('', [InvoiceAttachmentController::class, 'index'])->name('attachments.index');
+        Route::get('/data', [InvoiceAttachmentController::class, 'data'])->name('attachments.data');
+        Route::put('/{attachment}', [InvoiceAttachmentController::class, 'update'])->name('attachments.update');
+        Route::get('/{attachment}/download', [InvoiceAttachmentController::class, 'download'])->name('attachments.download');
+        Route::get('/{attachment}/preview', [InvoiceAttachmentController::class, 'preview'])->name('attachments.preview');
+        Route::delete('/{attachment}', [InvoiceAttachmentController::class, 'destroy'])->name('attachments.destroy');
+    });
+});
 // API routes for invoice attachments
 use App\Http\Controllers\Api\InvoiceAttachmentController as ApiInvoiceAttachmentController;
 

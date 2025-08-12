@@ -1,5 +1,5 @@
 Purpose: Technical reference for understanding system design and development patterns
-Last Updated: 2025-08-09
+Last Updated: 2025-08-11
 
 ## Architecture Documentation Guidelines
 
@@ -259,3 +259,99 @@ Response ← JSON/Redirect ← Validation ← Business Logic ← Query
 -   **Test Coverage**: Unit and integration test implementation
 -   **Documentation**: API documentation with OpenAPI/Swagger
 -   **Performance Monitoring**: Application performance metrics
+
+## Infrastructure & Database
+
+### MySQL Server Configuration
+
+-   **Database Engine**: MySQL Server 9.2.0 Community Edition
+-   **Installation Method**: Chocolatey package manager (`choco install mysql`)
+-   **Platform**: Windows 11 with proper service configuration
+-   **Database Name**: `dds_laravel` (ready for Laravel integration)
+-   **Security**: Configured via `mysql_secure_installation` with proper authentication
+
+### Route Architecture
+
+#### Invoice Routes Structure
+
+```php
+Route::prefix('invoices')->group(function () {
+    // Core invoice endpoints
+    Route::get('/data', [InvoiceController::class, 'data']);
+    Route::post('/validate-invoice-number', [InvoiceController::class, 'validateInvoiceNumber']);
+    Route::get('/check-session', [InvoiceController::class, 'checkSession']);
+
+    // Attachment management (corrected structure)
+    Route::get('/attachments/{invoice}/show', [InvoiceAttachmentController::class, 'show']);
+    Route::get('/attachments', [InvoiceAttachmentController::class, 'index']);
+    Route::get('/attachments/data', [InvoiceAttachmentController::class, 'data']);
+    Route::post('/{invoice}/attachments', [InvoiceAttachmentController::class, 'store']);
+    Route::put('/attachments/{attachment}', [InvoiceAttachmentController::class, 'update']);
+    Route::get('/attachments/{attachment}/download', [InvoiceAttachmentController::class, 'download']);
+    Route::get('/attachments/{attachment}/preview', [InvoiceAttachmentController::class, 'preview']);
+    Route::delete('/attachments/{attachment}', [InvoiceAttachmentController::class, 'destroy']);
+});
+```
+
+#### Route Model Binding
+
+-   **Implicit Binding**: Uses `InvoiceAttachment $attachment` parameter for automatic model resolution
+-   **URL Pattern**: `/invoices/attachments/{id}/show` where `{id}` maps to `InvoiceAttachment::findOrFail($id)`
+
+### Frontend Architecture
+
+#### Notification System
+
+-   **Toastr**: Primary notification system for success/error messages
+-   Upload success/error notifications
+-   Edit success/error notifications
+-   Delete success notifications
+-   Consistent styling and positioning
+-   **SweetAlert2**: Used only for confirmation dialogs
+-   Delete confirmation before proceeding
+-   User-friendly confirmation interface
+
+#### JavaScript Integration
+
+-   **AJAX Operations**: All CRUD operations use AJAX for seamless user experience
+-   **Form Handling**: Proper form submission with FormData for file uploads
+-   **Error Handling**: Comprehensive error handling with fallback notifications
+-   **Debugging**: Console logging for troubleshooting and development
+
+#### UI Components
+
+-   **DataTables**: Enhanced table functionality with sorting, searching, and pagination
+-   **Bootstrap Modals**: Upload and edit forms presented in modal dialogs
+-   **Responsive Design**: Mobile-friendly interface with proper button spacing
+-   **Permission Integration**: UI elements respect user permissions using @can directives
+
+### File Management System
+
+#### Attachment Storage
+
+-   **File Structure**: Organized by year/month/invoice_id for efficient organization
+-   **File Validation**: Server-side validation for file types and sizes
+-   **Security**: Proper permission checks before file operations
+-   **Metadata**: Comprehensive file information including description, uploader, and timestamps
+
+#### File Operations
+
+-   **Upload**: Multiple file support with progress feedback
+-   **Download**: Secure file download with permission validation
+-   **Preview**: In-browser preview for supported file types (PDF, images)
+-   **Delete**: Secure deletion with confirmation and cleanup
+
+### Permission System
+
+#### Role-Based Access Control
+
+-   **View Permissions**: `inv-attachment-view` for viewing attachments
+-   **Create Permissions**: `inv-attachment-create` for uploading new files
+-   **Edit Permissions**: `inv-attachment-edit` for modifying descriptions
+-   **Delete Permissions**: `inv-attachment-delete` for removing files
+
+#### Location-Based Access
+
+-   **Department Restrictions**: Users can only access attachments from their department location
+-   **Admin Override**: Superadmin and admin roles have access to all attachments
+-   **Security**: Prevents unauthorized access to sensitive documents

@@ -47,19 +47,6 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            @if (session('import_errors') && count(session('import_errors')) > 0)
-                                <div class="alert alert-warning alert-dismissible">
-                                    <button type="button" class="close" data-dismiss="alert"
-                                        aria-hidden="true">&times;</button>
-                                    <h5><i class="icon fas fa-exclamation-triangle"></i> Import Warnings!</h5>
-                                    <p>The import completed but some records had issues:</p>
-                                    <ul>
-                                        @foreach (session('import_errors') as $error)
-                                            <li>{{ $error }}</li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            @endif
 
                             <!-- Advanced Search Panel -->
                             <div class="row mb-3">
@@ -180,8 +167,6 @@
         </div>
     </section>
     </div>
-
-
 @endsection
 
 @section('scripts')

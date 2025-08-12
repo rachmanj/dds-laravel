@@ -192,7 +192,7 @@
                                                 @endif
                                             </div>
                                             <div class="attachment-actions">
-                                                <a href="{{ route('invoices.attachments.show', $attachment) }}"
+                                                <a href="{{ route('invoices.attachments.show', $invoice) }}"
                                                     class="btn btn-sm btn-info" target="_blank" title="View">
                                                     <i class="fas fa-eye"></i>
                                                 </a>

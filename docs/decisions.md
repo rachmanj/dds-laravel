@@ -1,5 +1,5 @@
 **Purpose**: Record technical decisions and rationale for future reference
-**Last Updated**: 2025-08-08
+**Last Updated**: 2025-08-11
 
 # Technical Decision Records
 
@@ -29,6 +29,55 @@ Decision: [Title] - [YYYY-MM-DD]
 ---
 
 ## Recent Decisions
+
+### Decision: MySQL Installation Method & Route Structure Optimization - 2025-08-11
+
+**Context**: Needed to install MySQL Server on Windows 11 for Laravel development and encountered 404 errors on invoice attachment routes that appeared to be routing issues but were actually structural problems.
+
+**Options Considered**:
+
+1. **Manual MySQL installation from official website**
+
+    - ✅ Pros: Official source, full control over configuration
+    - ❌ Cons: More complex setup, manual service configuration, potential compatibility issues
+
+2. **Chocolatey package manager installation**
+
+    - ✅ Pros: Automated installation, proper service configuration, Windows integration, easier updates
+    - ❌ Cons: Requires Chocolatey installation, dependency on package manager
+
+3. **Docker containerization**
+    - ✅ Pros: Isolated environment, easy to manage, portable
+    - ❌ Cons: Additional complexity, resource overhead, Windows Docker limitations
+
+**Decision**: Used Chocolatey package manager (`choco install mysql`) for MySQL Server installation and fixed nested route prefixing issues in Laravel routes.
+
+**Rationale**: Chocolatey provides the best balance of automation and Windows integration. The route structure issues were caused by nested `Route::prefix()` calls creating confusing URL patterns that appeared as routing problems but were actually structural issues.
+
+**Implementation Details**:
+
+-   Installed MySQL Server 9.2.0 via `choco install mysql`
+-   Configured security via `mysql_secure_installation`
+-   Created `dds_laravel` database for Laravel integration
+-   Fixed nested route prefixes in `routes/invoice.php`:
+
+    ```php
+    // Before: Double-prefixed URLs like /invoices/invoices/attachments/1/show
+    Route::prefix('invoices')->group(function () {
+        Route::prefix('attachments')->group(function () {
+            Route::get('/{attachment}/show', ...);
+        });
+    });
+
+    // After: Clean URLs like /invoices/attachments/1/show
+    Route::prefix('invoices')->group(function () {
+        Route::get('/attachments/{attachment}/show', ...);
+    });
+    ```
+
+**Outcome**: MySQL Server is properly installed and configured on Windows 11, route structure generates correct URLs, and the system is ready for Laravel database integration. The 404 errors were confirmed to be data availability issues (missing `InvoiceAttachment` records) rather than routing problems.
+
+**Review Date**: 2026-02-11
 
 ### Decision: Invoice Attachments Aggregated Index + Detail Management - 2025-08-11
 
@@ -546,3 +595,91 @@ Review Date: 2025-11-11
 -   Standardized error handling and validation feedback
 
 **Status**: ✅ Implemented
+
+### Decision: Frontend Notification System Architecture & Integration - 2025-08-11
+
+**Context**: After implementing the invoice attachments system, needed to establish a consistent notification system that provides user feedback for all CRUD operations while maintaining a good user experience.
+
+**Options Considered**:
+
+1. **Session Messages Only**
+
+    - ✅ Pros: Simple implementation, works with page redirects
+    - ❌ Cons: No real-time feedback, requires page reload, poor UX for AJAX operations
+
+2. **SweetAlert2 for All Notifications**
+
+    - ✅ Pros: Beautiful, customizable alerts, good user experience
+    - ❌ Cons: Blocking notifications, can be annoying for frequent operations, inconsistent with modern web apps
+
+3. **Toastr for All Notifications**
+
+    - ✅ Pros: Non-blocking, consistent styling, good for frequent operations
+    - ❌ Cons: Less prominent than modal dialogs, might be missed by users
+
+4. **Hybrid Approach: Toastr + SweetAlert2**
+    - ✅ Pros: Best of both worlds, appropriate tool for each use case
+    - ❌ Cons: More complex implementation, need to decide when to use each
+
+**Decision**: Implemented hybrid notification system with Toastr for success/error messages and SweetAlert2 only for confirmation dialogs.
+
+**Rationale**: This approach provides the best user experience by using non-blocking toastr notifications for routine feedback (success/error messages) while reserving SweetAlert2 for important confirmations that require user attention (delete confirmations).
+
+**Implementation Details**:
+
+-   **Toastr Notifications**: Used for all success/error feedback
+-   File upload success/error
+-   Description update success/error
+-   File deletion success
+-   Consistent positioning and styling
+-   **SweetAlert2 Confirmations**: Used only for delete confirmations
+-   Prevents accidental deletions
+-   Clear user intent confirmation
+-   Professional appearance
+-   **Fallback Handling**: Added fallback to alert() if libraries fail to load
+-   **Debugging**: Comprehensive console logging for troubleshooting
+
+**Outcome**: The system now provides consistent, non-intrusive feedback for routine operations while maintaining clear confirmation for destructive actions. Users receive immediate feedback without interruption, and the interface feels modern and professional.
+
+**Review Date**: 2026-02-11
+
+### Decision: JavaScript Integration Method & Layout Structure - 2025-08-11
+
+**Context**: Encountered issues with JavaScript not loading properly in the invoice attachments system, leading to non-functional edit/delete buttons and missing toastr notifications.
+
+**Options Considered**:
+
+1. **@push/@stack Method**
+
+    - ✅ Pros: Laravel's recommended approach for adding scripts/styles
+    - ❌ Cons: Requires @stack directive in layout, which wasn't present
+
+2. **@section/@yield Method**
+
+    - ✅ Pros: Standard Laravel layout structure, already implemented in main.blade.php
+    - ❌ Cons: Less flexible than @push for multiple script additions
+
+3. **Inline Scripts**
+
+    - ✅ Pros: Simple, guaranteed to work
+    - ❌ Cons: Poor separation of concerns, harder to maintain
+
+4. **External JavaScript Files**
+    - ✅ Pros: Clean separation, reusable across pages
+    - ❌ Cons: Additional HTTP requests, potential caching issues
+
+**Decision**: Changed from @push('scripts') to @section('scripts') to match the existing main layout structure.
+
+**Rationale**: The main layout file already used @yield('scripts'), so using @section('scripts') ensures proper integration without requiring layout modifications. This approach maintains the existing architecture while fixing the JavaScript loading issues.
+
+**Implementation Details**:
+
+-   Changed @push('scripts') to @section('scripts') in show.blade.php
+-   Maintained all existing JavaScript functionality
+-   Added comprehensive debugging and error handling
+-   Ensured proper library loading (DataTables, SweetAlert2, Toastr)
+-   Added fallback error handling for missing libraries
+
+**Outcome**: JavaScript now loads properly, edit/delete buttons function correctly, and toastr notifications work as expected. The system maintains clean separation of concerns while ensuring reliable functionality.
+
+**Review Date**: 2026-02-11

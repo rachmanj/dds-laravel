@@ -133,11 +133,12 @@ class InvoiceAttachmentController extends Controller
             }
         }
 
+        // For non-AJAX requests, redirect with session messages
         if (empty($errors)) {
-            return redirect()->route('invoices.show', $invoice)
+            return redirect()->route('invoices.attachments.show', $invoice)
                 ->with('success', count($uploadedFiles) . ' file(s) uploaded successfully.');
         } else {
-            return redirect()->route('invoices.show', $invoice)
+            return redirect()->route('invoices.attachments.show', $invoice)
                 ->with('warning', 'Some files failed to upload.')
                 ->with('errors', $errors);
         }
@@ -232,9 +233,26 @@ class InvoiceAttachmentController extends Controller
         return Storage::download($attachment->file_path, $attachment->file_name);
     }
 
-    public function show(InvoiceAttachment $attachment)
+    public function show(Invoice $invoice)
     {
-        return view('invoices.attachments.show', compact('attachment'));
+        // Check if user has permission to view invoice attachments
+        if (!Auth::user() || !Auth::user()->can('inv-attachment-view')) {
+            abort(403, 'You do not have permission to view invoice attachments.');
+        }
+
+        // Check if user can view this invoice's attachments
+        $user = Auth::user();
+        if (!$user->hasRole(['superadmin', 'admin'])) {
+            $locationCode = $user->department_location_code;
+            if ($locationCode && $invoice->cur_loc !== $locationCode) {
+                abort(403, 'You can only view attachments from invoices in your department location.');
+            }
+        }
+
+        // Load invoice with all necessary relationships
+        $invoice->load(['supplier', 'type', 'creator', 'attachments.uploader', 'receiveProjectInfo', 'invoiceProjectInfo', 'paymentProjectInfo']);
+
+        return view('invoices.attachments.show', compact('invoice'));
     }
 
     /**
