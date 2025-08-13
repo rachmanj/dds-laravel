@@ -27,6 +27,14 @@
 
 ## Project Memory Entries
 
+### [036] Invoice ↔ Additional Documents Linking (2025-08-12) ✅ COMPLETE
+
+**Challenge/Decision**: Enable optional linking of multiple additional documents to an invoice, primarily suggested by matching `po_no`, while respecting location-based access.
+
+**Solution**: Added pivot `additional_document_invoice`, Eloquent many-to-many, AJAX search endpoint `/invoices/search-additional-documents` with role/location filter, and UI section on create/edit forms to search by `po_no` on blur, present results in a table with checkboxes, and show `cur_loc` badges. Persist selections on store/update and display linked docs on show page.
+
+**Key Learning**: Treat `po_no` as a discovery aid, not a binding rule. Many-to-many with explicit user selection balances flexibility with clarity, and showing `cur_loc` helps users decide relevance.
+
 ### [034] Invoice Attachments System Final Fixes & Integration (2025-08-11) ✅ COMPLETE
 
 **Challenge/Decision**: Completed final integration fixes for the invoice attachments system, resolving issues with toastr notifications, SweetAlert2 confirmations, route parameter binding, and ensuring proper description field handling throughout the system.

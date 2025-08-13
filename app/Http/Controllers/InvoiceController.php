@@ -6,6 +6,8 @@ use App\Models\Invoice;
 use App\Models\InvoiceType;
 use App\Models\Supplier;
 use App\Models\Project;
+use App\Models\AdditionalDocument;
+use App\Models\User;
 use App\Rules\UniqueInvoicePerSupplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,16 +34,12 @@ class InvoiceController extends Controller
 
     public function data(Request $request)
     {
+        /** @var User $user */
         $user = Auth::user();
         $query = Invoice::with(['supplier', 'type', 'creator', 'attachments']);
 
         // Apply location-based filtering unless user is admin/superadmin
-        if (!$user->hasRole(['superadmin', 'admin'])) {
-            $locationCode = $user->department_location_code;
-            if ($locationCode) {
-                $query->forLocation($locationCode);
-            }
-        }
+        // Location-based restrictions removed: all users see all matching additional documents
 
         // Apply search filters
         if ($request->filled('search_invoice_number')) {
@@ -153,8 +151,10 @@ class InvoiceController extends Controller
 
         // Auto-populate receive_project from user's project if not provided
         $receiveProject = $request->receive_project;
-        if (!$receiveProject && auth()->user()->project) {
-            $receiveProject = auth()->user()->project;
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        if (!$receiveProject && $authUser && $authUser->project) {
+            $receiveProject = $authUser->project;
         }
 
         $invoice = Invoice::create([
@@ -177,6 +177,12 @@ class InvoiceController extends Controller
             'created_by' => Auth::id(),
         ]);
 
+        // Link additional documents if provided
+        $additionalDocumentIds = $request->input('additional_document_ids', []);
+        if (!empty($additionalDocumentIds)) {
+            $invoice->additionalDocuments()->sync(array_unique($additionalDocumentIds));
+        }
+
         if ($request->ajax()) {
             return response()->json([
                 'success' => true,
@@ -192,6 +198,7 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice)
     {
         // Check if user can view this invoice
+        /** @var User $user */
         $user = Auth::user();
         if (!$user->hasRole(['superadmin', 'admin'])) {
             $locationCode = $user->department_location_code;
@@ -200,7 +207,7 @@ class InvoiceController extends Controller
             }
         }
 
-        $invoice->load(['supplier', 'type', 'creator', 'attachments.uploader']);
+        $invoice->load(['supplier', 'type', 'creator', 'attachments.uploader', 'additionalDocuments.type']);
 
         return view('invoices.show', compact('invoice'));
     }
@@ -208,6 +215,7 @@ class InvoiceController extends Controller
     public function edit(Invoice $invoice)
     {
         // Check if user can edit this invoice
+        /** @var User $user */
         $user = Auth::user();
         if (!$user->hasRole(['superadmin', 'admin'])) {
             $locationCode = $user->department_location_code;
@@ -227,6 +235,7 @@ class InvoiceController extends Controller
     public function update(Request $request, Invoice $invoice)
     {
         // Check if user can edit this invoice
+        /** @var User $user */
         $user = Auth::user();
         if (!$user->hasRole(['superadmin', 'admin'])) {
             $locationCode = $user->department_location_code;
@@ -273,6 +282,10 @@ class InvoiceController extends Controller
             'status' => $request->status,
         ]);
 
+        // Sync additional documents if provided
+        $additionalDocumentIds = $request->input('additional_document_ids', []);
+        $invoice->additionalDocuments()->sync(array_unique($additionalDocumentIds));
+
         if ($request->ajax()) {
             return response()->json([
                 'success' => true,
@@ -287,6 +300,7 @@ class InvoiceController extends Controller
     public function destroy(Invoice $invoice)
     {
         // Check if user can delete this invoice
+        /** @var User $user */
         $user = Auth::user();
         if (!$user->hasRole(['superadmin', 'admin'])) {
             $locationCode = $user->department_location_code;
@@ -319,6 +333,7 @@ class InvoiceController extends Controller
     {
         $invoiceTypes = InvoiceType::orderBy('type_name')->get();
         $suppliers = Supplier::active()->orderBy('name')->get();
+        /** @var User $user */
         $user = Auth::user();
 
         return view('invoices.import', compact('invoiceTypes', 'suppliers', 'user'));
@@ -403,6 +418,50 @@ class InvoiceController extends Controller
         return response()->json([
             'status' => 'authenticated',
             'user' => Auth::user()->name
+        ]);
+    }
+
+    /**
+     * Search additional documents by PO number, respecting role/location rules.
+     */
+    public function searchAdditionalDocuments(Request $request)
+    {
+        $request->validate([
+            'po_no' => 'required|string|max:50',
+        ]);
+
+        /** @var User $user */
+        $user = Auth::user();
+        $query = AdditionalDocument::query()
+            ->with(['type'])
+            ->whereNotNull('po_no')
+            ->where('po_no', 'like', '%' . $request->po_no . '%')
+            ->orderByDesc('document_date')
+            ->limit(50);
+
+        if (!$user->hasRole(['superadmin', 'admin'])) {
+            $locationCode = $user->department_location_code;
+            if ($locationCode) {
+                $query->forLocation($locationCode);
+            }
+        }
+
+        $documents = $query->get()->map(function ($doc) {
+            return [
+                'id' => $doc->id,
+                'document_number' => $doc->document_number,
+                'type_name' => optional($doc->type)->type_name,
+                'document_date' => optional($doc->document_date)->format('Y-m-d'),
+                'po_no' => $doc->po_no,
+                'cur_loc' => $doc->cur_loc,
+                'remarks' => $doc->remarks,
+                'status' => $doc->status,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'documents' => $documents,
         ]);
     }
 }

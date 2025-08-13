@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Invoice extends Model
 {
@@ -69,6 +70,14 @@ class Invoice extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(InvoiceAttachment::class);
+    }
+
+    /**
+     * Additional documents linked to this invoice.
+     */
+    public function additionalDocuments(): BelongsToMany
+    {
+        return $this->belongsToMany(AdditionalDocument::class, 'additional_document_invoice')->withTimestamps();
     }
 
     /**

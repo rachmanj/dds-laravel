@@ -120,6 +120,62 @@
                                         </div>
                                     </div>
 
+                                    <!-- Link Additional Documents (optional) -->
+                                    <div class="card card-outline card-secondary mt-3" id="additional-docs-card"
+                                        style="display:none;">
+                                        <div class="card-header">
+                                            <h3 class="card-title">Link Additional Documents (optional)</h3>
+                                            <div class="card-tools">
+                                                <span class="badge badge-info" id="selected-count">Selected: 0</span>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="additional-docs-loading" style="display:none;">
+                                                <i class="fas fa-spinner fa-spin"></i> Searching by PO No...
+                                            </div>
+                                            <div class="table-responsive" id="additional-docs-table-wrapper"
+                                                style="display:none;">
+                                                <table class="table table-sm table-bordered" id="additional-docs-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width:32px;"><input type="checkbox"
+                                                                    id="select-all-docs"></th>
+                                                            <th>Document No</th>
+                                                            <th>Type</th>
+                                                            <th>Date</th>
+                                                            <th>PO No</th>
+                                                            <th>Current Location</th>
+                                                            <th>Remarks</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody></tbody>
+                                                </table>
+                                                <small class="text-muted">Showing up to 50 results.</small>
+                                            </div>
+                                            <div id="additional-docs-empty" class="text-muted" style="display:none;">
+                                                No documents found for this PO No. Adjust PO or link manually later.
+                                            </div>
+                                            <div id="selected-docs-wrapper" class="mt-3" style="display:none;">
+                                                <h6>Currently selected</h6>
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped" id="selected-docs-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Document No</th>
+                                                                <th>Type</th>
+                                                                <th>Date</th>
+                                                                <th>PO No</th>
+                                                                <th>Current Location</th>
+                                                                <th>Action</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody></tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- Invoice Type, Currency, and Amount -->
                                     <div class="row">
                                         <div class="col-md-4">
@@ -663,6 +719,139 @@
                     });
                     $('#cur_loc').after(hiddenInput);
                 }
+
+                // ---------- Additional Documents Linking ----------
+                var selectedDocs = {};
+
+                function updateSelectedCounter() {
+                    var count = Object.keys(selectedDocs).length;
+                    $('#selected-count').text('Selected: ' + count);
+                    if (count > 0) {
+                        $('#selected-docs-wrapper').show();
+                    } else {
+                        $('#selected-docs-wrapper').hide();
+                    }
+                }
+
+                function renderSelectedTable() {
+                    var tbody = $('#selected-docs-table tbody');
+                    tbody.empty();
+                    Object.values(selectedDocs).forEach(function(doc) {
+                        var row = '<tr>' +
+                            '<td>' + doc.document_number + '</td>' +
+                            '<td>' + (doc.type_name || '-') + '</td>' +
+                            '<td>' + (doc.document_date || '-') + '</td>' +
+                            '<td>' + (doc.po_no || '-') + '</td>' +
+                            '<td><span class="badge badge-secondary">' + (doc.cur_loc || '-') + '</span></td>' +
+                            '<td><button type="button" class="btn btn-xs btn-danger remove-doc" data-id="' + doc.id +
+                            '"><i class="fas fa-times"></i></button></td>' +
+                            '</tr>' +
+                            '<input type="hidden" name="additional_document_ids[]" value="' + doc.id + '">';
+                        tbody.append(row);
+                    });
+                    updateSelectedCounter();
+                }
+
+                function renderResultsTable(docs) {
+                    var tbody = $('#additional-docs-table tbody');
+                    tbody.empty();
+                    docs.forEach(function(doc) {
+                        var checked = selectedDocs[doc.id] ? 'checked' : '';
+                        var row = '<tr data-id="' + doc.id + '">' +
+                            '<td><input type="checkbox" class="doc-checkbox" data-id="' + doc.id + '" ' + checked +
+                            '></td>' +
+                            '<td>' + doc.document_number + '</td>' +
+                            '<td>' + (doc.type_name || '-') + '</td>' +
+                            '<td>' + (doc.document_date || '-') + '</td>' +
+                            '<td>' + (doc.po_no || '-') + '</td>' +
+                            '<td><span class="badge badge-secondary">' + (doc.cur_loc || '-') + '</span></td>' +
+                            '<td>' + (doc.remarks || '') + '</td>' +
+                            '</tr>';
+                        tbody.append(row);
+                    });
+                    $('#additional-docs-table-wrapper').toggle(docs.length > 0);
+                    $('#additional-docs-empty').toggle(docs.length === 0);
+                    $('#additional-docs-card').show();
+                }
+
+                function searchAdditionalDocuments() {
+                    var po = $('#po_no').val().trim();
+                    if (!po) {
+                        $('#additional-docs-card').hide();
+                        return;
+                    }
+                    $('#additional-docs-card').show();
+                    $('#additional-docs-loading').show();
+                    $('#additional-docs-table-wrapper').hide();
+                    $('#additional-docs-empty').hide();
+
+                    $.ajax({
+                        url: '{{ route('invoices.search-additional-documents') }}',
+                        type: 'POST',
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            po_no: po
+                        },
+                        success: function(resp) {
+                            $('#additional-docs-loading').hide();
+                            if (resp.success) {
+                                renderResultsTable(resp.documents || []);
+                                renderSelectedTable();
+                                if ((resp.documents || []).length === 0 && typeof toastr !== 'undefined') {
+                                    toastr.info('No additional documents found for this PO.');
+                                }
+                            } else {
+                                if (typeof toastr !== 'undefined') toastr.error('Search failed');
+                            }
+                        },
+                        error: function() {
+                            $('#additional-docs-loading').hide();
+                            if (typeof toastr !== 'undefined') toastr.error(
+                            'Failed to search additional documents');
+                        }
+                    });
+                }
+
+                // Handle blur on PO number
+                $('#po_no').on('blur', searchAdditionalDocuments);
+
+                // Row checkbox toggle
+                $(document).on('change', '.doc-checkbox', function() {
+                    var id = $(this).data('id');
+                    var row = $(this).closest('tr');
+                    if (this.checked) {
+                        var data = {
+                            id: id,
+                            document_number: row.find('td').eq(1).text(),
+                            type_name: row.find('td').eq(2).text(),
+                            document_date: row.find('td').eq(3).text(),
+                            po_no: row.find('td').eq(4).text(),
+                            cur_loc: row.find('td').eq(5).text().trim(),
+                            remarks: row.find('td').eq(6).text()
+                        };
+                        selectedDocs[id] = data;
+                    } else {
+                        delete selectedDocs[id];
+                    }
+                    renderSelectedTable();
+                });
+
+                // Select all
+                $(document).on('change', '#select-all-docs', function() {
+                    var checked = this.checked;
+                    $('#additional-docs-table tbody .doc-checkbox').each(function() {
+                        $(this).prop('checked', checked).trigger('change');
+                    });
+                });
+
+                // Remove from selected list
+                $(document).on('click', '.remove-doc', function() {
+                    var id = $(this).data('id');
+                    delete selectedDocs[id];
+                    $('#additional-docs-table tbody .doc-checkbox[data-id="' + id + '"]').prop('checked', false);
+                    renderSelectedTable();
+                });
+                // ---------- End Additional Documents Linking ----------
 
                 // Ensure receive_project is properly set and readonly
                 var userProject = '{{ auth()->user()->project ?? '' }}';

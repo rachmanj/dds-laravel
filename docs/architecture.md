@@ -61,8 +61,23 @@ The DDS Laravel system is a comprehensive document management and invoice proces
 ### 2. Database Architecture
 
 -   **Primary Database**: MySQL (`dds_backend`)
--   **Key Tables**: users, departments, invoices, suppliers, invoice_types, projects, additional_documents, distributions
--   **Relationships**: Complex many-to-many relationships with pivot tables for document distribution
+-   **Key Tables**: users, departments, invoices, suppliers, invoice_types, projects, additional_documents, additional_document_invoice (pivot), distributions
+-   **Relationships**: Invoices ↔ Additional Documents many-to-many via `additional_document_invoice`
+
+```mermaid
+graph TD;
+  "Invoice" -- "additional_document_invoice" --- "AdditionalDocument";
+  "additional_document_invoice"["additional_document_invoice\n(invoice_id, additional_document_id)"]
+```
+
+#### Invoice ↔ Additional Documents Linking Flow
+
+-   Users can optionally link additional documents to an invoice on Create/Edit.
+-   Suggestions are discovered via PO Number: on blur of `po_no`, the UI calls `POST /invoices/search-additional-documents`.
+-   The endpoint returns up to 50 matches without location restrictions (all users see all matches).
+-   Users select documents via checkboxes; selections are persisted with hidden inputs `additional_document_ids[]`.
+-   On save, the pivot is synchronized (`attach/sync`).
+-   The Invoice show page lists linked additional documents with `cur_loc` badges.
 
 ### 3. File Management System
 

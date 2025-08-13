@@ -2,6 +2,15 @@
 
 ## Recently Completed
 
+### Invoice ↔ Additional Documents Linking (2025-08-12) ✅ COMPLETE
+
+-   ✅ Pivot migration `additional_document_invoice`
+-   ✅ Eloquent relations on `Invoice` and `AdditionalDocument`
+-   ✅ AJAX search endpoint by `po_no` (no location filter; all users see all matches)
+-   ✅ Create/Edit form UI: optional linking section with table + selection and `cur_loc` badges
+-   ✅ Persist selections on store/update via pivot attach/sync
+-   ✅ Invoice show page lists linked additional documents
+
 ### Invoice Attachments System Final Integration & Debugging (2025-08-11) ✅ COMPLETE
 
 -   ✅ Fixed toastr notifications not showing after successful uploads

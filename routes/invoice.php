@@ -22,6 +22,9 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
 
     Route::post('/{invoice}/attachments', [InvoiceAttachmentController::class, 'store'])->name('attachments.store');
 
+    // Search additional documents by PO number (AJAX)
+    Route::post('/search-additional-documents', [InvoiceController::class, 'searchAdditionalDocuments'])->name('search-additional-documents');
+
     // Invoice attachment routes
     Route::prefix('attachments')->group(function () {
         Route::get('/{invoice}/show', [InvoiceAttachmentController::class, 'show'])->name('attachments.show');

@@ -243,6 +243,47 @@
                             </form>
                         </div>
                     </div>
+
+                    <!-- Linked Additional Documents -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-link"></i> Linked Additional Documents
+                                <span class="badge badge-info">{{ $invoice->additionalDocuments->count() }}</span>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            @if ($invoice->additionalDocuments->count() > 0)
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Document No</th>
+                                                <th>Type</th>
+                                                <th>Date</th>
+                                                <th>PO No</th>
+                                                <th>Cur Loc</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach ($invoice->additionalDocuments as $doc)
+                                                <tr>
+                                                    <td>{{ $doc->document_number }}</td>
+                                                    <td>{{ optional($doc->type)->type_name }}</td>
+                                                    <td>{{ optional($doc->document_date)->format('Y-m-d') }}</td>
+                                                    <td>{{ $doc->po_no }}</td>
+                                                    <td><span class="badge badge-secondary">{{ $doc->cur_loc }}</span>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <p class="text-muted mb-0">No additional documents linked.</p>
+                            @endif
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,5 +1,16 @@
-**Purpose**: Record technical decisions and rationale for future reference
-**Last Updated**: 2025-08-11
+### [D-2025-08-12] Link Invoices to Additional Documents via Pivot ✅
+
+-   Context: Users often attach additional documents to invoices, usually by matching `po_no`, but not always.
+-   Decision: Implement many-to-many relationship between `invoices` and `additional_documents` using pivot `additional_document_invoice`.
+-   Alternatives: One-to-many from invoice to additional_documents (rejected: a document can relate to multiple invoices); implicit linking by `po_no` only (rejected: not always reliable).
+-   Implications:
+    -   New migration for pivot; Eloquent `belongsToMany` on both models
+    -   Form UX: optional linking section with PO-blur suggestions and manual selection
+    -   API: `/invoices/search-additional-documents` (no location filtering; all users see all matches)
+    -   Show page lists linked documents
+-   Review: Revisit matching heuristics (beyond `po_no`) in future.
+    **Purpose**: Record technical decisions and rationale for future reference
+    **Last Updated**: 2025-08-11
 
 # Technical Decision Records
 

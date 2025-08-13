@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class AdditionalDocument extends Model
 {
@@ -106,5 +107,13 @@ class AdditionalDocument extends Model
 
         // Regular users can only delete their own documents
         return $this->created_by === $user->id;
+    }
+
+    /**
+     * Invoices linked to this additional document.
+     */
+    public function invoices(): BelongsToMany
+    {
+        return $this->belongsToMany(Invoice::class, 'additional_document_invoice')->withTimestamps();
     }
 }
