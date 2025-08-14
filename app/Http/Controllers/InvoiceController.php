@@ -64,14 +64,17 @@ class InvoiceController extends Controller
             $query->where('status', $request->search_status);
         }
 
-        if ($request->filled('search_date_range')) {
-            $dates = explode(' - ', $request->search_date_range);
-            if (count($dates) == 2) {
-                $startDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[0]))->startOfDay();
-                $endDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[1]))->endOfDay();
-                $query->whereBetween('invoice_date', [$startDate, $endDate]);
-            }
+        if ($request->filled('search_supplier')) {
+            $query->whereHas('supplier', function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search_supplier . '%');
+            });
         }
+
+        if ($request->filled('search_invoice_project')) {
+            $query->where('invoice_project', $request->search_invoice_project);
+        }
+
+
 
         // Show all records for admin/superadmin if requested
         if ($request->show_all && $user->hasRole(['superadmin', 'admin'])) {
@@ -85,9 +88,6 @@ class InvoiceController extends Controller
             ->addColumn('type_name', function ($invoice) {
                 return $invoice->type ? $invoice->type->type_name : '-';
             })
-            ->addColumn('creator_name', function ($invoice) {
-                return $invoice->creator ? $invoice->creator->name : '-';
-            })
             ->addColumn('formatted_invoice_date', function ($invoice) {
                 return $invoice->formatted_invoice_date;
             })
@@ -100,12 +100,34 @@ class InvoiceController extends Controller
             ->addColumn('status_badge', function ($invoice) {
                 return $invoice->status_badge;
             })
-            ->addColumn('attachment_count', function ($invoice) {
-                $count = $invoice->attachment_count;
-                if ($count > 0) {
-                    return '<span class="badge badge-info">' . $count . ' file(s)</span>';
+            ->addColumn('days_difference', function ($invoice) {
+                if (!$invoice->receive_date) {
+                    return '<span class="text-muted">-</span>';
                 }
-                return '<span class="badge badge-secondary">No files</span>';
+
+                // Calculate days since receive_date (positive = past, negative = future)
+                $now = \Carbon\Carbon::now()->startOfDay(); // Start of today to avoid time issues
+                $receiveDate = \Carbon\Carbon::parse($invoice->receive_date)->startOfDay(); // Start of receive date
+
+                // Use timestamp difference for more accurate calculation
+                $days = $now->timestamp - $receiveDate->timestamp;
+                $days = $days / (24 * 60 * 60); // Convert seconds to days
+                $roundedDays = round($days); // Round to nearest integer
+
+                if ($roundedDays < 0) {
+                    // Future date (negative days) - invoice not yet received
+                    $roundedDays = abs($roundedDays);
+                    return '<span class="badge badge-info">' . $roundedDays . '</span>';
+                } elseif ($roundedDays < 7) {
+                    // Less than 7 days since received (green)
+                    return '<span class="badge badge-success">' . $roundedDays . '</span>';
+                } elseif ($roundedDays == 7) {
+                    // Exactly 7 days since received (yellow)
+                    return '<span class="badge badge-warning">' . $roundedDays . '</span>';
+                } else {
+                    // More than 7 days since received (red)
+                    return '<span class="badge badge-danger">' . $roundedDays . '</span>';
+                }
             })
             ->addColumn('actions', function ($invoice) {
                 $actions = '<div class="btn-group" style="gap:2px;">';
@@ -115,7 +137,7 @@ class InvoiceController extends Controller
                 $actions .= '</div>';
                 return $actions;
             })
-            ->rawColumns(['status_badge', 'attachment_count', 'actions'])
+            ->rawColumns(['status_badge', 'days_difference', 'actions'])
             ->make(true);
     }
 
@@ -428,12 +450,13 @@ class InvoiceController extends Controller
     {
         $request->validate([
             'po_no' => 'required|string|max:50',
+            'current_invoice_id' => 'nullable|exists:invoices,id',
         ]);
 
         /** @var User $user */
         $user = Auth::user();
         $query = AdditionalDocument::query()
-            ->with(['type'])
+            ->with(['type', 'invoices'])
             ->whereNotNull('po_no')
             ->where('po_no', 'like', '%' . $request->po_no . '%')
             ->orderByDesc('document_date')
@@ -446,7 +469,11 @@ class InvoiceController extends Controller
             }
         }
 
-        $documents = $query->get()->map(function ($doc) {
+        $documents = $query->get()->map(function ($doc) use ($request) {
+            $linkedInvoices = $doc->invoices;
+            $linkedInvoicesCount = $linkedInvoices->count();
+            $currentInvoiceId = $request->current_invoice_id;
+
             return [
                 'id' => $doc->id,
                 'document_number' => $doc->document_number,
@@ -456,6 +483,9 @@ class InvoiceController extends Controller
                 'cur_loc' => $doc->cur_loc,
                 'remarks' => $doc->remarks,
                 'status' => $doc->status,
+                'linked_invoices_count' => $linkedInvoicesCount,
+                'linked_invoices_list' => $linkedInvoices->take(3)->pluck('invoice_number')->toArray(),
+                'is_linked_to_current' => $currentInvoiceId ? $linkedInvoices->contains('id', $currentInvoiceId) : false,
             ];
         });
 

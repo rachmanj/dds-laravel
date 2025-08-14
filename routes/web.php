@@ -42,6 +42,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     // Include Invoice Routes
     require __DIR__ . '/invoice.php';
 
+    // Include Distribution Routes
+    require __DIR__ . '/distributions.php';
+
     // Include Admin Routes
     require __DIR__ . '/admin.php';
 });

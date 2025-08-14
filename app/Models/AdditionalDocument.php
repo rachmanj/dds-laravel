@@ -20,6 +20,7 @@ class AdditionalDocument extends Model
         'remarks',
         'flag',
         'status',
+        'distribution_status',
         'cur_loc',
         'ito_creator',
         'grpo_no',
@@ -110,10 +111,42 @@ class AdditionalDocument extends Model
     }
 
     /**
+     * Scope a query to only include documents available for distribution.
+     */
+    public function scopeAvailableForDistribution($query)
+    {
+        return $query->where('distribution_status', 'available');
+    }
+
+    /**
+     * Scope a query to only include documents currently in transit.
+     */
+    public function scopeInTransit($query)
+    {
+        return $query->where('distribution_status', 'in_transit');
+    }
+
+    /**
+     * Scope a query to only include distributed documents.
+     */
+    public function scopeDistributed($query)
+    {
+        return $query->where('distribution_status', 'distributed');
+    }
+
+    /**
      * Invoices linked to this additional document.
      */
     public function invoices(): BelongsToMany
     {
         return $this->belongsToMany(Invoice::class, 'additional_document_invoice')->withTimestamps();
+    }
+
+    /**
+     * Distributions that include this additional document.
+     */
+    public function distributions(): BelongsToMany
+    {
+        return $this->morphedByMany(Distribution::class, 'document', 'distribution_documents', 'document_id', 'distribution_id');
     }
 }

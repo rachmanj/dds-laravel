@@ -5,36 +5,38 @@
 @endsection
 
 @section('breadcrumb_title')
-    invoices
+    <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('invoices.index') }}">Invoices</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a></li>
+    <li class="breadcrumb-item active">Edit</li>
 @endsection
 
 @section('styles')
     <!-- Select2 -->
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+
+    <style>
+        .linked-invoices-badge {
+            cursor: help;
+        }
+
+        .linked-invoices-badge.badge-success {
+            background-color: #28a745;
+        }
+
+        .linked-invoices-badge.badge-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .linked-invoices-badge.badge-info {
+            background-color: #17a2b8;
+        }
+    </style>
 @endsection
 
 @section('content')
-    <!-- Content Header (Page header) -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">Edit Invoice</h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="{{ route('invoices.index') }}">Invoices</a></li>
-                        <li class="breadcrumb-item"><a
-                                href="{{ route('invoices.show', $invoice) }}">{{ $invoice->invoice_number }}</a></li>
-                        <li class="breadcrumb-item active">Edit</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <section class="content">
         <div class="container-fluid">
             <div class="row">
@@ -42,6 +44,9 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Edit Invoice: {{ $invoice->invoice_number }}</h3>
+                            <a href="{{ route('invoices.index') }}" class="btn btn-sm btn-info float-right">
+                                <i class="fas fa-arrow-left"></i> Back to List
+                            </a>
                         </div>
                         <form action="{{ route('invoices.update', $invoice) }}" method="POST">
                             @csrf
@@ -358,8 +363,7 @@
                                 </div>
 
                                 <!-- Link Additional Documents (optional) -->
-                                <div class="card card-outline card-secondary mt-3" id="additional-docs-card"
-                                    style="display:none;">
+                                <div class="card card-outline card-secondary mt-3" id="additional-docs-card">
                                     <div class="card-header">
                                         <h3 class="card-title">Link Additional Documents (optional)</h3>
                                         <div class="card-tools">
@@ -383,6 +387,7 @@
                                                         <th>PO No</th>
                                                         <th>Current Location</th>
                                                         <th>Remarks</th>
+                                                        <th>Linked Invoices</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody></tbody>
@@ -421,9 +426,7 @@
                                 <a href="{{ route('invoices.show', $invoice) }}" class="btn btn-secondary">
                                     <i class="fas fa-eye"></i> View Invoice
                                 </a>
-                                <a href="{{ route('invoices.index') }}" class="btn btn-info">
-                                    <i class="fas fa-arrow-left"></i> Back to List
-                                </a>
+
                             </div>
                         </form>
                     </div>
@@ -816,7 +819,8 @@
 
             // Preload existing selections from server-rendered data if available
             @if (isset($invoice))
-                @php$preselected = $invoice->additionalDocuments
+                @php
+                    $preselected = $invoice->additionalDocuments
                         ? $invoice->additionalDocuments
                             ->map(function ($d) {
                                 return [
@@ -830,7 +834,8 @@
                                 ];
                             })
                             ->toArray()
-                    : []; @endphp
+                        : [];
+                @endphp
                 var preselected = @json($preselected ?? []);
                 preselected.forEach(function(doc) {
                     selectedDocs[doc.id] = doc;
@@ -870,7 +875,41 @@
                 var tbody = $('#additional-docs-table tbody');
                 tbody.empty();
                 docs.forEach(function(doc) {
+                    // Pre-check if document is already linked to current invoice
+                    if (doc.is_linked_to_current && !selectedDocs[doc.id]) {
+                        selectedDocs[doc.id] = {
+                            id: doc.id,
+                            document_number: doc.document_number,
+                            type_name: doc.type_name,
+                            document_date: doc.document_date,
+                            po_no: doc.po_no,
+                            cur_loc: doc.cur_loc,
+                            remarks: doc.remarks
+                        };
+                    }
+
                     var checked = selectedDocs[doc.id] ? 'checked' : '';
+
+                    // Build linked invoices display
+                    var linkedInvoicesHtml = '';
+                    if (doc.linked_invoices_count > 0) {
+                        var badgeClass = doc.linked_invoices_count > 1 ? 'badge-warning' : 'badge-info';
+                        var tooltipText = 'Linked to: ' + doc.linked_invoices_list.join(', ');
+
+                        // Check if this document is already linked to current invoice
+                        if (doc.is_linked_to_current) {
+                            badgeClass = 'badge-success';
+                            tooltipText += ' (including current invoice: {{ $invoice->invoice_number }})';
+                        }
+
+                        linkedInvoicesHtml = '<span class="badge linked-invoices-badge ' + badgeClass +
+                            '" data-toggle="tooltip" title="' + tooltipText + '">' +
+                            doc.linked_invoices_count + ' invoice' + (doc.linked_invoices_count > 1 ? 's' : '') +
+                            '</span>';
+                    } else {
+                        linkedInvoicesHtml = '<span class="text-muted">None</span>';
+                    }
+
                     var row = '<tr data-id="' + doc.id + '">' +
                         '<td><input type="checkbox" class="doc-checkbox" data-id="' + doc.id + '" ' + checked +
                         '></td>' +
@@ -880,9 +919,14 @@
                         '<td>' + (doc.po_no || '-') + '</td>' +
                         '<td><span class="badge badge-secondary">' + (doc.cur_loc || '-') + '</span></td>' +
                         '<td>' + (doc.remarks || '') + '</td>' +
+                        '<td>' + linkedInvoicesHtml + '</td>' +
                         '</tr>';
                     tbody.append(row);
                 });
+
+                // Initialize tooltips for the new badges
+                $('[data-toggle="tooltip"]').tooltip();
+
                 $('#additional-docs-table-wrapper').toggle(docs.length > 0);
                 $('#additional-docs-empty').toggle(docs.length === 0);
                 $('#additional-docs-card').show();
@@ -904,7 +948,8 @@
                     type: 'POST',
                     data: {
                         _token: '{{ csrf_token() }}',
-                        po_no: po
+                        po_no: po,
+                        current_invoice_id: {{ $invoice->id }} // Current invoice being edited
                     },
                     success: function(resp) {
                         $('#additional-docs-loading').hide();
@@ -921,7 +966,7 @@
                     error: function() {
                         $('#additional-docs-loading').hide();
                         if (typeof toastr !== 'undefined') toastr.error(
-                        'Failed to search additional documents');
+                            'Failed to search additional documents');
                     }
                 });
             }
@@ -942,6 +987,16 @@
                 var id = $(this).data('id');
                 var row = $(this).closest('tr');
                 if (this.checked) {
+                    // Check if document is already linked to other invoices
+                    var linkedInvoicesCell = row.find('td').eq(7); // Linked Invoices column
+                    var linkedBadge = linkedInvoicesCell.find('.badge');
+                    if (linkedBadge.length > 0 && !linkedBadge.hasClass('badge-success')) {
+                        var count = parseInt(linkedBadge.text().match(/\d+/)[0]);
+                        if (count > 0 && typeof toastr !== 'undefined') {
+                            toastr.warning('This document is already linked to ' + count + ' other invoice(s).');
+                        }
+                    }
+
                     var data = {
                         id: id,
                         document_number: row.find('td').eq(1).text(),

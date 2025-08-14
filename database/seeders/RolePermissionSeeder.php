@@ -104,6 +104,10 @@ class RolePermissionSeeder extends Seeder
             'create-suppliers',
             'edit-suppliers',
             'delete-suppliers',
+            'view-distributions',
+            'create-distributions',
+            'edit-distributions',
+            'delete-distributions',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);
@@ -112,6 +116,10 @@ class RolePermissionSeeder extends Seeder
             'create-additional-documents',
             'edit-additional-documents',
             'delete-additional-documents',
+            'view-distributions',
+            'create-distributions',
+            'edit-distributions',
+            'delete-distributions',
         ]);
 
         $accounting = Role::firstOrCreate(['name' => 'accounting']);
@@ -132,6 +140,10 @@ class RolePermissionSeeder extends Seeder
             'create-suppliers',
             'edit-suppliers',
             'delete-suppliers',
+            'view-distributions',
+            'create-distributions',
+            'edit-distributions',
+            'delete-distributions',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance']);
@@ -152,6 +164,10 @@ class RolePermissionSeeder extends Seeder
             'create-suppliers',
             'edit-suppliers',
             'delete-suppliers',
+            'view-distributions',
+            'create-distributions',
+            'edit-distributions',
+            'delete-distributions',
         ]);
 
         Role::firstOrCreate(['name' => 'user']);

@@ -17,8 +17,10 @@
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/toastr/toastr.min.css') }}">
     <!-- Bootstrap Switch -->
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/bootstrap-switch/css/bootstrap4-switch.min.css') }}">
-    <!-- Date Range Picker -->
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/daterangepicker/daterangepicker.css') }}">
+    <!-- Select2 -->
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+
 
     <style>
         /* Start search card in collapsed state */
@@ -28,6 +30,24 @@
 
         .search-card.collapsed .card-body {
             display: block;
+        }
+
+        /* Days column badge styling */
+        .badge.badge-success {
+            background-color: #28a745;
+        }
+
+        .badge.badge-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .badge.badge-danger {
+            background-color: #dc3545;
+        }
+
+        .badge.badge-info {
+            background-color: #17a2b8;
         }
     </style>
 @endsection
@@ -74,6 +94,18 @@
                                                 </div>
                                                 <div class="col-md-2">
                                                     <div class="form-group">
+                                                        <label for="search_supplier">Supplier</label>
+                                                        <select class="form-control select2bs4" id="search_supplier">
+                                                            <option value="">All Suppliers</option>
+                                                            @foreach ($suppliers as $supplier)
+                                                                <option value="{{ $supplier->name }}">
+                                                                    {{ $supplier->name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <div class="form-group">
                                                         <label for="search_po_no">PO Number</label>
                                                         <input type="text" class="form-control" id="search_po_no"
                                                             placeholder="Search by PO number">
@@ -107,9 +139,14 @@
                                                 </div>
                                                 <div class="col-md-2">
                                                     <div class="form-group">
-                                                        <label for="search_date_range">Date Range</label>
-                                                        <input type="text" class="form-control" id="search_date_range"
-                                                            placeholder="Select date range">
+                                                        <label for="search_invoice_project">Invoice Project</label>
+                                                        <select class="form-control" id="search_invoice_project">
+                                                            <option value="">All Projects</option>
+                                                            @foreach ($projects as $project)
+                                                                <option value="{{ $project->code }}">
+                                                                    {{ $project->code }} - {{ $project->name }}</option>
+                                                            @endforeach
+                                                        </select>
                                                     </div>
                                                 </div>
                                             </div>
@@ -144,6 +181,7 @@
                             <table id="invoices-table" class="table table-bordered table-striped">
                                 <thead>
                                     <tr>
+                                        <th style="width: 50px;">#</th>
                                         <th>Invoice #</th>
                                         <th>Supplier</th>
                                         <th>Type</th>
@@ -152,8 +190,7 @@
                                         <th>PO Number</th>
                                         <th>Amount</th>
                                         <th>Status</th>
-                                        <th>Attachments</th>
-                                        <th>Created By</th>
+                                        <th>Days</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -181,9 +218,8 @@
     <script src="{{ asset('adminlte/plugins/toastr/toastr.min.js') }}"></script>
     <!-- Bootstrap Switch -->
     <script src="{{ asset('adminlte/plugins/bootstrap-switch/js/bootstrap-switch.min.js') }}"></script>
-    <!-- Date Range Picker -->
-    <script src="{{ asset('adminlte/plugins/moment/moment.min.js') }}"></script>
-    <script src="{{ asset('adminlte/plugins/daterangepicker/daterangepicker.js') }}"></script>
+    <!-- Select2 -->
+    <script src="{{ asset('adminlte/plugins/select2/js/select2.full.min.js') }}"></script>
 
     <script>
         $(document).ready(function() {
@@ -232,22 +268,12 @@
                 $(this).bootstrapSwitch();
             });
 
-            // Initialize Date Range Picker
-            $('#search_date_range').daterangepicker({
-                locale: {
-                    format: 'DD/MM/YYYY'
-                },
-                autoUpdateInput: false
-            });
-
-            // Handle date range picker events
-            $('#search_date_range').on('apply.daterangepicker', function(ev, picker) {
-                $(this).val(picker.startDate.format('DD/MM/YYYY') + ' - ' + picker.endDate.format(
-                    'DD/MM/YYYY'));
-            });
-
-            $('#search_date_range').on('cancel.daterangepicker', function(ev, picker) {
-                $(this).val('');
+            // Initialize Select2 for supplier search
+            $('#search_supplier').select2({
+                theme: 'bootstrap4',
+                placeholder: 'All Suppliers',
+                allowClear: true,
+                width: '100%'
             });
 
             // Initialize DataTable
@@ -258,9 +284,21 @@
                     url: '{{ route('invoices.data') }}',
                     data: function(d) {
                         d.show_all = $('#show_all_records').is(':checked') ? 1 : 0;
+                        d.search_supplier = $('#search_supplier').val();
+                        d.search_invoice_project = $('#search_invoice_project').val();
                     }
                 },
                 columns: [{
+                        data: null,
+                        name: 'index',
+                        orderable: false,
+                        searchable: false,
+                        width: '50px',
+                        render: function(data, type, row, meta) {
+                            return meta.row + meta.settings._iDisplayStart + 1;
+                        }
+                    },
+                    {
                         data: 'invoice_number',
                         name: 'invoice_number'
                     },
@@ -293,12 +331,8 @@
                         name: 'status'
                     },
                     {
-                        data: 'attachment_count',
-                        name: 'attachments'
-                    },
-                    {
-                        data: 'creator_name',
-                        name: 'creator_name'
+                        data: 'days_difference',
+                        name: 'days_difference'
                     },
                     {
                         data: 'actions',
@@ -316,16 +350,17 @@
 
             // Apply search
             $('#apply_search').click(function() {
-                table.draw();
+                table.ajax.reload();
             });
 
             // Clear search
             $('#clear_search').click(function() {
                 $('#search_invoice_number').val('');
+                $('#search_supplier').val('').trigger('change');
                 $('#search_po_no').val('');
                 $('#search_type').val('');
                 $('#search_status').val('');
-                $('#search_date_range').val('');
+                $('#search_invoice_project').val('');
                 $('#show_all_records').bootstrapSwitch('state', false);
                 table.search('').columns().search('').draw();
             });
@@ -333,48 +368,38 @@
             // Custom search functionality
             $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
                 var invoiceNumber = $('#search_invoice_number').val().toLowerCase();
-                var fakturNo = $('#search_faktur_no').val().toLowerCase();
+                var supplier = $('#search_supplier').val().toLowerCase();
                 var poNo = $('#search_po_no').val().toLowerCase();
                 var type = $('#search_type').val();
                 var status = $('#search_status').val();
-                var dateRange = $('#search_date_range').val();
+                var invoiceProject = $('#search_invoice_project').val();
 
-                // Invoice number filter
-                if (invoiceNumber && data[0].toLowerCase().indexOf(invoiceNumber) === -1) {
+                // Invoice number filter (now at index 1 due to index column)
+                if (invoiceNumber && data[1].toLowerCase().indexOf(invoiceNumber) === -1) {
                     return false;
                 }
 
-                // Faktur number filter
-                if (fakturNo && data[1].toLowerCase().indexOf(fakturNo) === -1) {
+                // Supplier filter (now at index 2 due to index column)
+                if (supplier && data[2].toLowerCase().indexOf(supplier) === -1) {
                     return false;
                 }
 
-                // PO Number filter
-                if (poNo && data[5].toLowerCase().indexOf(poNo) === -1) {
+                // PO Number filter (now at index 6 due to index column)
+                if (poNo && data[6].toLowerCase().indexOf(poNo) === -1) {
                     return false;
                 }
 
-                // Type filter
+                // Type filter (now at index 3 due to index column)
                 if (type && data[3] !== type) {
                     return false;
                 }
 
-                // Status filter
+                // Status filter (now at index 8 due to index column)
                 if (status && data[8].indexOf(status) === -1) {
                     return false;
                 }
 
-                // Date range filter
-                if (dateRange) {
-                    var dates = dateRange.split(' - ');
-                    var startDate = moment(dates[0], 'DD/MM/YYYY');
-                    var endDate = moment(dates[1], 'DD/MM/YYYY');
-                    var invoiceDate = moment(data[4], 'DD/MM/YYYY');
 
-                    if (!invoiceDate.isBetween(startDate, endDate, 'day', '[]')) {
-                        return false;
-                    }
-                }
 
                 return true;
             });

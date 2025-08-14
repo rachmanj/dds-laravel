@@ -5,7 +5,10 @@
 @endsection
 
 @section('breadcrumb_title')
-    additional-documents / create
+    <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('additional-documents.index') }}">Additional
+            Documents</a></li>
+    <li class="breadcrumb-item active">Create</li>
 @endsection
 
 @section('styles')
@@ -15,25 +18,6 @@
 @endsection
 
 @section('content')
-    <!-- Content Header (Page header) -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">Create Additional Document</h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="{{ route('additional-documents.index') }}">Additional
-                                Documents</a></li>
-                        <li class="breadcrumb-item active">Create</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Main content -->
     <section class="content">
         <div class="container-fluid">
@@ -53,7 +37,7 @@
                             @csrf
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="form-group">
                                             <label for="type_id">Document Type <span class="text-danger">*</span></label>
                                             <select class="form-control select2bs4 @error('type_id') is-invalid @enderror"
@@ -71,7 +55,7 @@
                                             @enderror
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="form-group">
                                             <label for="document_number">Document Number <span
                                                     class="text-danger">*</span></label>
@@ -84,10 +68,20 @@
                                             @enderror
                                         </div>
                                     </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="po_no">PO Number</label>
+                                            <input type="text" class="form-control @error('po_no') is-invalid @enderror"
+                                                id="po_no" name="po_no" value="{{ old('po_no') }}" maxlength="50">
+                                            @error('po_no')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="form-group">
                                             <label for="document_date">Document Date <span
                                                     class="text-danger">*</span></label>
@@ -100,7 +94,7 @@
                                             @enderror
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="form-group">
                                             <label for="receive_date">Receive Date <span
                                                     class="text-danger">*</span></label>
@@ -113,20 +107,7 @@
                                             @enderror
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label for="po_no">PO Number</label>
-                                            <input type="text" class="form-control @error('po_no') is-invalid @enderror"
-                                                id="po_no" name="po_no" value="{{ old('po_no') }}" maxlength="50">
-                                            @error('po_no')
-                                                <div class="invalid-feedback">{{ $message }}</div>
-                                            @enderror
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="form-group">
                                             <label for="cur_loc">Current Location</label>
                                             <input type="text" class="form-control" id="cur_loc"

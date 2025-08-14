@@ -5,7 +5,8 @@
 @endsection
 
 @section('breadcrumb_title')
-    additional-documents
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">Additional Documents</li>
 @endsection
 
 @section('styles')
@@ -49,153 +50,136 @@
 @endsection
 
 @section('content')
-    <div class="content-wrapper">
-        <div class="content-header">
-            <div class="container-fluid">
-                <div class="row mb-2">
-                    <div class="col-sm-6">
-                        <h1 class="m-0">Additional Documents Management</h1>
+    <section class="content">
+        <div class="container-fluid">
+            <!-- Search and Filter Card -->
+            <div class="card search-card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-search"></i> Search & Filter
+                    </h3>
+                    <div class="card-tools">
+                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                            <i class="fas fa-plus"></i>
+                        </button>
                     </div>
-                    <div class="col-sm-6">
-                        <ol class="breadcrumb float-sm-right">
-                            <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
-                            <li class="breadcrumb-item active">Additional Documents</li>
-                        </ol>
+                </div>
+                <div class="card-body" style="display: none;">
+                    <form id="search-form">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="search_number">Document Number</label>
+                                    <input type="text" class="form-control" id="search_number" name="search_number"
+                                        placeholder="Search by document number">
+                                </div>
+                            </div>
+                            {{-- <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="search_project">Project</label>
+                                    <input type="text" class="form-control" id="search_project" name="search_project"
+                                        placeholder="Search by project">
+                                </div>
+                            </div> --}}
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="filter_type">Document Type</label>
+                                    <select class="form-control" id="filter_type" name="filter_type">
+                                        <option value="">All Types</option>
+                                        @foreach ($documentTypes as $type)
+                                            <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="filter_status">Status</label>
+                                    <select class="form-control" id="filter_status" name="filter_status">
+                                        <option value="">All Statuses</option>
+                                        <option value="open">Open</option>
+                                        <option value="closed">Closed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="date_range">Date Range</label>
+                                    <input type="text" class="form-control" id="date_range" name="date_range"
+                                        placeholder="Select date range">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="show_all_records">Show All Records</label>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="show_all_records">
+                                        <label class="custom-control-label" for="show_all_records">Include
+                                            completed/rejected</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>&nbsp;</label>
+                                    <div class="d-flex">
+                                        <button type="submit" class="btn btn-primary mr-2">
+                                            <i class="fas fa-search"></i> Search
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" id="reset-search">
+                                            <i class="fas fa-undo"></i> Reset
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Main Content Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-file-alt"></i> Additional Documents
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{{ route('additional-documents.create') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Add New Document
+                        </a>
+                        <a href="{{ route('additional-documents.import') }}" class="btn btn-success btn-sm">
+                            <i class="fas fa-upload"></i> Import Documents
+                        </a>
+                        {{-- <a href="{{ route('additional-documents.download-template') }}" class="btn btn-info btn-sm">
+                            <i class="fas fa-download"></i> Download Template
+                        </a> --}}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="documents-table" class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Document Number</th>
+                                    {{-- <th>Project</th> --}}
+                                    <th>Type</th>
+                                    <th>Current Location</th>
+                                    <th>Status</th>
+                                    <th>Created By</th>
+                                    <th>Created Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
-
-        <section class="content">
-            <div class="container-fluid">
-                <!-- Search and Filter Card -->
-                <div class="card search-card">
-                    <div class="card-header">
-                        <h3 class="card-title">
-                            <i class="fas fa-search"></i> Search & Filter
-                        </h3>
-                        <div class="card-tools">
-                            <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body" style="display: none;">
-                        <form id="search-form">
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="search_number">Document Number</label>
-                                        <input type="text" class="form-control" id="search_number" name="search_number"
-                                            placeholder="Search by document number">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="search_project">Project</label>
-                                        <input type="text" class="form-control" id="search_project" name="search_project"
-                                            placeholder="Search by project">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="filter_type">Document Type</label>
-                                        <select class="form-control" id="filter_type" name="filter_type">
-                                            <option value="">All Types</option>
-                                            @foreach ($documentTypes as $type)
-                                                <option value="{{ $type->id }}">{{ $type->type_name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="filter_status">Status</label>
-                                        <select class="form-control" id="filter_status" name="filter_status">
-                                            <option value="">All Statuses</option>
-                                            <option value="open">Open</option>
-                                            <option value="closed">Closed</option>
-                                            <option value="cancelled">Cancelled</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="date_range">Date Range</label>
-                                        <input type="text" class="form-control" id="date_range" name="date_range"
-                                            placeholder="Select date range">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="show_all_records">Show All Records</label>
-                                        <div class="custom-control custom-switch">
-                                            <input type="checkbox" class="custom-control-input" id="show_all_records">
-                                            <label class="custom-control-label" for="show_all_records">Include
-                                                completed/rejected</label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label>&nbsp;</label>
-                                        <div class="d-flex">
-                                            <button type="submit" class="btn btn-primary mr-2">
-                                                <i class="fas fa-search"></i> Search
-                                            </button>
-                                            <button type="button" class="btn btn-secondary" id="reset-search">
-                                                <i class="fas fa-undo"></i> Reset
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Main Content Card -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">
-                            <i class="fas fa-file-alt"></i> Additional Documents
-                        </h3>
-                        <div class="card-tools">
-                            <a href="{{ route('additional-documents.create') }}" class="btn btn-primary btn-sm">
-                                <i class="fas fa-plus"></i> Add New Document
-                            </a>
-                            <a href="{{ route('additional-documents.import') }}" class="btn btn-success btn-sm">
-                                <i class="fas fa-upload"></i> Import Documents
-                            </a>
-                            <a href="{{ route('additional-documents.download-template') }}" class="btn btn-info btn-sm">
-                                <i class="fas fa-download"></i> Download Template
-                            </a>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table id="documents-table" class="table table-bordered table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>No</th>
-                                        <th>Document Number</th>
-                                        <th>Project</th>
-                                        <th>Type</th>
-                                        <th>Current Location</th>
-                                        <th>Status</th>
-                                        <th>Created By</th>
-                                        <th>Created Date</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+    </section>
     </div>
 @endsection
 
@@ -254,10 +238,10 @@
                         data: 'document_number',
                         name: 'document_number'
                     },
-                    {
-                        data: 'project',
-                        name: 'project'
-                    },
+                    // {
+                    //     data: 'project',
+                    //     name: 'project'
+                    // },
                     {
                         data: 'type.type_name',
                         name: 'type.type_name'

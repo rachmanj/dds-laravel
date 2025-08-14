@@ -1,0 +1,1299 @@
+@extends('layouts.main')
+
+@section('title_page', 'Distribution Details')
+@section('breadcrumb_title', 'Distribution Details')
+
+@section('content')
+    <div class="row">
+        <div class="col-12">
+            <!-- Distribution Header -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-share-alt"></i>
+                        Distribution: {{ $distribution->distribution_number }}
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{{ route('distributions.index') }}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back to List
+                        </a>
+                        @if ($distribution->status === 'draft')
+                            @can('edit-distributions')
+                                <a href="{{ route('distributions.edit', $distribution) }}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                            @endcan
+                            @can('delete-distributions')
+                                <button type="button" class="btn btn-danger btn-sm delete-distribution"
+                                    data-id="{{ $distribution->id }}" data-number="{{ $distribution->distribution_number }}">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            @endcan
+                        @else
+                            @role('superadmin|admin')
+                                <button type="button" class="btn btn-danger btn-sm cancel-distribution"
+                                    data-id="{{ $distribution->id }}" data-number="{{ $distribution->distribution_number }}"
+                                    title="Only admins can cancel non-draft distributions">
+                                    <i class="fas fa-ban"></i> Cancel
+                                </button>
+                            @endrole
+                        @endif
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td width="150"><strong>Distribution Number:</strong></td>
+                                    <td>{{ $distribution->distribution_number }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Type:</strong></td>
+                                    <td>
+                                        <span class="badge badge-info">{{ $distribution->type->name }}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Origin Department:</strong></td>
+                                    <td>{{ $distribution->originDepartment->name }}
+                                        ({{ $distribution->originDepartment->location_code }})</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Destination Department:</strong></td>
+                                    <td>{{ $distribution->destinationDepartment->name }}
+                                        ({{ $distribution->destinationDepartment->location_code }})</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Document Type:</strong></td>
+                                    <td>{{ ucwords(str_replace('_', ' ', $distribution->document_type)) }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td width="150"><strong>Status:</strong></td>
+                                    <td>
+                                        <span class="badge {{ $distribution->status_badge_class }} badge-lg">
+                                            {{ $distribution->status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Created:</strong></td>
+                                    <td>{{ $distribution->created_at->format('d-M-Y H:i') }} by
+                                        {{ $distribution->creator->name }}</td>
+                                </tr>
+                                @if ($distribution->sender_verified_at)
+                                    <tr>
+                                        <td><strong>Sender Verified:</strong></td>
+                                        <td>{{ $distribution->sender_verified_at->format('d-M-Y H:i') }} by
+                                            {{ $distribution->senderVerifier->name }}</td>
+                                    </tr>
+                                @endif
+                                @if ($distribution->sent_at)
+                                    <tr>
+                                        <td><strong>Sent:</strong></td>
+                                        <td>{{ $distribution->sent_at->format('d-M-Y H:i') }}</td>
+                                    </tr>
+                                @endif
+                                @if ($distribution->received_at)
+                                    <tr>
+                                        <td><strong>Received:</strong></td>
+                                        <td>{{ $distribution->received_at->format('d-M-Y H:i') }}</td>
+                                    </tr>
+                                @endif
+                                @if ($distribution->receiver_verified_at)
+                                    <tr>
+                                        <td><strong>Receiver Verified:</strong></td>
+                                        <td>{{ $distribution->receiver_verified_at->format('d-M-Y H:i') }} by
+                                            {{ $distribution->receiverVerifier->name }}</td>
+                                    </tr>
+                                @endif
+                            </table>
+                        </div>
+                    </div>
+
+                    @if ($distribution->notes)
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <strong>Notes:</strong> {{ $distribution->notes }}
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Workflow Progress -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-project-diagram"></i> Workflow Progress
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="workflow-progress">
+                        <div class="row">
+                            <div class="col-md-2 text-center">
+                                <div
+                                    class="workflow-step {{ $distribution->status === 'draft' ? 'active' : ($distribution->status !== 'draft' ? 'completed' : '') }}">
+                                    <div class="step-icon">
+                                        <i class="fas fa-edit"></i>
+                                    </div>
+                                    <div class="step-label">Draft</div>
+                                    @if ($distribution->status !== 'draft')
+                                        <small class="text-muted">{{ $distribution->created_at->format('d-M') }}</small>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <div
+                                    class="workflow-step {{ $distribution->status === 'verified_by_sender' ? 'active' : (in_array($distribution->status, ['verified_by_sender', 'sent', 'received', 'verified_by_receiver', 'completed']) ? 'completed' : '') }}">
+                                    <div class="step-icon">
+                                        <i class="fas fa-check-circle"></i>
+                                    </div>
+                                    <div class="step-label">Sender Verified</div>
+                                    @if ($distribution->sender_verified_at)
+                                        <small
+                                            class="text-muted">{{ $distribution->sender_verified_at->format('d-M') }}</small>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <div
+                                    class="workflow-step {{ $distribution->status === 'sent' ? 'active' : (in_array($distribution->status, ['sent', 'received', 'verified_by_receiver', 'completed']) ? 'completed' : '') }}">
+                                    <div class="step-icon">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </div>
+                                    <div class="step-label">Sent</div>
+                                    @if ($distribution->sent_at)
+                                        <small class="text-muted">{{ $distribution->sent_at->format('d-M') }}</small>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <div
+                                    class="workflow-step {{ $distribution->status === 'received' ? 'active' : (in_array($distribution->status, ['received', 'verified_by_receiver', 'completed']) ? 'completed' : '') }}">
+                                    <div class="step-icon">
+                                        <i class="fas fa-download"></i>
+                                    </div>
+                                    <div class="step-label">Received</div>
+                                    @if ($distribution->received_at)
+                                        <small class="text-muted">{{ $distribution->received_at->format('d-M') }}</small>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <div
+                                    class="workflow-step {{ $distribution->status === 'verified_by_receiver' ? 'active' : ($distribution->status === 'completed' ? 'completed' : '') }}">
+                                    <div class="step-icon">
+                                        <i class="fas fa-clipboard-check"></i>
+                                    </div>
+                                    <div class="step-label">Receiver Verified</div>
+                                    @if ($distribution->receiver_verified_at)
+                                        <small
+                                            class="text-muted">{{ $distribution->receiver_verified_at->format('d-M') }}</small>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <div class="workflow-step {{ $distribution->status === 'completed' ? 'active' : '' }}">
+                                    <div class="step-icon">
+                                        <i class="fas fa-flag-checkered"></i>
+                                    </div>
+                                    <div class="step-label">Completed</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Actions -->
+            @if ($distribution->status !== 'completed')
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">
+                            <i class="fas fa-cogs"></i> Workflow Actions
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            @if ($distribution->canVerifyBySender())
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h5>Sender Verification</h5>
+                                            <p class="text-muted">Verify documents before sending</p>
+                                            <button type="button" class="btn btn-primary" data-toggle="modal"
+                                                data-target="#senderVerificationModal">
+                                                <i class="fas fa-check-circle"></i> Verify as Sender
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if ($distribution->canSend())
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h5>Send Distribution</h5>
+                                            <p class="text-muted">Mark distribution as sent</p>
+                                            <button type="button" class="btn btn-warning" data-toggle="modal"
+                                                data-target="#sendModal">
+                                                <i class="fas fa-paper-plane"></i> Send
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if ($distribution->canReceive())
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h5>Receive Distribution</h5>
+                                            <p class="text-muted">Confirm receipt of documents</p>
+                                            <button type="button" class="btn btn-info" data-toggle="modal"
+                                                data-target="#receiveModal">
+                                                <i class="fas fa-download"></i> Receive
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if ($distribution->canVerifyByReceiver())
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h5>Receiver Verification</h5>
+                                            <p class="text-muted">Verify received documents</p>
+                                            <button type="button" class="btn btn-success" data-toggle="modal"
+                                                data-target="#receiverVerificationModal">
+                                                <i class="fas fa-clipboard-check"></i> Verify as Receiver
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if ($distribution->canComplete())
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h5>Complete Distribution</h5>
+                                            <p class="text-muted">Mark distribution as completed</p>
+                                            <button type="button" class="btn btn-success" data-toggle="modal"
+                                                data-target="#completeModal">
+                                                <i class="fas fa-flag-checkered"></i> Complete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            <!-- Documents -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-file-alt"></i> Distributed Documents
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Type</th>
+                                    <th>Sender Verification</th>
+                                    <th>Receiver Verification</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($distribution->documents as $doc)
+                                    <tr>
+                                        <td>
+                                            <strong>{{ $doc->document->document_number ?? ($doc->document->invoice_number ?? 'N/A') }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ class_basename($doc->document_type) }}</small>
+                                        </td>
+                                        <td>
+                                            @if ($doc->document_type === 'App\Models\Invoice')
+                                                Invoice
+                                            @else
+                                                Additional Document
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($doc->sender_verified)
+                                                <span class="badge badge-success">
+                                                    {{ ucfirst($doc->sender_verification_status) }}
+                                                </span>
+                                                @if ($doc->sender_verification_notes)
+                                                    <br><small
+                                                        class="text-muted">{{ $doc->sender_verification_notes }}</small>
+                                                @endif
+                                            @else
+                                                <span class="badge badge-secondary">Pending</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($doc->receiver_verified)
+                                                <span class="badge badge-success">
+                                                    {{ ucfirst($doc->receiver_verification_status) }}
+                                                </span>
+                                                @if ($doc->receiver_verification_notes)
+                                                    <br><small
+                                                        class="text-muted">{{ $doc->receiver_verification_notes }}</small>
+                                                @endif
+                                            @else
+                                                <span class="badge badge-secondary">Pending</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ $doc->verification_status_badge_class }}">
+                                                {{ $doc->verification_status_display }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-history"></i> Distribution History
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        @foreach ($distribution->histories as $history)
+                            <div class="timeline-item">
+                                <div class="timeline-marker">
+                                    <i class="fas fa-circle"></i>
+                                </div>
+                                <div class="timeline-content">
+                                    <div class="timeline-header">
+                                        <strong>{{ $history->action_display }}</strong>
+                                        <small class="text-muted float-right">{{ $history->time_ago }}</small>
+                                    </div>
+                                    <div class="timeline-body">
+                                        <p class="mb-1">
+                                            <strong>{{ $history->user->name }}</strong>
+                                            performed action: <em>{{ $history->action_type_display }}</em>
+                                        </p>
+                                        @if ($history->notes)
+                                            <p class="mb-0 text-muted">{{ $history->notes }}</p>
+                                        @endif
+                                        @if ($history->old_status && $history->new_status)
+                                            <p class="mb-0">
+                                                Status changed from
+                                                <span class="badge badge-secondary">{{ $history->old_status }}</span>
+                                                to
+                                                <span class="badge badge-primary">{{ $history->new_status }}</span>
+                                            </p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sender Verification Modal -->
+    <div class="modal fade" id="senderVerificationModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Sender Verification</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <form id="senderVerificationForm">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="sender_verification_notes">Verification Notes</label>
+                            <textarea class="form-control" id="sender_verification_notes" name="verification_notes" rows="3"
+                                placeholder="Optional notes about the verification"></textarea>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h6>Document Verification</h6>
+                            </div>
+                            <div class="col-md-6 text-right">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="selectAllVerified">
+                                    <i class="fas fa-check-double"></i> Select All as Verified
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="clearAll">
+                                    <i class="fas fa-times"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th width="50">
+                                            <input type="checkbox" id="selectAll" class="form-check-input">
+                                        </th>
+                                        <th>Document</th>
+                                        <th>Status</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($distribution->documents as $doc)
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" class="form-check-input document-checkbox"
+                                                    data-document-id="{{ $doc->document_id }}">
+                                            </td>
+                                            <td>
+                                                <strong>{{ $doc->document->document_number ?? ($doc->document->invoice_number ?? 'N/A') }}</strong>
+                                                <br>
+                                                <small
+                                                    class="text-muted">{{ class_basename($doc->document_type) }}</small>
+                                            </td>
+                                            <td>
+                                                <select class="form-control document-status"
+                                                    name="document_verifications[{{ $doc->document_id }}][status]"
+                                                    data-document-id="{{ $doc->document_id }}" required>
+                                                    <option value="">Select Status</option>
+                                                    <option value="verified">Verified</option>
+                                                    <option value="missing">Missing</option>
+                                                    <option value="damaged">Damaged</option>
+                                                </select>
+                                                <input type="hidden"
+                                                    name="document_verifications[{{ $doc->document_id }}][document_id]"
+                                                    value="{{ $doc->document_id }}">
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control document-notes"
+                                                    name="document_verifications[{{ $doc->document_id }}][notes]"
+                                                    placeholder="Notes required for Missing/Damaged status"
+                                                    data-document-id="{{ $doc->document_id }}">
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Verify as Sender</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Send Modal -->
+    <div class="modal fade" id="sendModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Send Distribution</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to mark this distribution as sent?</p>
+                    <p class="text-muted">This action will move the distribution to the next workflow stage.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" id="sendDistribution">Send Distribution</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receive Modal -->
+    <div class="modal fade" id="receiveModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Receive Distribution</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to mark this distribution as received?</p>
+                    <p class="text-muted">This action will update document locations and move to the next workflow stage.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info" id="receiveDistribution">Receive Distribution</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receiver Verification Modal -->
+    <div class="modal fade" id="receiverVerificationModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Receiver Verification</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <form id="receiverVerificationForm">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="receiver_verification_notes">Verification Notes</label>
+                            <textarea class="form-control" id="receiver_verification_notes" name="verification_notes" rows="3"
+                                placeholder="Optional notes about the verification"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="has_discrepancies"
+                                    name="has_discrepancies">
+                                <label class="custom-control-label" for="has_discrepancies">
+                                    Distribution has discrepancies
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h6>Document Verification</h6>
+                            </div>
+                            <div class="col-md-6 text-right">
+                                <button type="button" class="btn btn-outline-success btn-sm"
+                                    id="selectAllVerifiedReceiver">
+                                    <i class="fas fa-check-double"></i> Select All as Verified
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="clearAllReceiver">
+                                    <i class="fas fa-times"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th width="50">
+                                            <input type="checkbox" id="selectAllReceiver" class="form-check-input">
+                                        </th>
+                                        <th>Document</th>
+                                        <th>Status</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($distribution->documents as $doc)
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" class="form-check-input document-checkbox-receiver"
+                                                    data-document-id="{{ $doc->document_id }}">
+                                            </td>
+                                            <td>
+                                                <strong>{{ $doc->document->document_number ?? ($doc->document->invoice_number ?? 'N/A') }}</strong>
+                                                <br>
+                                                <small
+                                                    class="text-muted">{{ class_basename($doc->document_type) }}</small>
+                                            </td>
+                                            <td>
+                                                <select class="form-control document-status-receiver"
+                                                    name="document_verifications[{{ $doc->document_id }}][status]"
+                                                    data-document-id="{{ $doc->document_id }}" required>
+                                                    <option value="">Select Status</option>
+                                                    <option value="verified">Verified</option>
+                                                    <option value="missing">Missing</option>
+                                                    <option value="damaged">Damaged</option>
+                                                </select>
+                                                <input type="hidden"
+                                                    name="document_verifications[{{ $doc->document_id }}][document_id]"
+                                                    value="{{ $doc->document_id }}">
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control document-notes-receiver"
+                                                    name="document_verifications[{{ $doc->document_id }}][notes]"
+                                                    placeholder="Notes required for Missing/Damaged status"
+                                                    data-document-id="{{ $doc->document_id }}">
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">Verify as Receiver</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Modal -->
+    <div class="modal fade" id="completeModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Complete Distribution</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to mark this distribution as completed?</p>
+                    <p class="text-muted">This action will finalize the distribution workflow.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="completeDistribution">Complete
+                        Distribution</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('styles')
+    <style>
+        .workflow-progress {
+            padding: 20px 0;
+        }
+
+        /* Modal enhancements */
+        .modal-xl {
+            max-width: 90%;
+        }
+
+        .document-checkbox {
+            margin: 0;
+        }
+
+        .form-check-input {
+            margin-top: 0.3rem;
+        }
+
+        /* Button spacing */
+        .btn+.btn {
+            margin-left: 0.25rem;
+        }
+
+        /* Table enhancements */
+        .table th {
+            vertical-align: middle;
+        }
+
+        .table td {
+            vertical-align: middle;
+        }
+
+        .workflow-step {
+            position: relative;
+            padding: 15px 10px;
+        }
+
+        .workflow-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: -50%;
+            width: 100%;
+            height: 2px;
+            background-color: #dee2e6;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+        .workflow-step.completed:not(:last-child)::after {
+            background-color: #28a745;
+        }
+
+        .step-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #dee2e6;
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-size: 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .workflow-step.active .step-icon {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .workflow-step.completed .step-icon {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .step-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .timeline-item {
+            position: relative;
+            padding: 20px 0;
+            border-left: 2px solid #dee2e6;
+            margin-left: 20px;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            left: -11px;
+            top: 20px;
+            width: 20px;
+            height: 20px;
+            background-color: #007bff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+        }
+
+        .timeline-content {
+            margin-left: 30px;
+        }
+
+        .timeline-header {
+            margin-bottom: 10px;
+        }
+
+        .timeline-body {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+        }
+    </style>
+@endsection
+
+@section('scripts')
+    <script>
+        $(document).ready(function() {
+            // Sender Verification Modal Functionality
+            let selectedDocuments = new Set();
+
+            // Select All checkbox functionality
+            $('#selectAll').change(function() {
+                const isChecked = $(this).is(':checked');
+                $('.document-checkbox').prop('checked', isChecked);
+
+                if (isChecked) {
+                    $('.document-checkbox').each(function() {
+                        selectedDocuments.add($(this).data('document-id'));
+                    });
+                } else {
+                    selectedDocuments.clear();
+                }
+                updateSelectAllButton();
+            });
+
+            // Individual document checkbox functionality
+            $(document).on('change', '.document-checkbox', function() {
+                const documentId = $(this).data('document-id');
+                if ($(this).is(':checked')) {
+                    selectedDocuments.add(documentId);
+                } else {
+                    selectedDocuments.delete(documentId);
+                }
+
+                // Update select all checkbox state
+                const totalDocuments = $('.document-checkbox').length;
+                const checkedDocuments = selectedDocuments.size;
+                $('#selectAll').prop('checked', checkedDocuments === totalDocuments);
+                $('#selectAll').prop('indeterminate', checkedDocuments > 0 && checkedDocuments <
+                    totalDocuments);
+
+                updateSelectAllButton();
+            });
+
+            // Select All as Verified button
+            $('#selectAllVerified').click(function() {
+                $('.document-checkbox').prop('checked', true);
+                $('.document-status').val('verified');
+                $('.document-notes').val('').prop('required', false);
+
+                selectedDocuments.clear();
+                $('.document-checkbox').each(function() {
+                    selectedDocuments.add($(this).data('document-id'));
+                });
+
+                $('#selectAll').prop('checked', true);
+                updateSelectAllButton();
+            });
+
+            // Clear All button
+            $('#clearAll').click(function() {
+                $('.document-checkbox').prop('checked', false);
+                $('.document-status').val('');
+                $('.document-notes').val('').prop('required', false);
+
+                selectedDocuments.clear();
+                $('#selectAll').prop('checked', false);
+                updateSelectAllButton();
+            });
+
+            // Update Select All button text based on selection
+            function updateSelectAllButton() {
+                const selectedCount = selectedDocuments.size;
+                const totalCount = $('.document-checkbox').length;
+
+                if (selectedCount === 0) {
+                    $('#selectAllVerified').html('<i class="fas fa-check-double"></i> Select All as Verified');
+                } else if (selectedCount === totalCount) {
+                    $('#selectAllVerified').html('<i class="fas fa-check-double"></i> All Selected');
+                } else {
+                    $('#selectAllVerified').html(
+                        `<i class="fas fa-check-double"></i> ${selectedCount}/${totalCount} Selected`);
+                }
+            }
+
+            // Status change handler for notes requirement
+            $(document).on('change', '.document-status', function() {
+                const documentId = $(this).data('document-id');
+                const status = $(this).val();
+                const notesField = $(`.document-notes[data-document-id="${documentId}"]`);
+
+                if (status === 'missing' || status === 'damaged') {
+                    notesField.prop('required', true);
+                    notesField.attr('placeholder', 'Notes required for ' + status.charAt(0).toUpperCase() +
+                        status.slice(1) + ' status');
+                } else {
+                    notesField.prop('required', false);
+                    notesField.attr('placeholder', 'Optional notes');
+                }
+            });
+
+            // Sender Verification Form
+            $('#senderVerificationForm').submit(function(e) {
+                e.preventDefault();
+
+                // Validate required fields
+                let isValid = true;
+                let errorMessage = '';
+
+                // Check if at least one document is selected
+                if ($('.document-checkbox:checked').length === 0) {
+                    isValid = false;
+                    errorMessage = 'Please select at least one document to verify.';
+                }
+
+                // Check required notes for missing/damaged status
+                $('.document-status').each(function() {
+                    const status = $(this).val();
+                    const documentId = $(this).data('document-id');
+                    const notesField = $(`.document-notes[data-document-id="${documentId}"]`);
+
+                    if (status === 'missing' || status === 'damaged') {
+                        if (!notesField.val().trim()) {
+                            isValid = false;
+                            errorMessage =
+                                'Notes are required for Missing or Damaged document status.';
+                            return false; // break the loop
+                        }
+                    }
+                });
+
+                if (!isValid) {
+                    toastr.error(errorMessage);
+                    return;
+                }
+
+                // Prepare form data with only selected documents
+                const formData = new FormData();
+                formData.append('verification_notes', $('#sender_verification_notes').val());
+
+                $('.document-checkbox:checked').each(function() {
+                    const documentId = $(this).data('document-id');
+                    const status = $(`.document-status[data-document-id="${documentId}"]`).val();
+                    const notes = $(`.document-notes[data-document-id="${documentId}"]`).val();
+
+                    formData.append(`document_verifications[${documentId}][document_id]`,
+                        documentId);
+                    formData.append(`document_verifications[${documentId}][status]`, status);
+                    formData.append(`document_verifications[${documentId}][notes]`, notes);
+                });
+
+                $.ajax({
+                    url: '{{ route('distributions.verify-sender', $distribution) }}',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                        } else {
+                            toastr.error(response.message || 'Failed to verify as sender');
+                        }
+                    },
+                    error: function(xhr) {
+                        if (xhr.status === 422) {
+                            const errors = xhr.responseJSON.errors;
+                            if (errors) {
+                                let errorMsg = '';
+                                Object.keys(errors).forEach(key => {
+                                    errorMsg += errors[key][0] + '\n';
+                                });
+                                toastr.error(errorMsg);
+                            } else {
+                                toastr.error('Please fill in all required fields');
+                            }
+                        } else {
+                            toastr.error('Failed to verify as sender');
+                        }
+                    }
+                });
+            });
+
+            // Send Distribution
+            $('#sendDistribution').click(function() {
+                $.ajax({
+                    url: '{{ route('distributions.send', $distribution) }}',
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                        } else {
+                            toastr.error(response.message || 'Failed to send distribution');
+                        }
+                    },
+                    error: function(xhr) {
+                        toastr.error('Failed to send distribution');
+                    }
+                });
+                $('#sendModal').modal('hide');
+            });
+
+            // Receive Distribution
+            $('#receiveDistribution').click(function() {
+                $.ajax({
+                    url: '{{ route('distributions.receive', $distribution) }}',
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                        } else {
+                            toastr.error(response.message || 'Failed to receive distribution');
+                        }
+                    },
+                    error: function(xhr) {
+                        toastr.error('Failed to receive distribution');
+                    }
+                });
+                $('#receiveModal').modal('hide');
+            });
+
+            // Receiver Verification Modal Functionality
+            let selectedDocumentsReceiver = new Set();
+
+            // Select All checkbox functionality for receiver
+            $('#selectAllReceiver').change(function() {
+                const isChecked = $(this).is(':checked');
+                $('.document-checkbox-receiver').prop('checked', isChecked);
+
+                if (isChecked) {
+                    $('.document-checkbox-receiver').each(function() {
+                        selectedDocumentsReceiver.add($(this).data('document-id'));
+                    });
+                } else {
+                    selectedDocumentsReceiver.clear();
+                }
+                updateSelectAllReceiverButton();
+            });
+
+            // Individual document checkbox functionality for receiver
+            $(document).on('change', '.document-checkbox-receiver', function() {
+                const documentId = $(this).data('document-id');
+                if ($(this).is(':checked')) {
+                    selectedDocumentsReceiver.add(documentId);
+                } else {
+                    selectedDocumentsReceiver.delete(documentId);
+                }
+
+                // Update select all checkbox state
+                const totalDocuments = $('.document-checkbox-receiver').length;
+                const checkedDocuments = selectedDocumentsReceiver.size;
+                $('#selectAllReceiver').prop('checked', checkedDocuments === totalDocuments);
+                $('#selectAllReceiver').prop('indeterminate', checkedDocuments > 0 && checkedDocuments <
+                    totalDocuments);
+
+                updateSelectAllReceiverButton();
+            });
+
+            // Select All as Verified button for receiver
+            $('#selectAllVerifiedReceiver').click(function() {
+                $('.document-checkbox-receiver').prop('checked', true);
+                $('.document-status-receiver').val('verified');
+                $('.document-notes-receiver').val('').prop('required', false);
+
+                selectedDocumentsReceiver.clear();
+                $('.document-checkbox-receiver').each(function() {
+                    selectedDocumentsReceiver.add($(this).data('document-id'));
+                });
+
+                $('#selectAllReceiver').prop('checked', true);
+                updateSelectAllReceiverButton();
+            });
+
+            // Clear All button for receiver
+            $('#clearAllReceiver').click(function() {
+                $('.document-checkbox-receiver').prop('checked', false);
+                $('.document-status-receiver').val('');
+                $('.document-notes-receiver').val('').prop('required', false);
+
+                selectedDocumentsReceiver.clear();
+                $('#selectAllReceiver').prop('checked', false);
+                updateSelectAllReceiverButton();
+            });
+
+            // Update Select All button text based on selection for receiver
+            function updateSelectAllReceiverButton() {
+                const selectedCount = selectedDocumentsReceiver.size;
+                const totalCount = $('.document-checkbox-receiver').length;
+
+                if (selectedCount === 0) {
+                    $('#selectAllVerifiedReceiver').html(
+                        '<i class="fas fa-check-double"></i> Select All as Verified');
+                } else if (selectedCount === totalCount) {
+                    $('#selectAllVerifiedReceiver').html('<i class="fas fa-check-double"></i> All Selected');
+                } else {
+                    $('#selectAllVerifiedReceiver').html(
+                        `<i class="fas fa-check-double"></i> ${selectedCount}/${totalCount} Selected`);
+                }
+            }
+
+            // Status change handler for notes requirement in receiver modal
+            $(document).on('change', '.document-status-receiver', function() {
+                const documentId = $(this).data('document-id');
+                const status = $(this).val();
+                const notesField = $(`.document-notes-receiver[data-document-id="${documentId}"]`);
+
+                if (status === 'missing' || status === 'damaged') {
+                    notesField.prop('required', true);
+                    notesField.attr('placeholder', 'Notes required for ' + status.charAt(0).toUpperCase() +
+                        status.slice(1) + ' status');
+                } else {
+                    notesField.prop('required', false);
+                    notesField.attr('placeholder', 'Optional notes');
+                }
+            });
+
+            // Receiver Verification Form
+            $('#receiverVerificationForm').submit(function(e) {
+                e.preventDefault();
+
+                // Validate required fields
+                let isValid = true;
+                let errorMessage = '';
+
+                // Check if at least one document is selected
+                if ($('.document-checkbox-receiver:checked').length === 0) {
+                    isValid = false;
+                    errorMessage = 'Please select at least one document to verify.';
+                }
+
+                // Check required notes for missing/damaged status
+                $('.document-status-receiver').each(function() {
+                    const status = $(this).val();
+                    const documentId = $(this).data('document-id');
+                    const notesField = $(
+                        `.document-notes-receiver[data-document-id="${documentId}"]`);
+
+                    if (status === 'missing' || status === 'damaged') {
+                        if (!notesField.val().trim()) {
+                            isValid = false;
+                            errorMessage =
+                                'Notes are required for Missing or Damaged document status.';
+                            return false; // break the loop
+                        }
+                    }
+                });
+
+                if (!isValid) {
+                    toastr.error(errorMessage);
+                    return;
+                }
+
+                // Prepare form data with only selected documents
+                const formData = new FormData();
+                formData.append('verification_notes', $('#receiver_verification_notes').val());
+                formData.append('has_discrepancies', $('#has_discrepancies').is(':checked') ? '1' : '0');
+
+                $('.document-checkbox-receiver:checked').each(function() {
+                    const documentId = $(this).data('document-id');
+                    const status = $(`.document-status-receiver[data-document-id="${documentId}"]`)
+                        .val();
+                    const notes = $(`.document-notes-receiver[data-document-id="${documentId}"]`)
+                        .val();
+
+                    formData.append(`document_verifications[${documentId}][document_id]`,
+                        documentId);
+                    formData.append(`document_verifications[${documentId}][status]`, status);
+                    formData.append(`document_verifications[${documentId}][notes]`, notes);
+                });
+
+                $.ajax({
+                    url: '{{ route('distributions.verify-receiver', $distribution) }}',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                        } else {
+                            toastr.error(response.message || 'Failed to verify as receiver');
+                        }
+                    },
+                    error: function(xhr) {
+                        if (xhr.status === 422) {
+                            const errors = xhr.responseJSON.errors;
+                            if (errors) {
+                                let errorMsg = '';
+                                Object.keys(errors).forEach(key => {
+                                    errorMsg += errors[key][0] + '\n';
+                                });
+                                toastr.error(errorMsg);
+                            } else {
+                                toastr.error('Please fill in all required fields');
+                            }
+                        } else {
+                            toastr.error('Failed to verify as receiver');
+                        }
+                    }
+                });
+            });
+
+            // Complete Distribution
+            $('#completeDistribution').click(function() {
+                $.ajax({
+                    url: '{{ route('distributions.complete', $distribution) }}',
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                        } else {
+                            toastr.error(response.message || 'Failed to complete distribution');
+                        }
+                    },
+                    error: function(xhr) {
+                        toastr.error('Failed to complete distribution');
+                    }
+                });
+                $('#completeModal').modal('hide');
+            });
+
+            // Cancel Distribution (Admin only)
+            $('.cancel-distribution').click(function() {
+                const distributionId = $(this).data('id');
+                const distributionNumber = $(this).data('number');
+
+                if (confirm(
+                        `Are you sure you want to cancel distribution ${distributionNumber}? This action cannot be undone.`
+                    )) {
+                    $.ajax({
+                        url: `/distributions/${distributionId}`,
+                        type: 'DELETE',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                toastr.success(response.message);
+                                setTimeout(function() {
+                                    location.reload();
+                                }, 1000);
+                            } else {
+                                toastr.error(response.message ||
+                                    'Failed to cancel distribution');
+                            }
+                        },
+                        error: function(xhr) {
+                            if (xhr.status === 403) {
+                                toastr.error(
+                                    'You do not have permission to cancel this distribution'
+                                );
+                            } else if (xhr.status === 422) {
+                                toastr.error('This distribution cannot be cancelled');
+                            } else {
+                                toastr.error('Failed to cancel distribution');
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+@endsection

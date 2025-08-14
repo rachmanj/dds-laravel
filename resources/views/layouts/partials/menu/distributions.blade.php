@@ -1,6 +1,6 @@
-<li class="nav-item {{ request()->is('content*') ? 'menu-open' : '' }}">
-    <a href="#" class="nav-link {{ request()->is('content*') ? 'active' : '' }}">
-        <i class="nav-icon fas fa-file-alt"></i>
+<li class="nav-item {{ request()->is('distributions*') ? 'menu-open' : '' }}">
+    <a href="#" class="nav-link {{ request()->is('distributions*') ? 'active' : '' }}">
+        <i class="nav-icon fas fa-share-alt"></i>
         <p>
             Distribution
             <i class="right fas fa-angle-left"></i>
@@ -8,16 +8,27 @@
     </a>
     <ul class="nav nav-treeview">
         <li class="nav-item">
-            <a href="/distribution" class="nav-link {{ request()->is('distribution') ? 'active' : '' }}">
+            <a href="{{ route('distributions.index') }}"
+                class="nav-link {{ request()->routeIs('distributions.index') ? 'active' : '' }}">
                 <i class="far fa-circle nav-icon"></i>
-                <p>Dashboard</p>
+                <p>Distribution List</p>
             </a>
         </li>
         @can('create-distributions')
             <li class="nav-item">
-                <a href="/distribution/create" class="nav-link {{ request()->is('distribution/create') ? 'active' : '' }}">
+                <a href="{{ route('distributions.create') }}"
+                    class="nav-link {{ request()->routeIs('distributions.create') ? 'active' : '' }}">
                     <i class="far fa-circle nav-icon"></i>
-                    <p>Distribution List</p>
+                    <p>Create Distribution</p>
+                </a>
+            </li>
+        @endcan
+        @can('view-distributions')
+            <li class="nav-item">
+                <a href="{{ route('distributions.numbering-stats') }}"
+                    class="nav-link {{ request()->routeIs('distributions.numbering-stats') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>Numbering Stats</p>
                 </a>
             </li>
         @endcan

@@ -26,6 +26,7 @@ class Invoice extends Model
         'remarks',
         'cur_loc',
         'status',
+        'distribution_status',
         'created_by',
         'duration1',
         'duration2',
@@ -81,11 +82,43 @@ class Invoice extends Model
     }
 
     /**
+     * Distributions that include this invoice.
+     */
+    public function distributions(): BelongsToMany
+    {
+        return $this->morphedByMany(Distribution::class, 'document', 'distribution_documents', 'document_id', 'distribution_id');
+    }
+
+    /**
      * Get the department for the invoice via location code.
      */
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class, 'cur_loc', 'location_code');
+    }
+
+    /**
+     * Scope a query to only include invoices available for distribution.
+     */
+    public function scopeAvailableForDistribution($query)
+    {
+        return $query->where('distribution_status', 'available');
+    }
+
+    /**
+     * Scope a query to only include invoices currently in transit.
+     */
+    public function scopeInTransit($query)
+    {
+        return $query->where('distribution_status', 'in_transit');
+    }
+
+    /**
+     * Scope a query to only include distributed invoices.
+     */
+    public function scopeDistributed($query)
+    {
+        return $query->where('distribution_status', 'distributed');
     }
 
     /**
