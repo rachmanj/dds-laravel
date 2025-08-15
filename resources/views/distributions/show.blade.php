@@ -17,6 +17,13 @@
                         <a href="{{ route('distributions.index') }}" class="btn btn-secondary btn-sm">
                             <i class="fas fa-arrow-left"></i> Back to List
                         </a>
+
+                        <!-- Print Transmittal Advice Button -->
+                        <a href="{{ route('distributions.print', $distribution) }}" class="btn btn-info btn-sm"
+                            target="_blank">
+                            <i class="fas fa-print"></i> Print Transmittal Advice
+                        </a>
+
                         @if ($distribution->status === 'draft')
                             @can('edit-distributions')
                                 <a href="{{ route('distributions.edit', $distribution) }}" class="btn btn-warning btn-sm">

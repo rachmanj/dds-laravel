@@ -9,6 +9,7 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     })->name('dashboard');
     Route::get('data', [\App\Http\Controllers\AdditionalDocumentController::class, 'data'])->name('data');
     Route::get('{additionalDocument}/download', [\App\Http\Controllers\AdditionalDocumentController::class, 'downloadAttachment'])->name('download');
+    Route::get('{additionalDocument}/modal', [\App\Http\Controllers\AdditionalDocumentController::class, 'modal'])->name('modal');
 
     // Import routes
     Route::get('import', [\App\Http\Controllers\AdditionalDocumentController::class, 'import'])->name('import');

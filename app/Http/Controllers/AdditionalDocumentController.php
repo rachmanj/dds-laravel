@@ -41,8 +41,8 @@ class AdditionalDocumentController extends Controller
             $query->where('document_number', 'like', '%' . $request->search_number . '%');
         }
 
-        if ($request->filled('search_project')) {
-            $query->where('project', 'like', '%' . $request->search_project . '%');
+        if ($request->filled('search_po_no')) {
+            $query->where('po_no', 'like', '%' . $request->search_po_no . '%');
         }
 
         if ($request->filled('filter_type')) {
@@ -63,7 +63,7 @@ class AdditionalDocumentController extends Controller
         }
 
         // Apply location-based filtering for non-admin users
-        if (!$user->hasRole(['admin', 'superadmin']) || !$showAllRecords) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']) || !$showAllRecords) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
                 $query->where('cur_loc', $locationCode);
@@ -80,9 +80,30 @@ class AdditionalDocumentController extends Controller
 
         return DataTables::of($documents)
             ->addIndexColumn()
+            ->addColumn('days_difference', function ($document) {
+                if (!$document->receive_date) {
+                    return '<span class="text-muted">-</span>';
+                }
+                $now = \Carbon\Carbon::now()->startOfDay();
+                $receiveDate = \Carbon\Carbon::parse($document->receive_date)->startOfDay();
+                $days = $now->timestamp - $receiveDate->timestamp;
+                $days = $days / (24 * 60 * 60); // Convert seconds to days
+                $roundedDays = round($days); // Round to nearest integer
+
+                if ($roundedDays < 0) {
+                    $roundedDays = abs($roundedDays);
+                    return '<span class="badge badge-info">' . $roundedDays . '</span>';
+                } elseif ($roundedDays < 7) {
+                    return '<span class="badge badge-success">' . $roundedDays . '</span>';
+                } elseif ($roundedDays == 7) {
+                    return '<span class="badge badge-warning">' . $roundedDays . '</span>';
+                } else {
+                    return '<span class="badge badge-danger">' . $roundedDays . '</span>';
+                }
+            })
             ->addColumn('actions', function ($document) use ($user) {
                 $actions = '<div class="btn-group" style="gap:2px;">';
-                $actions .= '<a href="' . route('additional-documents.show', $document) . '" class="btn btn-info btn-xs" title="View Document"><i class="fas fa-eye"></i></a>';
+                $actions .= '<button type="button" class="btn btn-info btn-xs show-document" data-id="' . $document->id . '" title="View Document"><i class="fas fa-eye"></i></button>';
 
                 if ($document->canBeEditedBy($user)) {
                     $actions .= '<a href="' . route('additional-documents.edit', $document) . '" class="btn btn-warning btn-xs" title="Edit Document"><i class="fas fa-edit"></i></a>';
@@ -95,7 +116,7 @@ class AdditionalDocumentController extends Controller
                 $actions .= '</div>';
                 return $actions;
             })
-            ->rawColumns(['actions'])
+            ->rawColumns(['days_difference', 'actions'])
             ->make(true);
     }
 
@@ -153,7 +174,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!$user->hasRole(['admin', 'superadmin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -171,6 +192,31 @@ class AdditionalDocumentController extends Controller
         $additionalDocument->load(['type', 'creator.department']);
 
         return view('additional_documents.show', compact('additionalDocument'));
+    }
+
+    public function modal(AdditionalDocument $additionalDocument)
+    {
+        $user = Auth::user();
+
+        // Check if user can view this document
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+            $userLocationCode = $user->department_location_code;
+            if ($userLocationCode) {
+                // User has department, check if document location matches
+                if ($additionalDocument->cur_loc !== $userLocationCode) {
+                    abort(403, 'You do not have permission to view this document.');
+                }
+            } else {
+                // User has no department, only allow viewing documents with no location or 'DEFAULT' location
+                if ($additionalDocument->cur_loc && $additionalDocument->cur_loc !== 'DEFAULT') {
+                    abort(403, 'You do not have permission to view this document.');
+                }
+            }
+        }
+
+        $additionalDocument->load(['type', 'creator.department']);
+
+        return view('additional_documents._modal_content', compact('additionalDocument'));
     }
 
     public function edit(AdditionalDocument $additionalDocument)
@@ -265,7 +311,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!$user->hasRole(['admin', 'superadmin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches

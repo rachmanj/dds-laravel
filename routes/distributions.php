@@ -14,6 +14,9 @@ Route::prefix('distributions')->name('distributions.')->group(function () {
     Route::put('/{distribution}', [DistributionController::class, 'update'])->name('update');
     Route::delete('/{distribution}', [DistributionController::class, 'destroy'])->name('destroy');
 
+    // Print route
+    Route::get('/{distribution}/print', [DistributionController::class, 'print'])->name('print');
+
     // Workflow transition routes
     Route::post('/{distribution}/verify-sender', [DistributionController::class, 'verifyBySender'])->name('verify-sender');
     Route::post('/{distribution}/send', [DistributionController::class, 'send'])->name('send');

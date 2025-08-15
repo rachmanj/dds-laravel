@@ -77,7 +77,7 @@ class InvoiceController extends Controller
 
 
         // Show all records for admin/superadmin if requested
-        if ($request->show_all && $user->hasRole(['superadmin', 'admin'])) {
+        if ($request->show_all && array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             // Don't apply location filter
         }
 
@@ -222,7 +222,7 @@ class InvoiceController extends Controller
         // Check if user can view this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only view invoices from your department location.');
@@ -239,7 +239,7 @@ class InvoiceController extends Controller
         // Check if user can edit this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only edit invoices from your department location.');
@@ -259,7 +259,7 @@ class InvoiceController extends Controller
         // Check if user can edit this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only edit invoices from your department location.');
@@ -462,7 +462,7 @@ class InvoiceController extends Controller
             ->orderByDesc('document_date')
             ->limit(50);
 
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
                 $query->forLocation($locationCode);

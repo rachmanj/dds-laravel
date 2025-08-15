@@ -30,7 +30,7 @@ class DistributionController extends Controller
         $query = Distribution::with(['type', 'originDepartment', 'destinationDepartment', 'creator']);
 
         // Filter by department access based on user role
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             if ($user->department) {
                 // Regular users only see distributions where they are the destination department
                 // and the distribution is in "sent" status (ready to receive)
@@ -235,6 +235,36 @@ class DistributionController extends Controller
     }
 
     /**
+     * Display the print view for Transmittal Advice.
+     */
+    public function print(Distribution $distribution): View
+    {
+        // Load all necessary relationships for printing
+        $distribution->load([
+            'type',
+            'originDepartment',
+            'destinationDepartment',
+            'creator',
+            'senderVerifier',
+            'receiverVerifier',
+            'documents.document',
+            'histories.user'
+        ]);
+
+        // Load additional documents for invoices
+        foreach ($distribution->documents as $distributionDocument) {
+            if ($distributionDocument->document_type === Invoice::class) {
+                $invoice = $distributionDocument->document;
+                if ($invoice) {
+                    $invoice->load('additionalDocuments.doctype');
+                }
+            }
+        }
+
+        return view('distributions.print', compact('distribution'));
+    }
+
+    /**
      * Display numbering statistics view
      */
     public function numberingStatsView(): View
@@ -416,7 +446,7 @@ class DistributionController extends Controller
         $user = Auth::user();
 
         // Check if user has permission to delete this distribution
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             // Regular users can only delete draft distributions they created
             if ($distribution->status !== 'draft' || $distribution->created_by !== $user->id) {
                 if (request()->ajax()) {
@@ -650,7 +680,7 @@ class DistributionController extends Controller
         $user = Auth::user();
 
         // Check if user has permission to receive this distribution
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             // Regular users can only receive distributions if they are in the destination department
             if (!$user->department || $user->department->id !== $distribution->destination_department_id) {
                 if ($request->ajax()) {

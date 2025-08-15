@@ -63,6 +63,34 @@ available   available     in_transit  distributed  distributed    distributed
 -   **`in_transit`**: Currently being distributed
 -   **`distributed`**: Reached final destination
 
+### **Additional Documents Index System**
+
+#### **Search & Filtering**
+
+-   **PO Number Search**: Primary search by purchase order number for document discovery
+-   **Document Type Filter**: Filter by document type (contracts, receipts, etc.)
+-   **Status Filter**: Filter by document status (open, closed, cancelled)
+-   **Date Range**: Filter by creation or receive date ranges
+-   **Location Toggle**: Admin-only "Show All Records" for cross-location access
+
+#### **DataTable Structure**
+
+-   **Index Column (#)**: Sequential row numbering with pagination awareness
+-   **Core Columns**: Document #, PO Number, Type, Current Location, Status, Days, Actions
+-   **Days Column**: Color-coded badges based on receive_date difference from today
+-   Green: < 7 days (badge-success)
+-   Yellow: = 7 days (badge-warning)
+-   Red: > 7 days (badge-danger)
+-   Blue: Future dates (badge-info)
+
+#### **Modal Viewing System**
+
+-   **Modal-Based**: Document details displayed in Bootstrap modal instead of page redirects
+-   **AJAX Loading**: Content loaded dynamically via `/additional-documents/{id}/modal` endpoint
+-   **Comprehensive Info**: Document details, dates, creator info, department, and remarks
+-   **Date Format**: dd-mmm-yyyy format (e.g., "15-Aug-2025") for better readability
+-   **Action Buttons**: Edit and full view options within modal
+
 ### **Automatic Document Inclusion**
 
 -   **Invoice Distribution**: Automatically includes attached additional documents
@@ -244,6 +272,117 @@ available   available     in_transit  distributed  distributed    distributed
 -   **Webhook Support**: Real-time notifications
 -   **Third-party Integration**: ERP system connections
 -   **Mobile Support**: Responsive design optimization
+
+## 🖨️ **Transmittal Advice Printing System**
+
+### **Overview**
+
+The Transmittal Advice printing system provides professional document generation for distributions, creating comprehensive business documents that list all distributed materials with their relationships and metadata.
+
+### **System Components**
+
+#### **1. Print Controller Layer**
+
+-   **Route**: `GET /distributions/{distribution}/print`
+-   **Controller**: `DistributionController::print()`
+-   **Permissions**: View distribution access required
+-   **Functionality**: Loads distribution data with all document relationships for printing
+
+#### **2. Print View Template**
+
+-   **File**: `resources/views/distributions/print.blade.php`
+-   **Layout**: Professional business document format
+-   **Content**: Company header, distribution details, comprehensive document listing
+-   **Styling**: Print-optimized CSS with AdminLTE integration
+
+#### **3. Document Relationship Display**
+
+-   **Primary Documents**: Invoices with full metadata (amounts, vendors, PO numbers, projects)
+-   **Attached Documents**: Additional documents grouped under parent invoices
+-   **Metadata**: Complete document information for business reference
+
+### **Data Flow**
+
+```
+Distribution Request → Controller Load → View Render → Print Dialog
+       ↓                    ↓            ↓           ↓
+   Permission Check → Eager Loading → Template → Browser Print
+```
+
+### **Key Features**
+
+#### **Document Listing**
+
+-   Comprehensive table of all distributed documents
+-   Invoice details with financial and project information
+-   Additional document relationships clearly displayed
+-   Status and verification information included
+
+#### **Professional Formatting**
+
+-   Company branding and header
+-   Business-standard document layout
+-   Print-optimized styling for A4 paper
+-   Auto-print functionality
+
+#### **Access Control**
+
+-   Role-based permission checking
+-   Department-based access control
+-   Available for all distribution statuses
+-   Secure document access
+
+### **Technical Implementation**
+
+#### **Database Relationships**
+
+```php
+Distribution → DistributionDocuments → Documents (Invoices/AdditionalDocuments)
+     ↓              ↓                        ↓
+Departments    Document Types         Related Metadata
+```
+
+#### **Eager Loading Strategy**
+
+```php
+$distribution->load([
+    'type',
+    'originDepartment',
+    'destinationDepartment',
+    'creator',
+    'documents.document',
+    'documents.document.additionalDocuments',
+    'histories.user'
+]);
+```
+
+#### **Print Optimization**
+
+-   CSS media queries for print
+-   Hidden navigation elements
+-   Optimized table layouts
+-   Page break controls
+
+### **Integration Points**
+
+#### **Distribution Show View**
+
+-   Print button in action header
+-   Consistent with existing UI patterns
+-   Accessible for all user roles with proper permissions
+
+#### **Workflow Integration**
+
+-   Available at all distribution stages
+-   Reflects current workflow status
+-   Includes verification and status information
+
+### **Future Enhancements**
+
+-   PDF export functionality
+-   Template customization options
+-   Batch printing capabilities
+-   Digital signature integration
 
 ---
 
