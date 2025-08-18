@@ -497,6 +497,144 @@ do {
 
 ---
 
+### **2025-08-14: Invoice Feature Improvements**
+
+#### **1. Cross-Department Document Linking**
+
+**Decision**: Remove department filtering to allow linking documents from any department
+**Context**: Users need to link additional documents with matching PO numbers regardless of current location
+**Implementation**:
+
+-   **Backend Changes**: Modified `searchAdditionalDocuments` method in `InvoiceController`
+-   **Removed Filtering**: Eliminated `forLocation()` scope restriction
+-   **Enhanced Response**: Added `is_in_user_department` flag for badge coloring
+-   **Security**: No permission restrictions - feature open to all authenticated users
+
+**Learning**: Cross-department document linking improves workflow efficiency and document discovery
+
+#### **2. Location Badge Color Coding System**
+
+**Decision**: Implement visual indicators for document location status
+**Implementation**:
+
+-   **Green Badge**: Document is in user's current department
+-   **Red Badge**: Document is in another department
+-   **Tooltips**: Added helpful information about document location
+-   **Consistent Styling**: Applied to both create and edit invoice forms
+
+**Learning**: Visual indicators significantly improve user understanding of document status and location
+
+#### **3. Refresh Button Functionality**
+
+**Decision**: Add manual refresh capability for additional documents table
+**Implementation**:
+
+-   **Button Placement**: Added to card header next to selection counter
+-   **Functionality**: Re-runs search with current PO number
+-   **User Experience**: Clears selections and refreshes entire table
+-   **Consistent Behavior**: Same functionality in both create and edit forms
+
+**Learning**: Manual refresh buttons improve user control and data freshness perception
+
+#### **4. Technical Implementation Details**
+
+**Controller Changes**:
+
+```php
+// Before: Department filtering
+if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+    $locationCode = $user->department_location_code;
+    if ($locationCode) {
+        $query->forLocation($locationCode);
+    }
+}
+
+// After: No filtering, show all documents
+// Remove department filtering - show all documents with matching PO number
+// Users can now link documents from any department
+```
+
+**Frontend Changes**:
+
+-   Added refresh button with FontAwesome sync icon
+-   Implemented location badge color logic
+-   Enhanced tooltip system for better user guidance
+-   Maintained existing functionality while adding new features
+
+**Learning**: Incremental improvements to existing features can significantly enhance user experience without major architectural changes
+
+---
+
+### **2025-08-14: Supplier Import Feature Implementation**
+
+#### **1. External API Integration**
+
+**Decision**: Implement supplier import from external API endpoint for bulk supplier creation
+**Context**: Users need to import suppliers from external system to avoid manual entry and maintain data consistency
+**Implementation**:
+
+-   **API Endpoint**: `http://192.168.32.15/ark-gs/api/suppliers` configured via `SUPPLIERS_SYNC_URL` environment variable
+-   **Data Mapping**: API response fields mapped to supplier model:
+    -   `code` → `sap_code`
+    -   `name` → `name`
+    -   `type` → `type` (vendor/customer)
+    -   `project` field ignored (not used)
+-   **Default Values**: `payment_project` set to `'001H'` as per migration default
+-   **Other Fields**: city, address, npwp left as null for manual update
+
+**Learning**: External API integration requires careful data mapping and default value handling for missing fields
+
+#### **2. Duplicate Prevention Strategy**
+
+**Decision**: Check existing suppliers by SAP code to prevent duplicates during import
+**Implementation**:
+
+-   **Pre-Import Check**: Query existing suppliers by `sap_code` before creation
+-   **Skip Logic**: Existing suppliers are skipped, not updated
+-   **Count Tracking**: Separate counters for created vs skipped suppliers
+-   **User Feedback**: Clear reporting of import results
+
+**Learning**: Duplicate prevention is crucial for data integrity in bulk import operations
+
+#### **3. User Experience Design**
+
+**Decision**: Implement comprehensive user feedback with loading states and detailed results
+**Implementation**:
+
+-   **Import Button**: Green sync button with FontAwesome icon next to "Add New Supplier"
+-   **Loading State**: Button disabled with spinner during import process
+-   **Results Display**: SweetAlert2 modal showing detailed import summary
+-   **Error Handling**: User-friendly error messages for various failure scenarios
+-   **Table Refresh**: Automatic DataTable reload to show new suppliers
+
+**Learning**: Good UX design for bulk operations includes loading states, progress feedback, and comprehensive results display
+
+#### **4. Technical Architecture**
+
+**Decision**: Use Laravel HTTP client with proper error handling and timeout configuration
+**Implementation**:
+
+-   **HTTP Client**: Laravel's built-in HTTP client with 30-second timeout
+-   **Error Handling**: Try-catch blocks for API failures and data processing errors
+-   **Configuration**: Environment-based API URL configuration
+-   **Response Validation**: Check API response structure before processing
+
+**Learning**: Laravel's HTTP client provides robust external API integration with built-in error handling
+
+#### **5. Security & Performance Considerations**
+
+**Decision**: Implement proper validation and efficient data processing
+**Implementation**:
+
+-   **Permission Check**: Import restricted to admin/superadmin users
+-   **Input Validation**: API response structure validation
+-   **Batch Processing**: Process vendors and customers in separate loops
+-   **Error Collection**: Collect and report individual supplier processing errors
+
+**Learning**: Bulk import operations require careful error handling to provide partial success feedback
+
+---
+
 **Last Updated**: 2025-08-14  
-**Version**: 2.0  
-**Status**: ✅ Comprehensive Development Memory Documented
+**Version**: 2.2  
+**Status**: ✅ Supplier Import Feature Implemented

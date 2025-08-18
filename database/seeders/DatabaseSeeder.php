@@ -21,7 +21,7 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             AdditionalDocumentTypeSeeder::class,
             InvoiceTypeSeeder::class,
-            SupplierSeeder::class,
+            // SupplierSeeder::class,
             DistributionTypeSeeder::class,
         ]);
     }

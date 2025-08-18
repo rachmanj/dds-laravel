@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Yajra\DataTables\Facades\DataTables;
 
 class SupplierController extends Controller
@@ -150,5 +152,148 @@ class SupplierController extends Controller
 
         return redirect()->route('admin.suppliers.index')
             ->with('success', 'Supplier deleted successfully.');
+    }
+
+    public function import()
+    {
+        try {
+            $apiUrl = config('app.suppliers_sync_url');
+
+            if (!$apiUrl) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Suppliers sync URL not configured.'
+                ], 400);
+            }
+
+            $response = Http::timeout(30)->get($apiUrl);
+
+            if (!$response->successful()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to fetch suppliers from API. Status: ' . $response->status()
+                ], 400);
+            }
+
+            $data = $response->json();
+
+            // Debug logging
+            Log::info('Suppliers API Response:', $data);
+            Log::info('API Response Keys:', ['keys' => array_keys($data)]);
+            Log::info('Customers array count:', ['count' => isset($data['customers']) ? count($data['customers']) : 'not set']);
+            if (isset($data['customers']) && is_array($data['customers'])) {
+                Log::info('First customer sample:', ['customer' => $data['customers'][0] ?? 'no customers']);
+            }
+
+            // Check if we have the expected structure
+            if (!isset($data['customers']) || !is_array($data['customers'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid API response format. Expected customers array.',
+                    'debug_data' => array_keys($data)
+                ], 400);
+            }
+
+            // Separate vendors and customers based on the 'type' field
+            $vendors = [];
+            $customers = [];
+
+            foreach ($data['customers'] as $supplier) {
+                if (isset($supplier['type'])) {
+                    if ($supplier['type'] === 'vendor') {
+                        $vendors[] = $supplier;
+                    } elseif ($supplier['type'] === 'customer') {
+                        $customers[] = $supplier;
+                    }
+                }
+            }
+
+            Log::info('Separated suppliers:', [
+                'vendors_count' => count($vendors),
+                'customers_count' => count($customers)
+            ]);
+
+            $created = 0;
+            $skipped = 0;
+            $errors = [];
+
+            // Process vendors
+            foreach ($vendors as $vendor) {
+                try {
+                    $result = $this->processSupplier($vendor, 'vendor');
+                    if ($result['created']) {
+                        $created++;
+                    } else {
+                        $skipped++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Vendor {$vendor['code']}: " . $e->getMessage();
+                }
+            }
+
+            // Process customers
+            foreach ($customers as $customer) {
+                try {
+                    $result = $this->processSupplier($customer, 'customer');
+                    if ($result['created']) {
+                        $created++;
+                    } else {
+                        $skipped++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Customer {$customer['code']}: " . $e->getMessage();
+                }
+            }
+
+            $message = "Import completed successfully. Created: {$created}, Skipped: {$skipped}";
+            if (!empty($errors)) {
+                $message .= ". Errors: " . count($errors);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'created' => $created,
+                    'skipped' => $skipped,
+                    'errors' => $errors
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Supplier import error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Import failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function processSupplier($supplierData, $type)
+    {
+        // Check if supplier already exists by SAP code
+        if (isset($supplierData['code']) && !empty($supplierData['code'])) {
+            $existingSupplier = Supplier::where('sap_code', $supplierData['code'])->first();
+            if ($existingSupplier) {
+                return ['created' => false, 'message' => 'Supplier already exists'];
+            }
+        }
+
+        // Create new supplier
+        Supplier::create([
+            'sap_code' => $supplierData['code'] ?? null,
+            'name' => $supplierData['name'],
+            'type' => $type,
+            'city' => null,
+            'payment_project' => '001H', // Default value as per migration
+            'is_active' => true,
+            'address' => null,
+            'npwp' => null,
+            'created_by' => Auth::id(),
+        ]);
+
+        return ['created' => true, 'message' => 'Supplier created successfully'];
     }
 }

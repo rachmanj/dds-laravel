@@ -6,7 +6,92 @@ This document records key architectural and implementation decisions made during
 
 ## 🎯 **Recent Decisions (2025-08-14)**
 
-### **1. Document Status Tracking Implementation**
+### **1. Supplier Import API Integration Architecture**
+
+#### **Decision**: Implement external API integration for bulk supplier import with duplicate prevention
+
+**Date**: 2025-08-14  
+**Status**: ✅ Implemented  
+**Impact**: High - Data management and user productivity
+
+**Context**: Users need to import suppliers from external system to avoid manual entry and maintain data consistency across systems.
+
+**Options Considered**:
+
+1. **CSV/Excel Import**: Manual file upload and processing
+2. **Database Direct Import**: Direct database connection to external system
+3. **API Integration**: RESTful API endpoint for data retrieval
+4. **Scheduled Sync**: Automated periodic synchronization
+
+**Chosen Solution**: API integration with manual trigger and comprehensive error handling
+
+-   **Rationale**: Provides real-time data, secure access, easy maintenance, and user control
+-   **Implementation**:
+    -   External API endpoint: `http://192.168.32.15/ark-gs/api/suppliers`
+    -   Environment-based configuration: `SUPPLIERS_SYNC_URL` variable
+    -   Duplicate prevention: SAP code-based checking
+    -   User feedback: Detailed import results with counts
+
+**Alternatives Rejected**:
+
+-   CSV/Excel Import: Requires file management, manual process, potential for errors
+-   Database Direct Import: Security risks, tight coupling, maintenance complexity
+-   Scheduled Sync: Less user control, potential for unnoticed failures
+
+**Consequences**:
+
+-   ✅ Real-time data synchronization
+-   ✅ Secure API-based access
+-   ✅ Comprehensive error handling and user feedback
+-   ✅ Easy configuration and maintenance
+-   ❌ Dependency on external API availability
+-   ❌ Network timeout considerations
+
+---
+
+### **2. API Response Structure Handling Strategy**
+
+#### **Decision**: Implement flexible API response parsing to handle varying data structures
+
+**Date**: 2025-08-14  
+**Status**: ✅ Implemented  
+**Impact**: Medium - System reliability and maintainability
+
+**Context**: External API response structure may vary, and the actual structure differs from initial assumptions.
+
+**Options Considered**:
+
+1. **Rigid Structure Validation**: Strict validation of expected response format
+2. **Flexible Parsing**: Adaptive parsing with multiple fallback strategies
+3. **Configuration-Based**: User-configurable response mapping
+4. **Error-Only Approach**: Fail fast with clear error messages
+
+**Chosen Solution**: Flexible parsing with comprehensive validation and detailed error reporting
+
+-   **Rationale**: Provides robustness while maintaining clear error feedback for troubleshooting
+-   **Implementation**:
+    -   Multiple structure detection strategies
+    -   Type-based supplier separation (vendor/customer)
+    -   Detailed logging and error collection
+    -   User-friendly error messages with debug information
+
+**Alternatives Rejected**:
+
+-   Rigid Validation: Too brittle, fails with minor API changes
+-   Configuration-Based: Adds complexity for users
+-   Error-Only: Poor user experience, difficult troubleshooting
+
+**Consequences**:
+
+-   ✅ Robust handling of API response variations
+-   ✅ Clear error reporting and debugging
+-   ✅ Easy troubleshooting and maintenance
+-   ❌ More complex parsing logic
+-   ❌ Additional logging overhead
+
+---
+
+### **3. Document Status Tracking Implementation**
 
 #### **Decision**: Add `distribution_status` field to prevent duplicate distributions
 
@@ -42,7 +127,7 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **2. Permission & Access Control Architecture**
+### **4. Permission & Access Control Architecture**
 
 #### **Decision**: Implement role-based access control with department isolation
 
@@ -81,7 +166,7 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **3. Invoice Additional Documents Auto-Inclusion**
+### **5. Invoice Additional Documents Auto-Inclusion**
 
 #### **Decision**: Automatically include attached additional documents when distributing invoices
 
@@ -101,7 +186,7 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **4. Additional Documents Index System Enhancement**
+### **6. Additional Documents Index System Enhancement**
 
 #### **Decision**: Implement modal-based viewing and optimize search/columns for better user experience
 
@@ -156,7 +241,7 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **4. Distribution Numbering System Format**
+### **7. Distribution Numbering System Format**
 
 #### **Decision**: Change format from `YY/DEPT/DDS/1` to `YY/DEPT/DDS/0001`
 
@@ -192,7 +277,7 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **5. Error Handling Strategy for Sequence Conflicts**
+### **8. Error Handling Strategy for Sequence Conflicts**
 
 #### **Decision**: Implement retry logic for sequence conflicts
 

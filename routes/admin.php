@@ -27,5 +27,6 @@ Route::prefix('admin')->name('admin.')->middleware(['role:superadmin|admin'])->g
     Route::resource('invoice-types', \App\Http\Controllers\Admin\InvoiceTypeController::class)->except(['create', 'edit']);
 
     Route::get('suppliers/data', [\App\Http\Controllers\Admin\SupplierController::class, 'data'])->name('suppliers.data');
+    Route::post('suppliers/import', [\App\Http\Controllers\Admin\SupplierController::class, 'import'])->name('suppliers.import');
     Route::resource('suppliers', \App\Http\Controllers\Admin\SupplierController::class)->except(['create', 'edit']);
 });

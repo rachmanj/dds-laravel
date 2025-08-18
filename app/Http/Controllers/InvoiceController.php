@@ -444,7 +444,7 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Search additional documents by PO number, respecting role/location rules.
+     * Search additional documents by PO number, showing all documents regardless of department.
      */
     public function searchAdditionalDocuments(Request $request)
     {
@@ -462,17 +462,17 @@ class InvoiceController extends Controller
             ->orderByDesc('document_date')
             ->limit(50);
 
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
-            $locationCode = $user->department_location_code;
-            if ($locationCode) {
-                $query->forLocation($locationCode);
-            }
-        }
+        // Remove department filtering - show all documents with matching PO number
+        // Users can now link documents from any department
 
-        $documents = $query->get()->map(function ($doc) use ($request) {
+        $documents = $query->get()->map(function ($doc) use ($request, $user) {
             $linkedInvoices = $doc->invoices;
             $linkedInvoicesCount = $linkedInvoices->count();
             $currentInvoiceId = $request->current_invoice_id;
+
+            // Determine if document is in user's department for badge coloring
+            $isInUserDepartment = $user->department_location_code &&
+                $doc->cur_loc === $user->department_location_code;
 
             return [
                 'id' => $doc->id,
@@ -486,6 +486,7 @@ class InvoiceController extends Controller
                 'linked_invoices_count' => $linkedInvoicesCount,
                 'linked_invoices_list' => $linkedInvoices->take(3)->pluck('invoice_number')->toArray(),
                 'is_linked_to_current' => $currentInvoiceId ? $linkedInvoices->contains('id', $currentInvoiceId) : false,
+                'is_in_user_department' => $isInUserDepartment,
             ];
         });
 

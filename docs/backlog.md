@@ -2,6 +2,29 @@
 
 ## 🎯 **Planned Features**
 
+### **Supplier Management Enhancements**
+
+-   [ ] **Scheduled Supplier Synchronization**
+
+    -   **Priority**: Medium
+    -   **Description**: Automatically sync suppliers from external API on a schedule
+    -   **Components**: Laravel scheduler, cron jobs, notification system
+    -   **Estimated Effort**: 2-3 days
+
+-   [ ] **Supplier Import History & Rollback**
+
+    -   **Priority**: Low
+    -   **Description**: Track import history and allow rollback of specific imports
+    -   **Components**: Import history table, rollback functionality, audit trail
+    -   **Estimated Effort**: 3-4 days
+
+-   [ ] **Advanced Supplier Mapping Configuration**
+
+    -   **Priority**: Low
+    -   **Description**: Allow admins to configure field mappings for different API endpoints
+    -   **Components**: Configuration interface, mapping rules, validation
+    -   **Estimated Effort**: 2-3 days
+
 ### **Print & Export Enhancements**
 
 -   [ ] **Advanced Transmittal Advice Customization**

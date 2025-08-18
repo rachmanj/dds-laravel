@@ -5,7 +5,8 @@
 @endsection
 
 @section('breadcrumb_title')
-    admin / suppliers
+    <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+    <li class="breadcrumb-item active">Suppliers</li>
 @endsection
 
 @section('styles')
@@ -17,23 +18,6 @@
 @endsection
 
 @section('content')
-    <!-- Content Header (Page header) -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">Suppliers Management</h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-                        <li class="breadcrumb-item active">Suppliers</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Main content -->
     <section class="content">
         <div class="container-fluid">
@@ -42,6 +26,9 @@
                 <div class="card-header">
                     <h3 class="card-title">Suppliers List</h3>
                     <div class="card-tools">
+                        <button type="button" class="btn btn-success btn-sm me-2" id="importSuppliersBtn">
+                            <i class="fas fa-sync"></i> Import Suppliers
+                        </button>
                         <button type="button" class="btn btn-primary btn-sm" data-toggle="modal"
                             data-target="#supplierModal" id="addSupplierBtn">
                             <i class="fas fa-plus"></i> Add New Supplier
@@ -126,8 +113,7 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="payment_project">Payment Project <span
-                                            class="text-danger">*</span></label>
+                                    <label for="payment_project">Payment Project <span class="text-danger">*</span></label>
                                     <select class="form-control" id="payment_project" name="payment_project" required>
                                         <option value="">Select Payment Project</option>
                                         @foreach ($projects as $project)
@@ -354,6 +340,72 @@
                 $('#supplierForm').find('input[name="_method"]').remove();
                 $('.invalid-feedback').hide();
                 $('.form-control').removeClass('is-invalid');
+            });
+
+            // Import Suppliers Button
+            $('#importSuppliersBtn').click(function() {
+                var btn = $(this);
+                var originalText = btn.html();
+
+                // Show loading state
+                btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Importing...');
+
+                $.ajax({
+                    url: '{{ route('admin.suppliers.import') }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Show success message with SweetAlert2
+                            Swal.fire({
+                                title: 'Import Successful!',
+                                html: `
+                                    <div class="text-left">
+                                        <p><strong>${response.message}</strong></p>
+                                        <div class="mt-3">
+                                            <p><i class="fas fa-check-circle text-success"></i> Created: <strong>${response.data.created}</strong></p>
+                                            <p><i class="fas fa-info-circle text-info"></i> Skipped: <strong>${response.data.skipped}</strong></p>
+                                            ${response.data.errors.length > 0 ? `<p><i class="fas fa-exclamation-triangle text-warning"></i> Errors: <strong>${response.data.errors.length}</strong></p>` : ''}
+                                        </div>
+                                    </div>
+                                `,
+                                icon: 'success',
+                                confirmButtonText: 'OK'
+                            });
+
+                            // Reload the table to show new suppliers
+                            table.ajax.reload();
+                        }
+                    },
+                    error: function(xhr) {
+                        var errorMessage = 'An error occurred during import.';
+                        var debugInfo = '';
+
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+
+                        if (xhr.responseJSON && xhr.responseJSON.debug_data) {
+                            debugInfo = '\n\nDebug Info: ' + JSON.stringify(xhr.responseJSON
+                                .debug_data);
+                        }
+
+                        console.error('Import Error:', xhr.responseJSON);
+
+                        Swal.fire({
+                            title: 'Import Failed!',
+                            text: errorMessage + debugInfo,
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        });
+                    },
+                    complete: function() {
+                        // Restore button state
+                        btn.prop('disabled', false).html(originalText);
+                    }
+                });
             });
         });
     </script>

@@ -123,4 +123,15 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | External API URLs
+    |--------------------------------------------------------------------------
+    |
+    | URLs for external API integrations
+    |
+    */
+
+    'suppliers_sync_url' => env('SUPPLIERS_SYNC_URL'),
+
 ];

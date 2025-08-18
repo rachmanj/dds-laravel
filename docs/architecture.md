@@ -384,8 +384,146 @@ $distribution->load([
 -   Batch printing capabilities
 -   Digital signature integration
 
+## 🏢 **Supplier Management System**
+
+### **External API Integration**
+
+#### **API Endpoint Configuration**
+
+-   **Environment Variable**: `SUPPLIERS_SYNC_URL` in `.env` file
+-   **Configuration**: `config/app.php` with `suppliers_sync_url` key
+-   **Endpoint**: `http://192.168.32.15/ark-gs/api/suppliers`
+
+#### **API Response Structure**
+
+```json
+{
+    "customer_count": 0,
+    "vendor_count": 252,
+    "customers": [
+        {
+            "id": 1,
+            "code": "VMUPAIDR01",
+            "name": "MULTI POWER ADITAMA",
+            "type": "vendor",
+            "project": null
+        }
+    ]
+}
+```
+
+#### **Data Mapping Strategy**
+
+-   **`code`** → `sap_code` (unique identifier for duplicate prevention)
+-   **`name`** → `name` (supplier name)
+-   **`type`** → `type` (vendor/customer classification)
+-   **`project`** → ignored (not used in local system)
+-   **Default Values**: `payment_project` set to `'001H'` (migration default)
+
+### **Import Workflow**
+
+#### **Process Flow**
+
+```
+Import Request → API Call → Response Validation → Data Separation → Duplicate Check → Database Insert → Results Summary
+      ↓            ↓            ↓                ↓              ↓              ↓              ↓
+  Button Click → HTTP GET → Structure Check → Type Filter → SAP Code Check → Create Records → User Feedback
+```
+
+#### **Duplicate Prevention**
+
+-   **Pre-Import Check**: Query existing suppliers by `sap_code`
+-   **Skip Logic**: Existing suppliers are skipped, not updated
+-   **Count Tracking**: Separate counters for created vs skipped suppliers
+-   **Data Integrity**: Prevents duplicate supplier entries
+
+#### **Error Handling Strategy**
+
+-   **API Failures**: Network timeouts, HTTP errors, invalid responses
+-   **Data Validation**: Structure validation, required field checking
+-   **Individual Errors**: Per-supplier error collection and reporting
+-   **User Feedback**: Clear error messages with debugging information
+
+### **User Interface Design**
+
+#### **Import Button**
+
+-   **Placement**: Green sync button next to "Add New Supplier" button
+-   **Icon**: FontAwesome sync icon for visual clarity
+-   **Loading State**: Disabled button with spinner during import
+-   **Access Control**: Restricted to admin/superadmin users
+
+#### **Results Display**
+
+-   **Success Modal**: SweetAlert2 with detailed import summary
+-   **Counts Display**: Created, skipped, and error counts
+-   **Error Details**: Individual error messages for troubleshooting
+-   **Table Refresh**: Automatic DataTable reload to show new suppliers
+
+### **Technical Implementation**
+
+#### **Controller Architecture**
+
+```php
+SupplierController::import()
+├── API Configuration Check
+├── HTTP Request with Timeout
+├── Response Validation
+├── Data Structure Parsing
+├── Vendor/Customer Separation
+├── Duplicate Prevention
+├── Database Operations
+└── Results Compilation
+```
+
+#### **Database Operations**
+
+-   **Transaction Safety**: Individual supplier creation with error handling
+-   **Audit Trail**: `created_by` field set to current user
+-   **Status Management**: All imported suppliers set as active
+-   **Relationship Handling**: Proper foreign key constraints
+
+#### **Performance Considerations**
+
+-   **HTTP Timeout**: 30-second timeout for external API calls
+-   **Batch Processing**: Efficient loop processing with error collection
+-   **Memory Management**: Streamlined data processing without excessive memory usage
+-   **User Feedback**: Real-time progress indication and results display
+
+### **Security & Access Control**
+
+#### **Permission System**
+
+-   **Role Restriction**: Only admin/superadmin users can import
+-   **Middleware**: `role:superadmin|admin` middleware protection
+-   **CSRF Protection**: Laravel CSRF token validation
+-   **Input Validation**: API response structure validation
+
+#### **Data Validation**
+
+-   **Structure Validation**: Ensures expected API response format
+-   **Field Validation**: Required field presence checking
+-   **Type Validation**: Vendor/customer type classification
+-   **Duplicate Prevention**: Database-level duplicate checking
+
+### **Integration Points**
+
+#### **Existing Systems**
+
+-   **Supplier Model**: Integrates with existing supplier management
+-   **User System**: Leverages existing authentication and role system
+-   **Project System**: Uses default payment project configuration
+-   **Department System**: Maintains existing organizational structure
+
+#### **External Dependencies**
+
+-   **API Endpoint**: External supplier data source
+-   **Network Configuration**: Proper firewall and network access
+-   **Environment Variables**: Configuration management
+-   **Error Monitoring**: Logging and debugging capabilities
+
 ---
 
 **Last Updated**: 2025-08-14  
-**Version**: 2.0  
+**Version**: 2.1  
 **Status**: ✅ Current Architecture Documented

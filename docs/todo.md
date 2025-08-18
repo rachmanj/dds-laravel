@@ -70,9 +70,30 @@
 -   [ ] **Notification System**: Alert users when distributions are sent to their department
 -   [ ] **Bulk Operations**: Allow admins to perform bulk actions on distributions
 
-## ✅ **Recently Completed**
+### **Invoice Feature Improvements**
 
-### **2025-08-14: Distribution Transmittal Advice Printing Feature**
+-   ✅ **Cross-Department Document Linking**: Users can now link additional documents from any department
+-   ✅ **Location Badge Color Coding**:
+    -   Green badge: Document is in user's department
+    -   Red badge: Document is in another department
+-   ✅ **Refresh Button**: Added refresh functionality to both create and edit invoice forms
+-   ✅ **Enhanced Search**: Removed department filtering to show all documents with matching PO numbers
+
+## ✅ **Recently Completed (2025-08-14)**
+
+### **9. Supplier Import Feature Implementation**
+
+-   ✅ **API Integration**: Successfully integrated with external API endpoint `http://192.168.32.15/ark-gs/api/suppliers`
+-   ✅ **Data Structure Handling**: Fixed API response parsing to handle single 'customers' array with type-based separation
+-   ✅ **Duplicate Prevention**: Implemented SAP code-based duplicate checking to prevent duplicate suppliers
+-   ✅ **Import Button**: Added green "Import Suppliers" button with sync icon and loading states
+-   ✅ **Results Display**: SweetAlert2 notification showing created/skipped counts and error details
+-   ✅ **Error Handling**: Comprehensive error handling for API failures, network issues, and data validation
+-   ✅ **Configuration**: Added `SUPPLIERS_SYNC_URL` environment variable and config integration
+-   ✅ **User Experience**: Loading states, progress feedback, and automatic table refresh
+-   ✅ **Debugging**: Enhanced logging and error reporting for troubleshooting
+
+### **8. Additional Documents Index Page Enhancement**
 
 -   ✅ **Status**: ✅ **COMPLETED** - All phases implemented successfully
 -   ✅ **Priority**: High

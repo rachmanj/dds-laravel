@@ -307,6 +307,10 @@
                                     <div class="card-header">
                                         <h3 class="card-title">Link Additional Documents (optional)</h3>
                                         <div class="card-tools">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary mr-2"
+                                                id="refresh-docs-btn" style="display:none;">
+                                                <i class="fas fa-sync-alt"></i> Refresh
+                                            </button>
                                             <span class="badge badge-info" id="selected-count">Selected: 0</span>
                                         </div>
                                     </div>
@@ -778,6 +782,22 @@
                         linkedInvoicesHtml = '<span class="text-muted">None</span>';
                     }
 
+                    // Build location badge with color coding
+                    var locationBadgeClass = 'badge-secondary';
+                    var locationTooltip = '';
+
+                    if (doc.is_in_user_department) {
+                        locationBadgeClass = 'badge-success';
+                        locationTooltip = 'Document is in your department';
+                    } else if (doc.cur_loc && doc.cur_loc !== '-') {
+                        locationBadgeClass = 'badge-danger';
+                        locationTooltip = 'Document is in another department: ' + doc.cur_loc;
+                    }
+
+                    var locationHtml = '<span class="badge ' + locationBadgeClass +
+                        '" data-toggle="tooltip" title="' + locationTooltip + '">' +
+                        (doc.cur_loc || '-') + '</span>';
+
                     var row = '<tr data-id="' + doc.id + '">' +
                         '<td><input type="checkbox" class="doc-checkbox" data-id="' + doc.id + '" ' + checked +
                         '></td>' +
@@ -785,7 +805,7 @@
                         '<td>' + (doc.type_name || '-') + '</td>' +
                         '<td>' + (doc.document_date || '-') + '</td>' +
                         '<td>' + (doc.po_no || '-') + '</td>' +
-                        '<td><span class="badge badge-secondary">' + (doc.cur_loc || '-') + '</span></td>' +
+                        '<td>' + locationHtml + '</td>' +
                         '<td>' + (doc.remarks || '') + '</td>' +
                         '<td>' + linkedInvoicesHtml + '</td>' +
                         '</tr>';
@@ -798,6 +818,9 @@
                 $('#additional-docs-table-wrapper').toggle(docs.length > 0);
                 $('#additional-docs-empty').toggle(docs.length === 0);
                 $('#additional-docs-card').show();
+
+                // Show refresh button when we have results
+                $('#refresh-docs-btn').toggle(docs.length > 0);
             }
 
             function searchAdditionalDocuments() {
@@ -887,6 +910,23 @@
                 delete selectedDocs[id];
                 $('#additional-docs-table tbody .doc-checkbox[data-id="' + id + '"]').prop('checked', false);
                 renderSelectedTable();
+            });
+
+            // Refresh additional documents table
+            $(document).on('click', '#refresh-docs-btn', function() {
+                var po = $('#po_no').val().trim();
+                if (po) {
+                    // Clear current selections before refreshing
+                    selectedDocs = {};
+                    renderSelectedTable();
+
+                    // Re-run the search
+                    searchAdditionalDocuments();
+
+                    if (typeof toastr !== 'undefined') {
+                        toastr.info('Refreshing additional documents...');
+                    }
+                }
             });
             // ---------- End Additional Documents Linking ----------
 
