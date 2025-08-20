@@ -58,6 +58,7 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
+            'view-distributions-numbering-stats',
 
             // Suppliers
             'view-suppliers',
@@ -108,6 +109,7 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
+            'view-distributions-numbering-stats',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);

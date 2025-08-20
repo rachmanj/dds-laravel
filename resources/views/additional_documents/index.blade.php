@@ -135,8 +135,8 @@
                                     <label for="show_all_records">Show All Records</label>
                                     <div class="custom-control custom-switch">
                                         <input type="checkbox" class="custom-control-input" id="show_all_records">
-                                        <label class="custom-control-label" for="show_all_records">Include
-                                            completed/rejected</label>
+                                        <label class="custom-control-label" for="show_all_records">Include in-transit
+                                            documents</label>
                                     </div>
                                 </div>
                             </div>
@@ -197,33 +197,9 @@
             </div>
         </div>
     </section>
-
-    <!-- Show Document Modal -->
-    <div class="modal fade" id="showDocumentModal" tabindex="-1" role="dialog"
-        aria-labelledby="showDocumentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="showDocumentModalLabel">Document Details</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body" id="documentModalBody">
-                    <!-- Document details will be loaded here -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    </div>
 @endsection
 
 @section('scripts')
-    <!-- Bootstrap Core JS -->
-    <script src="{{ asset('adminlte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <!-- DataTables -->
     <script src="{{ asset('adminlte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
     <script src="{{ asset('adminlte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
@@ -252,6 +228,9 @@
                     format: 'DD/MM/YYYY'
                 }
             });
+
+            // Clear date range on page load
+            $('#date_range').val('');
 
             // Initialize DataTable
             var table = $('#documents-table').DataTable({
@@ -339,7 +318,7 @@
             // Reset search
             $('#reset-search').on('click', function() {
                 $('#search-form')[0].reset();
-                $('#date_range').val('');
+                $('#date_range').val(''); // Clear date range input
                 table.ajax.reload();
             });
 
@@ -424,38 +403,13 @@
                 });
             });
 
-            // Show document details in modal
+            // Show document details - redirect to show page instead of modal
             $(document).on('click', '.show-document', function(e) {
                 e.preventDefault();
                 var documentId = $(this).data('id');
-                console.log('Show document clicked for ID:', documentId);
 
-                // Show loading in modal
-                $('#documentModalBody').html(
-                    '<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Loading document details...</p></div>'
-                );
-                $('#showDocumentModal').modal('show');
-
-                // Load document details via AJAX
-                var modalUrl = '/additional-documents/' + documentId + '/modal';
-                console.log('Loading modal from URL:', modalUrl);
-
-                $.ajax({
-                    url: modalUrl,
-                    type: 'GET',
-                    success: function(response) {
-                        console.log('Modal content loaded successfully');
-                        $('#documentModalBody').html(response);
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Modal loading failed:', status, error);
-                        console.error('Response:', xhr.responseText);
-                        $('#documentModalBody').html(
-                            '<div class="alert alert-danger">Failed to load document details. Error: ' +
-                            error + '</div>'
-                        );
-                    }
-                });
+                // Redirect to the show page instead of opening modal
+                window.location.href = '/additional-documents/' + documentId;
             });
 
             // Success message display

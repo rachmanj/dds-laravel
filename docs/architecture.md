@@ -83,13 +83,13 @@ available   available     in_transit  distributed  distributed    distributed
 -   Red: > 7 days (badge-danger)
 -   Blue: Future dates (badge-info)
 
-#### **Modal Viewing System**
+#### **Document Viewing System**
 
--   **Modal-Based**: Document details displayed in Bootstrap modal instead of page redirects
--   **AJAX Loading**: Content loaded dynamically via `/additional-documents/{id}/modal` endpoint
--   **Comprehensive Info**: Document details, dates, creator info, department, and remarks
--   **Date Format**: dd-mmm-yyyy format (e.g., "15-Aug-2025") for better readability
--   **Action Buttons**: Edit and full view options within modal
+-   **Page-Based Navigation**: Document details displayed on dedicated show page instead of modals
+-   **Direct Routing**: Clean URLs like `/additional-documents/{id}` for better SEO and navigation
+-   **Comprehensive Info**: Document details, creator info, department, distribution status, and remarks
+-   **Distribution History**: Direct access to document distribution history with proper permission checks
+-   **Action Buttons**: Edit, back to list, and distribution history options
 
 ### **Automatic Document Inclusion**
 
@@ -111,7 +111,7 @@ available   available     in_transit  distributed  distributed    distributed
 ### **Status-Based Permissions**
 
 -   **Draft**: Creator can edit/delete, admins can cancel
--   **Sent**: Only destination department can receive
+-   **Sent**: Only destination department users can receive (with admin override)
 -   **Completed**: Read-only for all users
 
 ### **Document Verification**
@@ -164,6 +164,14 @@ available   available     in_transit  distributed  distributed    distributed
 -   **Dynamic UI**: Different views based on user role
 -   **Smart Filtering**: Automatic document availability checking
 -   **Bulk Operations**: Select all, clear all functionality for verifications
+
+### **5. Additional Documents System Improvements**
+
+-   **Distribution Status Filtering**: Proper filtering by `available` and `distributed` status
+-   **Route Structure**: Fixed route conflicts and parameter resolution issues
+-   **Relationship Management**: Proper loading of distributions relationship for history tracking
+-   **UI Navigation**: Changed from modal-based to page-based document viewing
+-   **Form Controls**: Fixed date range input clearing and reset functionality
 
 ## 🛡️ **Security Features**
 
@@ -524,6 +532,6 @@ SupplierController::import()
 
 ---
 
-**Last Updated**: 2025-08-14  
-**Version**: 2.1  
-**Status**: ✅ Current Architecture Documented
+**Last Updated**: 2025-08-18  
+**Version**: 2.2  
+**Status**: ✅ Additional Documents System Improvements Documented

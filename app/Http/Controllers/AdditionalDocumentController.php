@@ -62,18 +62,42 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        // Apply location-based filtering for non-admin users
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']) || !$showAllRecords) {
+        // Apply location-based filtering and distribution status filtering
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+            // Regular users - department-based access
             $locationCode = $user->department_location_code;
+
             if ($locationCode) {
+                // Filter by current location (user's department)
                 $query->where('cur_loc', $locationCode);
+
+                // Filter by distribution status:
+                // - Show 'available' documents (ready for new distribution)
+                // - Show 'distributed' documents (physically present in department)
+                // - Hide 'in_transit' documents (on the way to department)
+                if (!$showAllRecords) {
+                    $query->whereIn('distribution_status', ['available', 'distributed']);
+                }
+                // If show_all_records is enabled, show all documents in department including in_transit
             } else {
                 // If user has no department, show documents with no location or 'DEFAULT' location
                 $query->where(function ($q) {
                     $q->whereNull('cur_loc')
                         ->orWhere('cur_loc', 'DEFAULT');
                 });
+
+                // Apply same distribution status logic
+                if (!$showAllRecords) {
+                    $query->whereIn('distribution_status', ['available', 'distributed']);
+                }
             }
+        } else {
+            // Admin/superadmin users - can see all documents
+            if (!$showAllRecords) {
+                // By default, only show available and distributed documents
+                $query->whereIn('distribution_status', ['available', 'distributed']);
+            }
+            // If show_all_records is enabled, show all documents regardless of status
         }
 
         $documents = $query->orderBy('created_at', 'desc')->get();
@@ -189,34 +213,9 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        $additionalDocument->load(['type', 'creator.department']);
+        $additionalDocument->load(['type', 'creator.department', 'distributions']);
 
         return view('additional_documents.show', compact('additionalDocument'));
-    }
-
-    public function modal(AdditionalDocument $additionalDocument)
-    {
-        $user = Auth::user();
-
-        // Check if user can view this document
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
-            $userLocationCode = $user->department_location_code;
-            if ($userLocationCode) {
-                // User has department, check if document location matches
-                if ($additionalDocument->cur_loc !== $userLocationCode) {
-                    abort(403, 'You do not have permission to view this document.');
-                }
-            } else {
-                // User has no department, only allow viewing documents with no location or 'DEFAULT' location
-                if ($additionalDocument->cur_loc && $additionalDocument->cur_loc !== 'DEFAULT') {
-                    abort(403, 'You do not have permission to view this document.');
-                }
-            }
-        }
-
-        $additionalDocument->load(['type', 'creator.department']);
-
-        return view('additional_documents._modal_content', compact('additionalDocument'));
     }
 
     public function edit(AdditionalDocument $additionalDocument)

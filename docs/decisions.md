@@ -488,6 +488,49 @@ Implement a comprehensive Transmittal Advice printing system that generates prof
 
 ---
 
-**Last Updated**: 2025-08-14  
-**Version**: 2.0  
-**Status**: ✅ Key Decisions Documented
+### **9. Additional Documents System Architecture Improvements**
+
+#### **Decision**: Fix distribution status filtering, route conflicts, and change from modal to page-based navigation
+
+**Date**: 2025-08-18  
+**Status**: ✅ Implemented  
+**Impact**: High - User experience and system reliability
+
+**Context**: The additional documents system had several critical issues: incorrect filtering logic hiding distributed documents, route conflicts causing 404 errors, and modal-based viewing that was unreliable and provided poor user experience.
+
+**Options Considered**:
+
+1. **Fix Existing Modal System**: Debug and fix modal loading issues
+2. **Hybrid Approach**: Keep modals for some features, pages for others
+3. **Complete Page-Based Navigation**: Replace all modals with dedicated pages
+4. **Route Patching**: Apply minimal fixes to existing route structure
+
+**Chosen Solution**: Complete system overhaul with page-based navigation and proper filtering logic
+
+-   **Rationale**: Provides better user experience, eliminates route conflicts, and ensures proper data visibility
+-   **Implementation**:
+    -   Fixed distribution status filtering to show available and distributed documents
+    -   Restructured routes to eliminate parameter conflicts
+    -   Replaced modal system with direct page navigation
+    -   Fixed relationship loading for distribution history
+
+**Alternatives Rejected**:
+
+-   **Modal Fixing**: Would require extensive debugging and still provide inferior UX
+-   **Hybrid Approach**: Adds complexity without solving core issues
+-   **Route Patching**: Would not address fundamental architectural problems
+
+**Consequences**:
+
+-   ✅ Better user experience with direct page navigation
+-   ✅ Proper document visibility based on distribution status
+-   ✅ Eliminated route conflicts and 404 errors
+-   ✅ Cleaner, more maintainable codebase
+-   ❌ Required significant refactoring effort
+-   ❌ Removed modal-based quick viewing capability
+
+---
+
+**Last Updated**: 2025-08-18  
+**Version**: 2.1  
+**Status**: ✅ Additional Documents System Improvements Documented

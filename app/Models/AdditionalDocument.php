@@ -134,6 +134,8 @@ class AdditionalDocument extends Model
         return $query->where('distribution_status', 'distributed');
     }
 
+
+
     /**
      * Invoices linked to this additional document.
      */
@@ -147,6 +149,7 @@ class AdditionalDocument extends Model
      */
     public function distributions(): BelongsToMany
     {
-        return $this->morphedByMany(Distribution::class, 'document', 'distribution_documents', 'document_id', 'distribution_id');
+        return $this->belongsToMany(Distribution::class, 'distribution_documents', 'document_id', 'distribution_id')
+            ->wherePivot('document_type', AdditionalDocument::class);
     }
 }

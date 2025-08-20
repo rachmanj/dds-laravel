@@ -99,6 +99,16 @@
 -   Frontend console logging for AJAX debugging
     **Learning**: Good error handling and debugging tools significantly reduce development time and improve system reliability
 
+#### **6. Enhanced Receive Button Permissions**
+
+**Decision**: Restrict Receive button visibility to only destination department users
+**Implementation**:
+
+-   Updated `canReceive()` method in Distribution model
+-   Added department-based permission checking
+-   Maintained admin/superadmin override capabilities
+    **Learning**: UI element visibility should match backend permission logic for consistent user experience
+
 ### **2025-08-14: Additional Documents Index System Enhancement**
 
 #### **1. Search & Column Optimization**
@@ -137,6 +147,56 @@
 -   **Route Management**: Added modal route and cleared route cache for proper registration
 
 **Learning**: Local assets eliminate CORS issues and provide better reliability. Proper Bootstrap JavaScript integration is essential for modal functionality. Comprehensive error handling improves debugging efficiency.
+
+### **2025-08-18: Additional Documents System Improvements & Bug Fixes**
+
+#### **1. Distribution Status Filtering Enhancement**
+
+**Decision**: Fix filtering logic to properly show available and distributed documents while hiding in-transit documents
+**Implementation**:
+
+-   **Filtering Logic**: Updated `AdditionalDocumentController::data()` method to show documents with `distribution_status IN ('available', 'distributed')`
+-   **User Experience**: Regular users now see documents in their department regardless of distribution status (except in-transit)
+-   **Toggle Control**: "Show All Records" toggle now only affects `in_transit` documents visibility
+-   **Business Logic**: Documents physically present in department are visible, documents on the way are hidden
+
+**Learning**: Distribution status filtering must consider both document availability and physical presence in user's department for proper business logic.
+
+#### **2. Route Structure & Navigation Fixes**
+
+**Decision**: Resolve route conflicts and change from modal-based to page-based document viewing
+**Implementation**:
+
+-   **Route Restructuring**: Fixed `Route::resource('', ...)` conflicts by using explicit individual routes
+-   **Parameter Resolution**: Proper `{additionalDocument}` parameter naming for clean URLs
+-   **Navigation Change**: Replaced modal popups with direct page navigation (`/additional-documents/{id}`)
+-   **Code Cleanup**: Removed unused modal HTML, JavaScript, and Bootstrap dependencies
+
+**Learning**: Empty string prefixes in resource routes within prefixed groups cause parameter conflicts. Explicit route definitions provide better control and clarity.
+
+#### **3. Distribution History Button Fix**
+
+**Decision**: Fix missing Distribution History button due to relationship loading issues
+**Implementation**:
+
+-   **Relationship Loading**: Added `distributions` to controller's `load()` method
+-   **Model Relationship**: Fixed `distributions()` relationship in `AdditionalDocument` model
+-   **Permission Integration**: Proper integration with `view-document-distribution-history` permission
+-   **Debug Implementation**: Added comprehensive debugging to identify relationship issues
+
+**Learning**: Eloquent relationships must be explicitly loaded in controllers to be available in views. Missing relationship loading is a common cause of UI elements not appearing.
+
+#### **4. Form Control Improvements**
+
+**Decision**: Fix date range input clearing and improve user experience
+**Implementation**:
+
+-   **Page Load**: Added `$('#date_range').val('');` to clear input on page load
+-   **Reset Functionality**: Enhanced reset button to properly clear date range input
+-   **User Feedback**: Clear visual indication when date range is reset
+-   **Consistent Behavior**: Same clearing behavior across page load and manual reset
+
+**Learning**: Form controls should have consistent and predictable behavior. Default values and reset functionality significantly improve user experience.
 
 ### **2025-08-13: Distribution Feature Improvements**
 

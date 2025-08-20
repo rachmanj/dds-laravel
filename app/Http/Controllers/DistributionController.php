@@ -1109,6 +1109,183 @@ class DistributionController extends Controller
     }
 
     /**
+     * Get department distribution history with enhanced statistics
+     */
+    public function departmentHistory(): View|RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (!$user->department) {
+            return back()->with('error', 'User must have a department assigned to view department history');
+        }
+
+        $distributions = Distribution::where(function ($query) use ($user) {
+            $query->where('origin_department_id', $user->department_id)
+                ->orWhere('destination_department_id', $user->department_id);
+        })->with(['histories', 'originDepartment', 'destinationDepartment', 'creator'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        // Enhanced statistics
+        $stats = [
+            'total_sent' => Distribution::where('origin_department_id', $user->department_id)->count(),
+            'total_received' => Distribution::where('destination_department_id', $user->department_id)->count(),
+            'pending_sent' => Distribution::where('origin_department_id', $user->department_id)
+                ->whereIn('status', ['draft', 'verified_by_sender'])->count(),
+            'pending_received' => Distribution::where('destination_department_id', $user->department_id)
+                ->where('status', 'sent')->count()
+        ];
+
+        // Calculate average days documents stay in department before distribution
+        $completedDistributions = Distribution::where('origin_department_id', $user->department_id)
+            ->where('status', 'completed')
+            ->whereNotNull('sent_at')
+            ->whereNotNull('created_at')
+            ->get();
+
+        $totalDays = 0;
+        $validDistributions = 0;
+
+        foreach ($completedDistributions as $distribution) {
+            if ($distribution->sent_at && $distribution->created_at) {
+                $daysDiff = $distribution->created_at->diffInDays($distribution->sent_at);
+                $totalDays += $daysDiff;
+                $validDistributions++;
+            }
+        }
+
+        $stats['avg_days_before_distribution'] = $validDistributions > 0 ? round($totalDays / $validDistributions, 1) : 0;
+
+        // Calculate average processing time for received distributions
+        $receivedDistributions = Distribution::where('destination_department_id', $user->department_id)
+            ->where('status', 'completed')
+            ->whereNotNull('received_at')
+            ->whereNotNull('sent_at')
+            ->get();
+
+        $totalProcessingDays = 0;
+        $validReceivedDistributions = 0;
+
+        foreach ($receivedDistributions as $distribution) {
+            if ($distribution->received_at && $distribution->sent_at) {
+                $daysDiff = $distribution->sent_at->diffInDays($distribution->received_at);
+                $totalProcessingDays += $daysDiff;
+                $validReceivedDistributions++;
+            }
+        }
+
+        $stats['avg_processing_days'] = $validReceivedDistributions > 0 ? round($totalProcessingDays / $validReceivedDistributions, 1) : 0;
+
+        // Monthly distribution trends (last 6 months)
+        $monthlyStats = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $monthKey = $date->format('Y-m');
+            $monthName = $date->format('M Y');
+
+            $monthlyStats[$monthKey] = [
+                'month' => $monthName,
+                'sent' => Distribution::where('origin_department_id', $user->department_id)
+                    ->whereYear('created_at', $date->year)
+                    ->whereMonth('created_at', $date->month)
+                    ->count(),
+                'received' => Distribution::where('destination_department_id', $user->department_id)
+                    ->whereYear('created_at', $date->year)
+                    ->whereMonth('created_at', $date->month)
+                    ->count()
+            ];
+        }
+
+        return view('distributions.department-history', compact('distributions', 'stats', 'monthlyStats'));
+    }
+
+    /**
+     * Get distribution history for a specific document (invoice or additional document)
+     */
+    public function documentDistributionHistory(string $documentType, int $documentId): View
+    {
+        // Validate document type
+        if (!in_array($documentType, ['invoice', 'additional-document'])) {
+            abort(404);
+        }
+
+        // Get the document with its relationships
+        if ($documentType === 'invoice') {
+            $document = Invoice::with(['distributions.originDepartment', 'distributions.destinationDepartment'])->findOrFail($documentId);
+        } else {
+            $document = AdditionalDocument::with(['distributions.originDepartment', 'distributions.destinationDepartment'])->findOrFail($documentId);
+        }
+
+        // Get all distributions this document has been part of
+        $distributions = Distribution::whereHas('documents', function ($query) use ($documentType, $documentId) {
+            $query->where('document_type', $documentType === 'invoice' ? Invoice::class : AdditionalDocument::class)
+                ->where('document_id', $documentId);
+        })->with(['originDepartment', 'destinationDepartment', 'histories.user', 'creator'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Calculate enhanced document journey statistics
+        $stats = [
+            'total_distributions' => $distributions->count(),
+            'total_departments_visited' => $distributions->pluck('destination_department_id')->unique()->count(),
+            'current_location' => $document->cur_loc ?? 'N/A',
+            'current_status' => $document->distribution_status ?? 'available'
+        ];
+
+        // Calculate time spent in each department
+        $departmentTimeStats = [];
+        foreach ($distributions as $distribution) {
+            $deptName = $distribution->destinationDepartment->name;
+            $deptId = $distribution->destinationDepartment->id;
+
+            if (!isset($departmentTimeStats[$deptId])) {
+                $departmentTimeStats[$deptId] = [
+                    'name' => $deptName,
+                    'total_time' => 0,
+                    'visits' => 0,
+                    'first_visit' => null,
+                    'last_visit' => null
+                ];
+            }
+
+            $departmentTimeStats[$deptId]['visits']++;
+
+            // Calculate time spent in this department
+            if ($distribution->received_at && $distribution->sent_at) {
+                $timeSpent = $distribution->sent_at->diffInDays($distribution->received_at);
+                $departmentTimeStats[$deptId]['total_time'] += $timeSpent;
+            }
+
+            // Track first and last visit
+            if (!$departmentTimeStats[$deptId]['first_visit'] || $distribution->created_at < $departmentTimeStats[$deptId]['first_visit']) {
+                $departmentTimeStats[$deptId]['first_visit'] = $distribution->created_at;
+            }
+            if (!$departmentTimeStats[$deptId]['last_visit'] || $distribution->created_at > $departmentTimeStats[$deptId]['last_visit']) {
+                $departmentTimeStats[$deptId]['last_visit'] = $distribution->created_at;
+            }
+        }
+
+        // Calculate average time per department
+        foreach ($departmentTimeStats as &$dept) {
+            $dept['avg_time'] = $dept['visits'] > 0 ? round($dept['total_time'] / $dept['visits'], 1) : 0;
+        }
+
+        // Calculate overall journey statistics
+        if ($distributions->count() > 0) {
+            $firstDistribution = $distributions->last(); // Oldest
+            $lastDistribution = $distributions->first(); // Newest
+
+            $stats['journey_start'] = $firstDistribution->created_at;
+            $stats['journey_duration'] = $firstDistribution->created_at->diffInDays(now());
+            $stats['total_distance'] = $distributions->count() - 1; // Number of transfers
+            $stats['avg_time_per_department'] = $distributions->count() > 0 ?
+                round($stats['journey_duration'] / $distributions->count(), 1) : 0;
+        }
+
+        return view('distributions.document-distribution-history', compact('document', 'distributions', 'stats', 'documentType', 'departmentTimeStats'));
+    }
+
+    /**
      * Get next sequence number for a department/year combination
      */
     public function getNextSequence(Request $request): JsonResponse

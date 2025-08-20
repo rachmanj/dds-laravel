@@ -5,6 +5,12 @@ use App\Http\Controllers\DistributionController;
 
 Route::prefix('distributions')->name('distributions.')->group(function () {
     Route::get('/numbering-stats', [DistributionController::class, 'numberingStatsView'])->name('numbering-stats');
+    Route::get('/department-history', [DistributionController::class, 'departmentHistory'])->name('department-history');
+    Route::get('/document/{document_type}/{document_id}/history', [DistributionController::class, 'documentDistributionHistory'])
+        ->name('document.distribution-history')
+        ->middleware('permission:view-document-distribution-history');
+    Route::get('/next-sequence', [DistributionController::class, 'getNextSequence'])->name('next-sequence');
+
     // Resource routes
     Route::get('/', [DistributionController::class, 'index'])->name('index');
     Route::get('/create', [DistributionController::class, 'create'])->name('create');
@@ -27,7 +33,4 @@ Route::prefix('distributions')->name('distributions.')->group(function () {
     // Additional routes
     Route::get('/{distribution}/history', [DistributionController::class, 'history'])->name('history');
     Route::get('/{distribution}/discrepancy-summary', [DistributionController::class, 'discrepancySummary'])->name('discrepancy-summary');
-
-    // Utility routes
-    Route::get('/next-sequence', [DistributionController::class, 'getNextSequence'])->name('next-sequence');
 });

@@ -22,6 +22,14 @@
                                 <i class="fas fa-file-invoice"></i> Invoice Information
                             </h3>
                             <div class="card-tools">
+                                @can('view-document-distribution-history')
+                                    @if ($invoice->distributions->count() > 0)
+                                        <a href="{{ route('distributions.document.distribution-history', ['document_type' => 'invoice', 'document_id' => $invoice->id]) }}"
+                                            class="btn btn-info btn-sm">
+                                            <i class="fas fa-route"></i> Distribution History
+                                        </a>
+                                    @endif
+                                @endcan
                                 <a href="{{ route('invoices.edit', $invoice) }}" class="btn btn-warning btn-sm">
                                     <i class="fas fa-edit"></i> Edit
                                 </a>

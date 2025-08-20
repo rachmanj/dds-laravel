@@ -32,5 +32,14 @@
                 </a>
             </li>
         @endcan
+        @if (auth()->user()->department)
+            <li class="nav-item">
+                <a href="{{ route('distributions.department-history') }}"
+                    class="nav-link {{ request()->routeIs('distributions.department-history') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>Department History</p>
+                </a>
+            </li>
+        @endif
     </ul>
 </li>

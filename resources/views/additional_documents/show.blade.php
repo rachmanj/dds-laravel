@@ -5,29 +5,13 @@
 @endsection
 
 @section('breadcrumb_title')
-    additional-documents / show
+    <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('additional-documents.index') }}">Additional
+            Documents</a></li>
+    <li class="breadcrumb-item active">Details</li>
 @endsection
 
 @section('content')
-    <!-- Content Header (Page header) -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">Additional Document Details</h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="{{ route('additional-documents.index') }}">Additional
-                                Documents</a></li>
-                        <li class="breadcrumb-item active">Details</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Main content -->
     <section class="content">
         <div class="container-fluid">
@@ -37,6 +21,15 @@
                         <div class="card-header">
                             <h3 class="card-title">Document Information</h3>
                             <div class="card-tools">
+                                @can('view-document-distribution-history')
+                                    @if ($additionalDocument->distributions->count() > 0)
+                                        <a href="{{ route('distributions.document.distribution-history', ['document_type' => 'additional-document', 'document_id' => $additionalDocument->id]) }}"
+                                            class="btn btn-info btn-sm">
+                                            <i class="fas fa-route"></i> Distribution History
+                                        </a>
+                                    @endif
+                                @endcan
+
                                 <a href="{{ route('additional-documents.index') }}" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-arrow-left"></i> Back to List
                                 </a>
@@ -89,6 +82,28 @@
                                                     class="badge badge-{{ $additionalDocument->status === 'open' ? 'success' : 'secondary' }}">
                                                     {{ ucfirst($additionalDocument->status) }}
                                                 </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Distribution Status:</strong></td>
+                                            <td>
+                                                @switch($additionalDocument->distribution_status)
+                                                    @case('available')
+                                                        <span class="badge badge-success">Available</span>
+                                                    @break
+
+                                                    @case('in_transit')
+                                                        <span class="badge badge-warning">In Transit</span>
+                                                    @break
+
+                                                    @case('distributed')
+                                                        <span class="badge badge-info">Distributed</span>
+                                                    @break
+
+                                                    @default
+                                                        <span
+                                                            class="badge badge-secondary">{{ ucfirst($additionalDocument->distribution_status ?? 'N/A') }}</span>
+                                                @endswitch
                                             </td>
                                         </tr>
                                         <tr>

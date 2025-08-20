@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class Distribution extends Model
 {
@@ -189,7 +190,24 @@ class Distribution extends Model
 
     public function canReceive(): bool
     {
-        return $this->status === 'sent';
+        // Only users of the destination department can receive a distribution when it's sent
+        if ($this->status !== 'sent') {
+            return false;
+        }
+
+        // Check if current user belongs to destination department
+        $user = Auth::user();
+        if (!$user) {
+            return false;
+        }
+
+        // Admin and superadmin can always receive distributions
+        if ($user->hasRole(['superadmin', 'admin'])) {
+            return true;
+        }
+
+        // Regular users can only receive if they belong to destination department
+        return $user->department && $user->department->id === $this->destination_department_id;
     }
 
     public function canVerifyByReceiver(): bool

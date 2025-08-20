@@ -121,6 +121,8 @@ class Invoice extends Model
         return $query->where('distribution_status', 'distributed');
     }
 
+
+
     /**
      * Get the receive project information.
      */
