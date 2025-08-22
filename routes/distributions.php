@@ -2,8 +2,10 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DistributionController;
+use App\Http\Controllers\DistributionDashboardController;
 
 Route::prefix('distributions')->name('distributions.')->group(function () {
+    Route::get('/dashboard', [DistributionDashboardController::class, 'index'])->name('dashboard');
     Route::get('/numbering-stats', [DistributionController::class, 'numberingStatsView'])->name('numbering-stats');
     Route::get('/department-history', [DistributionController::class, 'departmentHistory'])->name('department-history');
     Route::get('/document/{document_type}/{document_id}/history', [DistributionController::class, 'documentDistributionHistory'])

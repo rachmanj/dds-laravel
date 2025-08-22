@@ -308,62 +308,211 @@
                 </div>
             @endif
 
+            <!-- Document Verification Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-chart-pie"></i> Document Verification Summary
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Sender Verification Summary -->
+                        <div class="col-md-6">
+                            <div class="verification-summary-card">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-user-check"></i> Sender Verification
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    @php
+                                        $senderVerified = $distribution->documents
+                                            ->where('sender_verified', true)
+                                            ->count();
+                                        $senderMissing = $distribution->documents
+                                            ->where('sender_verification_status', 'missing')
+                                            ->count();
+                                        $senderDamaged = $distribution->documents
+                                            ->where('sender_verification_status', 'damaged')
+                                            ->count();
+                                        $senderPending = $distribution->documents->count() - $senderVerified;
+                                    @endphp
+
+                                    <div class="row text-center">
+                                        <div class="col-3">
+                                            <div class="verification-stat">
+                                                <div class="stat-number text-success">{{ $senderVerified }}</div>
+                                                <div class="stat-label">Verified</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="verification-stat">
+                                                <div class="stat-number text-warning">{{ $senderMissing }}</div>
+                                                <div class="stat-label">Missing</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="verification-stat">
+                                                <div class="stat-number text-danger">{{ $senderDamaged }}</div>
+                                                <div class="stat-label">Damaged</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="verification-stat">
+                                                <div class="stat-number text-secondary">{{ $senderPending }}</div>
+                                                <div class="stat-label">Pending</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if ($senderVerified > 0)
+                                        <div class="progress mt-3" style="height: 8px;">
+                                            <div class="progress-bar bg-success"
+                                                style="width: {{ ($senderVerified / $distribution->documents->count()) * 100 }}%">
+                                            </div>
+                                        </div>
+                                        <small
+                                            class="text-muted">{{ round(($senderVerified / $distribution->documents->count()) * 100) }}%
+                                            verified</small>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Receiver Verification Summary -->
+                        <div class="col-md-6">
+                            <div class="verification-summary-card">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-clipboard-check"></i> Receiver Verification
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    @php
+                                        $receiverVerified = $distribution->documents
+                                            ->where('receiver_verified', true)
+                                            ->count();
+                                        $receiverMissing = $distribution->documents
+                                            ->where('receiver_verification_status', 'missing')
+                                            ->count();
+                                        $receiverDamaged = $distribution->documents
+                                            ->where('receiver_verification_status', 'damaged')
+                                            ->count();
+                                        $receiverPending = $distribution->documents->count() - $receiverVerified;
+                                    @endphp
+
+                                    <div class="row text-center">
+                                        <div class="col-3">
+                                            <div class="verification-stat">
+                                                <div class="stat-number text-success">{{ $receiverVerified }}</div>
+                                                <div class="stat-label">Verified</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="verification-stat">
+                                                <div class="stat-number text-warning">{{ $receiverMissing }}</div>
+                                                <div class="stat-label">Missing</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="verification-stat">
+                                                <div class="stat-number text-danger">{{ $receiverDamaged }}</div>
+                                                <div class="stat-label">Damaged</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="verification-stat">
+                                                <div class="stat-number text-secondary">{{ $receiverPending }}</div>
+                                                <div class="stat-label">Pending</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if ($receiverVerified > 0)
+                                        <div class="progress mt-3" style="height: 8px;">
+                                            <div class="progress-bar bg-success"
+                                                style="width: {{ ($receiverVerified / $distribution->documents->count()) * 100 }}%">
+                                            </div>
+                                        </div>
+                                        <small
+                                            class="text-muted">{{ round(($receiverVerified / $distribution->documents->count()) * 100) }}%
+                                            verified</small>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Documents -->
             <div class="card">
                 <div class="card-header">
                     <h4 class="card-title">
                         <i class="fas fa-file-alt"></i> Distributed Documents
                     </h4>
+                    <div class="card-tools">
+                        <span class="badge badge-info badge-lg">
+                            Total: {{ $distribution->documents->count() }} documents
+                        </span>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover">
-                            <thead>
+                            <thead class="thead-light">
                                 <tr>
-                                    <th>Document</th>
-                                    <th>Type</th>
-                                    <th>Sender Verification</th>
-                                    <th>Receiver Verification</th>
-                                    <th>Status</th>
+                                    <th width="25%">Document</th>
+                                    <th width="15%">Type</th>
+                                    <th width="20%">Sender Status</th>
+                                    <th width="20%">Receiver Status</th>
+                                    <th width="20%">Overall Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($distribution->documents as $doc)
+                                @forelse ($distribution->documents as $doc)
                                     <tr>
                                         <td>
-                                            <strong>{{ $doc->document->document_number ?? ($doc->document->invoice_number ?? 'N/A') }}</strong>
-                                            <br>
-                                            <small class="text-muted">{{ class_basename($doc->document_type) }}</small>
+                                            <div class="d-flex align-items-center">
+                                                <div class="document-icon mr-2">
+                                                    @if ($doc->document_type === 'App\Models\Invoice')
+                                                        <i class="fas fa-file-invoice text-primary"></i>
+                                                    @else
+                                                        <i class="fas fa-file-alt text-info"></i>
+                                                    @endif
+                                                </div>
+                                                <div>
+                                                    <strong>{{ $doc->document->document_number ?? ($doc->document->invoice_number ?? 'N/A') }}</strong>
+                                                    <br>
+                                                    <small
+                                                        class="text-muted">{{ class_basename($doc->document_type) }}</small>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td>
                                             @if ($doc->document_type === 'App\Models\Invoice')
-                                                Invoice
+                                                <span class="badge badge-primary">Invoice</span>
                                             @else
-                                                Additional Document
+                                                <span class="badge badge-info">Additional Document</span>
                                             @endif
                                         </td>
                                         <td>
                                             @if ($doc->sender_verified)
-                                                <span class="badge badge-success">
+                                                <span
+                                                    class="badge badge-{{ $doc->sender_verification_status === 'verified' ? 'success' : ($doc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
                                                     {{ ucfirst($doc->sender_verification_status) }}
                                                 </span>
-                                                @if ($doc->sender_verification_notes)
-                                                    <br><small
-                                                        class="text-muted">{{ $doc->sender_verification_notes }}</small>
-                                                @endif
                                             @else
                                                 <span class="badge badge-secondary">Pending</span>
                                             @endif
                                         </td>
                                         <td>
                                             @if ($doc->receiver_verified)
-                                                <span class="badge badge-success">
+                                                <span
+                                                    class="badge badge-{{ $doc->receiver_verification_status === 'verified' ? 'success' : ($doc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
                                                     {{ ucfirst($doc->receiver_verification_status) }}
                                                 </span>
-                                                @if ($doc->receiver_verification_notes)
-                                                    <br><small
-                                                        class="text-muted">{{ $doc->receiver_verification_notes }}</small>
-                                                @endif
                                             @else
                                                 <span class="badge badge-secondary">Pending</span>
                                             @endif
@@ -374,7 +523,16 @@
                                             </span>
                                         </td>
                                     </tr>
-                                @endforeach
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4">
+                                            <div class="text-muted">
+                                                <i class="fas fa-file-alt fa-2x mb-2"></i>
+                                                <p>No documents found in this distribution</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
@@ -389,37 +547,73 @@
                     </h4>
                 </div>
                 <div class="card-body">
-                    <div class="timeline">
-                        @foreach ($distribution->histories as $history)
-                            <div class="timeline-item">
-                                <div class="timeline-marker">
-                                    <i class="fas fa-circle"></i>
-                                </div>
-                                <div class="timeline-content">
-                                    <div class="timeline-header">
-                                        <strong>{{ $history->action_display }}</strong>
-                                        <small class="text-muted float-right">{{ $history->time_ago }}</small>
-                                    </div>
-                                    <div class="timeline-body">
-                                        <p class="mb-1">
-                                            <strong>{{ $history->user->name }}</strong>
-                                            performed action: <em>{{ $history->action_type_display }}</em>
-                                        </p>
-                                        @if ($history->notes)
-                                            <p class="mb-0 text-muted">{{ $history->notes }}</p>
-                                        @endif
-                                        @if ($history->old_status && $history->new_status)
-                                            <p class="mb-0">
-                                                Status changed from
-                                                <span class="badge badge-secondary">{{ $history->old_status }}</span>
-                                                to
-                                                <span class="badge badge-primary">{{ $history->new_status }}</span>
-                                            </p>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th width="15%">Date & Time</th>
+                                    <th width="20%">Action</th>
+                                    <th width="20%">User</th>
+                                    <th width="25%">Details</th>
+                                    <th width="20%">Status Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($distribution->histories as $history)
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex flex-column">
+                                                <strong>{{ $history->action_performed_at->format('d-M-Y') }}</strong>
+                                                <small
+                                                    class="text-muted">{{ $history->action_performed_at->format('H:i') }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-primary badge-lg">
+                                                {{ $history->action_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div
+                                                    class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mr-2">
+                                                    {{ strtoupper(substr($history->user->name, 0, 1)) }}
+                                                </div>
+                                                <span>{{ $history->user->name }}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @if ($history->notes)
+                                                <p class="mb-0">{{ $history->notes }}</p>
+                                            @else
+                                                <span class="text-muted">No additional notes</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($history->old_status && $history->new_status)
+                                                <div class="d-flex align-items-center">
+                                                    <span
+                                                        class="badge badge-secondary mr-1">{{ $history->old_status }}</span>
+                                                    <i class="fas fa-arrow-right text-muted mx-2"></i>
+                                                    <span class="badge badge-primary">{{ $history->new_status }}</span>
+                                                </div>
+                                            @else
+                                                <span class="text-muted">No status change</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4">
+                                            <div class="text-muted">
+                                                <i class="fas fa-history fa-2x mb-2"></i>
+                                                <p>No history records found</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -772,45 +966,110 @@
             margin-bottom: 5px;
         }
 
-        .timeline {
-            position: relative;
-            padding: 20px 0;
+        /* Verification Summary Cards */
+        .verification-summary-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .timeline-item {
-            position: relative;
-            padding: 20px 0;
-            border-left: 2px solid #dee2e6;
-            margin-left: 20px;
+        .verification-summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
-        .timeline-marker {
-            position: absolute;
-            left: -11px;
-            top: 20px;
-            width: 20px;
-            height: 20px;
-            background-color: #007bff;
-            border-radius: 50%;
+        .verification-summary-card .card-header {
+            border: none;
+            padding: 15px 20px;
+        }
+
+        .verification-summary-card .card-header h5 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .verification-summary-card .card-body {
+            padding: 20px;
+        }
+
+        .verification-stat {
+            padding: 10px 5px;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Document Table Enhancements */
+        .document-icon {
+            width: 32px;
+            height: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-size: 10px;
-        }
-
-        .timeline-content {
-            margin-left: 30px;
-        }
-
-        .timeline-header {
-            margin-bottom: 10px;
-        }
-
-        .timeline-body {
+            border-radius: 6px;
             background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
+        }
+
+        .document-icon i {
+            font-size: 16px;
+        }
+
+        /* Avatar Styles */
+        .avatar-sm {
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        /* Badge Enhancements */
+        .badge-lg {
+            font-size: 0.9rem;
+            padding: 8px 12px;
+        }
+
+        /* Progress Bar Enhancement */
+        .progress {
+            border-radius: 10px;
+            background-color: #e9ecef;
+        }
+
+        .progress-bar {
+            border-radius: 10px;
+        }
+
+        /* Table Enhancements */
+        .table thead th {
+            border-top: none;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.85rem;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: scale(1.01);
+            transition: all 0.2s ease;
+        }
+
+        /* Card Tools Enhancement */
+        .card-tools .badge {
+            font-size: 0.9rem;
+            padding: 8px 12px;
         }
     </style>
 @endsection

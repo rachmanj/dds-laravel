@@ -25,6 +25,7 @@ class DepartmentSeeder extends Seeder
             ['name' => 'Warehouse 023C', 'project' => '023C', 'akronim' => 'WH023', 'created_at' => now(), 'updated_at' => now()],
             ['name' => 'Warehouse 025C', 'project' => '025C', 'akronim' => 'WH025', 'created_at' => now(), 'updated_at' => now()],
             ['name' => 'Accounting', 'project' => '000H', 'akronim' => 'ACC', 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Cashier HO', 'project' => '000H', 'akronim' => 'CASHO', 'created_at' => now(), 'updated_at' => now()],
             ['name' => 'Plant', 'project' => '000H', 'akronim' => 'PLANT', 'created_at' => now(), 'updated_at' => now()],
             ['name' => 'Procurement', 'project' => '000H', 'akronim' => 'PROC', 'created_at' => now(), 'updated_at' => now()],
             ['name' => 'Operation & Production', 'project' => '000H', 'akronim' => 'OPR', 'created_at' => now(), 'updated_at' => now()],
@@ -36,6 +37,7 @@ class DepartmentSeeder extends Seeder
         DB::table('departments')->insert($departments);
 
         DB::table('departments')->where('akronim', 'ACC')->update(['location_code' => '000HACC']);
+        DB::table('departments')->where('akronim', 'CASHO')->update(['location_code' => '000HCASHO']);
         DB::table('departments')->where('akronim', 'LOG')->update(['location_code' => '000HLOG']);
         DB::table('departments')->where('akronim', 'FIN')->update(['location_code' => '001HFIN']);
         DB::table('departments')->where('akronim', 'PLANT')->update(['location_code' => '000HPLANT']);

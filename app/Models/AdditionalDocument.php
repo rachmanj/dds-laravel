@@ -134,6 +134,11 @@ class AdditionalDocument extends Model
         return $query->where('distribution_status', 'distributed');
     }
 
+    public function scopeUnaccountedFor($query)
+    {
+        return $query->where('distribution_status', 'unaccounted_for');
+    }
+
 
 
     /**

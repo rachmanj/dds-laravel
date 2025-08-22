@@ -356,6 +356,38 @@ class AdditionalDocumentController extends Controller
         try {
             $user = Auth::user();
 
+            // Validate file before processing
+            $file = $request->file('file');
+            if (!$file->isValid()) {
+                throw new \Exception('Invalid file uploaded');
+            }
+
+            // Check file size
+            if ($file->getSize() > 10 * 1024 * 1024) { // 10MB
+                throw new \Exception('File size exceeds 10MB limit');
+            }
+
+            // Validate Excel file format
+            $extension = strtolower($file->getClientOriginalExtension());
+            if (!in_array($extension, ['xlsx', 'xls'])) {
+                throw new \Exception('Invalid file format. Only .xlsx and .xls files are supported.');
+            }
+
+            // Try to read a small portion of the file to validate it's a valid Excel file
+            try {
+                $testData = Excel::toArray(new class implements \Maatwebsite\Excel\Concerns\ToArray {
+                    public function array(array $array) {
+                        return $array;
+                    }
+                }, $file);
+                
+                if (empty($testData) || empty($testData[0])) {
+                    throw new \Exception('Excel file appears to be empty or cannot be read');
+                }
+            } catch (\Exception $e) {
+                throw new \Exception('Invalid Excel file format or corrupted file: ' . $e->getMessage());
+            }
+
             // Prepare import options
             $documentTypeId = $request->input('document_type_id');
 
@@ -365,6 +397,14 @@ class AdditionalDocumentController extends Controller
                 'status' => 'open',
             ];
 
+            // Log import attempt for debugging
+            Log::info('Starting Excel import:', [
+                'file_name' => $file->getClientOriginalName(),
+                'file_size' => $file->getSize(),
+                'document_type_id' => $documentTypeId,
+                'default_values' => $defaultValues
+            ]);
+
             // Create import instance
             $import = new AdditionalDocumentImport(
                 $documentTypeId,
@@ -372,7 +412,7 @@ class AdditionalDocumentController extends Controller
             );
 
             // Process the import
-            Excel::import($import, $request->file('file'));
+            Excel::import($import, $file);
 
             // Get results
             $successCount = $import->getSuccessCount();
@@ -410,9 +450,19 @@ class AdditionalDocumentController extends Controller
                 ->with('import_summary', $importSummary);
         } catch (\Exception $e) {
             Log::error('Import error: ' . $e->getMessage());
+            Log::error('Import error trace: ' . $e->getTraceAsString());
+
+            // Provide more specific error messages for common issues
+            $errorMessage = 'Import failed: ' . $e->getMessage();
+            
+            if (str_contains($e->getMessage(), 'Column count doesn\'t match value count')) {
+                $errorMessage = 'Import failed: Excel column structure mismatch. Please use the provided template format.';
+            } elseif (str_contains($e->getMessage(), 'SQLSTATE[21S01]')) {
+                $errorMessage = 'Import failed: Database column mismatch. Please check the Excel template format.';
+            }
 
             return redirect()->back()
-                ->with('error', 'Import failed: ' . $e->getMessage())
+                ->with('error', $errorMessage)
                 ->withInput();
         }
     }

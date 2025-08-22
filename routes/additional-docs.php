@@ -1,13 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AdditionalDocumentDashboardController;
 
 // Additional Documents Routes (accessible to all authenticated users)
 Route::prefix('additional-documents')->name('additional-documents.')->group(function () {
     // Special routes that need to come before the resource routes
-    Route::get('dashboard', function () {
-        return redirect()->route('additional-documents.index');
-    })->name('dashboard');
+    Route::get('dashboard', [AdditionalDocumentDashboardController::class, 'index'])->name('dashboard');
     Route::get('data', [\App\Http\Controllers\AdditionalDocumentController::class, 'data'])->name('data');
     Route::get('import', [\App\Http\Controllers\AdditionalDocumentController::class, 'import'])->name('import');
     Route::post('import', [\App\Http\Controllers\AdditionalDocumentController::class, 'processImport'])->name('process-import');

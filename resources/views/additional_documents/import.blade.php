@@ -236,30 +236,53 @@
                             <div class="card-body">
                                 <h6>Required Fields:</h6>
                                 <ul class="list-unstyled">
-                                    <li><strong>document_number</strong> - Unique document identifier</li>
-                                    <li><strong>document_date</strong> - Document date (DD/MM/YYYY)</li>
+                                    <li><strong>ito_no</strong> - ITO number (unique document identifier)</li>
+                                    <li><strong>ito_date</strong> - ITO date (DD.MM.YYYY format)</li>
                                 </ul>
+
+                                <div class="alert alert-info mt-2">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    <strong>Column Headers:</strong> The system will automatically recognize various column
+                                    header formats (with or without spaces/underscores).
+                                </div>
 
                                 <h6>Optional Fields:</h6>
                                 <ul class="list-unstyled">
-                                    <li><strong>document_type</strong> - Document type name</li>
                                     <li><strong>po_no</strong> - Purchase order number</li>
-                                    <li><strong>project</strong> - Project name</li>
-                                    <li><strong>receive_date</strong> - Receive date (DD/MM/YYYY)</li>
-                                    <li><strong>remarks</strong> - Additional notes</li>
-                                    <li><strong>status</strong> - Document status (default: open)</li>
-                                    <li><strong>cur_loc</strong> - Current location code</li>
-                                    <li><strong>ito_creator</strong> - ITO creator name</li>
                                     <li><strong>grpo_no</strong> - GRPO number</li>
-                                    <li><strong>origin_wh</strong> - Origin warehouse</li>
-                                    <li><strong>destination_wh</strong> - Destination warehouse</li>
+                                    <li><strong>origin_wh</strong> - Origin warehouse code</li>
+                                    <li><strong>destinatic</strong> - Destination warehouse code</li>
+                                    <li><strong>ito_remar</strong> - ITO remarks/notes</li>
+                                    <li><strong>ito_create</strong> - ITO creation date</li>
+                                    <li><strong>User Nam</strong> - User name</li>
+                                    <li><strong>Printed</strong> - Print status</li>
+                                    <li><strong>iti_no</strong> - ITI number</li>
+                                    <li><strong>iti_date</strong> - ITI date</li>
+                                    <li><strong>delivery_s</strong> - Delivery status</li>
+                                    <li><strong>delivery_1</strong> - Delivery date</li>
+                                    <li><strong>Send To Si</strong> - Send to site date</li>
+                                    <li><strong>Send To B</strong> - Send to branch date</li>
+                                    <li><strong>Send To A</strong> - Send to agent date</li>
+                                    <li><strong>TA Numbe</strong> - TA number</li>
+                                    <li><strong>Journal Remarks</strong> - Journal remarks</li>
                                 </ul>
 
                                 <h6>Date Formats Supported:</h6>
                                 <ul class="list-unstyled">
-                                    <li>DD/MM/YYYY (e.g., 01/01/2024)</li>
-                                    <li>DD-MM-YYYY (e.g., 01-01-2024)</li>
-                                    <li>YYYY-MM-DD (e.g., 2024-01-01)</li>
+                                    <li>DD.MM.YYYY (e.g., 20.08.2025) - <strong>Primary format</strong></li>
+                                    <li>DD-MM-YYYY (e.g., 20-08-2025)</li>
+                                    <li>DD/MM/YYYY (e.g., 20/08/2025)</li>
+                                    <li>YYYY-MM-DD (e.g., 2025-08-20)</li>
+                                </ul>
+
+                                <h6>Important Notes:</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-info-circle text-info"></i> The system will automatically detect
+                                        ITO document type</li>
+                                    <li><i class="fas fa-info-circle text-info"></i> Duplicate ITO numbers will be
+                                        automatically skipped</li>
+                                    <li><i class="fas fa-info-circle text-info"></i> All documents will be assigned to your
+                                        current location</li>
                                 </ul>
                             </div>
                         </div>

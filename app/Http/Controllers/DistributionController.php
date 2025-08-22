@@ -13,6 +13,7 @@ use App\Models\Invoice;
 use App\Models\AdditionalDocument;
 use App\Models\DistributionDocument;
 use App\Models\DistributionHistory;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -830,6 +831,9 @@ class DistributionController extends Controller
                 }
             }
 
+            // ✅ CRITICAL FIX: Handle missing/damaged documents properly
+            $this->handleMissingOrDamagedDocuments($distribution, $user);
+
             // Log workflow transition
             DistributionHistory::logWorkflowTransition(
                 $distribution,
@@ -1029,19 +1033,72 @@ class DistributionController extends Controller
     private function updateDocumentDistributionStatuses(Distribution $distribution, string $status): void
     {
         foreach ($distribution->documents as $distributionDocument) {
-            if ($distributionDocument->document_type === Invoice::class) {
-                // Update invoice status
-                Invoice::where('id', $distributionDocument->document_id)
-                    ->update(['distribution_status' => $status]);
+            // ✅ CRITICAL FIX: Only update documents that were actually received
+            if ($distributionDocument->receiver_verification_status === 'verified') {
+                if ($distributionDocument->document_type === Invoice::class) {
+                    // Update invoice status
+                    Invoice::where('id', $distributionDocument->document_id)
+                        ->update(['distribution_status' => $status]);
 
-                // Also update status of any additional documents attached to this invoice
-                $invoice = Invoice::find($distributionDocument->document_id);
-                if ($invoice && $invoice->additionalDocuments()->count() > 0) {
-                    $invoice->additionalDocuments()->update(['distribution_status' => $status]);
+                    // Also update status of any additional documents attached to this invoice
+                    $invoice = Invoice::find($distributionDocument->document_id);
+                    if ($invoice && $invoice->additionalDocuments()->count() > 0) {
+                        $invoice->additionalDocuments()->update(['distribution_status' => $status]);
+                    }
+                } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+                    AdditionalDocument::where('id', $distributionDocument->document_id)
+                        ->update(['distribution_status' => $status]);
                 }
-            } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
-                AdditionalDocument::where('id', $distributionDocument->document_id)
-                    ->update(['distribution_status' => $status]);
+            }
+            // ❌ Missing/damaged documents keep their original status
+            // This prevents false audit trails and maintains data integrity
+        }
+    }
+
+    /**
+     * Handle missing or damaged documents by updating their status to reflect reality
+     * This ensures that missing/damaged documents don't get false location or status updates
+     */
+    private function handleMissingOrDamagedDocuments(Distribution $distribution, User $user): void
+    {
+        foreach ($distribution->documents as $distributionDocument) {
+            // Check if document was marked as missing or damaged by receiver
+            if (in_array($distributionDocument->receiver_verification_status, ['missing', 'damaged'])) {
+
+                // Update document distribution status to reflect reality
+                if ($distributionDocument->document_type === Invoice::class) {
+                    Invoice::where('id', $distributionDocument->document_id)
+                        ->update([
+                            'distribution_status' => 'unaccounted_for',
+                            // Keep original cur_loc - don't move missing documents!
+                        ]);
+
+                    // Log the discrepancy for audit purposes
+                    DistributionHistory::logDiscrepancyReport(
+                        $distribution,
+                        $user,
+                        $distributionDocument->document_type,
+                        $distributionDocument->document_id,
+                        $distributionDocument->receiver_verification_status,
+                        $distributionDocument->receiver_verification_notes
+                    );
+                } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+                    AdditionalDocument::where('id', $distributionDocument->document_id)
+                        ->update([
+                            'distribution_status' => 'unaccounted_for',
+                            // Keep original cur_loc - don't move missing documents!
+                        ]);
+
+                    // Log the discrepancy for audit purposes
+                    DistributionHistory::logDiscrepancyReport(
+                        $distribution,
+                        $user,
+                        $distributionDocument->document_type,
+                        $distributionDocument->document_id,
+                        $distributionDocument->receiver_verification_status,
+                        $distributionDocument->receiver_verification_notes
+                    );
+                }
             }
         }
     }
@@ -1054,26 +1111,34 @@ class DistributionController extends Controller
      * 
      * Note: When moving invoices, this also moves any additional documents
      * that are attached to those invoices.
+     * 
+     * CRITICAL: Only documents verified as 'verified' by receiver get location updates.
+     * Missing or damaged documents keep their original location to maintain data integrity.
      */
     private function updateDocumentLocations(Distribution $distribution): void
     {
         $destinationLocationCode = $distribution->destinationDepartment->location_code;
 
         foreach ($distribution->documents as $distributionDocument) {
-            if ($distributionDocument->document_type === Invoice::class) {
-                // Update invoice location
-                Invoice::where('id', $distributionDocument->document_id)
-                    ->update(['cur_loc' => $destinationLocationCode]);
+            // ✅ CRITICAL FIX: Only update documents that were actually received
+            if ($distributionDocument->receiver_verification_status === 'verified') {
+                if ($distributionDocument->document_type === Invoice::class) {
+                    // Update invoice location
+                    Invoice::where('id', $distributionDocument->document_id)
+                        ->update(['cur_loc' => $destinationLocationCode]);
 
-                // Also update location of any additional documents attached to this invoice
-                $invoice = Invoice::find($distributionDocument->document_id);
-                if ($invoice && $invoice->additionalDocuments()->count() > 0) {
-                    $invoice->additionalDocuments()->update(['cur_loc' => $destinationLocationCode]);
+                    // Also update location of any additional documents attached to this invoice
+                    $invoice = Invoice::find($distributionDocument->document_id);
+                    if ($invoice && $invoice->additionalDocuments()->count() > 0) {
+                        $invoice->additionalDocuments()->update(['cur_loc' => $destinationLocationCode]);
+                    }
+                } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+                    AdditionalDocument::where('id', $distributionDocument->document_id)
+                        ->update(['cur_loc' => $destinationLocationCode]);
                 }
-            } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
-                AdditionalDocument::where('id', $distributionDocument->document_id)
-                    ->update(['cur_loc' => $destinationLocationCode]);
             }
+            // ❌ Missing/damaged documents keep their original location
+            // This prevents false audit trails and maintains data integrity
         }
     }
 

@@ -4,9 +4,183 @@
 
 This document records key architectural and implementation decisions made during the development of the Document Distribution System (DDS), including rationale, alternatives considered, and implementation details.
 
-## 🎯 **Recent Decisions (2025-08-14)**
+## 🎯 **Recent Decisions (2025-08-21)**
 
-### **1. Supplier Import API Integration Architecture**
+### **1. Dashboard Error Prevention Strategy**
+
+#### **Decision**: Implement comprehensive safe array access and defensive programming for all dashboard views
+
+**Date**: 2025-08-21  
+**Status**: ✅ Implemented  
+**Impact**: High - Dashboard reliability and user experience
+
+**Context**: Multiple dashboards were experiencing "Undefined array key" errors due to missing data or incorrect column references, causing crashes and poor user experience.
+
+**Options Considered**:
+
+1. **Fix Individual Errors**: Address each error as it occurs
+2. **Comprehensive Safe Access**: Implement `??` fallbacks throughout all views
+3. **Data Validation**: Add validation in controllers before passing data to views
+4. **Error Handling**: Catch and handle errors gracefully in views
+
+**Chosen Solution**: Comprehensive safe array access with defensive programming
+
+-   **Rationale**: Provides robust error prevention, better user experience, and easier maintenance
+-   **Implementation**:
+    -   Added `?? 0` fallbacks for all numeric metrics
+    -   Added `?? []` fallbacks for all array iterations
+    -   Protected all array accesses with safe defaults
+    -   Implemented defensive programming patterns
+
+**Alternatives Rejected**:
+
+-   Fix Individual Errors: Reactive approach, doesn't prevent future issues
+-   Data Validation: Adds complexity without addressing view-level safety
+-   Error Handling: Doesn't prevent the errors from occurring
+
+**Consequences**:
+
+-   ✅ Eliminated all "Undefined array key" errors
+-   ✅ Dashboards display gracefully even with missing data
+-   ✅ Better user experience with consistent display
+-   ✅ Easier maintenance and debugging
+-   ❌ Slightly more verbose view code
+-   ❌ Need to maintain fallback values
+
+---
+
+### **2. Database Schema Alignment Strategy**
+
+#### **Decision**: Correct all controller database queries to match actual database schema
+
+**Date**: 2025-08-21  
+**Status**: ✅ Implemented  
+**Impact**: High - Data integrity and system reliability
+
+**Context**: Controllers were referencing non-existent database columns (`ito_no`, `destinatic`) causing SQL errors and dashboard failures.
+
+**Options Considered**:
+
+1. **Database Schema Changes**: Modify database to match controller expectations
+2. **Controller Corrections**: Update controllers to use correct column names
+3. **Hybrid Approach**: Mix of schema changes and controller updates
+4. **Error Handling**: Catch SQL errors and handle gracefully
+
+**Chosen Solution**: Controller corrections to match actual database schema
+
+-   **Rationale**: Maintains data integrity, follows existing database design, and prevents future errors
+-   **Implementation**:
+    -   Corrected `ito_no` → `ito_creator` in AdditionalDocumentDashboardController
+    -   Fixed `destinatic` → `destination_wh` in location analysis
+    -   Verified all column references against actual migrations
+    -   Updated queries to use correct column names
+
+**Alternatives Rejected**:
+
+-   Database Schema Changes: Could affect existing data and other systems
+-   Hybrid Approach: Adds complexity without clear benefits
+-   Error Handling: Doesn't address the root cause
+
+**Consequences**:
+
+-   ✅ Eliminated all SQL column not found errors
+-   ✅ Controllers now match actual database structure
+-   ✅ Better data integrity and system reliability
+-   ✅ Easier debugging and maintenance
+-   ❌ Required controller code updates
+-   ❌ Need to verify all column references
+
+---
+
+## 🎯 **Previous Decisions (2025-08-14)**
+
+### **1. Additional Documents Import System Architecture**
+
+#### **Decision**: Replace batch insert functionality with individual model saves to resolve column mismatch errors
+
+**Date**: 2025-08-21  
+**Status**: ✅ Implemented  
+**Impact**: High - Core import functionality and data integrity
+
+**Context**: The additional documents import was failing with SQL column count mismatch errors due to batch insert operations not properly handling the database schema changes.
+
+**Options Considered**:
+
+1. **Fix Batch Insert**: Debug and fix the column mapping in batch operations
+2. **Individual Saves**: Process each row individually with proper error handling
+3. **Hybrid Approach**: Use batch inserts for valid rows, individual saves for problematic ones
+4. **Database Schema Update**: Modify the import to match current database structure
+
+**Chosen Solution**: Individual model saves with comprehensive error handling and logging
+
+-   **Rationale**: Provides better error isolation, easier debugging, and more reliable data processing
+-   **Implementation**:
+    -   Removed `WithBatchInserts` interface
+    -   Implemented individual `AdditionalDocument` model creation and saving
+    -   Added comprehensive logging for each row processing step
+    -   Enhanced error handling with specific error messages
+
+**Alternatives Rejected**:
+
+-   Fix Batch Insert: Too complex, potential for hidden data corruption
+-   Hybrid Approach: Adds complexity without significant benefits
+-   Database Schema Update: Would require migration changes and potential data loss
+
+**Consequences**:
+
+-   ✅ Reliable import process with proper error handling
+-   ✅ Better debugging capabilities through detailed logging
+-   ✅ Individual row error isolation (one bad row doesn't fail entire import)
+-   ✅ Easier maintenance and troubleshooting
+-   ❌ Slightly slower processing for large files
+-   ❌ More database connections during import
+
+---
+
+### **2. Excel Column Header Normalization Strategy**
+
+#### **Decision**: Implement flexible column header mapping to handle various Excel file formats
+
+**Date**: 2025-08-21  
+**Status**: ✅ Implemented  
+**Impact**: Medium - Import flexibility and user experience
+
+**Context**: Users may have Excel files with different column header formats (spaces, underscores, abbreviations) that need to be consistently mapped to database fields.
+
+**Options Considered**:
+
+1. **Strict Header Matching**: Require exact column header matches
+2. **Flexible Mapping**: Handle various header format variations
+3. **User Configuration**: Allow users to map columns manually
+4. **Template Enforcement**: Require specific Excel template format
+
+**Chosen Solution**: Flexible header normalization with intelligent mapping
+
+-   **Rationale**: Improves user experience by accepting various Excel formats while maintaining data integrity
+-   **Implementation**:
+    -   `normalizeRowData()` method for header processing
+    -   Multiple format recognition (e.g., 'ito_no', 'ito no', 'itono')
+    -   Consistent key mapping to database fields
+    -   Fallback handling for unmapped columns
+
+**Alternatives Rejected**:
+
+-   Strict Matching: Too rigid, poor user experience
+-   User Configuration: Adds complexity for users
+-   Template Enforcement: Reduces flexibility and adoption
+
+**Consequences**:
+
+-   ✅ Better user experience with flexible file formats
+-   ✅ Reduced import failures due to header format issues
+-   ✅ Easier adoption for users with existing Excel files
+-   ✅ Maintains data integrity through proper mapping
+-   ❌ More complex header processing logic
+-   ❌ Potential for unexpected column mappings
+
+---
+
+### **3. Supplier Import API Integration Architecture**
 
 #### **Decision**: Implement external API integration for bulk supplier import with duplicate prevention
 
@@ -46,6 +220,51 @@ This document records key architectural and implementation decisions made during
 -   ✅ Easy configuration and maintenance
 -   ❌ Dependency on external API availability
 -   ❌ Network timeout considerations
+
+---
+
+### **4. Additional Documents Index Page Enhancement Strategy**
+
+#### **Decision**: Enhance index page with date columns and improved date range handling for better user experience
+
+**Date**: 2025-08-21  
+**Status**: ✅ Implemented  
+**Impact**: Medium - User interface and data visibility
+
+**Context**: Users need better visibility of document dates and improved date range search functionality for more effective document management.
+
+**Options Considered**:
+
+1. **Add Date Columns**: Include document_date and receive_date in the DataTable
+2. **Improve Date Range**: Fix date range input default behavior
+3. **Enhanced Formatting**: Use consistent date formatting across the application
+4. **Column Reordering**: Optimize table structure for better information hierarchy
+
+**Chosen Solution**: Comprehensive index page enhancement with date columns and improved UX
+
+-   **Rationale**: Provides better document visibility, improved search capabilities, and consistent user experience
+-   **Implementation**:
+    -   Added Document Date and Receive Date columns to DataTable
+    -   Implemented DD-MMM-YYYY date format using Moment.js
+    -   Fixed date range input to be empty by default
+    -   Applied proper CSS styling for date columns
+    -   Updated column ordering and DataTable configuration
+
+**Alternatives Rejected**:
+
+-   Minimal Changes: Would not address user needs for better date visibility
+-   Modal-Based Dates: Would add complexity without significant benefit
+-   Separate Date Page: Would fragment user experience
+
+**Consequences**:
+
+-   ✅ Better document date visibility and management
+-   ✅ Improved search and filtering capabilities
+-   ✅ Consistent date formatting across the application
+-   ✅ Enhanced user experience with better table structure
+-   ✅ More comprehensive document information display
+-   ❌ Slightly wider table layout
+-   ❌ Additional data processing for date formatting
 
 ---
 

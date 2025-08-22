@@ -64,6 +64,13 @@
         .badge.badge-info {
             background-color: #17a2b8;
         }
+
+        /* Date column styling */
+        .date-column {
+            white-space: nowrap;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
     </style>
 @endsection
 
@@ -185,6 +192,8 @@
                                     <th>Document Number</th>
                                     <th>PO Number</th>
                                     <th>Type</th>
+                                    <th>Document Date</th>
+                                    <th>Receive Date</th>
                                     <th>Current Location</th>
                                     <th>Status</th>
                                     <th>Days</th>
@@ -229,7 +238,7 @@
                 }
             });
 
-            // Clear date range on page load
+            // Clear date range on page load and ensure it's empty by default
             $('#date_range').val('');
 
             // Initialize DataTable
@@ -266,6 +275,28 @@
                         name: 'type.type_name'
                     },
                     {
+                        data: 'document_date',
+                        name: 'document_date',
+                        className: 'date-column',
+                        render: function(data, type, row) {
+                            if (data) {
+                                return moment(data).format('DD-MMM-YYYY');
+                            }
+                            return '-';
+                        }
+                    },
+                    {
+                        data: 'receive_date',
+                        name: 'receive_date',
+                        className: 'date-column',
+                        render: function(data, type, row) {
+                            if (data) {
+                                return moment(data).format('DD-MMM-YYYY');
+                            }
+                            return '-';
+                        }
+                    },
+                    {
                         data: 'cur_loc',
                         name: 'cur_loc'
                     },
@@ -285,7 +316,7 @@
                     }
                 ],
                 order: [
-                    [7, 'desc']
+                    [9, 'desc']
                 ],
                 pageLength: 25,
                 responsive: true,

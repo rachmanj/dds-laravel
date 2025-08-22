@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceAttachmentController;
+use App\Http\Controllers\InvoiceDashboardController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -15,10 +16,8 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
     // Session check endpoint
     Route::get('/check-session', [InvoiceController::class, 'checkSession'])->name('check-session');
 
-    // Optional dashboard redirect within invoices section
-    Route::get('/dashboard', function () {
-        return redirect()->route('invoices.index');
-    })->name('dashboard');
+    // Dashboard route
+    Route::get('/dashboard', [InvoiceDashboardController::class, 'index'])->name('dashboard');
 
     Route::post('/{invoice}/attachments', [InvoiceAttachmentController::class, 'store'])->name('attachments.store');
 

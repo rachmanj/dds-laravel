@@ -8,6 +8,13 @@
     </a>
     <ul class="nav nav-treeview">
         <li class="nav-item">
+            <a href="{{ route('distributions.dashboard') }}"
+                class="nav-link {{ request()->routeIs('distributions.dashboard') ? 'active' : '' }}">
+                <i class="far fa-circle nav-icon"></i>
+                <p>Dashboard</p>
+            </a>
+        </li>
+        <li class="nav-item">
             <a href="{{ route('distributions.index') }}"
                 class="nav-link {{ request()->routeIs('distributions.index') ? 'active' : '' }}">
                 <i class="far fa-circle nav-icon"></i>

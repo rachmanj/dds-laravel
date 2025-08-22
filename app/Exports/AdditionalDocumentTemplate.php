@@ -16,56 +16,62 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
 {
     public function array(): array
     {
-        $documentTypes = AdditionalDocumentType::orderByName()->pluck('type_name')->toArray();
-        $typeList = implode(', ', $documentTypes);
-
         return [
             [
-                'DOC-001',
-                'ITO',
-                '01/01/2024',
-                'PO-2024-001',
-                'Project Alpha',
-                '02/01/2024',
-                'Sample ITO document for import testing',
-                'open',
-                '000HLOG',
-                'John Doe',
-                'GRPO-001',
-                'WH-001',
-                'WH-002'
+                '251005358',
+                '20.08.2025',
+                '20.08.2025',
+                'logbpn3',
+                '000H LOG',
+                'Y',
+                '250506242',
+                '250204145',
+                '02-SPT',
+                '13-SPT',
+                'PR 250140607 (T105) BARANG DITERIMA DISITE TGL 08.08.2025',
+                '251005358',
+                '20.08.2025',
+                '20.08.2025',
+                'Delivered',
+                '20.08.2025',
+                '20.08.2025',
+                '',
+                '',
+                '',
+                'Inventory Transfers -'
             ],
             [
-                'DOC-002',
-                'Goods Issue',
-                '01/02/2024',
-                'PO-2024-002',
-                'Project Beta',
-                '02/02/2024',
-                'Sample Goods Issue document',
-                'open',
-                '000HLOG',
-                'Jane Smith',
-                'GRPO-002',
-                'WH-003',
-                'WH-004'
+                '251005359',
+                '20.08.2025',
+                '20.08.2025',
+                'logbpn3',
+                '000H LOG',
+                'Y',
+                '250506243',
+                '250204857',
+                '02-SPT',
+                '13-SPT',
+                'ADA BARANGNYA',
+                '251005359',
+                '20.08.2025',
+                '20.08.2025',
+                'Delivered',
+                '20.08.2025',
+                '20.08.2025',
+                '',
+                '',
+                '',
+                'Inventory Transfers -'
             ],
             [
-                'DOC-003',
-                'BAPP',
-                '01/03/2024',
-                'PO-2024-003',
-                'Project Gamma',
-                '02/03/2024',
-                'Sample BAPP document',
-                'open',
-                '000HLOG',
-                'Mike Johnson',
-                'GRPO-003',
-                'WH-005',
-                'WH-006'
-            ],
-            [
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
                 '',
                 '',
                 '',
@@ -93,6 +99,15 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
                 '',
                 '',
                 '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
                 ''
             ],
             [
@@ -108,27 +123,6 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
                 '',
                 '',
                 '',
-                ''
-            ],
-            [
-                '2. Date formats supported: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                ''
-            ],
-            [
-                '3. Document types available: ' . $typeList,
-                '',
-                '',
                 '',
                 '',
                 '',
@@ -141,7 +135,16 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
                 ''
             ],
             [
-                '4. Status options: open, closed',
+                '2. Date format: DD.MM.YYYY (e.g., 20.08.2025)',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
                 '',
                 '',
                 '',
@@ -156,7 +159,64 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
                 ''
             ],
             [
-                '5. Location (cur_loc) will be automatically set to 000HLOG',
+                '3. Document type will be automatically set to ITO',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                ''
+            ],
+            [
+                '4. Location will be automatically set to your department location',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                ''
+            ],
+            [
+                '5. Duplicate ITO numbers will be automatically skipped',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
                 '',
                 '',
                 '',
@@ -177,25 +237,33 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
     {
         return [
             'ito_no',
-            'document_type',
             'ito_date',
-            'po_no',
-            'project',
-            'ito_created_date',
-            'ito_remarks',
-            'status',
-            'cur_loc',
-            'ito_creator',
+            'ito_create',
+            'ito_create',
+            'User Nam',
+            'Printed',
             'grpo_no',
+            'po_no',
             'origin_wh',
-            'destination_wh'
+            'destinatic',
+            'ito_remar',
+            'iti_no',
+            'iti_date',
+            'iti_create',
+            'delivery_s',
+            'delivery_1',
+            'Send To Si',
+            'Send To B',
+            'Send To A',
+            'TA Numbe',
+            'Journal Remarks'
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
         // Style the header row
-        $sheet->getStyle('A1:M1')->applyFromArray([
+        $sheet->getStyle('A1:U1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -211,7 +279,7 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
         ]);
 
         // Style the sample data rows
-        $sheet->getStyle('A2:M4')->applyFromArray([
+        $sheet->getStyle('A2:U3')->applyFromArray([
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'F0F8FF'],
@@ -219,7 +287,7 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
         ]);
 
         // Style the instructions section
-        $sheet->getStyle('A6:A10')->applyFromArray([
+        $sheet->getStyle('A5:A9')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FF0000'],
@@ -227,7 +295,7 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
         ]);
 
         // Add borders to the data area
-        $sheet->getStyle('A1:M4')->applyFromArray([
+        $sheet->getStyle('A1:U3')->applyFromArray([
             'borders' => [
                 'allBorders' => [
                     'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
@@ -242,19 +310,27 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
     public function columnWidths(): array
     {
         return [
-            'A' => 20, // ito_no
-            'B' => 15, // document_type
-            'C' => 15, // ito_date
-            'D' => 15, // po_no
-            'E' => 20, // project
-            'F' => 15, // ito_created_date
-            'G' => 30, // ito_remarks
-            'H' => 10, // status
-            'I' => 15, // cur_loc
-            'J' => 20, // ito_creator
-            'K' => 15, // grpo_no
-            'L' => 15, // origin_wh
-            'M' => 15, // destination_wh
+            'A' => 15, // ito_no
+            'B' => 12, // ito_date
+            'C' => 12, // ito_create
+            'D' => 12, // ito_create
+            'E' => 15, // User Nam
+            'F' => 10, // Printed
+            'G' => 15, // grpo_no
+            'H' => 15, // po_no
+            'I' => 12, // origin_wh
+            'J' => 12, // destinatic
+            'K' => 40, // ito_remar
+            'L' => 15, // iti_no
+            'M' => 12, // iti_date
+            'N' => 12, // iti_create
+            'O' => 15, // delivery_s
+            'P' => 12, // delivery_1
+            'Q' => 12, // Send To Si
+            'R' => 12, // Send To B
+            'S' => 12, // Send To A
+            'T' => 12, // TA Numbe
+            'U' => 30, // Journal Remarks
         ];
     }
 }
