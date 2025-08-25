@@ -97,6 +97,50 @@ available   available     in_transit  distributed  distributed    distributed
 -   **Additional Documents**: Supporting documentation with automatic linking
 -   **Distribution Documents**: Polymorphic relationship for workflow management
 
+## 🌐 **External API System**
+
+### **API Architecture**
+
+-   **API Key Authentication**: Secure middleware using `DDS_API_KEY` environment variable
+-   **Rate Limiting**: Multi-tier rate limiting (hourly, minute, daily limits)
+-   **Route Protection**: All API endpoints protected by authentication middleware
+-   **Version Control**: API versioning with `/api/v1/` prefix
+
+### **API Endpoints**
+
+-   **Health Check**: `GET /api/health` (public access for monitoring)
+-   **Department Listing**: `GET /api/v1/departments` (authenticated access)
+-   **Invoice Retrieval**: `GET /api/v1/departments/{location_code}/invoices` (authenticated access)
+
+### **Security Implementation**
+
+-   **ApiKeyMiddleware**: Validates `X-API-Key` header against environment variable
+-   **ApiRateLimitMiddleware**: Enforces rate limits with sliding window approach
+-   **Audit Logging**: Complete logging of all API access attempts and failures
+-   **Input Validation**: Comprehensive validation of query parameters and path variables
+
+### **Data Access Patterns**
+
+-   **Department Filtering**: Invoices filtered by department location code
+-   **Relationship Loading**: Eager loading of supplier and additional documents
+-   **Data Transformation**: Structured JSON responses with consistent formatting
+-   **Complete Data Retrieval**: All invoices returned in single response (no pagination)
+-   **Enhanced Validation**: Comprehensive location code validation with empty code handling
+
+### **Rate Limiting Strategy**
+
+-   **Hourly Limit**: 100 requests per hour per API key + IP combination
+-   **Minute Limit**: 20 requests per minute per API key + IP combination
+-   **Daily Limit**: 1000 requests per day per API key + IP combination
+-   **Response Headers**: Rate limit information included in response headers
+
+### **API Response Optimization**
+
+-   **No Pagination**: Complete datasets returned in single response for simplified integration
+-   **Total Count**: Invoice count included in meta section for client applications
+-   **Efficient Queries**: Single database query instead of pagination overhead
+-   **Performance Focus**: Optimized for external application integration needs
+
 ### **Document Lifecycle**
 
 -   **Creation**: Documents start with 'available' distribution status
@@ -230,6 +274,58 @@ available   available     in_transit  distributed  distributed    distributed
 -   **AI-Powered Insights**: Machine learning for document routing
 -   **Workflow Automation**: Advanced business process automation
 -   **Integration APIs**: Third-party system integration
+
+## 📚 **User Documentation & Training Architecture**
+
+### **Documentation Strategy**
+
+The DDS application includes comprehensive documentation designed for different user types:
+
+#### **IT Administrator Guide**
+
+-   **Purpose**: Complete system installation and configuration
+-   **Audience**: System administrators and DevOps teams
+-   **Content**: Server setup, database configuration, security, monitoring
+-   **Format**: Technical markdown with code examples and commands
+
+#### **End User Operating Guide**
+
+-   **Purpose**: Daily application usage and workflow management
+-   **Audience**: Business users and operational staff
+-   **Content**: Navigation, workflows, troubleshooting, best practices
+-   **Format**: User-friendly markdown with screenshots and step-by-step instructions
+
+### **Documentation Standards**
+
+#### **Content Organization**
+
+-   **Progressive Disclosure**: Basic concepts before advanced features
+-   **Task-Oriented**: Organized by what users need to accomplish
+-   **Visual Aids**: Screenshots, diagrams, and quick reference cards
+-   **Searchable**: Clear headings and consistent terminology
+
+#### **Maintenance Process**
+
+-   **Version Control**: All guides stored in Git with version tracking
+-   **Review Cycle**: Quarterly updates to reflect system changes
+-   **User Feedback**: Continuous improvement based on user input
+-   **Multi-Format**: Available in markdown, PDF, and HTML formats
+
+### **Training Integration**
+
+#### **Learning Paths**
+
+-   **New User Onboarding**: Step-by-step introduction to core features
+-   **Role-Based Training**: Specific workflows for different job functions
+-   **Advanced Features**: Deep-dive into analytics and reporting
+-   **Refresher Sessions**: Periodic updates and new feature training
+
+#### **Support Resources**
+
+-   **Self-Service**: Comprehensive guides and FAQ sections
+-   **Video Tutorials**: Recorded demonstrations of common tasks
+-   **Practice Environment**: Safe area for learning new features
+-   **Mentor Program**: Experienced users helping new team members
 
 ---
 
