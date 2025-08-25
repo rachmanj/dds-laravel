@@ -33,10 +33,20 @@ class DistributionController extends Controller
         // Filter by department access based on user role
         if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             if ($user->department) {
-                // Regular users only see distributions where they are the destination department
-                // and the distribution is in "sent" status (ready to receive)
-                $query->where('destination_department_id', $user->department->id)
-                    ->where('status', 'sent');
+                // Enhanced logic: Show both incoming and outgoing distributions
+                $query->where(function ($q) use ($user) {
+                    // Incoming distributions: destination = user's department & status = sent
+                    $q->where(function ($subQ) use ($user) {
+                        $subQ->where('destination_department_id', $user->department->id)
+                            ->where('status', 'sent');
+                    })
+                        // OR
+                        // Outgoing distributions: origin = user's department & status in (draft, sent)
+                        ->orWhere(function ($subQ) use ($user) {
+                            $subQ->where('origin_department_id', $user->department->id)
+                                ->whereIn('status', ['draft', 'sent']);
+                        });
+                });
             }
         }
 

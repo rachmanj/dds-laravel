@@ -6,10 +6,29 @@
 -   Valid API key in `.env` file (`DDS_API_KEY`)
 -   Test data in database (departments and invoices)
 
+## **⚠️ Important Note for Windows Users**
+
+**PowerShell Users**: PowerShell's `curl` is an alias for `Invoke-WebRequest` and has different syntax. Use the PowerShell commands provided below.
+
+**Alternative Solutions**:
+
+-   Use `Invoke-RestMethod` (recommended for JSON APIs)
+-   Install real `curl` from https://curl.se/windows/
+-   Use Windows Subsystem for Linux (WSL)
+-   Use Git Bash or similar Unix-like terminal
+
 ## **Test 1: Health Check (No Authentication Required)**
 
+**PowerShell (Windows):**
+
+```powershell
+Invoke-RestMethod -Uri "http://192.168.32.13/dds/api/health" -Headers @{"Accept" = "application/json"}
+```
+
+**Bash/Linux/macOS:**
+
 ```bash
-curl -X GET "http://your-domain.com/api/health" \
+curl -X GET "http://192.168.32.13/dds/api/health" \
   -H "Accept: application/json"
 ```
 
@@ -24,6 +43,14 @@ curl -X GET "http://your-domain.com/api/health" \
 ```
 
 ## **Test 2: Get Available Departments**
+
+**PowerShell (Windows):**
+
+```powershell
+Invoke-RestMethod -Uri "http://192.168.32.13/dds/api/v1/departments" -Headers @{"X-API-Key" = "YOUR_DDS_API_KEY"; "Accept" = "application/json"}
+```
+
+**Bash/Linux/macOS:**
 
 ```bash
 curl -X GET "http://your-domain.com/api/v1/departments" \
@@ -102,17 +129,10 @@ curl -X GET "http://your-domain.com/api/v1/departments/000HACC/invoices" \
             }
         ]
     },
-    "pagination": {
-        "current_page": 1,
-        "per_page": 50,
-        "total": 1,
-        "last_page": 1,
-        "from": 1,
-        "to": 1
-    },
     "meta": {
         "department_location": "000HACC",
         "department_name": "Accounting",
+        "total_invoices": 1,
         "requested_at": "2025-01-21T10:30:00Z",
         "filters_applied": []
     }

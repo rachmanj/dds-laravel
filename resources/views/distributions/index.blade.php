@@ -20,7 +20,7 @@
                                 @if (auth()->user()->hasRole(['superadmin', 'admin']))
                                     Distribution Management
                                 @else
-                                    Distributions to Receive
+                                    Department Distributions
                                 @endif
                             </h3>
                             <div class="card-tools">
@@ -46,9 +46,13 @@
                             @if (!auth()->user()->hasRole(['superadmin', 'admin']))
                                 <div class="alert alert-info">
                                     <i class="fas fa-info-circle"></i>
-                                    <strong>Note:</strong> You can only see distributions that are sent to your department
-                                    and are
-                                    ready to receive (status: Sent).
+                                    <strong>Note:</strong> You can see:
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Incoming:</strong> Distributions sent TO your department (status: Sent)
+                                            - ready to receive</li>
+                                        <li><strong>Outgoing:</strong> Distributions FROM your department (status:
+                                            Draft/Sent) - can edit drafts, monitor sent</li>
+                                    </ul>
                                 </div>
                             @endif
 
@@ -167,9 +171,29 @@
                                                     <td>{{ $distribution->originDepartment->name }}</td>
                                                     <td>{{ $distribution->destinationDepartment->name }}</td>
                                                     <td>
+                                                        @php
+                                                            $isIncoming =
+                                                                $distribution->destination_department_id ===
+                                                                auth()->user()->department->id;
+                                                            $isOutgoing =
+                                                                $distribution->origin_department_id ===
+                                                                auth()->user()->department->id;
+                                                        @endphp
+
                                                         <span class="badge {{ $distribution->status_badge_class }}">
                                                             {{ $distribution->status_display }}
                                                         </span>
+
+                                                        @if ($isIncoming)
+                                                            <span class="badge badge-info badge-sm ml-1">
+                                                                <i class="fas fa-download"></i> Incoming
+                                                            </span>
+                                                        @elseif ($isOutgoing)
+                                                            <span class="badge badge-warning badge-sm ml-1">
+                                                                <i class="fas fa-upload"></i> Outgoing
+                                                            </span>
+                                                        @endif
+
                                                         <div class="progress mt-1" style="height: 3px;">
                                                             <div class="progress-bar bg-success"
                                                                 style="width: {{ $distribution->workflow_progress }}%">
@@ -220,12 +244,12 @@
                         @else
                             <div class="text-center py-5">
                                 <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                <h5 class="text-muted">No Distributions to Receive</h5>
+                                <h5 class="text-muted">No Department Distributions</h5>
                                 <p class="text-muted">
                                     @if (auth()->user()->hasRole(['superadmin', 'admin']))
                                         There are no distributions in the system.
                                     @else
-                                        There are no distributions sent to your department that are ready to receive.
+                                        There are no incoming distributions to receive or outgoing distributions to monitor.
                                     @endif
                                 </p>
                             </div>

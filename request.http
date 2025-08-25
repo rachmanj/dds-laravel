@@ -1,0 +1,42 @@
+### Health Check (No Authentication Required)
+GET http://localhost:8000/api/health
+Accept: application/json
+
+### Get Available Departments (Requires API Key)
+GET http://localhost:8000/api/v1/departments
+X-API-Key: mantapjiwa
+Accept: application/json
+
+### Get Invoices by Department (Requires API Key)
+GET http://localhost:8000/api/v1/departments/000HACC/invoices
+X-API-Key: mantapjiwa
+Accept: application/json
+
+### Get Invoices with Status Filter
+GET http://localhost:8000/api/v1/departments/000HACC/invoices?status=open
+X-API-Key: mantapjiwa
+Accept: application/json
+
+### Get Invoices with Date Range Filter
+GET http://localhost:8000/api/v1/departments/000HACC/invoices?date_from=2025-01-01&date_to=2025-01-31
+X-API-Key: mantapjiwa
+Accept: application/json
+
+### Test Invalid API Key (Security Test)
+GET http://localhost:8000/api/v1/departments/000HACC/invoices
+X-API-Key: mantapjiwa
+Accept: application/json
+
+### Test Missing API Key
+GET http://localhost:8000/api/v1/departments/000HACC/invoices
+Accept: application/json
+
+### Test Invalid Location Code
+GET http://localhost:8000/api/v1/departments/INVALID_CODE/invoices
+X-API-Key: mantapjiwa
+Accept: application/json
+
+### Test Empty Location Code (Should return 400)
+GET http://localhost:8000/api/v1/departments//invoices
+X-API-Key: mantapjiwa
+Accept: application/json

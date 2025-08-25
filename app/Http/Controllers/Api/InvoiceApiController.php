@@ -70,8 +70,8 @@ class InvoiceApiController extends Controller
             }
 
             // Build query
-            $query = Invoice::with(['supplier', 'additionalDocuments'])
-                ->where('destination_department_id', $department->id);
+            $query = Invoice::with(['supplier', 'additionalDocuments', 'type'])
+                ->where('cur_loc', $locationCode);
 
             // Apply filters
             if ($request->filled('status')) {
@@ -92,10 +92,11 @@ class InvoiceApiController extends Controller
             // Transform data
             $transformedInvoices = $invoices->map(function ($invoice) {
                 return [
-                    'invoice_number' => $invoice->invoice_number,
-                    'faktur_no' => $invoice->faktur_no,
-                    'invoice_date' => $invoice->invoice_date,
-                    'receive_date' => $invoice->receive_date,
+                    'id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number ? str_replace('\\', '', $invoice->invoice_number) : null,
+                    'faktur_no' => $invoice->faktur_no ? str_replace('\\', '', $invoice->faktur_no) : null,
+                    'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : null,
+                    'receive_date' => $invoice->receive_date ? $invoice->receive_date->format('Y-m-d') : null,
                     'supplier_name' => $invoice->supplier->name ?? null,
                     'supplier_sap_code' => $invoice->supplier->sap_code ?? null,
                     'po_no' => $invoice->po_no,
@@ -104,16 +105,17 @@ class InvoiceApiController extends Controller
                     'payment_project' => $invoice->payment_project,
                     'currency' => $invoice->currency,
                     'amount' => $invoice->amount,
-                    'invoice_type' => $invoice->invoice_type,
-                    'payment_date' => $invoice->payment_date,
+                    'invoice_type' => $invoice->type->type_name ?? null,
+                    'payment_date' => $invoice->payment_date ? $invoice->payment_date->format('Y-m-d') : null,
                     'remarks' => $invoice->remarks,
                     'status' => $invoice->status,
                     'sap_doc' => $invoice->sap_doc,
                     'additional_documents' => $invoice->additionalDocuments->map(function ($doc) {
                         return [
-                            'document_no' => $doc->document_no,
-                            'document_date' => $doc->document_date,
-                            'document_type' => $doc->document_type,
+                            'id' => $doc->id,
+                            'document_no' => $doc->document_number ? str_replace('\\', '', $doc->document_number) : null,
+                            'document_date' => $doc->document_date ? $doc->document_date->format('Y-m-d') : null,
+                            'document_type' => $doc->type->type_name ?? '',
                         ];
                     })->toArray(),
                 ];

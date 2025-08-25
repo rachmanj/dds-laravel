@@ -15,6 +15,15 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+// Health check endpoint (no authentication required) - Place this FIRST
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'healthy',
+        'timestamp' => now()->toISOString(),
+        'version' => '1.0.0'
+    ]);
+});
+
 // API v1 routes with authentication and rate limiting
 Route::prefix('v1')->middleware(['api.key', 'api.rate.limit'])->group(function () {
 
@@ -23,13 +32,4 @@ Route::prefix('v1')->middleware(['api.key', 'api.rate.limit'])->group(function (
 
     // Get available departments for reference
     Route::get('/departments', [InvoiceApiController::class, 'getDepartments']);
-});
-
-// Health check endpoint (no authentication required)
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'healthy',
-        'timestamp' => now()->toISOString(),
-        'version' => '1.0.0'
-    ]);
 });
