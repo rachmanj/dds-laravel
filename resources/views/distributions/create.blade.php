@@ -435,7 +435,8 @@
                             toastr.success(response.message);
                             setTimeout(function() {
                                 window.location.href = response.distribution ?
-                                    '/distributions/' + response.distribution.id :
+                                    '{{ url('distributions') }}/' + response
+                                    .distribution.id :
                                     '{{ route('distributions.index') }}';
                             }, 1000);
                         } else {

@@ -1530,7 +1530,7 @@
                         `Are you sure you want to cancel distribution ${distributionNumber}? This action cannot be undone.`
                     )) {
                     $.ajax({
-                        url: `/distributions/${distributionId}`,
+                        url: '{{ url('distributions') }}/' + distributionId,
                         type: 'DELETE',
                         headers: {
                             'X-CSRF-TOKEN': '{{ csrf_token() }}'

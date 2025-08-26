@@ -402,7 +402,7 @@
 
                         // Make AJAX delete request
                         $.ajax({
-                            url: '/additional-documents/' + documentId,
+                            url: '{{ url('additional-documents') }}/' + documentId,
                             type: 'DELETE',
                             data: {
                                 _token: '{{ csrf_token() }}'
@@ -440,7 +440,7 @@
                 var documentId = $(this).data('id');
 
                 // Redirect to the show page instead of opening modal
-                window.location.href = '/additional-documents/' + documentId;
+                window.location.href = '{{ url('additional-documents') }}/' + documentId;
             });
 
             // Success message display

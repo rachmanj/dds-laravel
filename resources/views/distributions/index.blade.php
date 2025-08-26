@@ -378,7 +378,7 @@
 
                 $('#confirmDelete').off('click').on('click', function() {
                     $.ajax({
-                        url: '/distributions/' + id,
+                        url: '{{ url('distributions') }}/' + id,
                         type: 'DELETE',
                         data: {
                             _token: '{{ csrf_token() }}'
