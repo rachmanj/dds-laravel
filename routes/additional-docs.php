@@ -16,6 +16,9 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     Route::get('/', [\App\Http\Controllers\AdditionalDocumentController::class, 'index'])->name('index');
     Route::get('create', [\App\Http\Controllers\AdditionalDocumentController::class, 'create'])->name('create');
     Route::post('/', [\App\Http\Controllers\AdditionalDocumentController::class, 'store'])->name('store');
+
+    // On-the-fly creation for invoice forms
+    Route::post('on-the-fly', [\App\Http\Controllers\AdditionalDocumentController::class, 'createOnTheFly'])->name('on-the-fly');
     Route::get('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'show'])->name('show');
     Route::get('{additionalDocument}/edit', [\App\Http\Controllers\AdditionalDocumentController::class, 'edit'])->name('edit');
     Route::put('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'update'])->name('update');

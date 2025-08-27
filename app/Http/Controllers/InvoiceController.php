@@ -147,8 +147,9 @@ class InvoiceController extends Controller
         $suppliers = Supplier::active()->orderBy('name')->get();
         $projects = Project::active()->orderBy('code')->get();
         $departments = \App\Models\Department::active()->orderBy('project')->get();
+        $additionalDocumentTypes = \App\Models\AdditionalDocumentType::orderByName()->get();
 
-        return view('invoices.create', compact('invoiceTypes', 'suppliers', 'projects', 'departments'));
+        return view('invoices.create', compact('invoiceTypes', 'suppliers', 'projects', 'departments', 'additionalDocumentTypes'));
     }
 
     public function store(Request $request)
@@ -250,8 +251,9 @@ class InvoiceController extends Controller
         $suppliers = Supplier::active()->orderBy('name')->get();
         $projects = Project::active()->orderBy('code')->get();
         $departments = \App\Models\Department::active()->orderBy('project')->get();
+        $additionalDocumentTypes = \App\Models\AdditionalDocumentType::orderByName()->get();
 
-        return view('invoices.edit', compact('invoice', 'invoiceTypes', 'suppliers', 'projects', 'departments'));
+        return view('invoices.edit', compact('invoice', 'invoiceTypes', 'suppliers', 'projects', 'departments', 'additionalDocumentTypes'));
     }
 
     public function update(Request $request, Invoice $invoice)

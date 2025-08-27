@@ -367,6 +367,12 @@
                                     <div class="card-header">
                                         <h3 class="card-title">Link Additional Documents (optional)</h3>
                                         <div class="card-tools">
+                                            @if (auth()->user()->can('on-the-fly-addoc-feature'))
+                                                <button type="button" class="btn btn-sm btn-success mr-2"
+                                                    id="create-doc-btn">
+                                                    <i class="fas fa-plus"></i> Create New Document
+                                                </button>
+                                            @endif
                                             <button type="button" class="btn btn-sm btn-outline-secondary mr-2"
                                                 id="refresh-docs-btn" style="display:none;">
                                                 <i class="fas fa-sync-alt"></i> Refresh
@@ -421,6 +427,7 @@
                                         </div>
                                     </div>
                                 </div>
+
                             </div>
 
                             <div class="card-footer">
@@ -438,6 +445,92 @@
             </div>
         </div>
     </section>
+
+    <!-- Create Additional Document Modal -->
+    <div class="modal fade" id="create-doc-modal" tabindex="-1" role="dialog"
+        aria-labelledby="create-doc-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="create-doc-modal-label">Create New Additional Document</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="create-doc-form">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="doc_type_id">Document Type <span class="text-danger">*</span></label>
+                                    <select class="form-control select2bs4" id="doc_type_id" name="document_type_id"
+                                        required>
+                                        <option value="">Select Document Type</option>
+                                        @foreach ($additionalDocumentTypes ?? [] as $type)
+                                            <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="doc_number">Document Number <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="doc_number" name="document_number"
+                                        required maxlength="255">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="doc_date">Document Date</label>
+                                    <input type="date" class="form-control" id="doc_date" name="document_date">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="doc_receive_date">Document Receive Date</label>
+                                    <input type="date" class="form-control" id="doc_receive_date"
+                                        name="document_receive_date">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="doc_cur_loc">Current Location <span class="text-danger">*</span></label>
+                                    <select class="form-control select2bs4" id="doc_cur_loc" name="cur_loc" required>
+                                        <option value="">Select Location</option>
+                                        <option value="000HLOG">000HLOG (Logistic)</option>
+                                        @if (auth()->user()->department && auth()->user()->department->location_code)
+                                            <option value="{{ auth()->user()->department->location_code }}" selected>
+                                                {{ auth()->user()->department->location_code }}
+                                                ({{ auth()->user()->department->name }})
+                                            </option>
+                                        @endif
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="doc_po_no">PO Number</label>
+                                    <input type="text" class="form-control" id="doc_po_no" name="po_no"
+                                        maxlength="255" value="{{ old('po_no', $invoice->po_no) }}">
+                                    <small class="form-text text-muted">This document will be automatically attached to the
+                                        current invoice.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="create-doc-submit">
+                            <i class="fas fa-plus"></i> Create Document
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 @endsection
 
@@ -1068,6 +1161,107 @@
                     }
                 }
             });
+
+            // ---------- On-the-fly Additional Document Creation ----------
+
+            // Open create document modal
+            $(document).on('click', '#create-doc-btn', function() {
+                // Pre-fill PO number if available
+                var po = $('#po_no').val().trim();
+                if (po) {
+                    $('#doc_po_no').val(po);
+                }
+
+                // Reset form
+                $('#create-doc-form')[0].reset();
+
+                // Show modal
+                $('#create-doc-modal').modal('show');
+            });
+
+            // Handle form submission
+            $(document).on('submit', '#create-doc-form', function(e) {
+                e.preventDefault();
+
+                var submitBtn = $('#create-doc-submit');
+                var originalText = submitBtn.html();
+
+                // Disable submit button and show loading
+                submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Creating...');
+
+                // Get form data
+                var formData = {
+                    _token: '{{ csrf_token() }}',
+                    document_type_id: $('#doc_type_id').val(),
+                    document_number: $('#doc_number').val(),
+                    document_date: $('#doc_date').val(),
+                    document_receive_date: $('#doc_receive_date').val(),
+                    cur_loc: $('#doc_cur_loc').val(),
+                    po_no: $('#doc_po_no').val()
+                };
+
+                // Validate required fields
+                if (!formData.document_type_id || !formData.document_number || !formData.cur_loc) {
+                    toastr.error('Please fill in all required fields.');
+                    submitBtn.prop('disabled', false).html(originalText);
+                    return false;
+                }
+
+                $.ajax({
+                    url: '{{ route('additional-documents.on-the-fly') }}',
+                    type: 'POST',
+                    data: formData,
+                    success: function(response) {
+                        if (response.success) {
+                            // Show success message
+                            toastr.success(response.message);
+
+                            // Close modal
+                            $('#create-doc-modal').modal('hide');
+
+                            // Auto-select the newly created document
+                            var newDoc = response.document;
+                            selectedDocs[newDoc.id] = {
+                                id: newDoc.id,
+                                document_number: newDoc.document_number,
+                                type_name: newDoc.document_type,
+                                document_date: newDoc.document_date || '-',
+                                po_no: newDoc.po_no || '-',
+                                cur_loc: newDoc.cur_loc,
+                                remarks: '-'
+                            };
+
+                            // Refresh the additional documents table to show the new document
+                            searchAdditionalDocuments();
+
+                            // Update selected count
+                            renderSelectedTable();
+
+                            // Show info message about auto-attachment
+                            toastr.info(
+                                'The newly created document has been automatically selected and will be attached to this invoice.'
+                            );
+
+                        } else {
+                            toastr.error(response.message || 'Failed to create document.');
+                        }
+                    },
+                    error: function(xhr) {
+                        var errorMessage = 'Failed to create document.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        toastr.error(errorMessage);
+                        submitBtn.prop('disabled', false).html(originalText);
+                    },
+                    complete: function() {
+                        // Re-enable submit button
+                        submitBtn.prop('disabled', false).html(originalText);
+                    }
+                });
+            });
+
+            // ---------- End On-the-fly Additional Document Creation ----------
             // ---------- End Additional Documents Linking ----------
         }
 

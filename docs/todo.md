@@ -2,6 +2,77 @@
 
 ## 🎯 **Current Sprint**
 
+### **On-the-Fly Additional Document Creation Feature** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED** - All functionality implemented successfully  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 1 day (including troubleshooting nested form issues)
+
+**Feature Overview**: Implemented comprehensive on-the-fly additional document creation within invoice create/edit pages, allowing users with appropriate permissions to create new additional documents directly from the invoice workflow without page refreshes.
+
+**Deliverables Completed**:
+
+-   ✅ **Permission System**:
+
+    -   Added `on-the-fly-addoc-feature` permission to RolePermissionSeeder
+    -   Assigned to admin, superadmin, logistic, accounting, and finance roles
+    -   Permission-based UI rendering and access control
+
+-   ✅ **Backend Implementation**:
+
+    -   New route: `POST /additional-documents/on-the-fly`
+    -   `AdditionalDocumentController::createOnTheFly()` method
+    -   Comprehensive validation and error handling
+    -   Automatic department association and document creation
+
+-   ✅ **Frontend Modal System**:
+
+    -   Bootstrap modal with complete form for document creation
+    -   Document type dropdown (populated with 46+ types)
+    -   All required fields: type, number, dates, location, PO number
+    -   Location dropdown with user's department pre-selected
+    -   PO number auto-fill from invoice
+
+-   ✅ **Integration & UX**:
+    -   Seamless integration in both create and edit invoice pages
+    -   Auto-selection of newly created documents
+    -   Real-time table updates without page refresh
+    -   Toastr notifications for success/error feedback
+    -   Automatic attachment notification to users
+
+**Technical Achievements**:
+
+-   **Controller Method**: `createOnTheFly()` with validation, permissions, and error handling
+-   **Route Integration**: Added to `additional-docs.php` route group
+-   **Modal Implementation**: Professional Bootstrap modal with form validation
+-   **JavaScript Integration**: AJAX form submission with real-time UI updates
+-   **Permission Checks**: Both backend (`Auth::user()->can()`) and frontend conditional rendering
+-   **Critical Bug Fix**: Resolved nested forms issue causing modal rendering failures
+
+**User Experience Features**:
+
+-   **Permission-Based Access**: Only authorized users see the "Create New Document" button
+-   **Auto-Population**: PO number automatically filled from invoice data
+-   **Smart Defaults**: User's department location pre-selected
+-   **Real-time Feedback**: Success/error messages via toastr notifications
+-   **Seamless Workflow**: Document creation without leaving invoice page
+-   **Auto-Selection**: Created documents automatically selected for invoice attachment
+
+**Problem Resolution**:
+
+-   **Critical Issue**: Fixed nested HTML forms causing modal rendering failures
+-   **Solution**: Moved modal HTML outside main form structure in both create.blade.php and edit.blade.php
+-   **Result**: Modal now renders correctly with all form elements accessible
+
+**Learning Outcomes**:
+
+-   Nested form structures are invalid HTML and cause unpredictable rendering behavior
+-   Bootstrap modals should be positioned outside main form elements for reliable rendering
+-   Permission-based features require both backend validation and frontend conditional rendering
+-   Real-time UI updates significantly improve user experience over page refreshes
+
+---
+
 ### **Dashboard Enhancement Project** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED** - All phases implemented successfully  

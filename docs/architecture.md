@@ -28,6 +28,68 @@ Distribution  Documents   Destination  Documents   Documents        Distribution
 3. **Distributed** (`distribution_status = 'distributed'`) → Cannot be selected for new distributions ✅
 4. **Unaccounted For** (`distribution_status = 'unaccounted_for'`) → Cannot be selected for new distributions ✅
 
+### **On-the-Fly Document Creation Workflow**
+
+**Overview**: Real-time additional document creation within invoice workflows
+
+```
+Invoice Create/Edit → Click "Create New Document" → Modal Form → Submit → Auto-Select → Continue Invoice
+        ↓                        ↓                    ↓           ↓            ↓              ↓
+    Permission Check      Open Bootstrap Modal    Fill Form    AJAX Submit   Add to Selection   Attach to Invoice
+```
+
+**Architecture Components**:
+
+-   **Frontend**: Bootstrap modal with comprehensive form validation
+-   **Backend**: Dedicated route and controller method with permission validation
+-   **Integration**: Seamless embedding in invoice create/edit workflows
+-   **UX**: Real-time updates without page refreshes
+
+**Key Technical Decisions**:
+
+1. **Modal Placement**: Positioned outside main form to prevent nested form HTML issues
+2. **Permission System**: Both backend (`Auth::user()->can()`) and frontend conditional rendering
+3. **Auto-Population**: PO number and location defaults for improved UX
+4. **Real-time Integration**: AJAX submission with immediate UI updates
+
+**Data Flow**:
+
+```php
+// Frontend: Modal form submission
+$.ajax({
+    url: '/additional-documents/on-the-fly',
+    data: formData,
+    success: function(response) {
+        // Auto-select created document
+        selectedDocs[newDoc.id] = newDoc;
+        // Refresh table and update UI
+        searchAdditionalDocuments();
+        renderSelectedTable();
+    }
+});
+
+// Backend: Document creation with validation
+public function createOnTheFly(Request $request) {
+    // Permission check
+    if (!Auth::user()->can('on-the-fly-addoc-feature')) {
+        return response()->json(['success' => false, 'message' => 'Unauthorized']);
+    }
+
+    // Validation and creation
+    $validated = $request->validate([...]);
+    $document = AdditionalDocument::create([...]);
+
+    return response()->json(['success' => true, 'document' => $document]);
+}
+```
+
+**Permission Integration**:
+
+-   **Role-Based Access**: `on-the-fly-addoc-feature` permission required
+-   **Assigned Roles**: admin, superadmin, logistic, accounting, finance
+-   **Frontend Rendering**: Conditional button display based on permissions
+-   **Backend Validation**: Server-side permission verification
+
 ### **Document Status Management**
 
 **Critical Implementation**:

@@ -40,6 +40,7 @@ class RolePermissionSeeder extends Seeder
             'create-additional-documents',
             'edit-additional-documents',
             'delete-additional-documents',
+            'on-the-fly-addoc-feature',
 
             // Invoices
             'view-invoices',
@@ -93,6 +94,7 @@ class RolePermissionSeeder extends Seeder
             'create-additional-documents',
             'edit-additional-documents',
             'delete-additional-documents',
+            'on-the-fly-addoc-feature',
             'view-invoices',
             'create-invoices',
             'edit-invoices',
@@ -130,6 +132,7 @@ class RolePermissionSeeder extends Seeder
             'create-additional-documents',
             'edit-additional-documents',
             'delete-additional-documents',
+            'on-the-fly-addoc-feature',
             'view-invoices',
             'create-invoices',
             'edit-invoices',

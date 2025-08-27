@@ -376,11 +376,12 @@ class AdditionalDocumentController extends Controller
             // Try to read a small portion of the file to validate it's a valid Excel file
             try {
                 $testData = Excel::toArray(new class implements \Maatwebsite\Excel\Concerns\ToArray {
-                    public function array(array $array) {
+                    public function array(array $array)
+                    {
                         return $array;
                     }
                 }, $file);
-                
+
                 if (empty($testData) || empty($testData[0])) {
                     throw new \Exception('Excel file appears to be empty or cannot be read');
                 }
@@ -454,7 +455,7 @@ class AdditionalDocumentController extends Controller
 
             // Provide more specific error messages for common issues
             $errorMessage = 'Import failed: ' . $e->getMessage();
-            
+
             if (str_contains($e->getMessage(), 'Column count doesn\'t match value count')) {
                 $errorMessage = 'Import failed: Excel column structure mismatch. Please use the provided template format.';
             } elseif (str_contains($e->getMessage(), 'SQLSTATE[21S01]')) {
@@ -470,5 +471,74 @@ class AdditionalDocumentController extends Controller
     public function downloadTemplate()
     {
         return Excel::download(new AdditionalDocumentTemplate(), 'additional_documents_template.xlsx');
+    }
+
+    /**
+     * Create additional document on-the-fly from invoice forms
+     */
+    public function createOnTheFly(Request $request)
+    {
+        // Check permission
+        $user = Auth::user();
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to create additional documents on-the-fly.'
+            ], 403);
+        }
+
+        // Validate request
+        $request->validate([
+            'document_type_id' => 'required|exists:additional_document_types,id',
+            'document_number' => 'required|string|max:255',
+            'document_date' => 'nullable|date',
+            'document_receive_date' => 'nullable|date',
+            'cur_loc' => 'required|string|max:50',
+            'po_no' => 'nullable|string|max:255',
+        ]);
+
+        try {
+
+            // Create the additional document
+            $additionalDocument = AdditionalDocument::create([
+                'document_number' => $request->document_number,
+                'document_date' => $request->document_date,
+                'document_receive_date' => $request->document_receive_date,
+                'type_id' => $request->document_type_id,
+                'cur_loc' => $request->cur_loc,
+                'po_no' => $request->po_no,
+                'status' => 'open',
+                'distribution_status' => 'available',
+                'created_by' => $user->id,
+                'origin_wh' => $request->cur_loc,
+                'destinatic' => $request->cur_loc,
+            ]);
+
+            // Load relationships for response
+            $additionalDocument->load(['type', 'creator']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Additional document created successfully and will be automatically attached to the invoice.',
+                'document' => [
+                    'id' => $additionalDocument->id,
+                    'document_number' => $additionalDocument->document_number,
+                    'document_type' => $additionalDocument->type->type_name,
+                    'document_date' => $additionalDocument->document_date ? \Carbon\Carbon::parse($additionalDocument->document_date)->format('d/m/Y') : null,
+                    'po_no' => $additionalDocument->po_no,
+                    'cur_loc' => $additionalDocument->cur_loc,
+                    'status' => $additionalDocument->status,
+                    'distribution_status' => $additionalDocument->distribution_status,
+                    'is_in_user_department' => $additionalDocument->cur_loc === $user->department_location_code,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('On-the-fly additional document creation failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create additional document: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
