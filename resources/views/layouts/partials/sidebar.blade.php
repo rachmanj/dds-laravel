@@ -46,9 +46,13 @@
                     @include('layouts.partials.menu.reports')
                 @endcan
 
-                @include('layouts.partials.menu.master')
+                @can('view-master')
+                    @include('layouts.partials.menu.master')
+                @endcan
 
-                @include('layouts.partials.menu.admin')
+                @can('view-admin')
+                    @include('layouts.partials.menu.admin')
+                @endcan
 
 
             </ul>

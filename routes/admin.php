@@ -29,4 +29,9 @@ Route::prefix('admin')->name('admin.')->middleware(['role:superadmin|admin'])->g
     Route::get('suppliers/data', [\App\Http\Controllers\Admin\SupplierController::class, 'data'])->name('suppliers.data');
     Route::post('suppliers/import', [\App\Http\Controllers\Admin\SupplierController::class, 'import'])->name('suppliers.import');
     Route::resource('suppliers', \App\Http\Controllers\Admin\SupplierController::class)->except(['create', 'edit']);
+
+    // Document Status Management
+    Route::get('document-status', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'index'])->name('document-status.index');
+    Route::post('document-status/reset', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'resetStatus'])->name('document-status.reset');
+    Route::post('document-status/bulk-reset', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'bulkResetStatus'])->name('document-status.bulk-reset');
 });

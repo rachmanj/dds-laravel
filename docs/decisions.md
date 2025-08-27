@@ -99,6 +99,261 @@ if (!Auth::user()->can('on-the-fly-addoc-feature')) {
 
 **Reasoning**: Defense in depth - both frontend UX and backend security validation.
 
+---
+
+### **2025-01-27: Document Status Management System Layout Fix**
+
+**Decision**: Recreate Document Status Management view with correct layout structure to resolve critical rendering errors
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+The Document Status Management page was created with incorrect layout structure, causing a "View [layouts.app] not found" error that completely prevented page access. This was a critical issue that blocked users from accessing essential document status management functionality.
+
+#### **Problem Analysis**
+
+**Root Causes Identified**:
+
+1. **Layout Extension Mismatch**: View was extending `layouts.app` instead of `layouts.main`
+2. **Section Name Inconsistency**: Using `@section('title')` instead of `@section('title_page')`
+3. **Missing Breadcrumb**: No `@section('breadcrumb_title')` for navigation
+4. **Content Structure Error**: Incorrect `<div class="content-wrapper">` instead of `<section class="content">`
+5. **Script Organization**: Using `@push` directive instead of proper `@section('scripts')`
+
+**Impact**: Complete page failure - users could not access document status management features
+
+#### **Decision Made**
+
+**Approach**: Complete view recreation with correct layout structure matching existing application patterns
+
+**Alternatives Considered**:
+
+1. **Partial Fix**: Attempt to fix individual issues one by one
+
+    - **Rejected**: Risk of missing critical structural problems
+    - **Reason**: Layout issues are often interconnected and require holistic approach
+
+2. **Layout Creation**: Create new `layouts.app` layout
+
+    - **Rejected**: Would create inconsistency with existing application
+    - **Reason**: All other views use `layouts.main` - maintaining consistency is critical
+
+3. **View Recreation**: Completely recreate view with correct structure
+    - **Selected**: Ensures complete resolution of all layout issues
+    - **Reason**: Provides clean, maintainable code that follows established patterns
+
+#### **Implementation Details**
+
+**Layout Structure**:
+
+```blade
+@extends('layouts.main')
+
+@section('title_page', 'Document Status Management')
+
+@section('breadcrumb_title')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">Document Status</li>
+@endsection
+
+@section('content')
+    <section class="content">
+        <div class="container-fluid">
+            <!-- Content here -->
+        </div>
+    </section>
+@endsection
+```
+
+**Technical Improvements**:
+
+-   **DataTables Integration**: Proper table IDs and script organization
+-   **Responsive Design**: Mobile-friendly interface with AdminLTE integration
+-   **Interface Consistency**: Matches existing application design patterns
+-   **Script Organization**: Proper `@section('scripts')` with DataTables initialization
+
+#### **Outcomes & Results**
+
+**Immediate Benefits**:
+
+-   ✅ **Page Accessibility**: Users can now access document status management functionality
+-   ✅ **System Reliability**: Eliminated layout-related errors and crashes
+-   ✅ **Feature Availability**: All document status management features now accessible
+
+**Long-term Benefits**:
+
+-   **Code Consistency**: All views now follow same layout extension pattern
+-   **Easier Maintenance**: Clear organization makes updates straightforward
+-   **Future Development**: Consistent structure supports new feature additions
+-   **Error Prevention**: Proper patterns prevent common layout issues
+
+#### **Lessons Learned**
+
+**Critical Insights**:
+
+1. **Layout Consistency**: All views must follow exact same layout extension pattern
+2. **Section Organization**: Proper use of `title_page`, `breadcrumb_title`, `content`, `styles`, and `scripts`
+3. **Pattern Matching**: Even minor deviations from established patterns cause complete failures
+4. **Holistic Approach**: Layout issues often require complete view recreation rather than partial fixes
+
+**Best Practices Established**:
+
+-   Always extend `layouts.main` for consistency
+-   Use proper section names matching existing application
+-   Organize scripts in `@section('scripts')` blocks
+-   Follow established content structure patterns
+
+---
+
+### **2025-01-27: Document Status Management System Implementation**
+
+**Decision**: Implement comprehensive document status management system with individual and bulk operations for admin users
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+The system needed a way to handle missing/damaged documents that were marked as `unaccounted_for` during distribution. Users required the ability to:
+
+1. Reset document statuses when missing documents are found
+2. Redistribute found documents without creating new records
+3. Maintain complete audit trails for compliance purposes
+4. Perform bulk operations for efficiency
+
+#### **Requirements Analysis**
+
+**User Requirements**:
+
+-   Reset document distribution statuses (especially `unaccounted_for` → `available`)
+-   Individual status reset with full flexibility
+-   Bulk operations for handling multiple found documents
+-   Permission-based access control for security
+-   Comprehensive audit logging for compliance
+
+**Technical Requirements**:
+
+-   Admin-only access with proper permission control
+-   Safe bulk operations with status transition restrictions
+-   Complete audit trail via existing `DistributionHistory` model
+-   Integration with existing AdminLTE UI patterns
+-   Department-based filtering for non-admin users
+
+#### **Decision Rationale**
+
+**Permission-Based Access**:
+
+-   **Considered**: Role-based, universal admin access, department-based
+-   **Chosen**: Custom permission `reset-document-status` assigned to admin/superadmin roles
+-   **Reasoning**: Granular control, security best practices, aligns with existing permission system
+
+**Bulk Operation Safety**:
+
+-   **Considered**: Full flexibility, no restrictions, manual approval
+-   **Chosen**: Limited to `unaccounted_for` → `available` transitions only
+-   **Reasoning**: Prevents accidental workflow corruption, maintains data integrity
+
+**Audit Logging Strategy**:
+
+-   **Considered**: Separate audit table, minimal logging, external logging
+-   **Chosen**: Integration with existing `DistributionHistory` model
+-   **Reasoning**: Centralized audit trail, consistent with existing patterns, easier maintenance
+
+#### **Implementation Decisions**
+
+**1. Controller Architecture**
+
+```php
+class DocumentStatusController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('permission:reset-document-status');
+    }
+
+    // Individual reset with full flexibility
+    public function resetStatus(Request $request): JsonResponse
+
+    // Bulk reset with safety restrictions
+    public function bulkResetStatus(Request $request): JsonResponse
+}
+```
+
+**Reasoning**: Middleware-based permission control, clear separation of concerns, consistent with existing controller patterns.
+
+**2. Bulk Operation Restrictions**
+
+```php
+// Only allow unaccounted_for → available for bulk operations
+if ($oldStatus === 'unaccounted_for') {
+    $document->update(['distribution_status' => 'available']);
+    $updatedCount++;
+} else {
+    $skippedCount++; // Document not eligible for bulk reset
+}
+```
+
+**Reasoning**: Safety-first approach prevents workflow corruption, maintains system integrity.
+
+**3. Audit Logging Integration**
+
+```php
+// Log to DistributionHistory for audit trail
+DistributionHistory::create([
+    'distribution_id' => null, // Not tied to specific distribution
+    'action_performed' => 'status_reset',
+    'action_details' => json_encode([
+        'document_type' => $documentType,
+        'document_id' => $documentId,
+        'old_status' => $oldStatus,
+        'new_status' => $newStatus,
+        'reason' => $reason,
+        'operation_type' => $operationType,
+        'timestamp' => now()->toISOString()
+    ])
+]);
+```
+
+**Reasoning**: Centralized audit trail, consistent with existing logging patterns, comprehensive compliance tracking.
+
+#### **Business Impact**
+
+**Immediate Benefits**:
+
+-   **Workflow Continuity**: Missing documents can be found and redistributed
+-   **Data Integrity**: Proper status management prevents workflow corruption
+-   **Compliance**: Complete audit trails for regulatory requirements
+-   **Efficiency**: Bulk operations for handling multiple found documents
+
+**Long-term Benefits**:
+
+-   **System Reliability**: Robust status management prevents data inconsistencies
+-   **User Trust**: Users can rely on system data for decision making
+-   **Compliance**: Comprehensive audit trails meet regulatory requirements
+-   **Scalability**: Foundation for future status management enhancements
+
+#### **Technical Considerations**
+
+**Performance**:
+
+-   **Database Transactions**: All operations wrapped in transactions for data integrity
+-   **Efficient Queries**: Proper indexing and eager loading for optimal performance
+-   **Bulk Processing**: Efficient batch operations for multiple documents
+
+**Security**:
+
+-   **Permission Middleware**: Route-level protection against unauthorized access
+-   **Input Validation**: Comprehensive validation of all input parameters
+-   **Audit Trail**: Complete tracking of all status changes for security monitoring
+
+**Maintainability**:
+
+-   **Clear Architecture**: Separation of concerns with private helper methods
+-   **Consistent Patterns**: Follows existing controller and view patterns
+-   **Comprehensive Logging**: Easy debugging and compliance verification
+
 **3. Auto-Selection Logic**
 
 ```javascript

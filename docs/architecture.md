@@ -169,6 +169,13 @@ if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'adm
 -   `additional_documents`: Supporting documents linked to invoices
 -   `distribution_status` enum: `available`, `in_transit`, `distributed`, `unaccounted_for`
 
+**Document Status Management**:
+
+-   `DocumentStatusController`: Admin interface for status management and reset operations
+-   `reset-document-status` permission: Controls access to status management features
+-   `DistributionHistory`: Audit trail for all status changes with reason tracking
+-   **View Architecture**: Proper layout structure with `layouts.main` extension and section organization
+
 **Users & Departments**:
 
 -   `users`: System users with role assignments
@@ -236,6 +243,26 @@ array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])
 -   `updateDocumentDistributionStatuses()`: Conditional status updates based on workflow stage
 -   `updateDocumentLocations()`: Location updates for verified documents only
 -   `handleMissingOrDamagedDocuments()`: Proper handling of discrepancies
+
+**DocumentStatusController**:
+
+-   **Status Management**: Individual and bulk status reset operations
+-   **Permission Control**: Middleware-based access control for admin operations
+-   **Audit Logging**: Comprehensive logging of all status changes with reasons
+-   **Bulk Operations**: Safe bulk processing with status transition restrictions
+
+**Key Methods**:
+
+-   `resetStatus()`: Individual document status reset with full flexibility
+-   `bulkResetStatus()`: Bulk reset limited to `unaccounted_for` → `available`
+-   `logStatusChange()`: Detailed audit logging for compliance purposes
+
+**View Architecture**:
+
+-   **Layout Extension**: All views extend `layouts.main` for consistency
+-   **Section Organization**: Proper use of `title_page`, `breadcrumb_title`, `content`, `styles`, and `scripts`
+-   **Content Structure**: `<section class="content">` with `<div class="container-fluid">` pattern
+-   **DataTables Integration**: Proper table IDs and script organization for enhanced functionality
 
 ### **Model Relationships**
 
@@ -312,5 +339,5 @@ public function scopeUnaccountedFor($query)
 ---
 
 **Last Updated**: 2025-01-27  
-**Version**: 4.2  
-**Status**: ✅ **Production Ready** - Critical fixes implemented, comprehensive workflow protection
+**Version**: 4.3  
+**Status**: ✅ **Production Ready** - Critical fixes implemented, comprehensive workflow protection & layout issues resolved

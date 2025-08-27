@@ -52,5 +52,16 @@
                 <p>Suppliers</p>
             </a>
         </li>
+
+        <!-- Document Status Management -->
+        @can('reset-document-status')
+            <li class="nav-item">
+                <a href="{{ route('admin.document-status.index') }}"
+                    class="nav-link {{ request()->routeIs('admin.document-status.*') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>Document Status</p>
+                </a>
+            </li>
+        @endcan
     </ul>
 </li>

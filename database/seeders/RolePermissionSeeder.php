@@ -72,6 +72,9 @@ class RolePermissionSeeder extends Seeder
 
             // Reports
             'view-reports',
+
+            // Document Status Management
+            'reset-document-status',
         ];
 
         foreach ($permissions as $permission) {
@@ -112,6 +115,7 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-distributions-numbering-stats',
+            'reset-document-status',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);
