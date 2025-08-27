@@ -123,65 +123,43 @@ class DistributionController extends Controller
             $currentYear = Carbon::now()->year;
             $originDepartmentId = $user->department->id;
 
-            // Generate sequence number for this department/year combination
+            // Get sequence number and create distribution
             $sequence = Distribution::getNextSequence($currentYear, $originDepartmentId);
-
-            Log::info("Generated sequence number: {$sequence} for year: {$currentYear}, department: {$originDepartmentId}");
 
             // Validate sequence number is within reasonable bounds
             if ($sequence > 999999) {
                 throw new \Exception("Sequence number {$sequence} exceeds maximum allowed value (999999)");
             }
 
-            // Generate distribution number with retry logic for sequence conflicts
-            $distributionNumber = $this->generateUniqueDistributionNumber(
-                $currentYear,
-                $user->department->location_code,
-                $sequence,
-                $originDepartmentId
-            );
+            // Generate distribution number
+            $distributionNumber = $this->generateDistributionNumber($currentYear, $user->department->location_code, $sequence);
 
+            Log::info("Generated sequence number: {$sequence} for year: {$currentYear}, department: {$originDepartmentId}");
             Log::info("Generated distribution number: {$distributionNumber}");
 
-            // Create distribution with retry logic for sequence conflicts
-            $maxRetries = 5;
-            $attempts = 0;
-            $distribution = null;
+            // Double-check that this sequence doesn't already exist (race condition protection)
+            $sequenceExists = Distribution::where('year', $currentYear)
+                ->where('origin_department_id', $originDepartmentId)
+                ->where('sequence', $sequence)
+                ->exists();
 
-            do {
-                try {
-                    $distribution = Distribution::create([
-                        'distribution_number' => $distributionNumber,
-                        'type_id' => $request->type_id,
-                        'origin_department_id' => $originDepartmentId,
-                        'destination_department_id' => $request->destination_department_id,
-                        'document_type' => $request->document_type,
-                        'created_by' => $user->id,
-                        'status' => 'draft',
-                        'notes' => $request->notes,
-                        'year' => $currentYear,
-                        'sequence' => $sequence
-                    ]);
-                    break; // Success, exit the loop
-                } catch (\Illuminate\Database\QueryException $e) {
-                    // Check if it's a duplicate key error
-                    if ($e->getCode() == 23000 && strpos($e->getMessage(), 'distributions_year_dept_seq_unique') !== false) {
-                        $attempts++;
-                        if ($attempts >= $maxRetries) {
-                            throw new \Exception("Unable to create distribution after {$maxRetries} attempts due to sequence conflicts");
-                        }
+            if ($sequenceExists) {
+                throw new \Exception("Sequence {$sequence} already exists for year {$currentYear}, department {$originDepartmentId}. This indicates a race condition.");
+            }
 
-                        // Get a fresh sequence number and try again
-                        $sequence = Distribution::getNextSequence($currentYear, $originDepartmentId);
-                        $distributionNumber = $this->generateDistributionNumber($currentYear, $user->department->location_code, $sequence);
-
-                        Log::warning("Sequence conflict detected, retrying with new sequence: {$sequence}");
-                    } else {
-                        // Re-throw if it's not a duplicate key error
-                        throw $e;
-                    }
-                }
-            } while ($attempts < $maxRetries);
+            // Create distribution
+            $distribution = Distribution::create([
+                'distribution_number' => $distributionNumber,
+                'type_id' => $request->type_id,
+                'origin_department_id' => $originDepartmentId,
+                'destination_department_id' => $request->destination_department_id,
+                'document_type' => $request->document_type,
+                'created_by' => $user->id,
+                'status' => 'draft',
+                'notes' => $request->notes,
+                'year' => $currentYear,
+                'sequence' => $sequence
+            ]);
 
             // Attach documents
             $this->attachDocuments($distribution, $request->document_type, $request->document_ids);
@@ -1033,20 +1011,24 @@ class DistributionController extends Controller
     /**
      * Update document distribution statuses
      * Called when:
-     * 1. Distribution is sent (status: in_transit)
-     * 2. Distribution is received (status: distributed)
-     * 3. Distribution is completed (status: distributed)
+     * 1. Distribution is sent (status = 'in_transit') - Update ALL documents
+     * 2. Distribution is received (status = 'distributed') - Only update verified documents
+     * 3. Distribution is completed (status = 'distributed') - Only update verified documents
      * 
      * Note: When distributing invoices, this also updates the status of any
      * additional documents that are attached to those invoices.
+     * 
+     * CRITICAL: 
+     * - When SENT: ALL documents become 'in_transit' (preventing selection in new distributions)
+     * - When RECEIVED: Only 'verified' documents become 'distributed'
+     * - Missing/damaged documents keep their original status to maintain data integrity
      */
     private function updateDocumentDistributionStatuses(Distribution $distribution, string $status): void
     {
         foreach ($distribution->documents as $distributionDocument) {
-            // ✅ CRITICAL FIX: Only update documents that were actually received
-            if ($distributionDocument->receiver_verification_status === 'verified') {
-                if ($distributionDocument->document_type === Invoice::class) {
-                    // Update invoice status
+            if ($distributionDocument->document_type === Invoice::class) {
+                if ($status === 'in_transit') {
+                    // ✅ When SENT: Update ALL documents to 'in_transit' (prevent selection in new distributions)
                     Invoice::where('id', $distributionDocument->document_id)
                         ->update(['distribution_status' => $status]);
 
@@ -1055,13 +1037,32 @@ class DistributionController extends Controller
                     if ($invoice && $invoice->additionalDocuments()->count() > 0) {
                         $invoice->additionalDocuments()->update(['distribution_status' => $status]);
                     }
-                } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+                } elseif ($status === 'distributed') {
+                    // ✅ When RECEIVED: Only update documents that were actually verified
+                    if ($distributionDocument->receiver_verification_status === 'verified') {
+                        Invoice::where('id', $distributionDocument->document_id)
+                            ->update(['distribution_status' => $status]);
+
+                        // Also update status of any additional documents attached to this invoice
+                        $invoice = Invoice::find($distributionDocument->document_id);
+                        if ($invoice && $invoice->additionalDocuments()->count() > 0) {
+                            $invoice->additionalDocuments()->update(['distribution_status' => $status]);
+                        }
+                    }
+                }
+            } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+                if ($status === 'in_transit') {
+                    // ✅ When SENT: Update ALL documents to 'in_transit'
                     AdditionalDocument::where('id', $distributionDocument->document_id)
                         ->update(['distribution_status' => $status]);
+                } elseif ($status === 'distributed') {
+                    // ✅ When RECEIVED: Only update verified documents
+                    if ($distributionDocument->receiver_verification_status === 'verified') {
+                        AdditionalDocument::where('id', $distributionDocument->document_id)
+                            ->update(['distribution_status' => $status]);
+                    }
                 }
             }
-            // ❌ Missing/damaged documents keep their original status
-            // This prevents false audit trails and maintains data integrity
         }
     }
 

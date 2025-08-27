@@ -277,7 +277,7 @@
                     {
                         data: 'document_date',
                         name: 'document_date',
-                        className: 'date-column',
+                        // className: 'date-column',
                         render: function(data, type, row) {
                             if (data) {
                                 return moment(data).format('DD-MMM-YYYY');
@@ -288,7 +288,7 @@
                     {
                         data: 'receive_date',
                         name: 'receive_date',
-                        className: 'date-column',
+                        // className: 'date-column',
                         render: function(data, type, row) {
                             if (data) {
                                 return moment(data).format('DD-MMM-YYYY');

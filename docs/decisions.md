@@ -1,72 +1,290 @@
 # DDS Laravel Development Decisions
 
-## 📋 **Overview**
+## 📝 **Decision Records**
 
-This document records key architectural and implementation decisions made during the development of the Document Distribution System (DDS), including rationale, alternatives considered, and implementation details.
+### **2025-01-27: Critical Distribution Document Status Management Fix**
 
-## 🎯 **Recent Decisions (2025-01-21)**
+**Decision**: Implement conditional logic for document status updates based on distribution workflow stage
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
 
-### **1. API Pagination Removal Strategy**
+#### **Context**
 
-#### **Decision**: Remove pagination from API responses to simplify external application integration
+The distribution system had a critical flaw where documents that were already "in transit" (being sent to another department) could still be selected for new distributions. This created:
 
-**Date**: 2025-01-21  
-**Status**: ✅ Implemented  
-**Impact**: Medium - External system integration and performance
+-   **Data integrity issues** (same document in multiple distributions)
+-   **Business logic problems** (documents can't be in two places at once)
+-   **Audit trail corruption** (unclear document location)
 
-**Context**: External applications requested simpler data handling without pagination complexity, and performance optimization was needed.
+#### **Problem Analysis**
 
-**Options Considered**:
+**Root Cause**: The `updateDocumentDistributionStatuses()` method was incorrectly designed to only update documents when they were "verified" by the receiver, but this logic was wrong for the "SENT" stage.
 
-1. **Keep Existing Pagination**: Maintain current pagination system
-2. **Configurable Pagination**: Add flag to enable/disable pagination
-3. **Remove Pagination**: Eliminate pagination completely
-4. **Cursor-based Pagination**: Implement cursor-based approach instead of offset
+**Technical Details**:
 
-**Chosen Solution**: Complete pagination removal with single response
+-   **Distribution SENT**: `updateDocumentDistributionStatuses($distribution, 'in_transit')` was called
+-   **Critical Flaw**: Method only updated documents with `receiver_verification_status === 'verified'`
+-   **Problem**: When distribution is just sent (not received), verification status is still `null`
+-   **Result**: Documents kept `distribution_status = 'available'` instead of `'in_transit'`
+-   **Business Impact**: Same document could be selected for multiple distributions simultaneously
 
--   **Rationale**: Simplifies external application integration, improves performance, and provides complete dataset access
--   **Implementation**:
-    -   Changed from `paginate()` to `get()` method in controller
-    -   Added total invoice count to meta section
-    -   Removed pagination validation rules (`page`, `per_page`)
-    -   Updated all documentation and test scripts
+#### **Alternatives Considered**
 
-**Alternatives Rejected**:
+1. **Keep Current Logic** (Rejected)
 
--   Keep Existing Pagination: Too complex for external integrations
--   Configurable Pagination: Adds unnecessary complexity
--   Cursor-based Pagination: Overkill for current requirements
+    - **Pros**: Minimal code changes
+    - **Cons**: Business logic flaw remains, data integrity compromised
+    - **Risk**: High - system allows invalid business operations
 
-**Consequences**:
+2. **Always Update All Documents** (Rejected)
 
--   ✅ Simplified external application integration
--   ✅ Better performance without pagination overhead
--   ✅ Complete dataset access in single request
--   ✅ Reduced complexity for client applications
--   ❌ Potential memory issues with very large datasets
--   ❌ No built-in data chunking for massive result sets
+    - **Pros**: Simple implementation
+    - **Cons**: Missing/damaged documents would get false status updates
+    - **Risk**: Medium - audit trail integrity compromised
+
+3. **Conditional Logic Based on Status** (Selected)
+    - **Pros**: Correct business logic, maintains audit trail integrity
+    - **Cons**: More complex implementation
+    - **Risk**: Low - proper business rules enforced
+
+#### **Solution Implemented**
+
+**Conditional Logic Implementation**:
+
+```php
+private function updateDocumentDistributionStatuses(Distribution $distribution, string $status): void
+{
+    foreach ($distribution->documents as $distributionDocument) {
+        if ($distributionDocument->document_type === Invoice::class) {
+            if ($status === 'in_transit') {
+                // ✅ When SENT: Update ALL documents to 'in_transit' (prevent selection in new distributions)
+                Invoice::where('id', $distributionDocument->document_id)
+                    ->update(['distribution_status' => $status]);
+
+                // Also update attached additional documents
+                $invoice->additionalDocuments()->update(['distribution_status' => $status]);
+            } elseif ($status === 'distributed') {
+                // ✅ When RECEIVED: Only update verified documents
+                if ($distributionDocument->receiver_verification_status === 'verified') {
+                    // Update status...
+                }
+            }
+        }
+        // Similar logic for AdditionalDocument...
+    }
+}
+```
+
+**Business Logic Flow**:
+
+1. **Document Available** (`distribution_status = 'available'`) → Can be selected for distribution
+2. **Distribution Created** → Document linked to distribution
+3. **Distribution SENT** → Document becomes `'in_transit'` → **Cannot be selected for new distributions** ✅
+4. **Distribution RECEIVED** → Document becomes `'distributed'` → **Cannot be selected for new distributions** ✅
+5. **If Missing/Damaged** → Document becomes `'unaccounted_for'` → **Cannot be selected for new distributions** ✅
+
+#### **Implementation Details**
+
+**Files Modified**:
+
+-   `app/Http/Controllers/DistributionController.php` - Fixed `updateDocumentDistributionStatuses()` method
+-   `app/Models/Invoice.php` - Enhanced documentation for `availableForDistribution()` scope
+-   `app/Models/AdditionalDocument.php` - Enhanced documentation for `availableForDistribution()` scope
+-   `MEMORY.md` - Documented the critical fix and business impact
+
+**Technical Changes**:
+
+-   **Conditional Logic**: Different behavior for sent vs received distributions
+-   **Status Transitions**: Clear state machine for document distribution lifecycle
+-   **Error Prevention**: System prevents invalid state transitions
+-   **Performance**: Efficient status updates without unnecessary database queries
+
+#### **Business Impact**
+
+**Immediate Benefits**:
+
+-   **Data Accuracy**: Physical document location always matches system records
+-   **Process Compliance**: Distribution workflow follows established business rules
+-   **Risk Reduction**: Eliminates possibility of documents being "in two places at once"
+-   **Audit Trail**: Complete history for regulatory and compliance requirements
+
+**Long-term Benefits**:
+
+-   **System Credibility**: Business process automation enforces real-world constraints
+-   **Compliance**: Better audit trails for regulatory requirements
+-   **Efficiency**: Users can trust system data for decision making
+-   **Scalability**: Robust foundation for future workflow enhancements
+
+#### **Testing & Validation**
+
+**Testing Scenarios**:
+
+1. **Create Distribution**: Verify only available documents are selectable
+2. **Send Distribution**: Verify documents become 'in_transit' and unavailable
+3. **Receive Distribution**: Verify only verified documents become 'distributed'
+4. **Missing Documents**: Verify missing documents don't get false status updates
+5. **Multiple Distributions**: Verify documents can't be in multiple distributions
+
+**Validation Methods**:
+
+-   **Unit Testing**: Test status update logic for different distribution stages
+-   **Integration Testing**: Verify document availability in distribution creation forms
+-   **Workflow Testing**: End-to-end testing of complete distribution lifecycle
+-   **Edge Case Testing**: Handle missing/damaged document scenarios
+
+#### **Lessons Learned**
+
+1. **Business Logic Must Reflect Reality**: System behavior must match physical business constraints
+2. **Workflow Stage Awareness**: Different stages require different logic and validation
+3. **Data Integrity Requires Multiple Protections**: Frontend, backend, and database-level protection
+4. **Comprehensive Testing Essential**: Business-critical fixes require thorough validation
+5. **Documentation Prevents Regression**: Clear decision records help future developers understand choices
+
+#### **Future Considerations**
+
+**Potential Enhancements**:
+
+-   **Real-time Status Updates**: WebSocket integration for live status changes
+-   **Advanced Validation**: Business rule engine for complex workflow validation
+-   **Performance Optimization**: Caching strategies for high-volume distributions
+-   **Mobile Integration**: Native mobile experience for distribution management
+
+**Maintenance Requirements**:
+
+-   **Regular Testing**: Quarterly workflow testing to ensure continued functionality
+-   **Performance Monitoring**: Track distribution creation success rates
+-   **User Feedback**: Monitor user experience and identify improvement opportunities
+-   **Code Reviews**: Ensure new features maintain data integrity standards
 
 ---
 
-### **2. Enhanced Location Code Validation**
+### **2025-01-21: External Invoice API Implementation**
 
-#### **Decision**: Implement comprehensive validation for empty and invalid location codes
+**Decision**: Implement secure external API for invoice data access with comprehensive security
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-21
+**Review Date**: 2025-04-21
 
-**Date**: 2025-01-21  
-**Status**: ✅ Implemented  
-**Impact**: Medium - API security and error handling
+#### **Context**
 
-**Context**: API needed to handle edge cases where location codes might be empty or malformed, improving security and user experience.
+External applications need secure access to invoice data by department location code for business integration and reporting purposes.
 
-**Options Considered**:
+#### **Alternatives Considered**
+
+1. **Basic API with Simple Authentication** (Rejected)
+
+    - **Pros**: Quick implementation
+    - **Cons**: Insufficient security for enterprise use
+    - **Risk**: High - potential data breaches
+
+2. **Complex OAuth Implementation** (Rejected)
+
+    - **Pros**: Enterprise-grade security
+    - **Cons**: Overkill for current needs, complex implementation
+    - **Risk**: Medium - unnecessary complexity
+
+3. **API Key Authentication with Rate Limiting** (Selected)
+    - **Pros**: Balanced security and simplicity, industry standard
+    - **Cons**: Requires API key management
+    - **Risk**: Low - proven approach
+
+#### **Solution Implemented**
+
+**Security Features**:
+
+-   **API Key Authentication**: X-API-Key header validation
+-   **Rate Limiting**: Multi-tier limits (hourly, minute, daily)
+-   **Audit Logging**: Complete access attempt logging
+-   **Input Validation**: Comprehensive parameter validation
+
+**API Endpoints**:
+
+-   **Health Check**: `GET /api/health` (public)
+-   **Departments**: `GET /api/v1/departments` (authenticated)
+-   **Invoices**: `GET /api/v1/departments/{location_code}/invoices` (authenticated)
+
+#### **Business Impact**
+
+**Immediate Benefits**:
+
+-   **External Integration**: Secure access for business applications
+-   **Data Accessibility**: External tools can access comprehensive invoice data
+-   **Compliance**: Proper audit trails for regulatory requirements
+
+**Long-term Benefits**:
+
+-   **System Interoperability**: Standard REST API for modern integration
+-   **Business Process Integration**: Connect invoice data with external systems
+-   **Reporting & Analytics**: External tools can access comprehensive data
+
+---
+
+### **2025-01-21: API Pagination Removal**
+
+**Decision**: Remove pagination from API responses to simplify external application integration
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-21
+**Review Date**: 2025-04-21
+
+#### **Context**
+
+External applications requested simpler data handling without pagination complexity for better integration experience.
+
+#### **Alternatives Considered**
+
+1. **Keep Pagination** (Rejected)
+
+    - **Pros**: Standard API practice
+    - **Cons**: Complex client implementation, multiple API calls needed
+    - **Risk**: Medium - poor user experience
+
+2. **Configurable Pagination** (Rejected)
+
+    - **Pros**: Flexibility for different use cases
+    - **Cons**: Increased complexity, maintenance overhead
+    - **Risk**: Medium - unnecessary complexity
+
+3. **Remove Pagination** (Selected)
+    - **Pros**: Simple integration, single API call, better performance
+    - **Cons**: Larger response sizes
+    - **Risk**: Low - meets current business needs
+
+#### **Solution Implemented**
+
+**Technical Changes**:
+
+-   **Query Optimization**: Changed from `paginate()` to `get()` method
+-   **Response Restructuring**: Removed pagination metadata, added total count
+-   **Validation Updates**: Removed pagination-related validation rules
+
+**Benefits**:
+
+-   **Simplified Integration**: External applications receive complete dataset
+-   **Better Performance**: Single database query instead of pagination overhead
+-   **Easier Processing**: No pagination logic required in client applications
+
+---
+
+### **2025-01-21: Enhanced Location Code Validation**
+
+**Decision**: Implement comprehensive validation for empty and invalid location codes
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-21
+**Review Date**: 2025-04-21
+
+#### **Context**
+
+API needed to handle edge cases where location codes might be empty or malformed, improving security and user experience.
+
+#### **Alternatives Considered**
 
 1. **Basic Validation**: Existing validation approach only
 2. **Route Model Binding**: Use Laravel's automatic model resolution
 3. **Custom Validation**: Implement comprehensive validation rules
 4. **Early Validation**: Check parameters before database queries
 
-**Chosen Solution**: Early validation with clear error responses
+#### **Chosen Solution**: Early validation with clear error responses
 
 -   **Rationale**: Prevents API abuse, provides clear error messages, and improves security through input validation
 -   **Implementation**:
@@ -92,24 +310,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **3. External API Security Architecture**
+### **2025-01-21: External API Security Architecture**
 
-#### **Decision**: Implement comprehensive API key authentication with rate limiting and audit logging
+**Decision**: Implement comprehensive API key authentication with rate limiting and audit logging
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-21
+**Review Date**: 2025-04-21
 
-**Date**: 2025-01-21  
-**Status**: ✅ Implemented  
-**Impact**: High - External system integration and security
+#### **Context**
 
-**Context**: Need to provide secure external access to invoice data for other applications while maintaining system security and preventing abuse.
+Need to provide secure external access to invoice data for other applications while maintaining system security and preventing abuse.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Basic API Key**: Simple header validation without additional security
 2. **Comprehensive Security**: API key + rate limiting + audit logging + input validation
 3. **OAuth/JWT**: Full OAuth 2.0 or JWT token system
 4. **IP Whitelisting**: IP-based access control only
 
-**Chosen Solution**: Comprehensive API key authentication with multi-layered security
+#### **Chosen Solution**: Comprehensive API key authentication with multi-layered security
 
 -   **Rationale**: Provides enterprise-level security while maintaining simplicity for external developers
 -   **Implementation**:
@@ -135,24 +354,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **2. API Rate Limiting Strategy**
+### **2025-01-21: API Rate Limiting Strategy**
 
-#### **Decision**: Implement multi-tier rate limiting with sliding window approach
+**Decision**: Implement multi-tier rate limiting with sliding window approach
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-21
+**Review Date**: 2025-04-21
 
-**Date**: 2025-01-21  
-**Status**: ✅ Implemented  
-**Impact**: Medium - System performance and abuse prevention
+#### **Context**
 
-**Context**: Need to prevent API abuse while allowing legitimate business usage patterns.
+Need to prevent API abuse while allowing legitimate business usage patterns.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Single Rate Limit**: One limit (e.g., 100 requests per hour)
 2. **Multi-tier Limits**: Hourly, minute, and daily limits
 3. **Fixed Window**: Reset counters at fixed intervals
 4. **Sliding Window**: Continuous rate limiting with rolling counters
 
-**Chosen Solution**: Multi-tier rate limiting with sliding window approach
+#### **Chosen Solution**: Multi-tier rate limiting with sliding window approach
 
 -   **Rationale**: Provides granular control, prevents burst abuse, and ensures fair usage
 -   **Implementation**:
@@ -177,24 +397,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **3. API Data Structure Design**
+### **2025-01-21: API Data Structure Design**
 
-#### **Decision**: Return comprehensive invoice data with nested additional documents in standardized JSON format
+**Decision**: Return comprehensive invoice data with nested additional documents in standardized JSON format
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-21
+**Review Date**: 2025-04-21
 
-**Date**: 2025-01-21  
-**Status**: ✅ Implemented  
-**Impact**: Medium - External system integration and data consistency
+#### **Context**
 
-**Context**: External applications need complete invoice information including all related additional documents for comprehensive business operations.
+External applications need complete invoice information including all related additional documents for comprehensive business operations.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Minimal Data**: Return only essential invoice fields
 2. **Comprehensive Data**: Full invoice data with all relationships
 3. **Separate Endpoints**: Different endpoints for invoices and additional documents
 4. **Customizable Fields**: Allow clients to specify which fields to return
 
-**Chosen Solution**: Comprehensive data with nested additional documents
+#### **Chosen Solution**: Comprehensive data with nested additional documents
 
 -   **Rationale**: Provides complete business context, reduces API calls, and ensures data consistency
 -   **Implementation**:
@@ -220,26 +441,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-## 🎯 **Previous Decisions (2025-08-21)**
+### **2025-01-21: Dashboard Error Prevention Strategy**
 
-### **1. Dashboard Error Prevention Strategy**
+**Decision**: Implement comprehensive safe array access and defensive programming for all dashboard views
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-21
+**Review Date**: 2025-09-21
 
-#### **Decision**: Implement comprehensive safe array access and defensive programming for all dashboard views
+#### **Context**
 
-**Date**: 2025-08-21  
-**Status**: ✅ Implemented  
-**Impact**: High - Dashboard reliability and user experience
+Multiple dashboards were experiencing "Undefined array key" errors due to missing data or incorrect column references, causing crashes and poor user experience.
 
-**Context**: Multiple dashboards were experiencing "Undefined array key" errors due to missing data or incorrect column references, causing crashes and poor user experience.
-
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Fix Individual Errors**: Address each error as it occurs
 2. **Comprehensive Safe Access**: Implement `??` fallbacks throughout all views
 3. **Data Validation**: Add validation in controllers before passing data to views
 4. **Error Handling**: Catch and handle errors gracefully in views
 
-**Chosen Solution**: Comprehensive safe array access with defensive programming
+#### **Chosen Solution**: Comprehensive safe array access with defensive programming
 
 -   **Rationale**: Provides robust error prevention, better user experience, and easier maintenance
 -   **Implementation**:
@@ -265,24 +485,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **2. Database Schema Alignment Strategy**
+### **2025-01-21: Database Schema Alignment Strategy**
 
-#### **Decision**: Correct all controller database queries to match actual database schema
+**Decision**: Correct all controller database queries to match actual database schema
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-21
+**Review Date**: 2025-09-21
 
-**Date**: 2025-08-21  
-**Status**: ✅ Implemented  
-**Impact**: High - Data integrity and system reliability
+#### **Context**
 
-**Context**: Controllers were referencing non-existent database columns (`ito_no`, `destinatic`) causing SQL errors and dashboard failures.
+Controllers were referencing non-existent database columns (`ito_no`, `destinatic`) causing SQL errors and dashboard failures.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Database Schema Changes**: Modify database to match controller expectations
 2. **Controller Corrections**: Update controllers to use correct column names
 3. **Hybrid Approach**: Mix of schema changes and controller updates
 4. **Error Handling**: Catch SQL errors and handle gracefully
 
-**Chosen Solution**: Controller corrections to match actual database schema
+#### **Chosen Solution**: Controller corrections to match actual database schema
 
 -   **Rationale**: Maintains data integrity, follows existing database design, and prevents future errors
 -   **Implementation**:
@@ -308,26 +529,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-## 🎯 **Previous Decisions (2025-08-14)**
+### **2025-01-21: Additional Documents Import System Architecture**
 
-### **1. Additional Documents Import System Architecture**
+**Decision**: Replace batch insert functionality with individual model saves to resolve column mismatch errors
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-21
+**Review Date**: 2025-09-21
 
-#### **Decision**: Replace batch insert functionality with individual model saves to resolve column mismatch errors
+#### **Context**
 
-**Date**: 2025-08-21  
-**Status**: ✅ Implemented  
-**Impact**: High - Core import functionality and data integrity
+The additional documents import was failing with SQL column count mismatch errors due to batch insert operations not properly handling the database schema changes.
 
-**Context**: The additional documents import was failing with SQL column count mismatch errors due to batch insert operations not properly handling the database schema changes.
-
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Fix Batch Insert**: Debug and fix the column mapping in batch operations
 2. **Individual Saves**: Process each row individually with proper error handling
 3. **Hybrid Approach**: Use batch inserts for valid rows, individual saves for problematic ones
 4. **Database Schema Update**: Modify the import to match current database structure
 
-**Chosen Solution**: Individual model saves with comprehensive error handling and logging
+#### **Chosen Solution**: Individual model saves with comprehensive error handling and logging
 
 -   **Rationale**: Provides better error isolation, easier debugging, and more reliable data processing
 -   **Implementation**:
@@ -353,24 +573,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **2. Excel Column Header Normalization Strategy**
+### **2025-01-21: Excel Column Header Normalization Strategy**
 
-#### **Decision**: Implement flexible column header mapping to handle various Excel file formats
+**Decision**: Implement flexible column header mapping to handle various Excel file formats
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-21
+**Review Date**: 2025-09-21
 
-**Date**: 2025-08-21  
-**Status**: ✅ Implemented  
-**Impact**: Medium - Import flexibility and user experience
+#### **Context**
 
-**Context**: Users may have Excel files with different column header formats (spaces, underscores, abbreviations) that need to be consistently mapped to database fields.
+Users may have Excel files with different column header formats (spaces, underscores, abbreviations) that need to be consistently mapped to database fields.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Strict Header Matching**: Require exact column header matches
 2. **Flexible Mapping**: Handle various header format variations
 3. **User Configuration**: Allow users to map columns manually
 4. **Template Enforcement**: Require specific Excel template format
 
-**Chosen Solution**: Flexible header normalization with intelligent mapping
+#### **Chosen Solution**: Flexible header normalization with intelligent mapping
 
 -   **Rationale**: Improves user experience by accepting various Excel formats while maintaining data integrity
 -   **Implementation**:
@@ -396,24 +617,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **3. Supplier Import API Integration Architecture**
+### **2025-01-21: Supplier Import API Integration Architecture**
 
-#### **Decision**: Implement external API integration for bulk supplier import with duplicate prevention
+**Decision**: Implement external API integration for bulk supplier import with duplicate prevention
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-14
+**Review Date**: 2025-09-14
 
-**Date**: 2025-08-14  
-**Status**: ✅ Implemented  
-**Impact**: High - Data management and user productivity
+#### **Context**
 
-**Context**: Users need to import suppliers from external system to avoid manual entry and maintain data consistency across systems.
+Users need to import suppliers from external system to avoid manual entry and maintain data consistency across systems.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **CSV/Excel Import**: Manual file upload and processing
 2. **Database Direct Import**: Direct database connection to external system
 3. **API Integration**: RESTful API endpoint for data retrieval
 4. **Scheduled Sync**: Automated periodic synchronization
 
-**Chosen Solution**: API integration with manual trigger and comprehensive error handling
+#### **Chosen Solution**: API integration with manual trigger and comprehensive error handling
 
 -   **Rationale**: Provides real-time data, secure access, easy maintenance, and user control
 -   **Implementation**:
@@ -439,24 +661,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **4. Additional Documents Index Page Enhancement Strategy**
+### **2025-01-21: Additional Documents Index Page Enhancement Strategy**
 
-#### **Decision**: Enhance index page with date columns and improved date range handling for better user experience
+**Decision**: Enhance index page with date columns and improved date range handling for better user experience
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-21
+**Review Date**: 2025-09-21
 
-**Date**: 2025-08-21  
-**Status**: ✅ Implemented  
-**Impact**: Medium - User interface and data visibility
+#### **Context**
 
-**Context**: Users need better visibility of document dates and improved date range search functionality for more effective document management.
+Users need better visibility of document dates and improved date range search functionality for more effective document management.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Add Date Columns**: Include document_date and receive_date in the DataTable
 2. **Improve Date Range**: Fix date range input default behavior
 3. **Enhanced Formatting**: Use consistent date formatting across the application
 4. **Column Reordering**: Optimize table structure for better information hierarchy
 
-**Chosen Solution**: Comprehensive index page enhancement with date columns and improved UX
+#### **Chosen Solution**: Comprehensive index page enhancement with date columns and improved UX
 
 -   **Rationale**: Provides better document visibility, improved search capabilities, and consistent user experience
 -   **Implementation**:
@@ -484,24 +707,25 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **2. API Response Structure Handling Strategy**
+### **2025-01-21: API Response Structure Handling Strategy**
 
-#### **Decision**: Implement flexible API response parsing to handle varying data structures
+**Decision**: Implement flexible API response parsing to handle varying data structures
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-14
+**Review Date**: 2025-09-14
 
-**Date**: 2025-08-14  
-**Status**: ✅ Implemented  
-**Impact**: Medium - System reliability and maintainability
+#### **Context**
 
-**Context**: External API response structure may vary, and the actual structure differs from initial assumptions.
+External API response structure may vary, and the actual structure differs from initial assumptions.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Rigid Structure Validation**: Strict validation of expected response format
 2. **Flexible Parsing**: Adaptive parsing with multiple fallback strategies
 3. **Configuration-Based**: User-configurable response mapping
 4. **Error-Only Approach**: Fail fast with clear error messages
 
-**Chosen Solution**: Flexible parsing with comprehensive validation and detailed error reporting
+#### **Chosen Solution**: Flexible parsing with comprehensive validation and detailed error reporting
 
 -   **Rationale**: Provides robustness while maintaining clear error feedback for troubleshooting
 -   **Implementation**:
@@ -526,23 +750,24 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **3. Document Status Tracking Implementation**
+### **2025-01-21: Document Status Tracking Implementation**
 
-#### **Decision**: Add `distribution_status` field to prevent duplicate distributions
+**Decision**: Add `distribution_status` field to prevent duplicate distributions
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-14
+**Review Date**: 2025-09-14
 
-**Date**: 2025-08-14  
-**Status**: ✅ Implemented  
-**Impact**: High - Core system functionality
+#### **Context**
 
-**Context**: Users could potentially select the same documents for multiple distributions, leading to data inconsistencies and workflow confusion.
+Users could potentially select the same documents for multiple distributions, leading to data inconsistencies and workflow confusion.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Database-level constraints**: Prevent duplicate document selections
 2. **Application-level filtering**: Filter out documents already in distributions
 3. **Status-based tracking**: Track document distribution state
 
-**Chosen Solution**: Status-based tracking with `distribution_status` field
+#### **Chosen Solution**: Status-based tracking with `distribution_status` field
 
 -   **Rationale**: Provides clear visibility of document state, prevents duplicates, enables future enhancements
 -   **Implementation**: Added enum field with values: `available`, `in_transit`, `distributed`
@@ -562,23 +787,24 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **4. Permission & Access Control Architecture**
+### **2025-01-21: Permission & Access Control Architecture**
 
-#### **Decision**: Implement role-based access control with department isolation
+**Decision**: Implement role-based access control with department isolation
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-14
+**Review Date**: 2025-09-14
 
-**Date**: 2025-08-14  
-**Status**: ✅ Implemented  
-**Impact**: High - Security and user experience
+#### **Context**
 
-**Context**: Need to ensure users only see and interact with distributions relevant to their department and role.
+Need to ensure users only see and interact with distributions relevant to their department and role.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Simple role-based access**: Basic admin/user permissions
 2. **Department-based filtering**: Filter by user's department
 3. **Hybrid approach**: Role + department + status-based access
 
-**Chosen Solution**: Hybrid approach with role-based permissions and department isolation
+#### **Chosen Solution**: Hybrid approach with role-based permissions and department isolation
 
 -   **Rationale**: Provides security while maintaining good user experience
 -   **Implementation**:
@@ -601,44 +827,46 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **5. Invoice Additional Documents Auto-Inclusion**
+### **2025-01-21: Invoice Additional Documents Auto-Inclusion**
 
-#### **Decision**: Automatically include attached additional documents when distributing invoices
+**Decision**: Automatically include attached additional documents when distributing invoices
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-14
+**Review Date**: 2025-09-14
 
-**Date**: 2025-08-14  
-**Status**: ✅ Implemented  
-**Impact**: Medium - User experience and data integrity
+#### **Context**
 
-**Context**: When distributing invoices, users need to remember to include supporting documentation, leading to incomplete distributions.
+When distributing invoices, users need to remember to include supporting documentation, leading to incomplete distributions.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Manual selection**: Users manually select all related documents
 2. **Prompt system**: System prompts users to include related documents
 3. **Automatic inclusion**: System automatically includes all attached documents
 
-**Chosen Solution**: Automatic inclusion with manual override capability
+#### **Chosen Solution**: Automatic inclusion with manual override capability
 
 ---
 
-### **6. Additional Documents Index System Enhancement**
+### **2025-01-21: Additional Documents Index System Enhancement**
 
-#### **Decision**: Implement modal-based viewing and optimize search/columns for better user experience
+**Decision**: Implement modal-based viewing and optimize search/columns for better user experience
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-14
+**Review Date**: 2025-09-14
 
-**Date**: 2025-08-14  
-**Status**: ✅ Implemented  
-**Impact**: Medium - User experience and interface optimization
+#### **Context**
 
-**Context**: The additional documents index page needed improvements in search functionality, data presentation, and document viewing experience.
+The additional documents index page needed improvements in search functionality, data presentation, and document viewing experience.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Search Optimization**: Replace project search with PO number search
 2. **Column Restructuring**: Remove less useful columns, add visual indicators
 3. **Viewing Experience**: Page redirects vs. modal-based viewing
 4. **Date Formatting**: Standard vs. business-friendly date formats
 
-**Chosen Solutions**:
+#### **Chosen Solutions**:
 
 **Search & Columns**:
 
@@ -676,23 +904,24 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **7. Distribution Numbering System Format**
+### **2025-01-21: Distribution Numbering System Format**
 
-#### **Decision**: Change format from `YY/DEPT/DDS/1` to `YY/DEPT/DDS/0001`
+**Decision**: Change format from `YY/DEPT/DDS/1` to `YY/DEPT/DDS/0001`
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-14
+**Review Date**: 2025-09-14
 
-**Date**: 2025-08-14  
-**Status**: ✅ Implemented  
-**Impact**: Low - Visual presentation and consistency
+#### **Context**
 
-**Context**: Current numbering format doesn't provide consistent visual alignment and professional appearance.
+Current numbering format doesn't provide consistent visual alignment and professional appearance.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Keep current format**: `YY/DEPT/DDS/1`
 2. **Add leading zeros**: `YY/DEPT/DDS/0001`
 3. **Use different separator**: `YY-DEPT-DDS-0001`
 
-**Chosen Solution**: Add leading zeros with 4-digit sequence
+#### **Chosen Solution**: Add leading zeros with 4-digit sequence
 
 -   **Rationale**: Provides consistent visual alignment and professional appearance
 -   **Implementation**: Updated `generateDistributionNumber()` method with `str_pad()`
@@ -712,23 +941,24 @@ This document records key architectural and implementation decisions made during
 
 ---
 
-### **8. Error Handling Strategy for Sequence Conflicts**
+### **2025-01-21: Error Handling Strategy for Sequence Conflicts**
 
-#### **Decision**: Implement retry logic for sequence conflicts
+**Decision**: Implement retry logic for sequence conflicts
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-08-14
+**Review Date**: 2025-09-14
 
-**Date**: 2025-08-14  
-**Status**: ✅ Implemented  
-**Impact**: Medium - System reliability
+#### **Context**
 
-**Context**: Race conditions can cause duplicate sequence numbers, leading to database constraint violations.
+Race conditions can cause duplicate sequence numbers, leading to database constraint violations.
 
-**Options Considered**:
+#### **Alternatives Considered**
 
 1. **Fail fast**: Return error immediately on conflict
 2. **Retry logic**: Attempt to generate new sequence numbers
 3. **Database-level handling**: Use database features to handle conflicts
 
-**Chosen Solution**: Retry logic with maximum attempts
+#### **Chosen Solution**: Retry logic with maximum attempts
 
 -   **Rationale**: Provides graceful handling of temporary conflicts
 -   **Implementation**:

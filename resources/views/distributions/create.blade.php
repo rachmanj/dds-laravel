@@ -357,8 +357,16 @@
             }
 
             // Form submission
+            var isSubmitting = false; // Submission guard
+            
             $('#distributionForm').submit(function(e) {
                 e.preventDefault();
+
+                // Prevent multiple submissions
+                if (isSubmitting) {
+                    console.log('Form submission already in progress, ignoring duplicate submit');
+                    return false;
+                }
 
                 // Debug: Log form data before submission
                 console.log('=== DISTRIBUTION FORM DEBUG ===');
@@ -415,6 +423,9 @@
                 var finalFormData = $(this).serialize();
                 console.log('Final form data (serialize):', finalFormData);
                 console.log('=== END DEBUG ===');
+
+                // Set submission guard
+                isSubmitting = true;
 
                 // Disable submit button
                 $('#submitBtn').prop('disabled', true).html(

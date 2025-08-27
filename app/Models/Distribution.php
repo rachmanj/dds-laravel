@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class Distribution extends Model
 {
@@ -135,14 +136,34 @@ class Distribution extends Model
 
     /**
      * Get next sequence number for a department/year combination
+     * This method finds the next available sequence number
      */
     public static function getNextSequence(int $year, int $departmentId): int
     {
-        $maxSequence = static::where('year', $year)
+        // Get all existing sequences for this department/year
+        $existingSequences = static::where('year', $year)
             ->where('origin_department_id', $departmentId)
-            ->max('sequence');
+            ->pluck('sequence')
+            ->sort()
+            ->values();
 
-        return ($maxSequence ?? 0) + 1;
+        if ($existingSequences->isEmpty()) {
+            return 1; // First sequence
+        }
+
+        // Find the first gap in the sequence, or use the next number after the highest
+        $expectedSequence = 1;
+
+        foreach ($existingSequences as $existingSequence) {
+            if ($existingSequence !== $expectedSequence) {
+                // Found a gap, use this sequence number
+                return $expectedSequence;
+            }
+            $expectedSequence++;
+        }
+
+        // No gaps found, use the next number after the highest
+        return $existingSequences->max() + 1;
     }
 
     /**
@@ -202,7 +223,7 @@ class Distribution extends Model
         }
 
         // Admin and superadmin can always receive distributions
-        if ($user->hasRole(['superadmin', 'admin'])) {
+        if (array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             return true;
         }
 

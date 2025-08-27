@@ -99,6 +99,11 @@ class Invoice extends Model
 
     /**
      * Scope a query to only include invoices available for distribution.
+     * 
+     * Documents are NOT available if they are:
+     * - 'in_transit' (currently being distributed to another department)
+     * - 'distributed' (already distributed to another department)
+     * - 'unaccounted_for' (missing or damaged in previous distribution)
      */
     public function scopeAvailableForDistribution($query)
     {

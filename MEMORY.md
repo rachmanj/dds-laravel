@@ -1655,3 +1655,154 @@ $stages = [
 -   **User Experience**: Floating print buttons provide better accessibility than embedded links
 
 ---
+
+### **2025-01-27: Critical Distribution Document Status Management Fix - Complete Workflow Protection**
+
+**Version**: 4.2  
+**Status**: ✅ **Critical Business Logic Fix Completed Successfully**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 1 hour (critical fix for data integrity)
+
+**Project Scope**: Fix critical flaw in document status management that allowed documents "in transit" to be selected for new distributions
+
+#### **1. Critical Problem Identification**
+
+**Decision**: Fix system allowing documents already in distribution to be selected for new distributions
+**Context**: Documents with status 'in_transit' (being sent to another department) were still appearing in the available documents list for new distributions
+**Implementation Date**: 2025-01-27
+**Actual Effort**: 1 hour
+**Status**: ✅ **COMPLETED** - Critical business logic flaw resolved
+
+**Root Cause Analysis**:
+
+-   **Distribution SENT**: `updateDocumentDistributionStatuses($distribution, 'in_transit')` was called
+-   **Critical Flaw**: Method only updated documents with `receiver_verification_status === 'verified'`
+-   **Problem**: When distribution is just sent (not received), verification status is still `null`
+-   **Result**: Documents kept `distribution_status = 'available'` instead of `'in_transit'`
+-   **Business Impact**: Same document could be selected for multiple distributions simultaneously
+
+**Learning**: Business logic must handle different workflow stages correctly - sent vs received distributions have different requirements
+
+#### **2. Complete Fix Implementation**
+
+**Decision**: Implement conditional logic based on distribution status (sent vs received)
+**Implementation**:
+
+-   **When SENT**: Update ALL documents to `'in_transit'` (preventing selection in new distributions)
+-   **When RECEIVED**: Only update `'verified'` documents to `'distributed'`
+-   **Missing/Damaged**: Keep original status for audit trail integrity
+
+**Technical Implementation**:
+
+```php
+private function updateDocumentDistributionStatuses(Distribution $distribution, string $status): void
+{
+    foreach ($distribution->documents as $distributionDocument) {
+        if ($distributionDocument->document_type === Invoice::class) {
+            if ($status === 'in_transit') {
+                // ✅ When SENT: Update ALL documents to 'in_transit' (prevent selection in new distributions)
+                Invoice::where('id', $distributionDocument->document_id)
+                    ->update(['distribution_status' => $status]);
+
+                // Also update attached additional documents
+                $invoice->additionalDocuments()->update(['distribution_status' => $status]);
+            } elseif ($status === 'distributed') {
+                // ✅ When RECEIVED: Only update verified documents
+                if ($distributionDocument->receiver_verification_status === 'verified') {
+                    // Update status...
+                }
+            }
+        }
+        // Similar logic for AdditionalDocument...
+    }
+}
+```
+
+**Business Logic Flow**:
+
+1. **Document Available** (`distribution_status = 'available'`) → Can be selected for distribution
+2. **Distribution Created** → Document linked to distribution
+3. **Distribution SENT** → Document becomes `'in_transit'` → **Cannot be selected for new distributions** ✅
+4. **Distribution RECEIVED** → Document becomes `'distributed'` → **Cannot be selected for new distributions** ✅
+5. **If Missing/Damaged** → Document becomes `'unaccounted_for'` → **Cannot be selected for new distributions** ✅
+
+**Learning**: Proper workflow state management requires understanding the business context of each operation
+
+#### **3. Data Integrity Protection**
+
+**Decision**: Ensure documents cannot be in multiple distributions simultaneously
+**Implementation**:
+
+-   **Scope Protection**: `availableForDistribution()` scope only shows documents with `status = 'available'`
+-   **Status Isolation**: Documents in transit are completely isolated from new distribution selection
+-   **Audit Trail**: Complete tracking of document movement through distribution workflow
+-   **Business Rules**: Physical reality matches system records
+
+**Protection Mechanisms**:
+
+-   **Frontend**: Only available documents shown in distribution creation forms
+-   **Backend**: Status updates prevent documents from being available during transit
+-   **Database**: `distribution_status` enum enforces valid state transitions
+-   **Workflow**: Clear separation between available, in-transit, and distributed states
+
+**Learning**: Data integrity requires protection at multiple levels - frontend, backend, and database
+
+#### **4. Business Impact & Compliance**
+
+**Decision**: Maintain complete audit trail and prevent workflow corruption
+**Implementation**:
+
+-   **Audit Compliance**: Complete tracking of document movement and status changes
+-   **Workflow Integrity**: Documents follow proper distribution lifecycle
+-   **Risk Mitigation**: Eliminates possibility of duplicate distribution assignments
+-   **Process Validation**: System enforces business rules automatically
+
+**Business Benefits**:
+
+-   **Data Accuracy**: Physical document location always matches system records
+-   **Process Compliance**: Distribution workflow follows established business rules
+-   **Risk Reduction**: Eliminates possibility of documents being "in two places at once"
+-   **Audit Trail**: Complete history for regulatory and compliance requirements
+
+**Learning**: Business process automation must enforce real-world constraints to maintain system credibility
+
+#### **5. Technical Architecture Improvements**
+
+**Decision**: Implement robust status management with clear business logic separation
+**Implementation**:
+
+-   **Conditional Logic**: Different behavior for sent vs received distributions
+-   **Status Transitions**: Clear state machine for document distribution lifecycle
+-   **Error Prevention**: System prevents invalid state transitions
+-   **Performance**: Efficient status updates without unnecessary database queries
+
+**Architecture Benefits**:
+
+-   **Maintainability**: Clear separation of concerns between different workflow stages
+-   **Reliability**: Robust error handling and state validation
+-   **Scalability**: Efficient database operations for status updates
+-   **Extensibility**: Easy to add new distribution statuses or workflow stages
+
+**Learning**: Good architecture design prevents business logic errors and makes systems more reliable
+
+#### **6. Testing & Validation Strategy**
+
+**Decision**: Implement comprehensive testing to validate fix effectiveness
+**Implementation**:
+
+-   **Unit Testing**: Test status update logic for different distribution stages
+-   **Integration Testing**: Verify document availability in distribution creation forms
+-   **Workflow Testing**: End-to-end testing of complete distribution lifecycle
+-   **Edge Case Testing**: Handle missing/damaged document scenarios
+
+**Testing Scenarios**:
+
+1. **Create Distribution**: Verify only available documents are selectable
+2. **Send Distribution**: Verify documents become 'in_transit' and unavailable
+3. **Receive Distribution**: Verify only verified documents become 'distributed'
+4. **Missing Documents**: Verify missing documents don't get false status updates
+5. **Multiple Distributions**: Verify documents can't be in multiple distributions
+
+**Learning**: Comprehensive testing is essential for business-critical fixes to prevent regression
+
+---
