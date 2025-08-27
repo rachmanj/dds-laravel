@@ -267,7 +267,7 @@ class DistributionController extends Controller
             if ($distributionDocument->document_type === Invoice::class) {
                 $invoice = $distributionDocument->document;
                 if ($invoice) {
-                    $invoice->load('additionalDocuments.doctype');
+                    $invoice->load(['additionalDocuments.type', 'supplier']);
                 }
             }
         }

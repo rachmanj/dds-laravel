@@ -337,6 +337,129 @@ The DDS application includes comprehensive documentation designed for different 
 
 ---
 
+## Distribution Print Functionality Architecture
+
+### Overview
+
+The distribution print system has been completely redesigned to provide professional Transmittal Advice documents with proper data display, visual hierarchy, and user-friendly print functionality.
+
+### Key Components
+
+#### 1. Floating Print Button System
+
+-   **Modern Design**: CSS-styled floating button with hover effects and mobile responsiveness
+-   **Positioning**: Fixed bottom-right corner with high z-index for easy access
+-   **Functionality**: Direct `window.print()` trigger for immediate print dialog
+-   **Print Media**: Automatically hidden during print operations with CSS media queries
+
+#### 2. Table Structure & Layout
+
+-   **9-Column Layout**: Consistent structure across all distribution types
+-   **Column Headers**: NO, DOC TYPE, VENDOR/SUPPLIER, DOC NO, DATE, AMOUNT, PO NO, PROJECT, STATUS
+-   **Responsive Design**: Proper alignment and spacing for professional output
+-   **Amount Alignment**: Right-aligned amount column with proper currency formatting
+
+#### 3. Conditional Display Logic
+
+-   **Invoice Distribution**: Primary invoice rows with additional document sub-rows
+-   **Additional Document Distribution**: Standalone document rows with complete information
+-   **Dynamic Layout**: Table adapts based on `distribution->document_type` value
+
+### Technical Implementation
+
+#### Print View Structure
+
+```php
+@if ($distribution->document_type === 'invoice')
+    // Show invoices with attached additional documents as sub-rows
+    @foreach ($distribution->documents as $doc)
+        // Invoice row with complete information
+        @if ($invoice->additionalDocuments->count() > 0)
+            // Additional document sub-rows with indentation
+        @endif
+    @endforeach
+@else
+    // Show standalone additional documents
+    @foreach ($distribution->documents as $doc)
+        // Additional document row with complete information
+    @endforeach
+@endif
+```
+
+#### CSS Styling System
+
+```css
+.additional-doc-row {
+    background-color: #f8f9fa;
+    font-size: 0.9em;
+}
+
+.documents-table .text-right {
+    text-align: right !important;
+}
+
+@media print {
+    .floating-print-btn {
+        display: none !important;
+    }
+}
+```
+
+#### Data Loading & Relationships
+
+```php
+// Enhanced controller relationships for print functionality
+$invoice->load(['additionalDocuments.type', 'supplier']);
+
+// Proper field mapping for professional output
+$invoice->supplier->name  // Instead of vendor_name
+$invoice->invoice_number  // Instead of inv_no
+$invoice->invoice_date    // Instead of inv_date
+```
+
+### Business Logic
+
+#### Invoice Distribution Display
+
+1. **Primary Row**: Invoice information (supplier, number, date, amount, PO, project, status)
+2. **Sub-rows**: Additional documents attached to the invoice
+3. **Visual Hierarchy**: Clear distinction between main and sub-rows
+4. **Complete Information**: All relevant fields properly displayed
+
+#### Additional Document Distribution Display
+
+1. **Standalone Rows**: Each additional document as a complete row
+2. **Field Mapping**: Document type, number, date, PO, project, status
+3. **Consistent Layout**: Same 9-column structure maintained
+4. **Professional Output**: Business-ready documentation
+
+### User Experience Features
+
+#### Print Workflow
+
+1. **Easy Access**: Floating print button always visible
+2. **Immediate Action**: One-click print functionality
+3. **Professional Output**: Clean, organized business documents
+4. **Mobile Friendly**: Responsive design for all devices
+
+#### Visual Enhancements
+
+1. **Clear Hierarchy**: Distinction between main and sub-rows
+2. **Professional Styling**: Light gray background for additional documents
+3. **Proper Alignment**: Right-aligned amounts, consistent spacing
+4. **Status Indicators**: Clear status badges for all documents
+
+### Business Impact
+
+-   **Professional Documentation**: Clean, organized Transmittal Advice documents
+-   **Clear Information Hierarchy**: Easy to read invoice and document relationships
+-   **Complete Data Display**: All relevant information properly organized
+-   **Print Quality**: Professional-grade output suitable for business use
+-   **User Efficiency**: Easy access to print functionality with floating button
+-   **Mobile Accessibility**: Responsive design for all device types
+
+---
+
 **Last Updated**: 2025-08-21  
-**Version**: 3.0  
-**Status**: ✅ Dashboard Analytics System Implemented & All Phases Completed
+**Version**: 3.1  
+**Status**: ✅ Distribution Print Functionality Enhanced & All Issues Resolved

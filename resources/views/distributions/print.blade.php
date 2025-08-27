@@ -94,6 +94,10 @@
             text-align: left;
         }
 
+        .documents-table .text-right {
+            text-align: right !important;
+        }
+
         .documents-table th {
             background-color: #f8f9fa;
             font-weight: bold;
@@ -103,6 +107,24 @@
             background-color: #e9ecef;
             font-weight: bold;
             font-style: italic;
+        }
+
+        .additional-doc-row {
+            background-color: #f8f9fa;
+            font-size: 0.9em;
+        }
+
+        .additional-doc-row td {
+            border-top: 1px solid #dee2e6;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .additional-doc-row td:first-child {
+            border-left: 1px solid #dee2e6;
+        }
+
+        .additional-doc-row td:last-child {
+            border-right: 1px solid #dee2e6;
         }
 
         .signature-section {
@@ -265,36 +287,37 @@
                             <tr>
                                 <th>NO</th>
                                 <th>DOCUMENT TYPE</th>
+                                <th>VENDOR/SUPPLIER</th>
                                 <th>DOCUMENT NO.</th>
                                 <th>DATE</th>
-                                <th>AMOUNT</th>
-                                <th>VENDOR/SUPPLIER</th>
+                                <th class="text-right">AMOUNT</th>
                                 <th>PO NO</th>
                                 <th>PROJECT</th>
                                 <th>STATUS</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($distribution->documents as $index => $doc)
-                                @if ($doc->document_type === 'App\Models\Invoice')
+
+                            @if ($distribution->document_type === 'invoice')
+                                @foreach ($distribution->documents as $index => $doc)
                                     @php $invoice = $doc->document; @endphp
                                     <tr>
                                         <td>{{ $index + 1 }}</td>
                                         <td><strong>Invoice</strong></td>
-                                        <td><strong>{{ $invoice->inv_no }}</strong></td>
-                                        <td>{{ $invoice->inv_date ? date('d-M-Y', strtotime($invoice->inv_date)) : 'N/A' }}
+                                        <td>{{ $invoice->supplier->name ?? 'N/A' }}</td>
+                                        <td><strong>{{ $invoice->invoice_number }}</strong></td>
+                                        <td>{{ $invoice->invoice_date ? date('d-M-Y', strtotime($invoice->invoice_date)) : 'N/A' }}
                                         </td>
                                         <td class="text-right">
-                                            @if ($invoice->inv_currency && $invoice->inv_nominal)
-                                                {{ $invoice->inv_currency }}
-                                                {{ number_format($invoice->inv_nominal, 0) }}
+                                            @if ($invoice->currency && $invoice->amount)
+                                                {{ $invoice->currency }}
+                                                {{ number_format($invoice->amount, 0) }}
                                             @else
                                                 N/A
                                             @endif
                                         </td>
-                                        <td>{{ $invoice->vendor->vendor_name ?? 'N/A' }}</td>
                                         <td>{{ $invoice->po_no ?? 'N/A' }}</td>
-                                        <td>{{ $invoice->project->project_code ?? 'N/A' }}</td>
+                                        <td>{{ $invoice->invoice_project ?? 'N/A' }}</td>
                                         <td>
                                             <span
                                                 class="status-badge status-{{ $doc->verification_status ?? 'pending' }}">
@@ -304,20 +327,19 @@
                                     </tr>
 
                                     @if ($invoice->additionalDocuments && $invoice->additionalDocuments->count() > 0)
-                                        <tr class="additional-docs-header">
-                                            <td colspan="9">
-                                                <strong>Additional Documents for Invoice
-                                                    {{ $invoice->inv_no }}:</strong>
-                                            </td>
-                                        </tr>
                                         @foreach ($invoice->additionalDocuments as $addDoc)
-                                            <tr>
+                                            <tr class="additional-doc-row">
                                                 <td></td>
                                                 <td colspan="2">
-                                                    {{ $addDoc->doctype->docdesc ?? 'Additional Document' }}</td>
-                                                <td colspan="2">{{ $addDoc->document_no ?? 'N/A' }}</td>
-                                                <td colspan="2"></td>
-                                                <td></td>
+                                                    <strong>{{ $addDoc->type->type_name ?? 'Additional Document' }}</strong>
+                                                </td>
+                                                <td colspan="2">
+                                                    <strong>{{ $addDoc->document_number ?? 'N/A' }}</strong>
+                                                </td>
+                                                <td>{{ $addDoc->document_date ? date('d-M-Y', strtotime($addDoc->document_date)) : 'N/A' }}
+                                                </td>
+                                                <td>{{ $addDoc->po_no ?? 'N/A' }}</td>
+                                                <td>{{ $addDoc->project ?? 'N/A' }}</td>
                                                 <td>
                                                     <span
                                                         class="status-badge status-{{ $addDoc->distribution_status ?? 'available' }}">
@@ -327,16 +349,20 @@
                                             </tr>
                                         @endforeach
                                     @endif
-                                @else
+                                @endforeach
+                            @else
+                                @foreach ($distribution->documents as $index => $doc)
                                     @php $additionalDoc = $doc->document; @endphp
                                     <tr>
                                         <td>{{ $index + 1 }}</td>
                                         <td><strong>Additional Document</strong></td>
-                                        <td><strong>{{ $additionalDoc->document_no ?? 'N/A' }}</strong></td>
-                                        <td>{{ $additionalDoc->created_at ? date('d-M-Y', strtotime($additionalDoc->created_at)) : 'N/A' }}
+                                        <td>{{ $additionalDoc->type->type_name ?? 'Additional Document' }}</td>
+                                        <td><strong>{{ $additionalDoc->document_number ?? 'N/A' }}</strong></td>
+                                        <td>{{ $additionalDoc->document_date ? date('d-M-Y', strtotime($additionalDoc->document_date)) : 'N/A' }}
                                         </td>
-                                        <td colspan="3">N/A</td>
-                                        <td>{{ $additionalDoc->project->project_code ?? 'N/A' }}</td>
+                                        <td class="text-right">N/A</td>
+                                        <td>{{ $additionalDoc->po_no ?? 'N/A' }}</td>
+                                        <td>{{ $additionalDoc->project ?? 'N/A' }}</td>
                                         <td>
                                             <span
                                                 class="status-badge status-{{ $doc->verification_status ?? 'pending' }}">
@@ -344,8 +370,8 @@
                                             </span>
                                         </td>
                                     </tr>
-                                @endif
-                            @endforeach
+                                @endforeach
+                            @endif
                         </tbody>
                     </table>
                 </div>
@@ -379,7 +405,8 @@
                             @if ($distribution->received_at)
                                 <div class="info-row">
                                     <div class="info-label">Received:</div>
-                                    <div class="info-value">{{ $distribution->received_at->format('d-M-Y H:i') }}</div>
+                                    <div class="info-value">{{ $distribution->received_at->format('d-M-Y H:i') }}
+                                    </div>
                                 </div>
                             @endif
                             @if ($distribution->receiver_verified_at)
@@ -439,13 +466,67 @@
         </section>
     </div>
 
+    <!-- Floating Print Button -->
+    <div class="floating-print-btn">
+        <button type="button" class="btn btn-primary btn-lg" onclick="window.print()">
+            <i class="fas fa-print"></i>
+            <span class="btn-text">Print Now</span>
+        </button>
+    </div>
+
     <!-- Page specific script -->
     <script>
         window.addEventListener("load", function() {
             // Auto-trigger print dialog
-            window.print();
+            // window.print();
         });
     </script>
+
+    <style>
+        .floating-print-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+        }
+
+        .floating-print-btn .btn {
+            border-radius: 50px;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+            transition: all 0.3s ease;
+            padding: 15px 20px;
+        }
+
+        .floating-print-btn .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+        }
+
+        .floating-print-btn .btn-text {
+            margin-left: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .floating-print-btn {
+                bottom: 20px;
+                right: 20px;
+            }
+
+            .floating-print-btn .btn {
+                padding: 12px 16px;
+            }
+
+            .floating-print-btn .btn-text {
+                display: none;
+            }
+        }
+
+        @media print {
+            .floating-print-btn {
+                display: none !important;
+            }
+        }
+    </style>
 </body>
 
 </html>
