@@ -265,6 +265,7 @@ class DocumentStatusController extends Controller
             'distribution_id' => null, // Not tied to a specific distribution
             'user_id' => $user->id,
             'action' => 'status_reset',
+            'action_type' => 'status_management', // Required field for status reset operations
             'metadata' => [
                 'document_type' => $documentType,
                 'document_id' => $documentId,

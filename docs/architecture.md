@@ -205,6 +205,34 @@ private function updateDocumentDistributionStatuses(Distribution $distribution, 
 -   **Content Structure**: `<section class="content">` with `<div class="container-fluid">` wrapper
 -   **Script Organization**: JavaScript organized in `@section('scripts')` with proper DataTables integration
 
+**Database Architecture**:
+
+-   **Migration Strategy**: Created migration to make `distribution_id` nullable in `distribution_histories` table
+-   **Constraint Management**: Proper foreign key constraints with nullable support for standalone operations
+-   **Audit Trail**: Complete status change tracking with required fields (`action`, `action_type`, `metadata`)
+
+**Audit Logging Architecture**:
+
+```php
+// Complete audit trail creation
+DistributionHistory::create([
+    'distribution_id' => null, // Nullable for standalone operations
+    'user_id' => $user->id,
+    'action' => 'status_reset',
+    'action_type' => 'status_management', // Required field for categorization
+    'metadata' => [
+        'document_type' => get_class($document),
+        'document_id' => $document->id,
+        'old_status' => $oldStatus,
+        'new_status' => $newStatus,
+        'reason' => $reason,
+        'operation_type' => $operationType,
+        'timestamp' => now()->toISOString()
+    ],
+    'action_performed_at' => now()
+]);
+```
+
 ## 🔐 **Security & Permissions**
 
 ### **Role-Based Access Control**
