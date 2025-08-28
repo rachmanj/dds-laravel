@@ -191,6 +191,19 @@ class RolePermissionSeeder extends Seeder
             'delete-distributions',
         ]);
 
-        Role::firstOrCreate(['name' => 'user']);
+        $cashierho = Role::firstOrCreate(['name' => 'cashierho']);
+        $cashierho->givePermissionTo([
+            'view-invoices',
+            'view-invoice-payment',
+            'update-invoice-payment',
+            'inv-attachment-view',
+            'inv-attachment-create',
+            'inv-attachment-edit',
+            'inv-attachment-delete',
+            'view-suppliers',
+            'view-distributions',
+            'create-distributions',
+            'edit-distributions',
+        ]);
     }
 }

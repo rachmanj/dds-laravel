@@ -57,5 +57,15 @@ class UserSeeder extends Seeder
             'is_active' => 1,
         ]);
         $finance->assignRole('finance');
+
+        $cashierho = User::create([
+            'name' => 'Cashier HO',
+            'email' => 'cashho@ninja.com',
+            'password' => Hash::make('123456'),
+            'project' => '000H',
+            'department_id' => 10,
+            'is_active' => 1,
+        ]);
+        $cashierho->assignRole('cashierho');
     }
 }
