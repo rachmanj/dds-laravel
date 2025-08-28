@@ -28,20 +28,22 @@
 
 **Controllers Updated**:
 
-1. **InvoiceAttachmentController**: 
-   - **Before**: `max:5120` (5MB) for invoice attachments
-   - **After**: `max:51200` (50MB) for invoice attachments
-   - **Impact**: Users can now upload larger invoice supporting documents
+1. **InvoiceAttachmentController**:
+
+    - **Before**: `max:5120` (5MB) for invoice attachments
+    - **After**: `max:51200` (50MB) for invoice attachments
+    - **Impact**: Users can now upload larger invoice supporting documents
 
 2. **AdditionalDocumentController**:
-   - **Excel Import**: `max:10240` (10MB) → `max:51200` (50MB)
-   - **Attachment Upload**: `max:2048` (2MB) → `max:51200` (50MB) in both store and update methods
-   - **File Size Check**: 10MB → 50MB in import validation
-   - **Impact**: Larger supporting documents and Excel imports now supported
+
+    - **Excel Import**: `max:10240` (10MB) → `max:51200` (50MB)
+    - **Attachment Upload**: `max:2048` (2MB) → `max:51200` (50MB) in both store and update methods
+    - **File Size Check**: 10MB → 50MB in import validation
+    - **Impact**: Larger supporting documents and Excel imports now supported
 
 3. **InvoiceController**:
-   - **Excel Import**: `max:10240` (10MB) → `max:51200` (50MB)
-   - **Impact**: Bulk invoice imports with larger Excel files now supported
+    - **Excel Import**: `max:10240` (10MB) → `max:51200` (50MB)
+    - **Impact**: Bulk invoice imports with larger Excel files now supported
 
 **Technical Implementation**:
 
@@ -67,17 +69,19 @@
 **Blade Templates Updated**:
 
 1. **invoices/show.blade.php**:
-   - **Help Text**: "Maximum file size: 5MB" → "Maximum file size: 50MB"
-   - **JavaScript Validation**: 5MB → 50MB in file input change event
-   - **User Experience**: Clear communication of new limits
+
+    - **Help Text**: "Maximum file size: 5MB" → "Maximum file size: 50MB"
+    - **JavaScript Validation**: 5MB → 50MB in file input change event
+    - **User Experience**: Clear communication of new limits
 
 2. **invoices/attachments/index.blade.php**:
-   - **JavaScript Validation**: 5MB → 50MB in modal upload validation
-   - **Consistency**: Same limits across all invoice attachment interfaces
+
+    - **JavaScript Validation**: 5MB → 50MB in modal upload validation
+    - **Consistency**: Same limits across all invoice attachment interfaces
 
 3. **additional_documents/import.blade.php**:
-   - **JavaScript Validation**: 10MB → 50MB in file size validation
-   - **User Feedback**: Updated error messages reflect new limits
+    - **JavaScript Validation**: 10MB → 50MB in file size validation
+    - **User Feedback**: Updated error messages reflect new limits
 
 **Frontend Implementation**:
 
@@ -100,17 +104,17 @@ var maxSize = 50 * 1024 * 1024; // 50MB
 
 **Consistency Achieved**:
 
-- **Invoice Attachments**: 5MB → 50MB (10x increase)
-- **Additional Document Attachments**: 2MB → 50MB (25x increase)
-- **Excel Import Files**: 10MB → 50MB (5x increase)
-- **All File Types**: PDF, images, Excel, Word documents now support 50MB
+-   **Invoice Attachments**: 5MB → 50MB (10x increase)
+-   **Additional Document Attachments**: 2MB → 50MB (25x increase)
+-   **Excel Import Files**: 10MB → 50MB (5x increase)
+-   **All File Types**: PDF, images, Excel, Word documents now support 50MB
 
 **User Experience Improvements**:
 
-- **Larger Documents**: Users can upload comprehensive business documents
-- **Bulk Imports**: Larger Excel files for bulk data import
-- **Consistent Limits**: Same 50MB limit across all upload interfaces
-- **Clear Communication**: Updated help text and error messages
+-   **Larger Documents**: Users can upload comprehensive business documents
+-   **Bulk Imports**: Larger Excel files for bulk data import
+-   **Consistent Limits**: Same 50MB limit across all upload interfaces
+-   **Clear Communication**: Updated help text and error messages
 
 **Learning**: System-wide consistency in file size limits significantly improves user experience and reduces support requests
 
@@ -121,17 +125,17 @@ var maxSize = 50 * 1024 * 1024; // 50MB
 
 **Performance Features**:
 
-- **Validation Consistency**: All validation rules updated simultaneously
-- **Memory Management**: Laravel's built-in file handling supports large files
-- **Storage Optimization**: Efficient file storage with unique naming
-- **Error Handling**: Comprehensive validation with clear user feedback
+-   **Validation Consistency**: All validation rules updated simultaneously
+-   **Memory Management**: Laravel's built-in file handling supports large files
+-   **Storage Optimization**: Efficient file storage with unique naming
+-   **Error Handling**: Comprehensive validation with clear user feedback
 
 **Technical Benefits**:
 
-- **Scalability**: System now handles much larger business documents
-- **User Productivity**: Reduced need to split large files
-- **Business Efficiency**: Support for comprehensive document uploads
-- **System Reliability**: Consistent validation across all endpoints
+-   **Scalability**: System now handles much larger business documents
+-   **User Productivity**: Reduced need to split large files
+-   **Business Efficiency**: Support for comprehensive document uploads
+-   **System Reliability**: Consistent validation across all endpoints
 
 **Learning**: File size enhancements require careful consideration of both user experience and system performance
 
@@ -142,17 +146,17 @@ var maxSize = 50 * 1024 * 1024; // 50MB
 
 **Immediate Benefits**:
 
-- **Document Upload**: Users can upload larger, more comprehensive documents
-- **Bulk Operations**: Support for larger Excel import files
-- **Business Process**: Reduced need to split or compress large documents
-- **User Satisfaction**: Better support for real-world business document sizes
+-   **Document Upload**: Users can upload larger, more comprehensive documents
+-   **Bulk Operations**: Support for larger Excel import files
+-   **Business Process**: Reduced need to split or compress large documents
+-   **User Satisfaction**: Better support for real-world business document sizes
 
 **Long-term Benefits**:
 
-- **Process Efficiency**: Streamlined document upload workflows
-- **Data Integrity**: Complete documents uploaded without compression
-- **System Adoption**: Better user experience leads to increased system usage
-- **Business Scalability**: Support for growing document size requirements
+-   **Process Efficiency**: Streamlined document upload workflows
+-   **Data Integrity**: Complete documents uploaded without compression
+-   **System Adoption**: Better user experience leads to increased system usage
+-   **Business Scalability**: Support for growing document size requirements
 
 **Learning**: File size enhancements directly impact business process efficiency and user satisfaction
 
@@ -163,17 +167,17 @@ var maxSize = 50 * 1024 * 1024; // 50MB
 
 **Technical Roadmap**:
 
-- **Phase 1**: ✅ File size limits increased to 50MB (COMPLETED)
-- **Phase 2**: Monitor upload performance and user feedback
-- **Phase 3**: Consider additional file type support if needed
-- **Phase 4**: Evaluate need for even larger file support
+-   **Phase 1**: ✅ File size limits increased to 50MB (COMPLETED)
+-   **Phase 2**: Monitor upload performance and user feedback
+-   **Phase 3**: Consider additional file type support if needed
+-   **Phase 4**: Evaluate need for even larger file support
 
 **Monitoring Strategy**:
 
-- **Performance Metrics**: Track upload success rates and response times
-- **User Feedback**: Monitor support requests and user satisfaction
-- **System Resources**: Watch for storage and bandwidth impact
-- **Business Impact**: Measure workflow efficiency improvements
+-   **Performance Metrics**: Track upload success rates and response times
+-   **User Feedback**: Monitor support requests and user satisfaction
+-   **System Resources**: Watch for storage and bandwidth impact
+-   **Business Impact**: Measure workflow efficiency improvements
 
 **Learning**: File handling improvements should be planned with monitoring and feedback loops for continuous optimization
 
@@ -3670,6 +3674,311 @@ DistributionHistory::create([
 
 ---
 
+### **2025-01-27: Invoice Payment Management System - Complete Implementation & Days Calculation Fix**
+
+**Version**: 4.13  
+**Status**: ✅ **Invoice Payment Management System Completed Successfully**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 1 day (comprehensive implementation)
+
+**Project Scope**: Implement comprehensive invoice payment management system allowing users to track, update, and manage payment statuses for invoices in their department with days calculation and overdue alerts
+
+#### **1. Project Overview & Success**
+
+**Decision**: Implement comprehensive invoice payment management with days calculation and overdue alerts
+**Context**: Users needed system to track payment statuses, calculate days since received, and manage bulk payment updates
+**Implementation Date**: 2025-01-27
+**Actual Effort**: 1 day (comprehensive implementation)
+**Status**: ✅ **COMPLETED** - All phases implemented successfully
+
+**Learning**: Comprehensive payment management systems provide significant business value through workflow visibility and process optimization
+
+#### **2. Database Schema Enhancement Implementation**
+
+**Decision**: Extend invoices table with payment-related fields for comprehensive tracking
+**Implementation**:
+
+-   **New Fields Added**:
+    -   `payment_status` (enum: 'pending', 'paid') - tracks payment state
+    -   `paid_by` (foreign key to users) - tracks who marked invoice as paid
+    -   `paid_at` (timestamp) - tracks when payment was marked
+-   **Migration Strategy**: Created migration `2025_08_29_000000_add_payment_status_to_invoices_table`
+-   **Data Integrity**: Maintained referential integrity with proper foreign key constraints
+-   **Default Values**: All existing invoices default to 'pending' status
+
+**Technical Implementation**:
+
+```sql
+Schema::table('invoices', function (Blueprint $table) {
+    $table->enum('payment_status', ['pending', 'paid'])->default('pending')->after('payment_date');
+    $table->foreignId('paid_by')->nullable()->constrained('users')->after('payment_status');
+    $table->timestamp('paid_at')->nullable()->after('paid_by');
+});
+```
+
+**Learning**: Extending existing tables maintains data relationships while adding new functionality efficiently
+
+#### **3. Permission System & Access Control**
+
+**Decision**: Implement permission-based access control for payment management
+**Implementation**:
+
+-   **New Permissions**:
+    -   `view-invoice-payment` - access to payment dashboard and lists
+    -   `update-invoice-payment` - ability to update payment statuses
+-   **Role Assignments**: Assigned to admin, superadmin, accounting, and finance roles
+-   **Middleware Integration**: Controller-level permission validation
+-   **Frontend Control**: Conditional rendering based on permissions
+
+**Security Features**:
+
+-   **Department Isolation**: Users can only update invoices in their department
+-   **Permission Validation**: Middleware-based access control
+-   **Input Validation**: Comprehensive frontend and backend validation
+-   **Audit Trail**: Complete tracking of payment status changes
+
+**Learning**: Permission-based systems provide better security and flexibility than role-based systems
+
+#### **4. Days Calculation System Implementation**
+
+**Decision**: Implement days calculation with fallback date handling for business logic accuracy
+**Implementation**:
+
+-   **Primary Date**: Uses `receive_date` for accurate business logic
+-   **Fallback Date**: Falls back to `created_at` if `receive_date` is null
+-   **Whole Numbers**: Ensures days are displayed as integers with no decimals
+-   **Color Coding**: Red for >15 days (urgent), Gray for ≤15 days (normal)
+
+**Technical Implementation**:
+
+```php
+public function getDaysSinceReceivedAttribute()
+{
+    // Use receive_date as primary, fallback to created_at
+    $dateToUse = $this->receive_date ?: $this->created_at;
+
+    if (!$dateToUse) {
+        return null;
+    }
+
+    // Calculate days and ensure whole numbers
+    $days = $dateToUse->diffInDays(now());
+    return (int) round($days);
+}
+```
+
+**Business Logic**:
+
+-   **Days Calculation**: Shows days since invoice received in department
+-   **Overdue Alerts**: Visual indicators for invoices requiring attention
+-   **User Reminders**: Acts as reminder for department users to pay invoices
+-   **Workflow Optimization**: Helps identify bottlenecks in payment processes
+
+**Learning**: Fallback approaches ensure system robustness while maintaining business logic accuracy
+
+#### **5. User Interface Architecture**
+
+**Decision**: Implement three-tab system for logical organization and better user experience
+**Implementation**:
+
+-   **Tab 1 - Dashboard**: Payment metrics, financial summary, recent payments, overdue alerts
+-   **Tab 2 - Waiting Payment**: Invoices pending payment with days calculation and bulk update
+-   **Tab 3 - Paid Invoices**: Historical payment records with search/filter and export
+
+**Interface Features**:
+
+-   **Responsive Design**: AdminLTE integration with mobile-friendly layout
+-   **Real-time Updates**: AJAX-based operations with immediate feedback
+-   **Bulk Operations**: Checkbox selection with select-all functionality
+-   **Visual Indicators**: Color-coded days, status badges, progress bars
+
+**User Experience Improvements**:
+
+-   **Logical Organization**: Three-tab system provides clear workflow separation
+-   **Visual Feedback**: Color coding and badges improve information scanning
+-   **Bulk Efficiency**: Select multiple invoices for batch processing
+-   **Search & Filtering**: Advanced search capabilities for large datasets
+
+**Learning**: Logical interface organization significantly improves user adoption and workflow efficiency
+
+#### **6. Bulk Operations & Form Handling**
+
+**Decision**: Implement manual data construction for reliable bulk update operations
+**Implementation**:
+
+-   **Form Data Handling**: Manual construction of data objects using jQuery selectors
+-   **AJAX Integration**: Real-time updates without page refreshes
+-   **Error Handling**: Comprehensive validation and user feedback
+-   **Debug Logging**: Console and server-side logging for troubleshooting
+
+**Technical Implementation**:
+
+```javascript
+// Build data object manually to ensure proper formatting
+const formData = {
+    payment_status: $("#bulk_payment_status").val(),
+    payment_date: $("#bulk_payment_date").val(),
+    remarks: $("#bulk_remarks").val(),
+    invoice_ids: invoiceIds,
+};
+```
+
+**Problem Resolution**:
+
+-   **Original Issue**: `form.serializeArray()` caused validation errors
+-   **Root Cause**: Form data not properly formatted for backend validation
+-   **Solution**: Manual data construction with explicit field selection
+-   **Result**: Reliable bulk operations with proper error handling
+
+**Learning**: Manual form data handling provides better control and reliability than automatic serialization
+
+#### **7. Testing & Validation Strategy**
+
+**Decision**: Create comprehensive test data for system validation and user testing
+**Implementation**:
+
+-   **Test Seeder**: Created `TestInvoiceSeeder` with 5 invoices
+-   **Date Variations**: Invoices with receive dates 1, 3, 8, 18, and 25 days ago
+-   **Validation Testing**: Days calculation, color coding, bulk operations
+-   **Permission Testing**: Role-based access control verification
+
+**Test Data Structure**:
+
+```php
+$testInvoices = [
+    ['receive_date' => Carbon::now()->subDays(25)], // Red badge >15 days
+    ['receive_date' => Carbon::now()->subDays(18)], // Red badge >15 days
+    ['receive_date' => Carbon::now()->subDays(8)],  // Gray badge ≤15 days
+    ['receive_date' => Carbon::now()->subDays(3)],  // Gray badge ≤15 days
+    ['receive_date' => Carbon::now()->subDays(1)],  // Gray badge ≤15 days
+];
+```
+
+**Validation Results**:
+
+-   ✅ **Days Calculation**: All invoices show correct days with whole numbers
+-   ✅ **Color Coding**: Red badges for >15 days, Gray for ≤15 days
+-   ✅ **Bulk Operations**: Checkbox selection and form submission working
+-   ✅ **Permission System**: Role-based access control functioning correctly
+
+**Learning**: Comprehensive test data is essential for validating complex business logic and user workflows
+
+#### **8. Configuration Management**
+
+**Decision**: Implement environment-based configuration for flexible deployment
+**Implementation**:
+
+-   **Configuration File**: Created `config/invoice.php` for payment-related settings
+-   **Environment Variables**: Support for `INVOICE_PAYMENT_OVERDUE_DAYS`
+-   **Default Values**: Sensible defaults for all configuration options
+-   **Flexibility**: Easy to adjust settings for different environments
+
+**Configuration Structure**:
+
+```php
+return [
+    'payment_overdue_days' => env('INVOICE_PAYMENT_OVERDUE_DAYS', 30),
+    'default_payment_date' => now()->format('Y-m-d'),
+    'payment_statuses' => ['pending', 'paid'],
+    'statuses' => ['open', 'verify', 'return', 'sap', 'close', 'cancel'],
+];
+```
+
+**Benefits**:
+
+-   **Environment Flexibility**: Different settings for development, staging, production
+-   **Maintenance**: Centralized configuration management
+-   **Scalability**: Easy to add new configuration options
+-   **Documentation**: Clear configuration structure for developers
+
+**Learning**: Environment-based configuration provides flexibility while maintaining consistency
+
+#### **9. Business Impact & User Value**
+
+**Decision**: Focus on workflow optimization and process visibility for business users
+**Implementation**:
+
+**Immediate Benefits**:
+
+-   **Payment Visibility**: Complete tracking of invoice payment statuses
+-   **Overdue Management**: Visual alerts for invoices requiring attention
+-   **Workflow Efficiency**: Bulk operations for managing multiple invoices
+-   **Department Control**: Users only manage invoices in their department
+
+**Long-term Benefits**:
+
+-   **Process Optimization**: Better visibility leads to improved payment processes
+-   **Compliance**: Complete audit trail of payment status changes
+-   **User Productivity**: Intuitive interface reduces training needs
+-   **Data Quality**: Consistent payment status tracking across departments
+
+**User Experience Improvements**:
+
+-   **Visual Clarity**: Color-coded days and status indicators
+-   **Actionable Insights**: Clear visibility of what needs attention
+-   **Efficient Operations**: Bulk updates for multiple invoices
+-   **Professional Interface**: Consistent with existing application design
+
+**Learning**: Business process automation provides significant value through workflow visibility and optimization
+
+#### **10. Technical Architecture & Best Practices**
+
+**Decision**: Implement robust architecture following Laravel best practices
+**Implementation**:
+
+**Controller Architecture**:
+
+```php
+class InvoicePaymentController extends Controller
+{
+    public function dashboard()           // Payment metrics and overview
+    public function waitingPayment()      // Invoices pending payment
+    public function paidInvoices()        // Historical payment records
+    public function updatePayment()       // Individual status updates
+    public function bulkUpdatePayment()   // Batch status updates
+}
+```
+
+**Best Practices Established**:
+
+1. **Single Responsibility**: Each method handles specific functionality
+2. **Permission Integration**: Middleware-based access control
+3. **Error Handling**: Comprehensive validation and user feedback
+4. **Data Integrity**: Database transactions for bulk operations
+5. **Performance**: Efficient queries with proper eager loading
+
+**Architecture Benefits**:
+
+-   **Maintainability**: Clear separation of concerns
+-   **Scalability**: Easy to add new payment features
+-   **Security**: Consistent permission validation
+-   **Performance**: Optimized database operations
+
+**Learning**: Good architecture design prevents business logic errors and makes systems more reliable
+
+#### **11. Future Development Considerations**
+
+**Decision**: Plan for continued enhancement while maintaining current functionality
+**Implementation**:
+
+**Technical Roadmap**:
+
+-   **Phase 1**: Payment reminders and notifications
+-   **Phase 2**: Integration with external payment systems
+-   **Phase 3**: Advanced reporting and analytics
+-   **Phase 4**: Payment workflow automation
+
+**Monitoring Strategy**:
+
+-   **Performance Metrics**: Track bulk operation response times
+-   **User Feedback**: Monitor payment workflow efficiency
+-   **System Resources**: Watch for database performance impact
+-   **Business Impact**: Measure payment process improvements
+
+**Learning**: Payment management systems provide foundation for advanced workflow automation and business intelligence
+
+---
+
 **Last Updated**: 2025-01-27  
-**Version**: 4.12  
-**Status**: ✅ File Upload Size Enhancement Completed Successfully - All Controllers and Frontend Updated to 50MB Limit
+**Version**: 4.13  
+**Status**: ✅ Invoice Payment Management System Completed Successfully - Complete Implementation & Days Calculation Fix

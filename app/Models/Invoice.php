@@ -23,6 +23,9 @@ class Invoice extends Model
         'amount',
         'type_id',
         'payment_date',
+        'payment_status',
+        'paid_by',
+        'paid_at',
         'remarks',
         'cur_loc',
         'status',
@@ -38,6 +41,7 @@ class Invoice extends Model
         'invoice_date' => 'date',
         'receive_date' => 'date',
         'payment_date' => 'date',
+        'paid_at' => 'datetime',
         'amount' => 'decimal:2',
     ];
 
@@ -63,6 +67,14 @@ class Invoice extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Get the user that marked the invoice as paid.
+     */
+    public function paidByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'paid_by');
     }
 
     /**
@@ -198,6 +210,39 @@ class Invoice extends Model
     }
 
     /**
+     * Scope a query to only include invoices pending payment.
+     */
+    public function scopePendingPayment($query)
+    {
+        return $query->where('payment_status', 'pending');
+    }
+
+    /**
+     * Scope a query to only include paid invoices.
+     */
+    public function scopePaid($query)
+    {
+        return $query->where('payment_status', 'paid');
+    }
+
+    /**
+     * Scope a query to only include invoices overdue for payment.
+     */
+    public function scopeOverdue($query, $days = 30)
+    {
+        return $query->where('payment_status', 'pending')
+            ->where('receive_date', '<=', now()->subDays($days));
+    }
+
+    /**
+     * Scope a query to only include invoices in user's department.
+     */
+    public function scopeInUserDepartment($query, $userLocationCode)
+    {
+        return $query->where('cur_loc', $userLocationCode);
+    }
+
+    /**
      * Get formatted invoice date.
      */
     public function getFormattedInvoiceDateAttribute()
@@ -227,6 +272,54 @@ class Invoice extends Model
     public function getFormattedAmountAttribute()
     {
         return $this->currency . ' ' . number_format($this->amount, 2);
+    }
+
+    /**
+     * Get formatted payment date.
+     */
+    public function getFormattedPaidAtAttribute()
+    {
+        return $this->paid_at ? $this->paid_at->format('d-M-Y H:i') : '-';
+    }
+
+    /**
+     * Get days since invoice received in department.
+     */
+    public function getDaysSinceReceivedAttribute()
+    {
+        // If no receive_date, try to use created_at as fallback
+        $dateToUse = $this->receive_date ?: $this->created_at;
+
+        if (!$dateToUse) {
+            return null;
+        }
+
+        // Calculate days and ensure it's a whole number
+        $days = $dateToUse->diffInDays(now());
+        return (int) round($days);
+    }
+
+    /**
+     * Get overdue status for payment.
+     */
+    public function getIsOverdueAttribute()
+    {
+        $configDays = config('invoice.payment_overdue_days', 30);
+        return $this->payment_status === 'pending' && $this->days_since_received > $configDays;
+    }
+
+    /**
+     * Get payment status badge HTML.
+     */
+    public function getPaymentStatusBadgeAttribute()
+    {
+        $statusColors = [
+            'pending' => 'badge-warning',
+            'paid' => 'badge-success',
+        ];
+
+        $color = $statusColors[$this->payment_status] ?? 'badge-secondary';
+        return '<span class="badge ' . $color . '">' . ucfirst($this->payment_status) . '</span>';
     }
 
     /**

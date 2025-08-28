@@ -34,13 +34,24 @@
             </a>
         </li>
 
-                       <!-- Invoice Attachments -->
-               <li class="nav-item">
-                   <a href="{{ route('invoices.attachments.index') }}"
-                       class="nav-link {{ request()->routeIs('invoices.attachments.*') ? 'active' : '' }}">
-                       <i class="far fa-circle nav-icon"></i>
-                       <p>Invoice Attachments</p>
-                   </a>
-               </li>
+        <!-- Invoice Attachments -->
+        <li class="nav-item">
+            <a href="{{ route('invoices.attachments.index') }}"
+                class="nav-link {{ request()->routeIs('invoices.attachments.*') ? 'active' : '' }}">
+                <i class="far fa-circle nav-icon"></i>
+                <p>Invoice Attachments</p>
+            </a>
+        </li>
+
+        <!-- Invoice Payments -->
+        @can('view-invoice-payment')
+            <li class="nav-item">
+                <a href="{{ route('invoices.payments.dashboard') }}"
+                    class="nav-link {{ request()->routeIs('invoices.payments.*') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>Invoice Payments</p>
+                </a>
+            </li>
+        @endcan
     </ul>
 </li>

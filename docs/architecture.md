@@ -92,6 +92,92 @@ public function createOnTheFly(Request $request) {
 -   **Permission System**: Uses `$user->can('permission-name')` instead of hardcoded role checks
 -   **Cache Management**: Permission cache cleared after changes to ensure immediate effect
 
+### **Invoice Payment Management System**
+
+**System Architecture**:
+
+The Invoice Payment Management System provides comprehensive tracking and management of invoice payment statuses across departments, with days calculation and overdue alerts for workflow optimization.
+
+**Core Components**:
+
+1. **Database Schema**:
+
+    ```sql
+    ALTER TABLE invoices ADD COLUMN payment_status ENUM('pending', 'paid') DEFAULT 'pending';
+    ALTER TABLE invoices ADD COLUMN paid_by BIGINT UNSIGNED NULL REFERENCES users(id);
+    ALTER TABLE invoices ADD COLUMN paid_at TIMESTAMP NULL;
+    ```
+
+2. **Permission System**:
+
+    - `view-invoice-payment`: Access to payment dashboard and lists
+    - `update-invoice-payment`: Ability to update payment statuses
+    - Role assignments: admin, superadmin, accounting, finance
+
+3. **Controller Architecture**:
+    ```php
+    class InvoicePaymentController extends Controller
+    {
+        public function dashboard()           // Payment metrics and overview
+        public function waitingPayment()      // Invoices pending payment
+        public function paidInvoices()        // Historical payment records
+        public function updatePayment()       // Individual status updates
+        public function bulkUpdatePayment()   // Batch status updates
+    }
+    ```
+
+**Days Calculation System**:
+
+```php
+public function getDaysSinceReceivedAttribute()
+{
+    // Use receive_date as primary, fallback to created_at
+    $dateToUse = $this->receive_date ?: $this->created_at;
+
+    if (!$dateToUse) {
+        return null;
+    }
+
+    // Calculate days and ensure whole numbers
+    $days = $dateToUse->diffInDays(now());
+    return (int) round($days);
+}
+```
+
+**User Interface Architecture**:
+
+-   **Three-Tab System**: Dashboard, Waiting Payment, Paid Invoices
+-   **Responsive Design**: AdminLTE integration with mobile-friendly layout
+-   **Real-time Updates**: AJAX-based operations with immediate feedback
+-   **Bulk Operations**: Checkbox selection with select-all functionality
+
+**Data Flow**:
+
+```
+User Action → Frontend Validation → AJAX Request → Backend Validation → Database Update → Response → UI Refresh
+     ↓              ↓                    ↓              ↓                ↓              ↓          ↓
+Select Invoices → Check Required → Send Form Data → Validate Fields → Update Records → Success/Error → Show Result
+```
+
+**Security & Access Control**:
+
+-   **Department Isolation**: Users can only update invoices in their department
+-   **Permission Validation**: Middleware-based access control
+-   **Input Validation**: Comprehensive frontend and backend validation
+-   **Audit Trail**: Complete tracking of payment status changes
+
+**Configuration Management**:
+
+```php
+// config/invoice.php
+return [
+    'payment_overdue_days' => env('INVOICE_PAYMENT_OVERDUE_DAYS', 30),
+    'default_payment_date' => now()->format('Y-m-d'),
+    'payment_statuses' => ['pending', 'paid'],
+    'statuses' => ['open', 'verify', 'return', 'sap', 'close', 'cancel'],
+];
+```
+
 ### **Document Status Management**
 
 **System Architecture**:
@@ -117,6 +203,7 @@ Current System Limits:
 **Validation Architecture**:
 
 **Backend Validation (Laravel)**:
+
 ```php
 // Invoice Attachments
 'files.*' => ['required', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,gif,webp']
@@ -129,18 +216,19 @@ Current System Limits:
 ```
 
 **Frontend Validation (JavaScript)**:
+
 ```javascript
 // Client-side file size validation
 var maxPerFile = 50 * 1024 * 1024; // 50MB
 var maxSize = 50 * 1024 * 1024; // 50MB
 
 // Real-time validation on file selection
-$('#files').on('change', function() {
+$("#files").on("change", function () {
     var files = this.files;
     for (var i = 0; i < files.length; i++) {
         if (files[i].size > maxPerFile) {
-            alert('Each file must be 50MB or less.');
-            $(this).val('');
+            alert("Each file must be 50MB or less.");
+            $(this).val("");
             break;
         }
     }
@@ -150,12 +238,14 @@ $('#files').on('change', function() {
 **File Storage Architecture**:
 
 **Storage Strategy**:
-- **Local Storage**: Files stored in `storage/app/private/` for security
-- **Organized Structure**: Year/month-based folder organization
-- **Unique Naming**: Random 40-character filenames with original extensions
-- **Metadata Storage**: File information stored in database with relationships
+
+-   **Local Storage**: Files stored in `storage/app/private/` for security
+-   **Organized Structure**: Year/month-based folder organization
+-   **Unique Naming**: Random 40-character filenames with original extensions
+-   **Metadata Storage**: File information stored in database with relationships
 
 **File Processing Flow**:
+
 ```
 File Upload → Validation → Storage → Database Record → User Feedback
      ↓            ↓         ↓          ↓              ↓
@@ -166,57 +256,65 @@ File Upload → Validation → Storage → Database Record → User Feedback
 **Controllers & Routes**:
 
 **Primary Controllers**:
+
 1. **InvoiceAttachmentController**: Handles invoice file attachments
 2. **AdditionalDocumentController**: Manages document attachments and Excel imports
 3. **InvoiceController**: Processes bulk invoice Excel imports
 
 **Key Routes**:
-- `POST /invoices/{invoice}/attachments` - Upload invoice attachments
-- `POST /additional-documents/import` - Import Excel files
-- `POST /invoices/import` - Bulk invoice import
+
+-   `POST /invoices/{invoice}/attachments` - Upload invoice attachments
+-   `POST /additional-documents/import` - Import Excel files
+-   `POST /invoices/import` - Bulk invoice import
 
 **User Experience Features**:
 
 **Consistent Interface**:
-- **Help Text**: Clear file size limits displayed on all upload forms
-- **Real-time Validation**: Immediate feedback on file selection
-- **Error Handling**: User-friendly error messages for validation failures
-- **Progress Feedback**: Loading states and success notifications
+
+-   **Help Text**: Clear file size limits displayed on all upload forms
+-   **Real-time Validation**: Immediate feedback on file selection
+-   **Error Handling**: User-friendly error messages for validation failures
+-   **Progress Feedback**: Loading states and success notifications
 
 **File Type Support**:
-- **Documents**: PDF, DOC, DOCX
-- **Images**: JPG, JPEG, PNG, GIF, WebP
-- **Spreadsheets**: XLS, XLSX
-- **Validation**: MIME type checking for security
+
+-   **Documents**: PDF, DOC, DOCX
+-   **Images**: JPG, JPEG, PNG, GIF, WebP
+-   **Spreadsheets**: XLS, XLSX
+-   **Validation**: MIME type checking for security
 
 **Performance & Security**:
 
 **Performance Optimizations**:
-- **Efficient Validation**: Single-pass validation with clear error messages
-- **Storage Optimization**: Organized folder structure for easy management
-- **Memory Management**: Laravel's built-in file handling for large files
-- **Database Efficiency**: Optimized queries for file metadata
+
+-   **Efficient Validation**: Single-pass validation with clear error messages
+-   **Storage Optimization**: Organized folder structure for easy management
+-   **Memory Management**: Laravel's built-in file handling for large files
+-   **Database Efficiency**: Optimized queries for file metadata
 
 **Security Features**:
-- **File Type Validation**: Strict MIME type checking
-- **Size Limits**: Server-side validation prevents abuse
-- **Permission Control**: Role-based access to upload functionality
-- **Secure Storage**: Files stored outside web-accessible directories
-- **Unique Naming**: Prevents filename conflicts and security issues
+
+-   **File Type Validation**: Strict MIME type checking
+-   **Size Limits**: Server-side validation prevents abuse
+-   **Permission Control**: Role-based access to upload functionality
+-   **Secure Storage**: Files stored outside web-accessible directories
+-   **Unique Naming**: Prevents filename conflicts and security issues
 
 **Business Impact**:
 
 **Immediate Benefits**:
-- **Larger Documents**: Support for comprehensive business documents up to 50MB
-- **Bulk Operations**: Enhanced Excel import capabilities for large datasets
-- **User Productivity**: Reduced need to split or compress large files
-- **Process Efficiency**: Streamlined document upload workflows
+
+-   **Larger Documents**: Support for comprehensive business documents up to 50MB
+-   **Bulk Operations**: Enhanced Excel import capabilities for large datasets
+-   **User Productivity**: Reduced need to split or compress large files
+-   **Process Efficiency**: Streamlined document upload workflows
 
 **Long-term Benefits**:
-- **System Scalability**: Support for growing document size requirements
-- **User Adoption**: Better experience leads to increased system usage
-- **Business Process**: Improved support for real-world document sizes
-- **Data Integrity**: Complete documents uploaded without compression
+
+-   **System Scalability**: Support for growing document size requirements
+-   **User Adoption**: Better experience leads to increased system usage
+-   **Business Process**: Improved support for real-world document sizes
+-   **Data Integrity**: Complete documents uploaded without compression
 
 **Controller Architecture**:
 

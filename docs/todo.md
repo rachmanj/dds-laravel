@@ -2,6 +2,103 @@
 
 ## 🎯 **Current Sprint**
 
+### **Invoice Payment Management System** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED** - Comprehensive payment management system implemented successfully  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 1 day (comprehensive implementation)
+
+**Feature Overview**: Implemented comprehensive invoice payment management system allowing users to track, update, and manage payment statuses for invoices in their department with days calculation and overdue alerts.
+
+**Deliverables Completed**:
+
+-   ✅ **Database Schema Enhancement**:
+
+    -   Added `payment_status` field (enum: 'pending', 'paid') to invoices table
+    -   Added `paid_by` field (foreign key to users) for tracking who marked invoice as paid
+    -   Added `paid_at` field (timestamp) for tracking when payment was marked
+    -   Migration successfully applied and tested
+
+-   ✅ **Permission System**:
+
+    -   Created `view-invoice-payment` permission for dashboard access
+    -   Created `update-invoice-payment` permission for payment updates
+    -   Assigned to admin, superadmin, accounting, and finance roles
+    -   Permissions seeded and cached cleared
+
+-   ✅ **Controller & Business Logic**:
+
+    -   New `InvoicePaymentController` with comprehensive functionality
+    -   Dashboard with payment metrics and overdue alerts
+    -   Waiting payment list with days calculation and bulk updates
+    -   Paid invoices history with search and filtering
+    -   Individual and bulk payment status updates
+    -   Department-based access control (users can only update invoices in their department)
+
+-   ✅ **User Interface - Three-Tab System**:
+
+    -   **Tab 1 - Dashboard**: Payment metrics, financial summary, recent payments, overdue alerts
+    -   **Tab 2 - Waiting Payment**: Invoices pending payment with days calculation and bulk update
+    -   **Tab 3 - Paid Invoices**: Historical payment records with search/filter and export
+
+-   ✅ **Days Calculation System**:
+
+    -   Shows days since invoice received in department
+    -   Uses `receive_date` as primary date, falls back to `created_at`
+    -   Color coding: Red for >15 days (urgent), Gray for ≤15 days (normal)
+    -   Rounded to whole numbers with no decimals
+    -   Debug information shows actual date used for calculation
+
+-   ✅ **Routes & Navigation**:
+
+    -   Added "Invoice Payments" sub-menu under Invoices group
+    -   Permission-based menu visibility
+    -   All payment routes properly registered and working
+    -   RESTful API endpoints for individual and bulk operations
+
+-   ✅ **Configuration & Testing**:
+
+    -   Created `config/invoice.php` with configurable overdue days (default: 30)
+    -   Environment variable support for `INVOICE_PAYMENT_OVERDUE_DAYS`
+    -   Created comprehensive test data with 5 invoices having different receive dates
+    -   Test seeder with invoices from 1-25 days ago for testing days calculation
+
+**Technical Achievements**:
+
+-   **Enhanced Invoice Model**: Added payment scopes, accessors, and relationships
+-   **Efficient Data Loading**: Proper eager loading and department filtering
+-   **AJAX Operations**: Real-time updates with proper error handling
+-   **Bulk Operations**: Checkbox-based selection with select-all functionality
+-   **Form Validation**: Comprehensive frontend and backend validation
+-   **Debug Logging**: Console and server-side logging for troubleshooting
+
+**User Experience Features**:
+
+-   **Visual Status Indicators**: Color-coded days with overdue alerts
+-   **Smart Filtering**: Search by invoice, PO, supplier, and status
+-   **Bulk Efficiency**: Select multiple invoices for batch processing
+-   **Real-time Feedback**: Success/error messages and automatic page refresh
+-   **Professional Interface**: AdminLTE integration with responsive design
+-   **Department Security**: Users only see and update invoices in their department
+
+**Business Impact**:
+
+-   **Payment Tracking**: Complete visibility of invoice payment status
+-   **Overdue Management**: Visual alerts for invoices requiring attention
+-   **Workflow Efficiency**: Bulk operations for managing multiple invoices
+-   **Compliance**: Complete audit trail of payment status changes
+-   **User Productivity**: Intuitive interface reduces training needs
+
+**Testing & Validation**:
+
+-   **Test Data**: 5 invoices with receive dates 1, 3, 8, 18, and 25 days ago
+-   **Days Calculation**: Verified whole number display with proper color coding
+-   **Bulk Operations**: Tested checkbox selection and form submission
+-   **Permission System**: Verified role-based access control
+-   **Form Validation**: Tested required field validation and error handling
+
+---
+
 ### **Document Status Management System** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED** - All functionality implemented successfully & layout issues resolved  
@@ -274,6 +371,7 @@ var maxSize = 50 * 1024 * 1024; // 50MB
 **Critical Issues Resolved**:
 
 -   **❌ Database Constraint Violation**: `distribution_id` field was required (not nullable) but needed to be null for standalone status resets
+
     -   **Problem**: `SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'distribution_id' cannot be null`
     -   **✅ Fix**: Created migration to make `distribution_id` nullable in `distribution_histories` table
 
@@ -285,10 +383,10 @@ var maxSize = 50 * 1024 * 1024; // 50MB
 
 -   **File**: `2025_08_28_080350_modify_distribution_histories_distribution_id_nullable.php`
 -   **Purpose**: Make `distribution_id` field nullable to support standalone document status resets
--   **Changes**: 
-    - Drop existing foreign key constraint
-    - Make `distribution_id` nullable
-    - Re-add foreign key constraint with nullable support
+-   **Changes**:
+    -   Drop existing foreign key constraint
+    -   Make `distribution_id` nullable
+    -   Re-add foreign key constraint with nullable support
 
 **Controller Fixes Applied**:
 

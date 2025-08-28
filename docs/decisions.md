@@ -2,6 +2,208 @@
 
 ## 📝 **Decision Records**
 
+### **2025-01-27: Invoice Payment Management System Implementation**
+
+**Decision**: Implement comprehensive invoice payment management system with days calculation and overdue alerts
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+Users needed a comprehensive system to track and manage invoice payment statuses across departments. The existing system lacked:
+
+-   Payment status tracking for invoices
+-   Days calculation since invoices were received
+-   Overdue alerts for invoices requiring attention
+-   Bulk payment status updates
+-   Department-based payment management
+
+This created workflow inefficiencies and lack of visibility into payment statuses.
+
+#### **Requirements Analysis**
+
+**User Requirements**:
+
+-   Track payment status (pending/paid) for all invoices
+-   Calculate days since invoice received in department
+-   Visual alerts for overdue invoices (>15 days)
+-   Bulk update payment statuses for multiple invoices
+-   Department-based access control for payment management
+-   Comprehensive payment dashboard with metrics
+
+**Technical Requirements**:
+
+-   Extend invoices table with payment-related fields
+-   Implement days calculation with proper date handling
+-   Create permission system for payment management
+-   Build responsive three-tab interface
+-   Implement AJAX-based bulk operations
+-   Ensure data integrity and audit trails
+
+#### **Decision Rationale**
+
+**Database Schema Design**:
+
+-   **Considered**: Add to existing invoices table vs. create separate payment table
+-   **Chosen**: Extend existing invoices table with payment fields
+-   **Reasoning**: Maintains data integrity, simpler queries, and better performance
+
+**Days Calculation Approach**:
+
+-   **Considered**: Use receive_date only vs. fallback to created_at
+-   **Chosen**: Primary use receive_date, fallback to created_at
+-   **Reasoning**: Provides accurate business logic while handling edge cases gracefully
+
+**Permission System**:
+
+-   **Considered**: Role-based vs. permission-based access control
+-   **Chosen**: Permission-based system with role assignments
+-   **Reasoning**: More flexible, granular control, easier to maintain and extend
+
+#### **Implementation Decisions**
+
+**1. Database Schema Enhancement**
+
+```sql
+-- Added payment-related fields to invoices table
+ALTER TABLE invoices ADD COLUMN payment_status ENUM('pending', 'paid') DEFAULT 'pending';
+ALTER TABLE invoices ADD COLUMN paid_by BIGINT UNSIGNED NULL REFERENCES users(id);
+ALTER TABLE invoices ADD COLUMN paid_at TIMESTAMP NULL;
+```
+
+**Reasoning**: Extending existing table maintains referential integrity and simplifies data relationships.
+
+**2. Days Calculation System**
+
+```php
+public function getDaysSinceReceivedAttribute()
+{
+    // Use receive_date as primary, fallback to created_at
+    $dateToUse = $this->receive_date ?: $this->created_at;
+
+    if (!$dateToUse) {
+        return null;
+    }
+
+    // Calculate days and ensure whole numbers
+    $days = $dateToUse->diffInDays(now());
+    return (int) round($days);
+}
+```
+
+**Reasoning**: Fallback approach ensures all invoices have days calculation while maintaining business logic accuracy.
+
+**3. User Interface Architecture**
+
+-   **Considered**: Single page vs. multiple tabs vs. modal-based approach
+-   **Chosen**: Three-tab system (Dashboard, Waiting Payment, Paid Invoices)
+-   **Reasoning**: Provides logical organization, better user experience, and easier navigation
+
+**4. Bulk Operations Implementation**
+
+-   **Considered**: Form serialization vs. manual data construction
+-   **Chosen**: Manual data object construction with jQuery selectors
+-   **Reasoning**: More reliable, easier to debug, and better control over data format
+
+**5. Configuration Management**
+
+```php
+// config/invoice.php
+return [
+    'payment_overdue_days' => env('INVOICE_PAYMENT_OVERDUE_DAYS', 30),
+    'default_payment_date' => now()->format('Y-m-d'),
+    'payment_statuses' => ['pending', 'paid'],
+];
+```
+
+**Reasoning**: Environment-based configuration provides flexibility for different deployment environments.
+
+#### **Technical Architecture**
+
+**Controller Design**:
+
+```php
+class InvoicePaymentController extends Controller
+{
+    public function dashboard()           // Payment metrics and overview
+    public function waitingPayment()      // Invoices pending payment
+    public function paidInvoices()        // Historical payment records
+    public function updatePayment()       // Individual status updates
+    public function bulkUpdatePayment()   // Batch status updates
+}
+```
+
+**Reasoning**: Single controller with focused methods provides better organization and maintainability.
+
+**Permission Integration**:
+
+```php
+// Middleware-based access control
+$this->middleware('permission:view-invoice-payment');
+$this->middleware('permission:update-invoice-payment');
+```
+
+**Reasoning**: Middleware approach provides clean separation of concerns and consistent access control.
+
+**Frontend Architecture**:
+
+-   **Bootstrap Modals**: For individual and bulk payment updates
+-   **AJAX Operations**: Real-time updates without page refreshes
+-   **Responsive Design**: AdminLTE integration for consistent UI
+-   **Debug Logging**: Console and server-side logging for troubleshooting
+
+**Reasoning**: Modern web application patterns provide better user experience and easier maintenance.
+
+#### **Business Impact**
+
+**Immediate Benefits**:
+
+-   **Payment Visibility**: Complete tracking of invoice payment statuses
+-   **Overdue Management**: Visual alerts for invoices requiring attention
+-   **Workflow Efficiency**: Bulk operations for managing multiple invoices
+-   **Department Control**: Users only manage invoices in their department
+
+**Long-term Benefits**:
+
+-   **Process Optimization**: Better visibility leads to improved payment processes
+-   **Compliance**: Complete audit trail of payment status changes
+-   **User Productivity**: Intuitive interface reduces training needs
+-   **Data Quality**: Consistent payment status tracking across departments
+
+#### **Testing & Validation**
+
+**Test Data Strategy**:
+
+-   Created comprehensive test seeder with 5 invoices
+-   Different receive dates (1, 3, 8, 18, 25 days ago)
+-   Tests days calculation, color coding, and bulk operations
+
+**Validation Approach**:
+
+-   Frontend validation for user experience
+-   Backend validation for data integrity
+-   Permission validation for security
+-   Department isolation for business rules
+
+#### **Future Considerations**
+
+**Potential Enhancements**:
+
+-   Payment reminders and notifications
+-   Integration with external payment systems
+-   Advanced reporting and analytics
+-   Payment workflow automation
+
+**Scalability Considerations**:
+
+-   Database indexing for performance
+-   Caching strategies for metrics
+-   Bulk operation optimization
+-   Real-time updates with WebSockets
+
+---
+
 ### **2025-01-27: File Upload Size Enhancement Implementation**
 
 **Decision**: Increase file upload size limits across the entire system from 2-10MB to 50MB per file
@@ -13,9 +215,9 @@
 
 Users needed to upload larger business documents (50MB+) for comprehensive invoices, supporting materials, and bulk Excel imports. The existing system had inconsistent file size limits:
 
-- Invoice attachments: 5MB limit
-- Additional document attachments: 2MB limit  
-- Excel import files: 10MB limit
+-   Invoice attachments: 5MB limit
+-   Additional document attachments: 2MB limit
+-   Excel import files: 10MB limit
 
 This created user frustration and workflow inefficiencies when dealing with large business documents.
 
@@ -23,39 +225,39 @@ This created user frustration and workflow inefficiencies when dealing with larg
 
 **User Requirements**:
 
-- Upload comprehensive business documents up to 50MB
-- Support for larger Excel files for bulk data import
-- Consistent file size limits across all upload interfaces
-- Clear communication of new limits to users
-- Maintain system performance with larger files
+-   Upload comprehensive business documents up to 50MB
+-   Support for larger Excel files for bulk data import
+-   Consistent file size limits across all upload interfaces
+-   Clear communication of new limits to users
+-   Maintain system performance with larger files
 
 **Technical Requirements**:
 
-- Update all Laravel validation rules to support 50MB
-- Synchronize frontend JavaScript validation with backend limits
-- Update user interface text and help messages
-- Ensure consistent behavior across all file upload endpoints
-- Maintain security and performance standards
+-   Update all Laravel validation rules to support 50MB
+-   Synchronize frontend JavaScript validation with backend limits
+-   Update user interface text and help messages
+-   Ensure consistent behavior across all file upload endpoints
+-   Maintain security and performance standards
 
 #### **Decision Rationale**
 
 **50MB Limit Selection**:
 
-- **Considered**: 25MB, 50MB, 100MB, unlimited
-- **Chosen**: 50MB per file
-- **Reasoning**: Balances user needs for large documents with system performance and storage considerations
+-   **Considered**: 25MB, 50MB, 100MB, unlimited
+-   **Chosen**: 50MB per file
+-   **Reasoning**: Balances user needs for large documents with system performance and storage considerations
 
 **System-Wide Consistency**:
 
-- **Considered**: Different limits for different document types, gradual rollout
-- **Chosen**: Same 50MB limit across all upload interfaces
-- **Reasoning**: Provides consistent user experience and prevents confusion
+-   **Considered**: Different limits for different document types, gradual rollout
+-   **Chosen**: Same 50MB limit across all upload interfaces
+-   **Reasoning**: Provides consistent user experience and prevents confusion
 
 **Implementation Approach**:
 
-- **Considered**: Phased rollout, selective updates, configuration-based limits
-- **Chosen**: Comprehensive update across all controllers and frontend
-- **Reasoning**: Ensures consistency and prevents user confusion about different limits
+-   **Considered**: Phased rollout, selective updates, configuration-based limits
+-   **Chosen**: Comprehensive update across all controllers and frontend
+-   **Reasoning**: Ensures consistency and prevents user confusion about different limits
 
 #### **Implementation Decisions**
 
@@ -99,7 +301,8 @@ var maxSize = 50 * 1024 * 1024; // 50MB
 
 <!-- AFTER: Updated 50MB information -->
 <small class="form-text text-muted">
-    Maximum file size: 50MB. Supported formats: PDF, Images (JPG, PNG, GIF, WebP)
+    Maximum file size: 50MB. Supported formats: PDF, Images (JPG, PNG, GIF,
+    WebP)
 </small>
 ```
 
@@ -121,74 +324,74 @@ var maxSize = 50 * 1024 * 1024; // 50MB
 
 **Validation Strategy**:
 
-- **Backend First**: Laravel validation rules as primary security layer
-- **Frontend Support**: JavaScript validation for immediate user feedback
-- **Consistent Limits**: Same 50MB limit across all interfaces
-- **Error Handling**: Clear error messages for validation failures
+-   **Backend First**: Laravel validation rules as primary security layer
+-   **Frontend Support**: JavaScript validation for immediate user feedback
+-   **Consistent Limits**: Same 50MB limit across all interfaces
+-   **Error Handling**: Clear error messages for validation failures
 
 #### **Business Impact**
 
 **Immediate Benefits**:
 
-- **User Productivity**: Reduced need to split or compress large documents
-- **Process Efficiency**: Streamlined document upload workflows
-- **User Satisfaction**: Better support for real-world business document sizes
-- **System Adoption**: Improved user experience leads to increased usage
+-   **User Productivity**: Reduced need to split or compress large documents
+-   **Process Efficiency**: Streamlined document upload workflows
+-   **User Satisfaction**: Better support for real-world business document sizes
+-   **System Adoption**: Improved user experience leads to increased usage
 
 **Long-term Benefits**:
 
-- **Business Scalability**: Support for growing document size requirements
-- **Process Optimization**: Improved support for comprehensive business documents
-- **Data Integrity**: Complete documents uploaded without compression
-- **Competitive Advantage**: Better user experience compared to limited systems
+-   **Business Scalability**: Support for growing document size requirements
+-   **Process Optimization**: Improved support for comprehensive business documents
+-   **Data Integrity**: Complete documents uploaded without compression
+-   **Competitive Advantage**: Better user experience compared to limited systems
 
 #### **Performance Considerations**
 
 **Storage Impact**:
 
-- **File Sizes**: 5-25x increase in maximum file sizes
-- **Storage Growth**: Potential for significant storage requirements
-- **Backup Strategy**: Larger backup files and longer backup times
-- **Monitoring**: Need to track storage usage and growth patterns
+-   **File Sizes**: 5-25x increase in maximum file sizes
+-   **Storage Growth**: Potential for significant storage requirements
+-   **Backup Strategy**: Larger backup files and longer backup times
+-   **Monitoring**: Need to track storage usage and growth patterns
 
 **System Performance**:
 
-- **Upload Times**: Longer upload times for large files
-- **Memory Usage**: Increased memory requirements for file processing
-- **Network Bandwidth**: Higher bandwidth usage for large uploads
-- **Validation**: Efficient validation to prevent performance degradation
+-   **Upload Times**: Longer upload times for large files
+-   **Memory Usage**: Increased memory requirements for file processing
+-   **Network Bandwidth**: Higher bandwidth usage for large uploads
+-   **Validation**: Efficient validation to prevent performance degradation
 
 #### **Risk Mitigation**
 
 **Storage Management**:
 
-- **Monitoring**: Track storage usage and growth patterns
-- **Cleanup**: Implement file cleanup strategies for old/unused files
-- **Archiving**: Consider archiving strategies for long-term storage
-- **Backup**: Optimize backup strategies for larger file volumes
+-   **Monitoring**: Track storage usage and growth patterns
+-   **Cleanup**: Implement file cleanup strategies for old/unused files
+-   **Archiving**: Consider archiving strategies for long-term storage
+-   **Backup**: Optimize backup strategies for larger file volumes
 
 **Performance Monitoring**:
 
-- **Upload Metrics**: Track upload success rates and response times
-- **System Resources**: Monitor memory and CPU usage during uploads
-- **User Feedback**: Collect feedback on upload performance
-- **Optimization**: Identify and address performance bottlenecks
+-   **Upload Metrics**: Track upload success rates and response times
+-   **System Resources**: Monitor memory and CPU usage during uploads
+-   **User Feedback**: Collect feedback on upload performance
+-   **Optimization**: Identify and address performance bottlenecks
 
 #### **Future Considerations**
 
 **Monitoring & Optimization**:
 
-- **Performance Metrics**: Track upload success rates and response times
-- **User Feedback**: Monitor support requests and user satisfaction
-- **System Resources**: Watch for storage and bandwidth impact
-- **Business Impact**: Measure workflow efficiency improvements
+-   **Performance Metrics**: Track upload success rates and response times
+-   **User Feedback**: Monitor support requests and user satisfaction
+-   **System Resources**: Watch for storage and bandwidth impact
+-   **Business Impact**: Measure workflow efficiency improvements
 
 **Potential Enhancements**:
 
-- **Progressive Upload**: Chunked file uploads for very large files
-- **Compression**: Optional file compression for storage optimization
-- **Cloud Storage**: Integration with cloud storage providers
-- **File Versioning**: Support for file versioning and history
+-   **Progressive Upload**: Chunked file uploads for very large files
+-   **Compression**: Optional file compression for storage optimization
+-   **Cloud Storage**: Integration with cloud storage providers
+-   **File Versioning**: Support for file versioning and history
 
 ---
 
@@ -552,10 +755,10 @@ After resolving the initial relationship and field reference issues, the Documen
 Schema::table('distribution_histories', function (Blueprint $table) {
     // Drop the foreign key constraint first
     $table->dropForeign(['distribution_id']);
-    
+
     // Make distribution_id nullable
     $table->foreignId('distribution_id')->nullable()->change();
-    
+
     // Re-add the foreign key constraint with nullable support
     $table->foreign('distribution_id')->references('id')->on('distributions')->onDelete('cascade');
 });

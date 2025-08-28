@@ -3,6 +3,7 @@
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceAttachmentController;
 use App\Http\Controllers\InvoiceDashboardController;
+use App\Http\Controllers\InvoicePaymentController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -18,6 +19,15 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
 
     // Dashboard route
     Route::get('/dashboard', [InvoiceDashboardController::class, 'index'])->name('dashboard');
+
+    // Payment routes
+    Route::prefix('payments')->name('payments.')->group(function () {
+        Route::get('/dashboard', [InvoicePaymentController::class, 'dashboard'])->name('dashboard');
+        Route::get('/waiting', [InvoicePaymentController::class, 'waitingPayment'])->name('waiting');
+        Route::get('/paid', [InvoicePaymentController::class, 'paidInvoices'])->name('paid');
+        Route::put('/{invoice}/update', [InvoicePaymentController::class, 'updatePayment'])->name('update');
+        Route::post('/bulk-update', [InvoicePaymentController::class, 'bulkUpdatePayment'])->name('bulk-update');
+    });
 
     Route::post('/{invoice}/attachments', [InvoiceAttachmentController::class, 'store'])->name('attachments.store');
 
