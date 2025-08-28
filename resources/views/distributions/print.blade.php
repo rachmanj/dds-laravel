@@ -218,7 +218,7 @@
                             <td class="text-right">ARKA/ACC/IV/01.01</td>
                         </tr>
                         <tr>
-                            <td>{{ $distribution->created_at->format('d-M-Y') }}</td>
+                            <td>{{ $distribution->local_created_at->format('d-M-Y') }}</td>
                         </tr>
                     </table>
                 </div>
@@ -267,7 +267,7 @@
                         <div class="info-row">
                             <div class="info-label">Created By:</div>
                             <div class="info-value">{{ $distribution->creator->name }} on
-                                {{ $distribution->created_at->format('d-M-Y H:i') }}</div>
+                                {{ $distribution->local_created_at->format('d-M-Y H:i') }}</div>
                         </div>
                         @if ($distribution->notes)
                             <div class="info-row">
@@ -282,98 +282,11 @@
             <!-- Documents Table -->
             <div class="row">
                 <div class="col-12 table-responsive">
-                    <table class="documents-table">
-                        <thead>
-                            <tr>
-                                <th>NO</th>
-                                <th>DOCUMENT TYPE</th>
-                                <th>VENDOR/SUPPLIER</th>
-                                <th>DOCUMENT NO.</th>
-                                <th>DATE</th>
-                                <th class="text-right">AMOUNT</th>
-                                <th>PO NO</th>
-                                <th>PROJECT</th>
-                                <th>STATUS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-
-                            @if ($distribution->document_type === 'invoice')
-                                @foreach ($distribution->documents as $index => $doc)
-                                    @php $invoice = $doc->document; @endphp
-                                    <tr>
-                                        <td>{{ $index + 1 }}</td>
-                                        <td><strong>Invoice</strong></td>
-                                        <td>{{ $invoice->supplier->name ?? 'N/A' }}</td>
-                                        <td><strong>{{ $invoice->invoice_number }}</strong></td>
-                                        <td>{{ $invoice->invoice_date ? date('d-M-Y', strtotime($invoice->invoice_date)) : 'N/A' }}
-                                        </td>
-                                        <td class="text-right">
-                                            @if ($invoice->currency && $invoice->amount)
-                                                {{ $invoice->currency }}
-                                                {{ number_format($invoice->amount, 0) }}
-                                            @else
-                                                N/A
-                                            @endif
-                                        </td>
-                                        <td>{{ $invoice->po_no ?? 'N/A' }}</td>
-                                        <td>{{ $invoice->invoice_project ?? 'N/A' }}</td>
-                                        <td>
-                                            <span
-                                                class="status-badge status-{{ $doc->verification_status ?? 'pending' }}">
-                                                {{ ucwords(str_replace('_', ' ', $doc->verification_status ?? 'pending')) }}
-                                            </span>
-                                        </td>
-                                    </tr>
-
-                                    @if ($invoice->additionalDocuments && $invoice->additionalDocuments->count() > 0)
-                                        @foreach ($invoice->additionalDocuments as $addDoc)
-                                            <tr class="additional-doc-row">
-                                                <td></td>
-                                                <td colspan="2">
-                                                    <strong>{{ $addDoc->type->type_name ?? 'Additional Document' }}</strong>
-                                                </td>
-                                                <td colspan="2">
-                                                    <strong>{{ $addDoc->document_number ?? 'N/A' }}</strong>
-                                                </td>
-                                                <td>{{ $addDoc->document_date ? date('d-M-Y', strtotime($addDoc->document_date)) : 'N/A' }}
-                                                </td>
-                                                <td>{{ $addDoc->po_no ?? 'N/A' }}</td>
-                                                <td>{{ $addDoc->project ?? 'N/A' }}</td>
-                                                <td>
-                                                    <span
-                                                        class="status-badge status-{{ $addDoc->distribution_status ?? 'available' }}">
-                                                        {{ ucwords(str_replace('_', ' ', $addDoc->distribution_status ?? 'available')) }}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    @endif
-                                @endforeach
-                            @else
-                                @foreach ($distribution->documents as $index => $doc)
-                                    @php $additionalDoc = $doc->document; @endphp
-                                    <tr>
-                                        <td>{{ $index + 1 }}</td>
-                                        <td><strong>Additional Document</strong></td>
-                                        <td>{{ $additionalDoc->type->type_name ?? 'Additional Document' }}</td>
-                                        <td><strong>{{ $additionalDoc->document_number ?? 'N/A' }}</strong></td>
-                                        <td>{{ $additionalDoc->document_date ? date('d-M-Y', strtotime($additionalDoc->document_date)) : 'N/A' }}
-                                        </td>
-                                        <td class="text-right">N/A</td>
-                                        <td>{{ $additionalDoc->po_no ?? 'N/A' }}</td>
-                                        <td>{{ $additionalDoc->project ?? 'N/A' }}</td>
-                                        <td>
-                                            <span
-                                                class="status-badge status-{{ $doc->verification_status ?? 'pending' }}">
-                                                {{ ucwords(str_replace('_', ' ', $doc->verification_status ?? 'pending')) }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            @endif
-                        </tbody>
-                    </table>
+                    @if ($distribution->document_type === 'invoice')
+                        @include('distributions.partials.invoice-table')
+                    @else
+                        @include('distributions.partials.additional-document-table')
+                    @endif
                 </div>
             </div>
 
@@ -388,7 +301,7 @@
                                     <div class="info-label">Sender Verified:</div>
                                     <div class="info-value">
                                         {{ $distribution->senderVerifier->name ?? 'N/A' }} on
-                                        {{ $distribution->sender_verified_at->format('d-M-Y H:i') }}
+                                        {{ $distribution->local_sender_verified_at->format('d-M-Y H:i') }}
                                         @if ($distribution->sender_verification_notes)
                                             <br><small><em>Notes:
                                                     {{ $distribution->sender_verification_notes }}</em></small>
@@ -399,13 +312,14 @@
                             @if ($distribution->sent_at)
                                 <div class="info-row">
                                     <div class="info-label">Sent:</div>
-                                    <div class="info-value">{{ $distribution->sent_at->format('d-M-Y H:i') }}</div>
+                                    <div class="info-value">{{ $distribution->local_sent_at->format('d-M-Y H:i') }}
+                                    </div>
                                 </div>
                             @endif
                             @if ($distribution->received_at)
                                 <div class="info-row">
                                     <div class="info-label">Received:</div>
-                                    <div class="info-value">{{ $distribution->received_at->format('d-M-Y H:i') }}
+                                    <div class="info-value">{{ $distribution->local_received_at->format('d-M-Y H:i') }}
                                     </div>
                                 </div>
                             @endif
@@ -413,8 +327,7 @@
                                 <div class="info-row">
                                     <div class="info-label">Receiver Verified:</div>
                                     <div class="info-value">
-                                        {{ $distribution->receiverVerifier->name ?? 'N/A' }} on
-                                        {{ $distribution->receiver_verified_at->format('d-M-Y H:i') }}
+                                        {{ $distribution->local_receiver_verified_at->format('d-M-Y H:i') }}
                                         @if ($distribution->receiver_verification_notes)
                                             <br><small><em>Notes:
                                                     {{ $distribution->receiver_verification_notes }}</em></small>

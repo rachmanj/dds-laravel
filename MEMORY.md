@@ -2656,3 +2656,346 @@ $query = Invoice::with([
 **Last Updated**: 2025-01-27  
 **Version**: 4.6  
 **Status**: ✅ API Distribution Information Enhancement Completed Successfully - Complete Distribution Data Integration
+
+---
+
+### **2025-01-27: Transmittal Advice Print Table Structure Fix - Complete Document Display Resolution**
+
+**Version**: 4.7  
+**Status**: ✅ **Print Table Structure Fixed Successfully**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 1 hour (critical table structure fix)
+
+**Project Scope**: Fix critical issue in Transmittal Advice print view where empty invoice rows were being displayed incorrectly, causing confusion and incorrect document counts
+
+#### **1. Critical Problem Identification**
+
+**Decision**: Fix incorrect document looping logic causing empty invoice rows in Transmittal Advice
+**Context**: Distribution with 1 invoice + 2 additional documents was showing 3 invoice rows (2 empty) instead of 1 invoice + 2 additional documents
+**Implementation Date**: 2025-01-27
+**Actual Effort**: 1 hour
+**Status**: ✅ **COMPLETED** - All table structure issues resolved successfully
+
+**Root Cause Analysis**:
+
+-   **Incorrect Looping**: `@foreach ($distribution->documents as $index => $doc)` was looping through ALL documents
+-   **Document Type Confusion**: System was treating additional documents as invoices in the loop
+-   **Empty Row Generation**: Each additional document was creating an empty invoice row
+-   **Table Structure Issues**: Incorrect column spanning for additional document sub-rows
+
+**Business Impact**: Users were seeing incorrect document counts and confusing empty rows in business documents
+
+#### **2. Complete Fix Implementation**
+
+**Decision**: Implement proper document filtering and correct table structure with clean separation using partial views
+**Implementation**:
+
+-   **Document Filtering**: Separate invoices and additional documents using `filter()` method
+-   **Clean Separation**: Different logic for invoice vs additional document distributions using partial views
+-   **No Duplication**: Additional documents only shown once (either attached to invoices or standalone)
+-   **Table Structure**: Fix column spanning and alignment for additional document rows
+-   **Row Numbering**: Proper sequential numbering for all document types
+
+**Technical Implementation**:
+
+```php
+<!-- Main print.blade.php now acts as a router -->
+<div class="col-12 table-responsive">
+    @if ($distribution->document_type === 'invoice')
+        @include('distributions.partials.invoice-table')
+    @else
+        @include('distributions.partials.additional-document-table')
+    @endif
+</div>
+```
+
+**Partial Views Created**:
+
+1. **`resources/views/distributions/partials/invoice-table.blade.php`**:
+
+    - Shows invoices with their attached additional documents as sub-rows
+    - Proper filtering to only show invoice documents
+    - Additional documents displayed as indented sub-rows under invoices
+
+2. **`resources/views/distributions/partials/additional-document-table.blade.php`**:
+    - Shows standalone additional documents
+    - Proper filtering to only show additional document documents
+    - Clean table structure without duplication
+
+**Key Improvements**:
+
+-   **Eliminated Duplication**: Additional documents no longer appear twice
+-   **Clean Logic Separation**: Invoice distributions vs Additional Document distributions handled separately
+-   **Proper Relationships**: Additional documents shown as sub-rows under their parent invoices
+-   **Standalone Documents**: Additional documents in their own distributions shown individually
+-   **Maintainable Code**: Partial views make the code easier to maintain and debug
+
+#### **3. Business Logic & Document Display**
+
+**Decision**: Ensure proper document type handling and display logic
+**Implementation**:
+
+**Invoice Distribution Display**:
+
+1. **Primary Invoice Row**: Complete invoice information (supplier, number, date, amount, PO, project, status)
+2. **Attached Additional Documents**: Sub-rows showing documents linked to the invoice
+3. **Standalone Additional Documents**: Separate rows for documents not attached to invoices
+
+**Additional Document Distribution Display**:
+
+1. **Individual Rows**: Each additional document as a complete row
+2. **Proper Field Mapping**: Document type, number, date, PO, project, status
+3. **Consistent Layout**: Same 9-column structure maintained
+
+**Document Type Handling**:
+
+-   **Invoice Documents**: Filtered by `document_type === 'App\Models\Invoice'`
+-   **Additional Documents**: Filtered by `document_type === 'App\Models\AdditionalDocument'`
+-   **Relationship Loading**: Proper eager loading of document relationships
+
+#### **4. User Experience & Visual Improvements**
+
+**Decision**: Focus on clear, professional document presentation
+**Implementation**:
+
+**Visual Enhancements**:
+
+-   **Clear Row Separation**: Invoice rows vs additional document rows
+-   **Proper Indentation**: Additional documents visually grouped under invoices
+-   **Status Indicators**: Clear status badges for all document types
+-   **Professional Layout**: Business-ready table structure
+
+**Table Structure**:
+
+-   **9 Columns**: NO, DOC TYPE, VENDOR/SUPPLIER, DOC NO, DATE, AMOUNT, PO NO, PROJECT, STATUS
+-   **Responsive Design**: Proper alignment and spacing for all screen sizes
+-   **Print Optimization**: Clean structure for professional printing
+
+**User Experience Features**:
+
+-   **Accurate Counts**: Correct document numbers displayed
+-   **Clear Relationships**: Visual indication of which documents are attached to invoices
+-   **Professional Output**: Business-standard Transmittal Advice format
+-   **No Empty Rows**: All rows contain meaningful information
+
+#### **5. Technical Architecture Improvements**
+
+**Decision**: Implement robust document filtering and display logic
+**Implementation**:
+
+**Filtering Strategy**:
+
+-   **Collection Filtering**: Use Laravel's `filter()` method for efficient document separation
+-   **Type Checking**: Proper model class comparison for document type identification
+-   **Performance**: Single pass through documents with efficient filtering
+
+**Code Organization**:
+
+-   **PHP Logic**: Document filtering logic in `@php` blocks for clarity
+-   **Blade Templates**: Clean, readable template structure
+-   **Maintainability**: Clear separation of concerns between logic and presentation
+
+**Error Prevention**:
+
+-   **Type Safety**: Proper document type checking prevents display errors
+-   **Null Handling**: Safe access to document properties with fallback values
+-   **Validation**: Ensures only valid documents are displayed
+
+#### **6. Business Impact & Compliance**
+
+**Decision**: Ensure accurate business document generation for compliance
+**Implementation**:
+
+**Immediate Benefits**:
+
+-   **Accurate Documentation**: Correct document counts and relationships displayed
+-   **Professional Appearance**: Clean, organized business documents
+-   **User Confidence**: Users can trust the information displayed
+-   **Compliance**: Accurate audit trail for regulatory requirements
+
+**Long-term Benefits**:
+
+-   **Process Efficiency**: Clear document visibility improves workflow management
+-   **Audit Trail**: Complete and accurate document tracking
+-   **Business Intelligence**: Proper data for analysis and reporting
+-   **System Reliability**: Consistent and predictable document display
+
+**Compliance Features**:
+
+-   **Complete Information**: All relevant document data properly displayed
+-   **Relationship Tracking**: Clear indication of document attachments
+-   **Status Visibility**: Complete status information for all documents
+-   **Audit Trail**: Proper documentation for regulatory requirements
+
+#### **7. Testing & Validation Strategy**
+
+**Decision**: Implement comprehensive testing to validate fix effectiveness
+**Implementation**:
+
+**Testing Scenarios**:
+
+1. **Invoice Distribution**: Verify only invoice documents create invoice rows
+2. **Additional Document Display**: Verify additional documents display as sub-rows
+3. **Standalone Documents**: Verify standalone additional documents display correctly
+4. **Row Numbering**: Verify sequential numbering across all document types
+5. **Table Structure**: Verify proper column alignment and spanning
+
+**Validation Methods**:
+
+-   **Visual Inspection**: Check table structure and row content
+-   **Document Counts**: Verify displayed counts match actual documents
+-   **Print Output**: Test actual printing to ensure professional appearance
+-   **Cross-browser Testing**: Verify consistent display across different browsers
+
+**Learning**: Table structure issues in business documents can significantly impact user experience and compliance - proper filtering and display logic is essential
+
+---
+
+**Last Updated**: 2025-01-27  
+**Version**: 4.7  
+**Status**: ✅ Transmittal Advice Print Table Structure Fixed Successfully - Complete Document Display Resolution
+
+---
+
+### **2025-01-27: Transmittal Advice Timezone Fix - Local Time Display Implementation**
+
+**Version**: 4.8  
+**Status**: ✅ **Timezone Fix Implemented Successfully**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 1 hour (comprehensive timezone implementation)
+
+**Project Scope**: Fix timezone mismatch where database stored UTC times but users needed to see local Asia/Singapore time (+8)
+
+#### **1. Problem Identification**
+
+**Decision**: Implement timezone conversion to display local time instead of UTC
+**Context**: Database stored timestamps in UTC (e.g., 02:25) but users needed to see local time (e.g., 10:25 Asia/Singapore)
+**Implementation Date**: 2025-01-27
+**Actual Effort**: 1 hour
+**Status**: ✅ **COMPLETED** - All timestamp displays now show local time
+
+**Root Cause Analysis**:
+
+-   **Database Storage**: Laravel stores all timestamps in UTC by default (best practice)
+-   **User Location**: Users in Asia/Singapore timezone (UTC+8)
+-   **Display Issue**: Raw UTC times shown instead of converted local times
+-   **Business Impact**: Users saw incorrect times in business documents
+
+**Example of the Problem**:
+
+-   **Database**: `28-Aug-2025 02:25` (UTC)
+-   **Should Display**: `28-Aug-2025 10:25` (Asia/Singapore)
+-   **Was Displaying**: `28-Aug-2025 02:25` (UTC - confusing for users)
+
+#### **2. Solution Implementation**
+
+**Decision**: Implement timezone accessors in the Distribution model for clean, reusable local time display
+**Implementation**:
+
+-   **Model Accessors**: Added local time accessors for all timestamp fields
+-   **Blade Updates**: Updated all templates to use local time accessors
+-   **Consistent Format**: All timestamps now display in Asia/Singapore timezone
+-   **No Data Migration**: Database remains in UTC (best practice maintained)
+
+**Technical Implementation**:
+
+```php
+// Added to Distribution model
+public function getLocalCreatedAtAttribute()
+{
+    return $this->created_at ? $this->created_at->setTimezone('Asia/Singapore') : null;
+}
+
+public function getLocalSenderVerifiedAtAttribute()
+{
+    return $this->sender_verified_at ? $this->sender_verified_at->setTimezone('Asia/Singapore') : null;
+}
+
+// And similar for other timestamp fields...
+```
+
+**Blade Template Updates**:
+
+```blade
+<!-- Before: UTC time -->
+{{ $distribution->created_at->format('d-M-Y H:i') }}
+
+<!-- After: Local time -->
+{{ $distribution->local_created_at->format('d-M-Y H:i') }}
+```
+
+#### **3. Files Updated**
+
+**Model Changes**:
+
+-   **`app/Models/Distribution.php`**: Added 5 timezone accessors for all timestamp fields
+
+**Template Changes**:
+
+-   **`resources/views/distributions/print.blade.php`**: Updated all timestamp displays
+-   **`resources/views/distributions/partials/invoice-table.blade.php`**: Updated document dates
+-   **`resources/views/distributions/partials/additional-document-table.blade.php`**: Updated document dates
+-   **`resources/views/distributions/show.blade.php`**: Updated all timestamp displays in distribution details, workflow progress, and history table
+
+**Accessors Added**:
+
+1. `local_created_at` - Distribution creation time
+2. `local_sender_verified_at` - Sender verification time
+3. `local_sent_at` - Distribution sent time
+4. `local_received_at` - Distribution received time
+5. `local_receiver_verified_at` - Receiver verification time
+
+#### **4. Benefits of This Approach**
+
+**Why Display Layer is Better**:
+
+✅ **Data Integrity**: Database remains in UTC (industry standard)  
+✅ **No Migration**: Existing records don't need to be changed  
+✅ **Flexibility**: Can easily change timezone or add user-specific timezones  
+✅ **Performance**: No repeated timezone calculations in templates  
+✅ **Maintainability**: All timezone logic centralized in model
+
+**User Experience Improvements**:
+
+-   **Correct Times**: Users now see times in their local timezone
+-   **Business Clarity**: No more confusion about "02:25 vs 10:25"
+-   **Professional Documents**: Transmittal Advice shows correct local times
+-   **Consistent Display**: All timestamps follow same timezone logic
+
+#### **5. Technical Architecture**
+
+**Timezone Strategy**:
+
+-   **Storage**: UTC (universal time for data consistency)
+-   **Display**: Asia/Singapore (local time for user experience)
+-   **Conversion**: Automatic via model accessors
+-   **Format**: Consistent DD-MMM-YYYY HH:MM format
+
+**Performance Considerations**:
+
+-   **Lazy Loading**: Timezone conversion only happens when accessed
+-   **Caching**: Laravel's accessor caching prevents repeated calculations
+-   **Memory**: Minimal memory impact from timezone objects
+
+**Future Extensibility**:
+
+-   **User Timezones**: Can easily add user-specific timezone preferences
+-   **Multi-region**: Can support multiple timezone displays
+-   **Configuration**: Timezone can be moved to config files
+
+#### **6. Testing & Validation**
+
+**Verification Steps**:
+
+1. **Database Check**: Confirm timestamps still stored in UTC
+2. **Display Check**: Verify all times show in Asia/Singapore timezone
+3. **Format Check**: Ensure consistent DD-MMM-YYYY HH:MM format
+4. **Edge Cases**: Test with different timezone scenarios
+
+**Expected Results**:
+
+-   **Before**: `28-Aug-2025 02:25` (UTC time)
+-   **After**: `28-Aug-2025 10:25` (Asia/Singapore time)
+-   **Difference**: +8 hours correctly applied
+
+**Learning**: Timezone handling at the display layer provides the best balance of data integrity and user experience

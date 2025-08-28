@@ -99,6 +99,32 @@ class Distribution extends Model
         return $this->morphedByMany(AdditionalDocument::class, 'document', 'distribution_documents', 'distribution_id', 'document_id');
     }
 
+    // Timezone Accessors for Local Time Display
+    public function getLocalCreatedAtAttribute()
+    {
+        return $this->created_at ? $this->created_at->setTimezone('Asia/Singapore') : null;
+    }
+
+    public function getLocalSenderVerifiedAtAttribute()
+    {
+        return $this->sender_verified_at ? $this->sender_verified_at->setTimezone('Asia/Singapore') : null;
+    }
+
+    public function getLocalSentAtAttribute()
+    {
+        return $this->sent_at ? $this->sent_at->setTimezone('Asia/Singapore') : null;
+    }
+
+    public function getLocalReceivedAtAttribute()
+    {
+        return $this->received_at ? $this->received_at->setTimezone('Asia/Singapore') : null;
+    }
+
+    public function getLocalReceiverVerifiedAtAttribute()
+    {
+        return $this->receiver_verified_at ? $this->receiver_verified_at->setTimezone('Asia/Singapore') : null;
+    }
+
     // Scopes
     public function scopeByStatus($query, $status)
     {

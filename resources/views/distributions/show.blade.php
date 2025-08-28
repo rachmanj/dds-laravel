@@ -89,32 +89,32 @@
                                 </tr>
                                 <tr>
                                     <td><strong>Created:</strong></td>
-                                    <td>{{ $distribution->created_at->format('d-M-Y H:i') }} by
+                                    <td>{{ $distribution->local_created_at->format('d-M-Y H:i') }} by
                                         {{ $distribution->creator->name }}</td>
                                 </tr>
                                 @if ($distribution->sender_verified_at)
                                     <tr>
                                         <td><strong>Sender Verified:</strong></td>
-                                        <td>{{ $distribution->sender_verified_at->format('d-M-Y H:i') }} by
+                                        <td>{{ $distribution->local_sender_verified_at->format('d-M-Y H:i') }} by
                                             {{ $distribution->senderVerifier->name }}</td>
                                     </tr>
                                 @endif
                                 @if ($distribution->sent_at)
                                     <tr>
                                         <td><strong>Sent:</strong></td>
-                                        <td>{{ $distribution->sent_at->format('d-M-Y H:i') }}</td>
+                                        <td>{{ $distribution->local_sent_at->format('d-M-Y H:i') }}</td>
                                     </tr>
                                 @endif
                                 @if ($distribution->received_at)
                                     <tr>
                                         <td><strong>Received:</strong></td>
-                                        <td>{{ $distribution->received_at->format('d-M-Y H:i') }}</td>
+                                        <td>{{ $distribution->local_received_at->format('d-M-Y H:i') }}</td>
                                     </tr>
                                 @endif
                                 @if ($distribution->receiver_verified_at)
                                     <tr>
                                         <td><strong>Receiver Verified:</strong></td>
-                                        <td>{{ $distribution->receiver_verified_at->format('d-M-Y H:i') }} by
+                                        <td>{{ $distribution->local_receiver_verified_at->format('d-M-Y H:i') }} by
                                             {{ $distribution->receiverVerifier->name }}</td>
                                     </tr>
                                 @endif
@@ -152,7 +152,8 @@
                                     </div>
                                     <div class="step-label">Draft</div>
                                     @if ($distribution->status !== 'draft')
-                                        <small class="text-muted">{{ $distribution->created_at->format('d-M') }}</small>
+                                        <small
+                                            class="text-muted">{{ $distribution->local_created_at->format('d-M') }}</small>
                                     @endif
                                 </div>
                             </div>
@@ -165,7 +166,7 @@
                                     <div class="step-label">Sender Verified</div>
                                     @if ($distribution->sender_verified_at)
                                         <small
-                                            class="text-muted">{{ $distribution->sender_verified_at->format('d-M') }}</small>
+                                            class="text-muted">{{ $distribution->local_sender_verified_at->format('d-M') }}</small>
                                     @endif
                                 </div>
                             </div>
@@ -177,7 +178,7 @@
                                     </div>
                                     <div class="step-label">Sent</div>
                                     @if ($distribution->sent_at)
-                                        <small class="text-muted">{{ $distribution->sent_at->format('d-M') }}</small>
+                                        <small class="text-muted">{{ $distribution->local_sent_at->format('d-M') }}</small>
                                     @endif
                                 </div>
                             </div>
@@ -189,7 +190,8 @@
                                     </div>
                                     <div class="step-label">Received</div>
                                     @if ($distribution->received_at)
-                                        <small class="text-muted">{{ $distribution->received_at->format('d-M') }}</small>
+                                        <small
+                                            class="text-muted">{{ $distribution->local_received_at->format('d-M') }}</small>
                                     @endif
                                 </div>
                             </div>
@@ -202,7 +204,7 @@
                                     <div class="step-label">Receiver Verified</div>
                                     @if ($distribution->receiver_verified_at)
                                         <small
-                                            class="text-muted">{{ $distribution->receiver_verified_at->format('d-M') }}</small>
+                                            class="text-muted">{{ $distribution->local_receiver_verified_at->format('d-M') }}</small>
                                     @endif
                                 </div>
                             </div>
@@ -485,8 +487,15 @@
                                                 <div>
                                                     <strong>{{ $doc->document->document_number ?? ($doc->document->invoice_number ?? 'N/A') }}</strong>
                                                     <br>
-                                                    <small
-                                                        class="text-muted">{{ class_basename($doc->document_type) }}</small>
+                                                    <small class="text-muted">
+                                                        @if ($doc->document_type === 'App\Models\Invoice')
+                                                            {{ $doc->document->type->type_name ?? 'N/A' }}
+                                                        @elseif($doc->document_type === 'App\Models\AdditionalDocument')
+                                                            {{ $doc->document->type->type_name ?? 'N/A' }}
+                                                        @else
+                                                            {{ class_basename($doc->document_type) }}
+                                                        @endif
+                                                    </small>
                                                 </div>
                                             </div>
                                         </td>
@@ -563,9 +572,9 @@
                                     <tr>
                                         <td>
                                             <div class="d-flex flex-column">
-                                                <strong>{{ $history->action_performed_at->format('d-M-Y') }}</strong>
+                                                <strong>{{ \Carbon\Carbon::parse($history->action_performed_at)->setTimezone('Asia/Singapore')->format('d-M-Y') }}</strong>
                                                 <small
-                                                    class="text-muted">{{ $history->action_performed_at->format('H:i') }}</small>
+                                                    class="text-muted">{{ \Carbon\Carbon::parse($history->action_performed_at)->setTimezone('Asia/Singapore')->format('H:i') }}</small>
                                             </div>
                                         </td>
                                         <td>

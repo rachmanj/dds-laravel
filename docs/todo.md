@@ -293,6 +293,31 @@
 
 ## 🚀 **Recently Completed**
 
+### **2025-01-27: Transmittal Advice Print Table Structure Fix**
+
+-   ✅ **Fixed critical issue** with empty invoice rows in Transmittal Advice print view
+-   ✅ **Implemented proper document filtering** to separate invoices and additional documents
+-   ✅ **Created partial views** for clean separation of invoice vs additional document table logic
+-   ✅ **Eliminated document duplication** - additional documents now only appear once
+-   ✅ **Enhanced maintainability** with modular partial view architecture
+-   ✅ **Updated MEMORY.md** with comprehensive fix documentation
+
+**Business Impact**: Professional Transmittal Advice documents with accurate document counts, proper table structure, and no duplicate entries
+
+### **2025-01-27: Transmittal Advice Timezone Fix**
+
+-   ✅ **Fixed timezone mismatch** where UTC times were displayed instead of local Asia/Singapore time
+-   ✅ **Implemented model accessors** for clean, reusable local time display
+-   ✅ **Updated all blade templates** to use local time accessors consistently:
+    -   Main print template (`print.blade.php`)
+    -   Document table partials (`invoice-table.blade.php`, `additional-document-table.blade.php`)
+    -   Distribution show page (`show.blade.php`)
+-   ✅ **Maintained data integrity** - database remains in UTC (best practice)
+-   ✅ **Enhanced user experience** - users now see correct local times in all distribution views
+-   ✅ **Updated MEMORY.md** with comprehensive timezone implementation documentation
+
+**Business Impact**: Users now see correct local times (e.g., 10:25 instead of 02:25) in all Transmittal Advice documents and distribution detail pages, eliminating timezone confusion across the entire application
+
 ### **2025-01-27: Critical Distribution Document Status Management Fix**
 
 -   ✅ **Fixed critical flaw** allowing documents "in transit" to be selected for new distributions
