@@ -640,7 +640,7 @@
                             } else {
                                 tbody.append(
                                     '<tr><td colspan="5" class="text-center text-muted">No recent uploads</td></tr>'
-                                    );
+                                );
                             }
                         }
                     }
@@ -691,13 +691,13 @@
                 });
             }
 
-            // Enforce 5MB max per file on client-side when uploading from detail page modal flows
+            // Enforce 50MB max per file on client-side when uploading from detail page modal flows
             $(document).on('change', 'input[type="file"][name="files[]"]', function() {
                 var files = this.files;
-                var maxPerFile = 5 * 1024 * 1024; // 5MB
+                var maxPerFile = 50 * 1024 * 1024; // 50MB
                 for (var i = 0; i < files.length; i++) {
                     if (files[i].size > maxPerFile) {
-                        toastr.error('Each file must be 5MB or less.');
+                        toastr.error('Each file must be 50MB or less.');
                         this.value = '';
                         break;
                     }

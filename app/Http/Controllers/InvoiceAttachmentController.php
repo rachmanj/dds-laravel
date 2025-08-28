@@ -78,7 +78,7 @@ class InvoiceAttachmentController extends Controller
         }
 
         $request->validate([
-            'files.*' => ['required', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png,gif,webp'],
+            'files.*' => ['required', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,gif,webp'],
             'description' => ['nullable', 'string', 'max:255'],
         ]);
 

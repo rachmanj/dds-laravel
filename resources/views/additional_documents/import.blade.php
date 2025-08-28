@@ -330,10 +330,10 @@
             // File size validation
             $('#file').change(function() {
                 var file = this.files[0];
-                var maxSize = 10 * 1024 * 1024; // 10MB
+                var maxSize = 50 * 1024 * 1024; // 50MB
 
                 if (file && file.size > maxSize) {
-                    alert('File size must be less than 10MB.');
+                    alert('File size must be less than 50MB.');
                     $(this).val('');
                     $('.custom-file-label').text('Choose file');
                 }

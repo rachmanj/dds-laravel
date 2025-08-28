@@ -98,6 +98,126 @@ public function createOnTheFly(Request $request) {
 
 The Document Status Management system provides comprehensive control over document distribution statuses, allowing administrators to reset and manage document states for workflow continuity.
 
+### **File Upload System**
+
+**System Architecture**:
+
+The File Upload System provides comprehensive file handling capabilities across all document types, supporting large file uploads up to 50MB with consistent validation and user experience.
+
+**File Size Limits & Validation**:
+
+```
+Current System Limits:
+├── Invoice Attachments: 50MB (max:51200)
+├── Additional Document Attachments: 50MB (max:51200)
+├── Excel Import Files: 50MB (max:51200)
+└── All File Types: PDF, Images, Excel, Word documents
+```
+
+**Validation Architecture**:
+
+**Backend Validation (Laravel)**:
+```php
+// Invoice Attachments
+'files.*' => ['required', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,gif,webp']
+
+// Excel Imports
+'file' => 'required|file|mimes:xlsx,xls|max:51200'
+
+// Document Attachments
+'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:51200'
+```
+
+**Frontend Validation (JavaScript)**:
+```javascript
+// Client-side file size validation
+var maxPerFile = 50 * 1024 * 1024; // 50MB
+var maxSize = 50 * 1024 * 1024; // 50MB
+
+// Real-time validation on file selection
+$('#files').on('change', function() {
+    var files = this.files;
+    for (var i = 0; i < files.length; i++) {
+        if (files[i].size > maxPerFile) {
+            alert('Each file must be 50MB or less.');
+            $(this).val('');
+            break;
+        }
+    }
+});
+```
+
+**File Storage Architecture**:
+
+**Storage Strategy**:
+- **Local Storage**: Files stored in `storage/app/private/` for security
+- **Organized Structure**: Year/month-based folder organization
+- **Unique Naming**: Random 40-character filenames with original extensions
+- **Metadata Storage**: File information stored in database with relationships
+
+**File Processing Flow**:
+```
+File Upload → Validation → Storage → Database Record → User Feedback
+     ↓            ↓         ↓          ↓              ↓
+  Form Submit  Size/Type  Local Disk  Attachment    Success/Error
+               Check      Storage     Model         Message
+```
+
+**Controllers & Routes**:
+
+**Primary Controllers**:
+1. **InvoiceAttachmentController**: Handles invoice file attachments
+2. **AdditionalDocumentController**: Manages document attachments and Excel imports
+3. **InvoiceController**: Processes bulk invoice Excel imports
+
+**Key Routes**:
+- `POST /invoices/{invoice}/attachments` - Upload invoice attachments
+- `POST /additional-documents/import` - Import Excel files
+- `POST /invoices/import` - Bulk invoice import
+
+**User Experience Features**:
+
+**Consistent Interface**:
+- **Help Text**: Clear file size limits displayed on all upload forms
+- **Real-time Validation**: Immediate feedback on file selection
+- **Error Handling**: User-friendly error messages for validation failures
+- **Progress Feedback**: Loading states and success notifications
+
+**File Type Support**:
+- **Documents**: PDF, DOC, DOCX
+- **Images**: JPG, JPEG, PNG, GIF, WebP
+- **Spreadsheets**: XLS, XLSX
+- **Validation**: MIME type checking for security
+
+**Performance & Security**:
+
+**Performance Optimizations**:
+- **Efficient Validation**: Single-pass validation with clear error messages
+- **Storage Optimization**: Organized folder structure for easy management
+- **Memory Management**: Laravel's built-in file handling for large files
+- **Database Efficiency**: Optimized queries for file metadata
+
+**Security Features**:
+- **File Type Validation**: Strict MIME type checking
+- **Size Limits**: Server-side validation prevents abuse
+- **Permission Control**: Role-based access to upload functionality
+- **Secure Storage**: Files stored outside web-accessible directories
+- **Unique Naming**: Prevents filename conflicts and security issues
+
+**Business Impact**:
+
+**Immediate Benefits**:
+- **Larger Documents**: Support for comprehensive business documents up to 50MB
+- **Bulk Operations**: Enhanced Excel import capabilities for large datasets
+- **User Productivity**: Reduced need to split or compress large files
+- **Process Efficiency**: Streamlined document upload workflows
+
+**Long-term Benefits**:
+- **System Scalability**: Support for growing document size requirements
+- **User Adoption**: Better experience leads to increased system usage
+- **Business Process**: Improved support for real-world document sizes
+- **Data Integrity**: Complete documents uploaded without compression
+
 **Controller Architecture**:
 
 ```php

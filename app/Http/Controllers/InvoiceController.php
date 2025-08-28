@@ -366,7 +366,7 @@ class InvoiceController extends Controller
     public function processImport(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls|max:10240', // 10MB max
+            'file' => 'required|file|mimes:xlsx,xls|max:51200', // 50MB max
             'invoice_type_id' => 'nullable|exists:invoice_types,id',
         ]);
 

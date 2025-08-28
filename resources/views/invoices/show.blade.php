@@ -237,7 +237,7 @@
                                     <input type="file" class="form-control-file" id="files" name="files[]" multiple
                                         accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" required>
                                     <small class="form-text text-muted">
-                                        Maximum file size: 5MB. Supported formats: PDF, Images (JPG, PNG, GIF, WebP)
+                                        Maximum file size: 50MB. Supported formats: PDF, Images (JPG, PNG, GIF, WebP)
                                     </small>
                                 </div>
                                 <div class="form-group">
@@ -401,10 +401,10 @@
             // File input change event
             $('#files').on('change', function() {
                 var files = this.files;
-                var maxPerFile = 5 * 1024 * 1024; // 5MB
+                var maxPerFile = 50 * 1024 * 1024; // 50MB
                 for (var i = 0; i < files.length; i++) {
                     if (files[i].size > maxPerFile) {
-                        alert('Each file must be 5MB or less.');
+                        alert('Each file must be 50MB or less.');
                         $(this).val('');
                         break;
                     }

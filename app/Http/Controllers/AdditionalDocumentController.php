@@ -168,7 +168,7 @@ class AdditionalDocumentController extends Controller
             'project' => 'nullable|string|max:50',
             'receive_date' => 'required|date',
             'remarks' => 'nullable|string',
-            'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
+            'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:51200',
         ]);
 
         $user = Auth::user();
@@ -263,7 +263,7 @@ class AdditionalDocumentController extends Controller
             'project' => 'nullable|string|max:50',
             'receive_date' => 'required|date',
             'remarks' => 'nullable|string',
-            'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
+            'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:51200',
         ]);
 
         $data = $request->only([
@@ -364,7 +364,7 @@ class AdditionalDocumentController extends Controller
     public function processImport(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls|max:10240', // 10MB max
+            'file' => 'required|file|mimes:xlsx,xls|max:51200', // 50MB max
             'document_type_id' => 'nullable|exists:additional_document_types,id',
         ]);
 
@@ -378,8 +378,8 @@ class AdditionalDocumentController extends Controller
             }
 
             // Check file size
-            if ($file->getSize() > 10 * 1024 * 1024) { // 10MB
-                throw new \Exception('File size exceeds 10MB limit');
+            if ($file->getSize() > 50 * 1024 * 1024) { // 50MB
+                throw new \Exception('File size exceeds 50MB limit');
             }
 
             // Validate Excel file format

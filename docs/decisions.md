@@ -2,6 +2,196 @@
 
 ## 📝 **Decision Records**
 
+### **2025-01-27: File Upload Size Enhancement Implementation**
+
+**Decision**: Increase file upload size limits across the entire system from 2-10MB to 50MB per file
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+Users needed to upload larger business documents (50MB+) for comprehensive invoices, supporting materials, and bulk Excel imports. The existing system had inconsistent file size limits:
+
+- Invoice attachments: 5MB limit
+- Additional document attachments: 2MB limit  
+- Excel import files: 10MB limit
+
+This created user frustration and workflow inefficiencies when dealing with large business documents.
+
+#### **Requirements Analysis**
+
+**User Requirements**:
+
+- Upload comprehensive business documents up to 50MB
+- Support for larger Excel files for bulk data import
+- Consistent file size limits across all upload interfaces
+- Clear communication of new limits to users
+- Maintain system performance with larger files
+
+**Technical Requirements**:
+
+- Update all Laravel validation rules to support 50MB
+- Synchronize frontend JavaScript validation with backend limits
+- Update user interface text and help messages
+- Ensure consistent behavior across all file upload endpoints
+- Maintain security and performance standards
+
+#### **Decision Rationale**
+
+**50MB Limit Selection**:
+
+- **Considered**: 25MB, 50MB, 100MB, unlimited
+- **Chosen**: 50MB per file
+- **Reasoning**: Balances user needs for large documents with system performance and storage considerations
+
+**System-Wide Consistency**:
+
+- **Considered**: Different limits for different document types, gradual rollout
+- **Chosen**: Same 50MB limit across all upload interfaces
+- **Reasoning**: Provides consistent user experience and prevents confusion
+
+**Implementation Approach**:
+
+- **Considered**: Phased rollout, selective updates, configuration-based limits
+- **Chosen**: Comprehensive update across all controllers and frontend
+- **Reasoning**: Ensures consistency and prevents user confusion about different limits
+
+#### **Implementation Decisions**
+
+**1. Backend Validation Updates**
+
+```php
+// BEFORE: Inconsistent file size limits
+'files.*' => ['required', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png,gif,webp'], // 5MB
+'file' => 'required|file|mimes:xlsx,xls|max:10240', // 10MB
+'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048', // 2MB
+
+// AFTER: Consistent 50MB limits
+'files.*' => ['required', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,gif,webp'], // 50MB
+'file' => 'required|file|mimes:xlsx,xls|max:51200', // 50MB
+'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:51200', // 50MB
+```
+
+**Reasoning**: Consistent validation rules across all endpoints provide better user experience and easier maintenance.
+
+**2. Frontend Validation Synchronization**
+
+```javascript
+// BEFORE: Different limits in different interfaces
+var maxPerFile = 5 * 1024 * 1024; // 5MB (invoice attachments)
+var maxSize = 10 * 1024 * 1024; // 10MB (Excel imports)
+
+// AFTER: Consistent 50MB validation
+var maxPerFile = 50 * 1024 * 1024; // 50MB
+var maxSize = 50 * 1024 * 1024; // 50MB
+```
+
+**Reasoning**: Frontend and backend validation must always match to prevent user confusion and ensure consistent behavior.
+
+**3. User Interface Updates**
+
+```html
+<!-- BEFORE: Limited file size information -->
+<small class="form-text text-muted">
+    Maximum file size: 5MB. Supported formats: PDF, Images (JPG, PNG, GIF, WebP)
+</small>
+
+<!-- AFTER: Updated 50MB information -->
+<small class="form-text text-muted">
+    Maximum file size: 50MB. Supported formats: PDF, Images (JPG, PNG, GIF, WebP)
+</small>
+```
+
+**Reasoning**: Clear communication of new limits helps users understand system capabilities and prevents upload failures.
+
+#### **Technical Architecture**
+
+**Controllers Updated**:
+
+1. **InvoiceAttachmentController**: Invoice file attachments (5MB → 50MB)
+2. **AdditionalDocumentController**: Document attachments (2MB → 50MB) and Excel imports (10MB → 50MB)
+3. **InvoiceController**: Bulk invoice Excel imports (10MB → 50MB)
+
+**Frontend Templates Updated**:
+
+1. **invoices/show.blade.php**: Invoice attachment upload interface
+2. **invoices/attachments/index.blade.php**: Modal upload validation
+3. **additional_documents/import.blade.php**: Excel import validation
+
+**Validation Strategy**:
+
+- **Backend First**: Laravel validation rules as primary security layer
+- **Frontend Support**: JavaScript validation for immediate user feedback
+- **Consistent Limits**: Same 50MB limit across all interfaces
+- **Error Handling**: Clear error messages for validation failures
+
+#### **Business Impact**
+
+**Immediate Benefits**:
+
+- **User Productivity**: Reduced need to split or compress large documents
+- **Process Efficiency**: Streamlined document upload workflows
+- **User Satisfaction**: Better support for real-world business document sizes
+- **System Adoption**: Improved user experience leads to increased usage
+
+**Long-term Benefits**:
+
+- **Business Scalability**: Support for growing document size requirements
+- **Process Optimization**: Improved support for comprehensive business documents
+- **Data Integrity**: Complete documents uploaded without compression
+- **Competitive Advantage**: Better user experience compared to limited systems
+
+#### **Performance Considerations**
+
+**Storage Impact**:
+
+- **File Sizes**: 5-25x increase in maximum file sizes
+- **Storage Growth**: Potential for significant storage requirements
+- **Backup Strategy**: Larger backup files and longer backup times
+- **Monitoring**: Need to track storage usage and growth patterns
+
+**System Performance**:
+
+- **Upload Times**: Longer upload times for large files
+- **Memory Usage**: Increased memory requirements for file processing
+- **Network Bandwidth**: Higher bandwidth usage for large uploads
+- **Validation**: Efficient validation to prevent performance degradation
+
+#### **Risk Mitigation**
+
+**Storage Management**:
+
+- **Monitoring**: Track storage usage and growth patterns
+- **Cleanup**: Implement file cleanup strategies for old/unused files
+- **Archiving**: Consider archiving strategies for long-term storage
+- **Backup**: Optimize backup strategies for larger file volumes
+
+**Performance Monitoring**:
+
+- **Upload Metrics**: Track upload success rates and response times
+- **System Resources**: Monitor memory and CPU usage during uploads
+- **User Feedback**: Collect feedback on upload performance
+- **Optimization**: Identify and address performance bottlenecks
+
+#### **Future Considerations**
+
+**Monitoring & Optimization**:
+
+- **Performance Metrics**: Track upload success rates and response times
+- **User Feedback**: Monitor support requests and user satisfaction
+- **System Resources**: Watch for storage and bandwidth impact
+- **Business Impact**: Measure workflow efficiency improvements
+
+**Potential Enhancements**:
+
+- **Progressive Upload**: Chunked file uploads for very large files
+- **Compression**: Optional file compression for storage optimization
+- **Cloud Storage**: Integration with cloud storage providers
+- **File Versioning**: Support for file versioning and history
+
+---
+
 ### **2025-01-27: On-the-Fly Additional Document Creation Feature Implementation**
 
 **Decision**: Implement in-workflow additional document creation with modal-based UI and real-time integration
