@@ -101,6 +101,213 @@ if (!Auth::user()->can('on-the-fly-addoc-feature')) {
 
 ---
 
+### **2025-01-27: Document Status Management System Critical Fixes Implementation**
+
+**Decision**: Fix critical relationship and field reference issues preventing Document Status Management page from loading
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+The Document Status Management system was implemented but had critical issues preventing the page from loading:
+
+1. **Undefined relationships**: Controller tried to eager load non-existent `project` relationships
+2. **Field reference errors**: View tried to access fields that didn't exist in models
+3. **Query logic bugs**: Status counts method reused query objects causing accumulated WHERE clauses
+4. **Audit logging issues**: Wrong field names used for DistributionHistory model
+
+#### **Requirements Analysis**
+
+**Technical Requirements**:
+
+-   Fix all relationship loading issues in DocumentStatusController
+-   Correct view field references to match actual model structure
+-   Fix query logic bugs in status counting
+-   Ensure proper audit logging integration
+-   Maintain data integrity and security
+
+**Business Requirements**:
+
+-   Document Status Management page must load successfully
+-   Correct project information display for invoices and additional documents
+-   Working search functionality without errors
+-   Proper audit trail for compliance
+
+#### **Decision Rationale**
+
+**Relationship Fix Strategy**:
+
+-   **Considered**: Creating new relationships, modifying existing models, changing data structure
+-   **Chosen**: Use existing correct relationships (`invoiceProjectInfo` for Invoice, direct field access for AdditionalDocument)
+-   **Reasoning**: Leverages existing model architecture without breaking changes
+
+**Field Reference Strategy**:
+
+-   **Considered**: Adding missing fields to database, creating computed attributes, changing view logic
+-   **Chosen**: Update view to use correct field references with fallback values
+-   **Reasoning**: Maintains data integrity while fixing display issues
+
+**Query Logic Strategy**:
+
+-   **Considered**: Fixing existing query objects, using query builders, implementing caching
+-   **Chosen**: Create fresh queries for each status count to prevent WHERE clause accumulation
+-   **Reasoning**: Simple, reliable solution that prevents complex debugging issues
+
+#### **Implementation Decisions**
+
+**1. Invoice Project Relationship**
+
+```php
+// BEFORE (BROKEN): Undefined relationship
+->with(['supplier', 'project', 'creator.department'])
+
+// AFTER (FIXED): Correct relationship
+->with(['supplier', 'invoiceProjectInfo', 'creator.department'])
+```
+
+**Reasoning**: Invoice model has `invoiceProjectInfo()` relationship, not generic `project` relationship.
+
+**2. Additional Document Project Field**
+
+```php
+// BEFORE (BROKEN): Non-existent relationship
+->with(['type', 'project', 'creator.department'])
+
+// AFTER (FIXED): Direct field access
+->with(['type', 'creator.department'])
+```
+
+**Reasoning**: AdditionalDocument model has `project` as a string field, not a relationship.
+
+**3. View Field Access**
+
+```blade
+<!-- BEFORE (BROKEN): Undefined relationship -->
+<td>{{ $invoice->project->project_code ?? 'N/A' }}</td>
+
+<!-- AFTER (FIXED): Correct relationship with fallback -->
+<td>{{ $invoice->invoiceProjectInfo->code ?? $invoice->invoice_project ?? 'N/A' }}</td>
+```
+
+**Reasoning**: Provides fallback values and uses correct relationship structure.
+
+**4. Status Counts Query Logic**
+
+```php
+// BEFORE (BROKEN): Reused query objects
+$counts[$status] = $invoicesQuery->where('distribution_status', $status)->count() +
+    $additionalQuery->where('distribution_status', $status)->count();
+
+// AFTER (FIXED): Fresh queries for each status
+$counts[$status] = Invoice::where('distribution_status', $status)
+    ->when($userLocationCode, function ($query) use ($userLocationCode) {
+        return $query->where('cur_loc', $userLocationCode);
+    })
+    ->count() +
+    AdditionalDocument::where('distribution_status', $status)
+    ->when($userLocationCode, function ($query) use ($userLocationCode) {
+        return $query->where('cur_loc', $userLocationCode);
+    })
+    ->count();
+```
+
+**Reasoning**: Prevents WHERE clause accumulation and ensures accurate counts.
+
+**5. DistributionHistory Field Names**
+
+```php
+// BEFORE (BROKEN): Wrong field names
+DistributionHistory::create([
+    'action_performed' => 'status_reset',
+    'action_details' => json_encode([...]),
+]);
+
+// AFTER (FIXED): Correct field names
+DistributionHistory::create([
+    'action' => 'status_reset',
+    'metadata' => [...],
+]);
+```
+
+**Reasoning**: Model uses `action` and `metadata` fields, not `action_performed` and `action_details`.
+
+**6. ITO Number Field Removal**
+
+```php
+// BEFORE (BROKEN): Non-existent field in search
+->orWhere('ito_no', 'like', "%{$search}%");
+
+// AFTER (FIXED): Removed non-existent field
+// Search only uses existing fields: document_number, po_no
+```
+
+**Reasoning**: `ito_no` field doesn't exist in AdditionalDocument model; search should only use valid fields.
+
+#### **Technical Impact**
+
+**Performance Improvements**:
+
+-   **Query Optimization**: Fresh queries prevent WHERE clause accumulation
+-   **Relationship Loading**: Correct eager loading prevents N+1 query problems
+-   **Field Access**: Direct field access is more efficient than relationship loading
+
+**Data Integrity**:
+
+-   **Correct Relationships**: Uses actual model relationships instead of undefined ones
+-   **Field Validation**: All field references match actual database schema
+-   **Audit Logging**: Proper DistributionHistory integration for compliance
+
+**Maintainability**:
+
+-   **Clear Architecture**: Correct relationship usage makes code easier to understand
+-   **Error Prevention**: Fixed issues prevent future debugging problems
+-   **Consistent Patterns**: Follows established Laravel best practices
+
+#### **Business Impact**
+
+**Immediate Benefits**:
+
+-   **System Accessibility**: Document Status Management page now loads successfully
+-   **Data Display**: Correct project information shown for all document types
+-   **Search Functionality**: Working search without field reference errors
+-   **User Experience**: Professional interface with proper data relationships
+
+**Long-term Benefits**:
+
+-   **Compliance**: Proper audit trail for regulatory requirements
+-   **Workflow Management**: Administrators can manage document statuses effectively
+-   **Data Accuracy**: Correct field references ensure accurate information display
+-   **System Reliability**: Fixed issues prevent future system failures
+
+#### **Lessons Learned**
+
+**Relationship Management**:
+
+-   Always verify model relationships before eager loading
+-   Use existing relationships instead of creating new ones unnecessarily
+-   Document relationship structure for future development
+
+**Field Reference Strategy**:
+
+-   Validate all field references against actual database schema
+-   Provide fallback values for optional fields
+-   Use correct field names from model definitions
+
+**Query Logic**:
+
+-   Avoid reusing query objects for different operations
+-   Create fresh queries when different WHERE conditions are needed
+-   Test query logic thoroughly to prevent accumulation bugs
+
+**Audit Integration**:
+
+-   Verify model field names before integration
+-   Use correct field mappings for audit trail systems
+-   Test audit logging functionality thoroughly
+
+---
+
 ### **2025-01-27: Document Status Management System Layout Fix**
 
 **Decision**: Recreate Document Status Management view with correct layout structure to resolve critical rendering errors

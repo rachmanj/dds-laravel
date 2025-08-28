@@ -98,6 +98,77 @@
 **Implementation Date**: 2025-01-27  
 **Actual Effort**: 1 hour (critical layout fix)
 
+**Critical Issues Resolved**:
+
+-   **❌ Undefined `project` relationship on Invoice model**
+
+    -   **Problem**: Controller tried to eager load `'project'` but Invoice model doesn't have that relationship
+    -   **✅ Fix**: Changed to `'invoiceProjectInfo'` which is the correct relationship name
+
+-   **❌ Undefined `project` relationship on AdditionalDocument model**
+
+    -   **Problem**: Controller tried to eager load `'project'` but AdditionalDocument model doesn't have that relationship
+    -   **✅ Fix**: Removed project eager loading since AdditionalDocument has `project` as a string field
+
+-   **❌ Incorrect view field references**
+
+    -   **Problem**: View tried to access `$invoice->project->project_code`
+    -   **✅ Fix**: Updated to `$invoice->invoiceProjectInfo->code ?? $invoice->invoice_project ?? 'N/A'`
+
+-   **❌ Non-existent `ito_no` field**
+
+    -   **Problem**: View tried to display `$doc->ito_no` which doesn't exist in database
+    -   **✅ Fix**: Removed ITO Number column from table since the field doesn't exist
+
+-   **❌ Query reuse bug in status counts**
+
+    -   **Problem**: Same query objects reused causing accumulated WHERE clauses
+    -   **✅ Fix**: Create fresh queries for each status count
+
+-   **❌ Wrong DistributionHistory field names**
+
+    -   **Problem**: Controller tried to use `action_performed` and `action_details`
+    -   **✅ Fix**: Changed to correct fields `action` and `metadata`
+
+-   **❌ Search for non-existent field**
+    -   **Problem**: Controller searched for `ito_no` in AdditionalDocument
+    -   **✅ Fix**: Removed the non-existent field from search
+
+**Files Updated**:
+
+1. **`app/Http/Controllers/Admin/DocumentStatusController.php`**:
+
+    - Fixed eager loading relationships
+    - Fixed status counts query logic
+    - Fixed DistributionHistory field names
+    - Removed search for non-existent `ito_no` field
+
+2. **`resources/views/admin/document-status/index.blade.php`**:
+    - Fixed project field access for invoices
+    - Fixed project field access for additional documents
+    - Removed ITO Number column and data
+    - Fixed table colspan for empty states
+
+**Route Status**:
+✅ All routes are properly registered:
+
+-   `GET admin/document-status` → DocumentStatusController@index
+-   `POST admin/document-status/reset` → DocumentStatusController@resetStatus
+-   `POST admin/document-status/bulk-reset` → DocumentStatusController@bulkResetStatus
+
+**Validation**:
+✅ PHP syntax check passed - no errors detected
+✅ View cache cleared
+✅ All model relationships verified and working
+
+**Business Impact**:
+
+-   **Route Accessibility**: Document Status Management page now loads successfully
+-   **Data Display**: Correct project information shown for invoices and additional documents
+-   **Search Functionality**: Working search without non-existent field references
+-   **Audit Logging**: Proper DistributionHistory integration for compliance
+-   **User Experience**: Professional interface with correct data relationships
+
 **Issue Overview**: Resolved "View [layouts.app] not found" error preventing access to Document Status Management page
 
 **Root Causes Identified & Fixed**:

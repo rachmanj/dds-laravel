@@ -94,6 +94,78 @@ public function createOnTheFly(Request $request) {
 
 ### **Document Status Management**
 
+**System Architecture**:
+
+The Document Status Management system provides comprehensive control over document distribution statuses, allowing administrators to reset and manage document states for workflow continuity.
+
+**Controller Architecture**:
+
+```php
+class DocumentStatusController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('permission:reset-document-status');
+    }
+
+    // Main listing with filtering and search
+    public function index(Request $request)
+
+    // Individual status reset with full flexibility
+    public function resetStatus(Request $request): JsonResponse
+
+    // Bulk reset (limited to unaccounted_for → available)
+    public function bulkResetStatus(Request $request): JsonResponse
+}
+```
+
+**Permission System**:
+
+-   **Permission**: `reset-document-status` required for all operations
+-   **Role Assignment**: Limited to admin and superadmin roles
+-   **Access Control**: Middleware-based protection at route level
+-   **Frontend Control**: Conditional rendering using `@can('reset-document-status')`
+
+**Data Relationships**:
+
+```php
+// Invoice eager loading
+->with(['supplier', 'invoiceProjectInfo', 'creator.department'])
+
+// Additional Document eager loading
+->with(['type', 'creator.department'])
+
+// Project relationship access
+$invoice->invoiceProjectInfo->code ?? $invoice->invoice_project ?? 'N/A'
+```
+
+**Status Management Logic**:
+
+1. **Individual Operations**: Full status flexibility (any → any)
+2. **Bulk Operations**: Safety-restricted (`unaccounted_for` → `available` only)
+3. **Department Filtering**: Non-admin users see only their department documents
+4. **Audit Logging**: Complete tracking via DistributionHistory model
+
+**Audit Trail Integration**:
+
+```php
+DistributionHistory::create([
+    'distribution_id' => null, // Not tied to specific distribution
+    'user_id' => $user->id,
+    'action' => 'status_reset',
+    'metadata' => [
+        'document_type' => get_class($document),
+        'document_id' => $document->id,
+        'old_status' => $oldStatus,
+        'new_status' => $newStatus,
+        'reason' => $reason,
+        'operation_type' => $operationType,
+        'timestamp' => now()->toISOString()
+    ],
+    'action_performed_at' => now()
+]);
+```
+
 **Critical Implementation**:
 
 ```php
@@ -125,6 +197,13 @@ private function updateDocumentDistributionStatuses(Distribution $distribution, 
 -   **When SENT**: ALL documents become `'in_transit'` (preventing selection in new distributions)
 -   **When RECEIVED**: Only `'verified'` documents become `'distributed'`
 -   **Missing/Damaged**: Keep original status for audit trail integrity
+
+**Layout Architecture**:
+
+-   **View Extension**: Uses `layouts.main` for consistent application structure
+-   **Section Organization**: Proper `@section('title_page')`, `@section('breadcrumb_title')`, `@section('content')`
+-   **Content Structure**: `<section class="content">` with `<div class="container-fluid">` wrapper
+-   **Script Organization**: JavaScript organized in `@section('scripts')` with proper DataTables integration
 
 ## 🔐 **Security & Permissions**
 

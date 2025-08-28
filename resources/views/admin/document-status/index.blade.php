@@ -178,7 +178,8 @@
                                             </td>
                                             <td>{{ $invoice->po_no ?? 'N/A' }}</td>
                                             <td>{{ $invoice->supplier->name ?? 'N/A' }}</td>
-                                            <td>{{ $invoice->project->project_code ?? 'N/A' }}</td>
+                                            <td>{{ $invoice->invoiceProjectInfo->code ?? ($invoice->invoice_project ?? 'N/A') }}
+                                            </td>
                                             <td>
                                                 <span class="badge badge-info">{{ $invoice->cur_loc ?? 'N/A' }}</span>
                                             </td>
@@ -263,7 +264,6 @@
                                             <th>Document #</th>
                                             <th>Type</th>
                                             <th>PO Number</th>
-                                            <th>ITO Number</th>
                                             <th>Project</th>
                                             <th>Current Location</th>
                                             <th>Status</th>
@@ -288,8 +288,7 @@
                                                 </td>
                                                 <td>{{ $doc->type->type_name ?? 'N/A' }}</td>
                                                 <td>{{ $doc->po_no ?? 'N/A' }}</td>
-                                                <td>{{ $doc->ito_no ?? 'N/A' }}</td>
-                                                <td>{{ $doc->project->project_code ?? 'N/A' }}</td>
+                                                <td>{{ $doc->project ?? 'N/A' }}</td>
                                                 <td>
                                                     <span class="badge badge-info">{{ $doc->cur_loc ?? 'N/A' }}</span>
                                                 </td>
@@ -327,7 +326,7 @@
                                             </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="10" class="text-center text-muted py-4">
+                                                    <td colspan="9" class="text-center text-muted py-4">
                                                         <i class="fas fa-file-alt fa-2x mb-2"></i>
                                                         <p>No additional documents found with the current filters.</p>
                                                     </td>

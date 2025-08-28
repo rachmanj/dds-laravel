@@ -31,7 +31,7 @@ class DocumentStatusController extends Controller
 
         // Build queries for invoices
         $invoicesQuery = Invoice::query()
-            ->with(['supplier', 'project', 'creator.department'])
+            ->with(['supplier', 'invoiceProjectInfo', 'creator.department'])
             ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
                 return $query->where('distribution_status', $statusFilter);
             })
@@ -47,15 +47,14 @@ class DocumentStatusController extends Controller
 
         // Build queries for additional documents
         $additionalDocumentsQuery = AdditionalDocument::query()
-            ->with(['type', 'project', 'creator.department'])
+            ->with(['type', 'creator.department'])
             ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
                 return $query->where('distribution_status', $statusFilter);
             })
             ->when($search, function ($query) use ($search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('document_number', 'like', "%{$search}%")
-                        ->orWhere('po_no', 'like', "%{$search}%")
-                        ->orWhere('ito_no', 'like', "%{$search}%");
+                        ->orWhere('po_no', 'like', "%{$search}%");
                 });
             });
 
@@ -238,8 +237,16 @@ class DocumentStatusController extends Controller
         $counts = [];
 
         foreach ($statuses as $status) {
-            $counts[$status] = $invoicesQuery->where('distribution_status', $status)->count() +
-                $additionalQuery->where('distribution_status', $status)->count();
+            $counts[$status] = Invoice::where('distribution_status', $status)
+                ->when($userLocationCode, function ($query) use ($userLocationCode) {
+                    return $query->where('cur_loc', $userLocationCode);
+                })
+                ->count() +
+                AdditionalDocument::where('distribution_status', $status)
+                ->when($userLocationCode, function ($query) use ($userLocationCode) {
+                    return $query->where('cur_loc', $userLocationCode);
+                })
+                ->count();
         }
 
         return $counts;
@@ -257,8 +264,8 @@ class DocumentStatusController extends Controller
         DistributionHistory::create([
             'distribution_id' => null, // Not tied to a specific distribution
             'user_id' => $user->id,
-            'action_performed' => 'status_reset',
-            'action_details' => json_encode([
+            'action' => 'status_reset',
+            'metadata' => [
                 'document_type' => $documentType,
                 'document_id' => $documentId,
                 'old_status' => $oldStatus,
@@ -266,7 +273,7 @@ class DocumentStatusController extends Controller
                 'reason' => $reason,
                 'operation_type' => $operationType,
                 'timestamp' => now()->toISOString()
-            ]),
+            ],
             'action_performed_at' => now()
         ]);
 
