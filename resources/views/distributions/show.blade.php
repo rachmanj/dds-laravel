@@ -1125,17 +1125,26 @@
 
             // Select All as Verified button
             $('#selectAllVerified').click(function() {
+                console.log('=== SELECT ALL AS VERIFIED CLICKED ===');
+                console.log('Total documents found:', $('.document-checkbox').length);
+
                 $('.document-checkbox').prop('checked', true);
                 $('.document-status').val('verified');
                 $('.document-notes').val('').prop('required', false);
 
                 selectedDocuments.clear();
                 $('.document-checkbox').each(function() {
-                    selectedDocuments.add($(this).data('document-id'));
+                    const docId = $(this).data('document-id');
+                    selectedDocuments.add(docId);
+                    console.log('Added document ID to selection:', docId);
                 });
 
                 $('#selectAll').prop('checked', true);
                 updateSelectAllButton();
+
+                console.log('Final selected documents count:', selectedDocuments.size);
+                console.log('Selected document IDs:', Array.from(selectedDocuments));
+                console.log('=== END SELECT ALL DEBUG ===');
             });
 
             // Clear All button
@@ -1194,10 +1203,10 @@
                     errorMessage = 'Please select at least one document to verify.';
                 }
 
-                // Check required notes for missing/damaged status
-                $('.document-status').each(function() {
-                    const status = $(this).val();
+                // Check required notes for missing/damaged status - ONLY for selected documents
+                $('.document-checkbox:checked').each(function() {
                     const documentId = $(this).data('document-id');
+                    const status = $(`.document-status[data-document-id="${documentId}"]`).val();
                     const notesField = $(`.document-notes[data-document-id="${documentId}"]`);
 
                     if (status === 'missing' || status === 'damaged') {
@@ -1219,16 +1228,32 @@
                 const formData = new FormData();
                 formData.append('verification_notes', $('#sender_verification_notes').val());
 
+                // Debug logging
+                console.log('=== SENDER VERIFICATION DEBUG ===');
+                console.log('Total documents in distribution:', $('.document-checkbox').length);
+                console.log('Selected documents:', $('.document-checkbox:checked').length);
+
+                const selectedDocumentsData = [];
                 $('.document-checkbox:checked').each(function() {
                     const documentId = $(this).data('document-id');
                     const status = $(`.document-status[data-document-id="${documentId}"]`).val();
                     const notes = $(`.document-notes[data-document-id="${documentId}"]`).val();
+
+                    selectedDocumentsData.push({
+                        document_id: documentId,
+                        status: status,
+                        notes: notes
+                    });
 
                     formData.append(`document_verifications[${documentId}][document_id]`,
                         documentId);
                     formData.append(`document_verifications[${documentId}][status]`, status);
                     formData.append(`document_verifications[${documentId}][notes]`, notes);
                 });
+
+                console.log('Documents being sent to backend:', selectedDocumentsData);
+                console.log('Form data entries:', Array.from(formData.entries()));
+                console.log('=== END DEBUG ===');
 
                 $.ajax({
                     url: '{{ route('distributions.verify-sender', $distribution) }}',
@@ -1357,17 +1382,26 @@
 
             // Select All as Verified button for receiver
             $('#selectAllVerifiedReceiver').click(function() {
+                console.log('=== RECEIVER SELECT ALL AS VERIFIED CLICKED ===');
+                console.log('Total documents found:', $('.document-checkbox-receiver').length);
+
                 $('.document-checkbox-receiver').prop('checked', true);
                 $('.document-status-receiver').val('verified');
                 $('.document-notes-receiver').val('').prop('required', false);
 
                 selectedDocumentsReceiver.clear();
                 $('.document-checkbox-receiver').each(function() {
-                    selectedDocumentsReceiver.add($(this).data('document-id'));
+                    const docId = $(this).data('document-id');
+                    selectedDocumentsReceiver.add(docId);
+                    console.log('Added document ID to selection:', docId);
                 });
 
                 $('#selectAllReceiver').prop('checked', true);
                 updateSelectAllReceiverButton();
+
+                console.log('Final selected documents count:', selectedDocumentsReceiver.size);
+                console.log('Selected document IDs:', Array.from(selectedDocumentsReceiver));
+                console.log('=== END RECEIVER SELECT ALL DEBUG ===');
             });
 
             // Clear All button for receiver
@@ -1427,10 +1461,11 @@
                     errorMessage = 'Please select at least one document to verify.';
                 }
 
-                // Check required notes for missing/damaged status
-                $('.document-status-receiver').each(function() {
-                    const status = $(this).val();
+                // Check required notes for missing/damaged status - ONLY for selected documents
+                $('.document-checkbox-receiver:checked').each(function() {
                     const documentId = $(this).data('document-id');
+                    const status = $(`.document-status-receiver[data-document-id="${documentId}"]`)
+                        .val();
                     const notesField = $(
                         `.document-notes-receiver[data-document-id="${documentId}"]`);
 
@@ -1454,6 +1489,12 @@
                 formData.append('verification_notes', $('#receiver_verification_notes').val());
                 formData.append('has_discrepancies', $('#has_discrepancies').is(':checked') ? '1' : '0');
 
+                // Debug logging
+                console.log('=== RECEIVER VERIFICATION DEBUG ===');
+                console.log('Total documents in distribution:', $('.document-checkbox-receiver').length);
+                console.log('Selected documents:', $('.document-checkbox-receiver:checked').length);
+
+                const selectedDocumentsData = [];
                 $('.document-checkbox-receiver:checked').each(function() {
                     const documentId = $(this).data('document-id');
                     const status = $(`.document-status-receiver[data-document-id="${documentId}"]`)
@@ -1461,11 +1502,21 @@
                     const notes = $(`.document-notes-receiver[data-document-id="${documentId}"]`)
                         .val();
 
+                    selectedDocumentsData.push({
+                        document_id: documentId,
+                        status: status,
+                        notes: notes
+                    });
+
                     formData.append(`document_verifications[${documentId}][document_id]`,
                         documentId);
                     formData.append(`document_verifications[${documentId}][status]`, status);
                     formData.append(`document_verifications[${documentId}][notes]`, notes);
                 });
+
+                console.log('Documents being sent to backend:', selectedDocumentsData);
+                console.log('Form data entries:', Array.from(formData.entries()));
+                console.log('=== END DEBUG ===');
 
                 $.ajax({
                     url: '{{ route('distributions.verify-receiver', $distribution) }}',

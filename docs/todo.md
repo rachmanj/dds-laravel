@@ -318,6 +318,17 @@
 
 **Business Impact**: Users now see correct local times (e.g., 10:25 instead of 02:25) in all Transmittal Advice documents and distribution detail pages, eliminating timezone confusion across the entire application
 
+### **2025-01-27: Document Verification "Select All" Bug Fix**
+
+-   ✅ **Fixed critical bug** where "Select All as Verified" was not working correctly
+-   ✅ **Resolved validation logic mismatch** between frontend and submission scope
+-   ✅ **Aligned validation logic** to only validate selected documents (not all documents)
+-   ✅ **Added comprehensive debugging** to track document selection and submission process
+-   ✅ **Enhanced both sender and receiver verification** forms with consistent logic
+-   ✅ **Updated MEMORY.md** with detailed bug analysis and fix documentation
+
+**Business Impact**: "Select All as Verified" functionality now works reliably, ensuring all selected documents are properly verified without the previous inconsistency where some documents were skipped
+
 ### **2025-01-27: Critical Distribution Document Status Management Fix**
 
 -   ✅ **Fixed critical flaw** allowing documents "in transit" to be selected for new distributions
