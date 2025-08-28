@@ -189,6 +189,8 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
+            'view-master',
+            'view-admin',
         ]);
 
         $cashierho = Role::firstOrCreate(['name' => 'cashierho']);
