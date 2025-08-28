@@ -1648,6 +1648,163 @@ Implement a comprehensive Transmittal Advice printing system that generates prof
 **Version**: 2.1  
 **Status**: ✅ Additional Documents System Improvements Documented
 
+---
+
+### **2025-01-27: On-the-Fly Feature Permission System Fix**
+
+**Decision**: Fix critical permission system bypass by replacing hardcoded role checks with proper permission validation
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+The on-the-fly additional document creation feature was implemented with a critical flaw in the permission system. Despite having the `on-the-fly-addoc-feature` permission properly assigned to roles like `accounting`, `finance`, and `logistic`, users with these roles were getting "You don't have permission" errors when trying to access the feature.
+
+#### **Problem Analysis**
+
+**Root Cause**: The `AdditionalDocumentController::createOnTheFly()` method was using hardcoded role checks instead of checking the assigned permission.
+
+**Technical Details**:
+
+```php
+// WRONG: Hardcoded role check bypasses permission system
+if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+    return response()->json([...], 403);
+}
+```
+
+**Impact**: Users with proper permissions couldn't access a feature they were authorized to use, creating confusion and workflow disruption.
+
+#### **Decision Rationale**
+
+**Permission-Based Approach**:
+
+-   **Considered**: Keep hardcoded role checks, implement role-based permission system, fix permission system
+-   **Chosen**: Fix permission system to use proper `$user->can('permission-name')` checks
+-   **Reasoning**: The permission system was already properly designed and implemented - the bug was in bypassing it
+
+**Implementation Strategy**:
+
+-   **Considered**: Partial fix, complete rewrite, incremental improvement
+-   **Chosen**: Complete fix with consistent permission checking across frontend and backend
+-   **Reasoning**: Defense-in-depth approach ensures security and user experience
+
+#### **Implementation Decisions**
+
+**1. Backend Permission Fix**
+
+```php
+// Before: Hardcoded role check
+if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+    return response()->json([...], 403);
+}
+
+// After: Proper permission check
+if (!$user->can('on-the-fly-addoc-feature')) {
+    return response()->json([...], 403);
+}
+```
+
+**Reasoning**: Use the existing permission system as designed, don't bypass it with hardcoded checks.
+
+**2. Frontend Permission Protection**
+
+```blade
+{{-- Before: No permission check (create.blade.php) --}}
+<button type="button" class="btn btn-sm btn-success mr-2" id="create-doc-btn">
+    <i class="fas fa-plus"></i> Create New Document
+</button>
+
+{{-- After: Proper permission check --}}
+@if (auth()->user()->can('on-the-fly-addoc-feature'))
+    <button type="button" class="btn btn-sm btn-success mr-2" id="create-doc-btn">
+        <i class="fas fa-plus"></i> Create New Document
+    </button>
+@endif
+```
+
+**Reasoning**: Consistent permission checking at both frontend and backend levels.
+
+**3. Permission Cache Management**
+
+```bash
+# Clear permission cache to ensure changes take effect
+php artisan permission:cache-reset
+```
+
+**Reasoning**: Permission changes require cache clearing to prevent stale permission data.
+
+#### **Alternative Approaches Considered**
+
+**1. Keep Hardcoded Role Checks**
+
+-   **Pros**: Quick fix, no permission system changes needed
+-   **Cons**: Bypasses designed permission system, creates maintenance issues, not scalable
+-   **Rejected**: Would perpetuate the design flaw
+
+**2. Implement Role-Based Permission System**
+
+-   **Pros**: More granular control, role-specific permissions
+-   **Cons**: Over-engineering, existing permission system already works
+-   **Rejected**: Existing system was sufficient, just needed proper usage
+
+**3. Partial Fix (Backend Only)**
+
+-   **Pros**: Quick backend fix
+-   **Cons**: Frontend still shows button to unauthorized users, poor UX
+-   **Rejected**: Incomplete solution doesn't provide proper user experience
+
+#### **Technical Challenges & Solutions**
+
+**Challenge 1: Permission System Bypass**
+
+-   **Problem**: Controller was checking roles instead of permissions
+-   **Solution**: Replace hardcoded role checks with `$user->can('permission-name')`
+-   **Learning**: Always use the permission system as designed
+
+**Challenge 2: Frontend Permission Consistency**
+
+-   **Problem**: create.blade.php had no permission protection
+-   **Solution**: Add `@if (auth()->user()->can('on-the-fly-addoc-feature'))` check
+-   **Learning**: Permission protection must be consistent across frontend and backend
+
+**Challenge 3: Permission Cache Management**
+
+-   **Problem**: Permission changes not taking effect immediately
+-   **Solution**: Clear permission cache after changes
+-   **Learning**: Permission system requires proper cache management
+
+#### **Business Impact**
+
+**Immediate Benefits**:
+
+-   **Feature Accessibility**: All authorized users can now access the feature
+-   **Permission Compliance**: System follows documented permission assignments
+-   **User Satisfaction**: No more confusing access denied errors
+
+**Long-term Benefits**:
+
+-   **System Reliability**: Permission system works as designed
+-   **Compliance**: Proper access control for audit purposes
+-   **Scalability**: Permission-based system supports future role additions
+
+#### **Future Considerations**
+
+**Best Practices Established**:
+
+1. Always use permissions, never hardcoded roles
+2. Implement permission checks at both frontend and backend
+3. Clear permission cache after permission changes
+4. Test permission system with all assigned roles
+5. Document permission requirements clearly
+
+**Technical Debt**:
+
+-   Review other controllers for similar hardcoded role checks
+-   Implement automated testing for permission system
+-   Consider permission system monitoring and alerting
+
 ## **Decision Record: User Documentation Strategy** 📚
 
 **Date**: 2025-08-21  

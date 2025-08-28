@@ -133,6 +133,27 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-group">
+                                            <label for="project">Project</label>
+                                            <select class="form-control select2bs4 @error('project') is-invalid @enderror"
+                                                id="project" name="project">
+                                                <option value="">Select Project</option>
+                                                @foreach ($projects as $project)
+                                                    <option value="{{ $project->code }}"
+                                                        {{ old('project', $additionalDocument->project) == $project->code ? 'selected' : '' }}>
+                                                        {{ $project->code }} - {{ $project->owner }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @error('project')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
                                             <label for="cur_loc">Current Location</label>
                                             <input type="text" class="form-control" id="cur_loc"
                                                 value="{{ $additionalDocument->cur_loc ?? 'Not assigned' }}"
@@ -299,6 +320,11 @@
                 allowClear: true,
                 width: '100%'
             });
+
+            // Set default project to user's department project if no project is set
+            if (!$('#project').val() && '{{ auth()->user()->project }}') {
+                $('#project').val('{{ auth()->user()->project }}').trigger('change');
+            }
 
             // Form validation and confirmation
             $('form').on('submit', function(e) {

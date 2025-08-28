@@ -180,7 +180,23 @@ curl -X GET "https://your-domain.com/api/v1/departments/000HACC/invoices?status=
                         "document_date": "2025-01-15",
                         "document_type": "supporting"
                     }
-                ]
+                ],
+                "distribution": {
+                    "id": 1,
+                    "distribution_number": "DIS-001",
+                    "type": "Internal",
+                    "origin_department": "Accounting",
+                    "destination_department": "Finance",
+                    "status": "sent",
+                    "created_by": "John Doe",
+                    "created_at": "2025-01-15 10:00:00",
+                    "sender_verified_at": "2025-01-15 10:05:00",
+                    "sent_at": "2025-01-15 10:10:00",
+                    "received_at": null,
+                    "receiver_verified_at": null,
+                    "has_discrepancies": false,
+                    "notes": "Regular monthly distribution"
+                }
             }
         ]
     },
@@ -256,6 +272,27 @@ Based on your DepartmentSeeder, the following location codes are available:
 | `document_no`   | string | Document number  |
 | `document_date` | date   | Document date    |
 | `document_type` | string | Type of document |
+
+### **Distribution Fields**
+
+| Field                    | Type     | Description                                   |
+| ------------------------ | -------- | --------------------------------------------- |
+| `id`                     | integer  | Distribution ID                               |
+| `distribution_number`    | string   | Unique distribution number                    |
+| `type`                   | string   | Distribution type name                        |
+| `origin_department`      | string   | Name of the department sending documents      |
+| `destination_department` | string   | Name of the department receiving documents    |
+| `status`                 | string   | Current distribution status                   |
+| `created_by`             | string   | Name of the user who created the distribution |
+| `created_at`             | datetime | When the distribution was created             |
+| `sender_verified_at`     | datetime | When sender verification was completed        |
+| `sent_at`                | datetime | When documents were sent                      |
+| `received_at`            | datetime | When documents were received                  |
+| `receiver_verified_at`   | datetime | When receiver verification was completed      |
+| `has_discrepancies`      | boolean  | Whether there are discrepancies in documents  |
+| `notes`                  | string   | Additional notes about the distribution       |
+
+**Note**: Only the latest distribution where the `destination_department` matches the requested department is included in the response. This shows where the invoice was last sent to or is currently located.
 
 ## **Error Responses**
 

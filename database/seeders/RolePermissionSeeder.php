@@ -68,7 +68,8 @@ class RolePermissionSeeder extends Seeder
             'delete-suppliers',
 
             //Master
-
+            'view-admin',
+            'view-master',
 
             // Reports
             'view-reports',
@@ -116,6 +117,8 @@ class RolePermissionSeeder extends Seeder
             'delete-distributions',
             'view-distributions-numbering-stats',
             'reset-document-status',
+            'view-master',
+            'view-admin',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);
@@ -153,6 +156,7 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
+            'view-master',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance']);

@@ -521,6 +521,23 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="doc_project">Project</label>
+                                    <select class="form-control select2bs4" id="doc_project" name="project">
+                                        <option value="">Select Project</option>
+                                        @foreach ($projects as $project)
+                                            <option value="{{ $project->code }}"
+                                                {{ auth()->user()->project == $project->code ? 'selected' : '' }}>
+                                                {{ $project->code }} - {{ $project->owner }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <small class="form-text text-muted">Optional: Assign to specific project</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -1197,7 +1214,8 @@
                     document_date: $('#doc_date').val(),
                     document_receive_date: $('#doc_receive_date').val(),
                     cur_loc: $('#doc_cur_loc').val(),
-                    po_no: $('#doc_po_no').val()
+                    po_no: $('#doc_po_no').val(),
+                    project: $('#doc_project').val()
                 };
 
                 // Validate required fields

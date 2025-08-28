@@ -307,13 +307,12 @@
                                     <div class="card-header">
                                         <h3 class="card-title">Link Additional Documents (optional)</h3>
                                         <div class="card-tools">
-                                            <!-- Temporarily show button for testing -->
-                                            <button type="button" class="btn btn-sm btn-success mr-2"
-                                                id="create-doc-btn">
-                                                <i class="fas fa-plus"></i> Create New Document
-                                            </button>
-
-                                            <!-- Debug: User roles: {{ auth()->user()->roles->pluck('name')->implode(', ') }} -->
+                                            @if (auth()->user()->can('on-the-fly-addoc-feature'))
+                                                <button type="button" class="btn btn-sm btn-success mr-2"
+                                                    id="create-doc-btn">
+                                                    <i class="fas fa-plus"></i> Create New Document
+                                                </button>
+                                            @endif
                                             <button type="button" class="btn btn-sm btn-outline-secondary mr-2"
                                                 id="refresh-docs-btn" style="display:none;">
                                                 <i class="fas fa-sync-alt"></i> Refresh
@@ -461,6 +460,23 @@
                                         maxlength="255">
                                     <small class="form-text text-muted">This document will be
                                         automatically attached to the current invoice.</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="doc_project">Project</label>
+                                    <select class="form-control select2bs4" id="doc_project" name="project">
+                                        <option value="">Select Project</option>
+                                        @foreach ($projects as $project)
+                                            <option value="{{ $project->code }}"
+                                                {{ auth()->user()->project == $project->code ? 'selected' : '' }}>
+                                                {{ $project->code }} - {{ $project->owner }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <small class="form-text text-muted">Optional: Assign to specific project</small>
                                 </div>
                             </div>
                         </div>
@@ -1074,7 +1090,8 @@
                     document_date: $('#doc_date').val(),
                     document_receive_date: $('#doc_receive_date').val(),
                     cur_loc: $('#doc_cur_loc').val(),
-                    po_no: $('#doc_po_no').val()
+                    po_no: $('#doc_po_no').val(),
+                    project: $('#doc_project').val()
                 };
 
                 // Validate required fields

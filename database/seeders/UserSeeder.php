@@ -20,7 +20,7 @@ class UserSeeder extends Seeder
             'email' => 'admin@ninja.com',
             'password' => Hash::make('123456'),
             'project' => '000H',
-            'department_id' => 20,
+            'department_id' => 21,
             'is_active' => 1,
         ]);
 

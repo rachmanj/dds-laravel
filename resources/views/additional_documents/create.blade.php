@@ -78,6 +78,24 @@
                                             @enderror
                                         </div>
                                     </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="project">Project</label>
+                                            <select class="form-control select2bs4 @error('project') is-invalid @enderror"
+                                                id="project" name="project">
+                                                <option value="">Select Project</option>
+                                                @foreach ($projects as $project)
+                                                    <option value="{{ $project->code }}"
+                                                        {{ old('project', $user->project) == $project->code ? 'selected' : '' }}>
+                                                        {{ $project->code }} - {{ $project->owner }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @error('project')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="row">
@@ -194,6 +212,11 @@
                 allowClear: true,
                 width: '100%'
             });
+
+            // Set default project to user's department project if available
+            if (!$('#project').val() && '{{ $user->project }}') {
+                $('#project').val('{{ $user->project }}').trigger('change');
+            }
 
             // Set default document date to today if not set
             if (!$('#document_date').val()) {

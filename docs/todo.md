@@ -129,9 +129,9 @@
 
 ### **On-the-Fly Additional Document Creation Feature** ✅ **COMPLETED**
 
-**Status**: ✅ **COMPLETED** - All functionality implemented successfully  
+**Status**: ✅ **COMPLETED** - All functionality implemented successfully & permission issues resolved  
 **Implementation Date**: 2025-01-27  
-**Actual Effort**: 1 day (including troubleshooting nested form issues)
+**Actual Effort**: 1 day (including troubleshooting nested form issues) + 1 hour (permission fix)
 
 **Feature Overview**: Implemented comprehensive on-the-fly additional document creation within invoice create/edit pages, allowing users with appropriate permissions to create new additional documents directly from the invoice workflow without page refreshes.
 
@@ -195,6 +195,40 @@
 -   Bootstrap modals should be positioned outside main form elements for reliable rendering
 -   Permission-based features require both backend validation and frontend conditional rendering
 -   Real-time UI updates significantly improve user experience over page refreshes
+
+---
+
+### **On-the-Fly Feature Permission Fix** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED** - Critical permission issue resolved successfully  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 1 hour (critical permission fix)
+
+**Issue Overview**: Resolved "You don't have permission to create additional document on the fly" error preventing users with proper permissions from accessing the feature.
+
+**Root Causes Identified & Fixed**:
+
+-   ✅ **Controller Permission Bug**: Fixed hardcoded role check `['admin', 'superadmin']` instead of permission check
+-   ✅ **Permission Method**: Changed from `array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])` to `$user->can('on-the-fly-addoc-feature')`
+-   ✅ **Frontend Button Protection**: Added permission check `@if (auth()->user()->can('on-the-fly-addoc-feature'))` to create.blade.php
+-   ✅ **Permission Cache**: Cleared permission cache to ensure changes take effect immediately
+-   ✅ **Consistent Protection**: Both create and edit pages now have identical permission-based button visibility
+
+**Technical Implementation**:
+
+-   **Backend Fix**: `AdditionalDocumentController::createOnTheFly()` now properly checks for `on-the-fly-addoc-feature` permission
+-   **Frontend Fix**: Button visibility now controlled by permission instead of hardcoded roles
+-   **Cache Management**: Permission cache cleared to prevent stale permission data
+-   **Security**: Defense-in-depth approach with both frontend UX and backend API validation
+
+**Business Impact**:
+
+-   **Feature Accessibility**: Users with accounting, finance, and logistic roles can now access the feature
+-   **Permission Compliance**: Feature access now properly follows assigned permissions
+-   **User Experience**: No more confusing permission errors for authorized users
+-   **System Reliability**: Permission system now works as designed and documented
+
+**Learning**: Permission-based access control requires consistent implementation across frontend, backend, and database - hardcoded role checks bypass the permission system and cause access issues.
 
 ---
 
@@ -269,6 +303,14 @@
 -   ✅ **Fixed linter error** in Distribution model (replaced `hasRole()` with `array_intersect`)
 
 **Business Impact**: Complete workflow protection ensuring documents follow proper distribution lifecycle
+
+### **2025-01-27: API Distribution Information Enhancement**
+
+-   **Status**: ✅ **COMPLETED**
+-   **Description**: Enhanced external invoice API to include comprehensive distribution information
+-   **Features**: Added distribution workflow data, department tracking, timeline information
+-   **Business Value**: Complete workflow visibility for external applications
+-   **Technical**: Enhanced eager loading, comprehensive distribution fields, updated documentation
 
 ### **2025-01-21: External Invoice API Implementation - Complete Secure API System**
 

@@ -25,8 +25,9 @@ class AdditionalDocumentController extends Controller
     public function index()
     {
         $documentTypes = AdditionalDocumentType::orderByName()->get();
+        $projects = \App\Models\Project::active()->orderBy('code')->get();
 
-        return view('additional_documents.index', compact('documentTypes'));
+        return view('additional_documents.index', compact('documentTypes', 'projects'));
     }
 
     public function data(Request $request)
@@ -51,6 +52,10 @@ class AdditionalDocumentController extends Controller
 
         if ($request->filled('filter_status')) {
             $query->where('status', $request->filter_status);
+        }
+
+        if ($request->filled('filter_project')) {
+            $query->where('project', $request->filter_project);
         }
 
         if ($request->filled('date_range')) {
@@ -147,9 +152,10 @@ class AdditionalDocumentController extends Controller
     public function create()
     {
         $documentTypes = AdditionalDocumentType::orderByName()->get();
+        $projects = \App\Models\Project::active()->orderBy('code')->get();
         $user = Auth::user();
 
-        return view('additional_documents.create', compact('documentTypes', 'user'));
+        return view('additional_documents.create', compact('documentTypes', 'projects', 'user'));
     }
 
     public function store(Request $request)
@@ -159,6 +165,7 @@ class AdditionalDocumentController extends Controller
             'document_number' => 'required|string|max:255',
             'document_date' => 'required|date',
             'po_no' => 'nullable|string|max:50',
+            'project' => 'nullable|string|max:50',
             'receive_date' => 'required|date',
             'remarks' => 'nullable|string',
             'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
@@ -170,6 +177,7 @@ class AdditionalDocumentController extends Controller
             'document_number',
             'document_date',
             'po_no',
+            'project',
             'receive_date',
             'remarks'
         ]);
@@ -177,6 +185,10 @@ class AdditionalDocumentController extends Controller
         $data['created_by'] = $user->id;
         // Get user's department location code, fallback to 'DEFAULT' if not assigned
         $data['cur_loc'] = $user->department_location_code ?: 'DEFAULT';
+        // Set default project to user's department project if not provided
+        if (empty($data['project']) && $user->project) {
+            $data['project'] = $user->project;
+        }
         $data['status'] = 'open';
 
         // Handle file upload
@@ -228,9 +240,10 @@ class AdditionalDocumentController extends Controller
         }
 
         $documentTypes = AdditionalDocumentType::orderByName()->get();
+        $projects = \App\Models\Project::active()->orderBy('code')->get();
         $additionalDocument->load(['type', 'creator.department']);
 
-        return view('additional_documents.edit', compact('additionalDocument', 'documentTypes'));
+        return view('additional_documents.edit', compact('additionalDocument', 'documentTypes', 'projects'));
     }
 
     public function update(Request $request, AdditionalDocument $additionalDocument)
@@ -247,6 +260,7 @@ class AdditionalDocumentController extends Controller
             'document_number' => 'required|string|max:255',
             'document_date' => 'required|date',
             'po_no' => 'nullable|string|max:50',
+            'project' => 'nullable|string|max:50',
             'receive_date' => 'required|date',
             'remarks' => 'nullable|string',
             'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
@@ -257,6 +271,7 @@ class AdditionalDocumentController extends Controller
             'document_number',
             'document_date',
             'po_no',
+            'project',
             'receive_date',
             'remarks'
         ]);
@@ -478,9 +493,9 @@ class AdditionalDocumentController extends Controller
      */
     public function createOnTheFly(Request $request)
     {
-        // Check permission
+        // Check permission using the specific permission
         $user = Auth::user();
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+        if (!$user->can('on-the-fly-addoc-feature')) {
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to create additional documents on-the-fly.'
@@ -495,6 +510,7 @@ class AdditionalDocumentController extends Controller
             'document_receive_date' => 'nullable|date',
             'cur_loc' => 'required|string|max:50',
             'po_no' => 'nullable|string|max:255',
+            'project' => 'nullable|string|max:50',
         ]);
 
         try {
@@ -507,6 +523,7 @@ class AdditionalDocumentController extends Controller
                 'type_id' => $request->document_type_id,
                 'cur_loc' => $request->cur_loc,
                 'po_no' => $request->po_no,
+                'project' => $request->project,
                 'status' => 'open',
                 'distribution_status' => 'available',
                 'created_by' => $user->id,

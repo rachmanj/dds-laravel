@@ -70,8 +70,24 @@ class InvoiceApiController extends Controller
             }
 
             // Build query
-            $query = Invoice::with(['supplier', 'additionalDocuments', 'type'])
-                ->where('cur_loc', $locationCode);
+            $query = Invoice::with([
+                'supplier',
+                'additionalDocuments',
+                'type',
+                'distributions' => function ($query) use ($locationCode) {
+                    $query->where('destination_department_id', function ($subQuery) use ($locationCode) {
+                        $subQuery->select('id')
+                            ->from('departments')
+                            ->where('location_code', $locationCode);
+                    })
+                        ->orderBy('created_at', 'desc')
+                        ->limit(1); // Only get the latest distribution
+                },
+                'distributions.type',
+                'distributions.originDepartment',
+                'distributions.destinationDepartment',
+                'distributions.creator'
+            ])->where('cur_loc', $locationCode);
 
             // Apply filters
             if ($request->filled('status')) {
@@ -118,6 +134,22 @@ class InvoiceApiController extends Controller
                             'document_type' => $doc->type->type_name ?? '',
                         ];
                     })->toArray(),
+                    'distribution' => $invoice->distributions->first() ? [
+                        'id' => $invoice->distributions->first()->id,
+                        'distribution_number' => $invoice->distributions->first()->distribution_number,
+                        'type' => $invoice->distributions->first()->type->name ?? null,
+                        'origin_department' => $invoice->distributions->first()->originDepartment->name ?? null,
+                        'destination_department' => $invoice->distributions->first()->destinationDepartment->name ?? null,
+                        'status' => $invoice->distributions->first()->status,
+                        'created_by' => $invoice->distributions->first()->creator->name ?? null,
+                        'created_at' => $invoice->distributions->first()->created_at ? $invoice->distributions->first()->created_at->format('Y-m-d H:i:s') : null,
+                        'sender_verified_at' => $invoice->distributions->first()->sender_verified_at ? $invoice->distributions->first()->sender_verified_at->format('Y-m-d H:i:s') : null,
+                        'sent_at' => $invoice->distributions->first()->sent_at ? $invoice->distributions->first()->sent_at->format('Y-m-d H:i:s') : null,
+                        'received_at' => $invoice->distributions->first()->received_at ? $invoice->distributions->first()->received_at->format('Y-m-d H:i:s') : null,
+                        'receiver_verified_at' => $invoice->distributions->first()->receiver_verified_at ? $invoice->distributions->first()->receiver_verified_at->format('Y-m-d H:i:s') : null,
+                        'has_discrepancies' => $invoice->distributions->first()->has_discrepancies,
+                        'notes' => $invoice->distributions->first()->notes,
+                    ] : null,
                 ];
             });
 

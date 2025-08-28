@@ -89,6 +89,8 @@ public function createOnTheFly(Request $request) {
 -   **Assigned Roles**: admin, superadmin, logistic, accounting, finance
 -   **Frontend Rendering**: Conditional button display based on permissions
 -   **Backend Validation**: Server-side permission verification
+-   **Permission System**: Uses `$user->can('permission-name')` instead of hardcoded role checks
+-   **Cache Management**: Permission cache cleared after changes to ensure immediate effect
 
 ### **Document Status Management**
 

@@ -376,6 +376,98 @@ curl -X GET "http://your-domain.com/api/v1/departments//invoices" \
 }
 ```
 
+### **Test 6: Verify Distribution Information in Response**
+
+**Purpose**: Verify that the API now includes the latest distribution information for invoices where the destination department matches the requested department
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/departments/000HACC/invoices" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/departments/000HACC/invoices" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should include `distribution` object (singular) with the latest distribution to the requested department:
+
+```json
+{
+    "success": true,
+    "data": {
+        "invoices": [
+            {
+                "id": 1,
+                "invoice_number": "1044/2025",
+                "faktur_no": "FK-001",
+                "invoice_date": "2025-08-07",
+                "receive_date": "2025-08-20",
+                "supplier_name": "Supplier ABC",
+                "supplier_sap_code": "SUP001",
+                "po_no": "PO-001",
+                "receive_project": "PRJ001",
+                "invoice_project": "PRJ001",
+                "payment_project": "PRJ001",
+                "currency": "IDR",
+                "amount": 1000000.0,
+                "invoice_type": "Regular",
+                "payment_date": "2025-09-07",
+                "remarks": "Sample invoice",
+                "status": "open",
+                "sap_doc": "DOC001",
+                "additional_documents": [
+                    {
+                        "id": 1,
+                        "document_no": "0118/IP/022",
+                        "document_date": "2025-08-25",
+                        "document_type": "Supporting"
+                    }
+                ],
+                "distribution": {
+                    "id": 1,
+                    "distribution_number": "DIS-001",
+                    "type": "Internal",
+                    "origin_department": "Finance",
+                    "destination_department": "Accounting",
+                    "status": "sent",
+                    "created_by": "John Doe",
+                    "created_at": "2025-01-15 10:00:00",
+                    "sender_verified_at": "2025-01-15 10:05:00",
+                    "sent_at": "2025-01-15 10:10:00",
+                    "received_at": null,
+                    "receiver_verified_at": null,
+                    "has_discrepancies": false,
+                    "notes": "Regular monthly distribution"
+                }
+            }
+        ]
+    },
+    "meta": {
+        "department_location": "000HACC",
+        "department_name": "Accounting",
+        "total_invoices": 1,
+        "requested_at": "2025-01-21T10:30:00Z",
+        "filters_applied": {}
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ `distribution` object (singular) is present in each invoice
+-   ✅ Only shows distributions where `destination_department` matches the requested department (000HACC = Accounting)
+-   ✅ Shows the latest distribution (most recent `created_at`) to that department
+-   ✅ Distribution fields include: `id`, `distribution_number`, `type`, `origin_department`, `destination_department`, `status`, `created_by`, `created_at`, `sender_verified_at`, `sent_at`, `received_at`, `receiver_verified_at`, `has_discrepancies`, `notes`
+-   ✅ Date fields are formatted as "YYYY-MM-DD HH:MM:SS"
+-   ✅ Department names are properly loaded from relationships
+-   ✅ User names are properly loaded from relationships
+-   ✅ If no distribution exists to the requested department, `distribution` will be `null`
+
 ## **Test Results Summary**
 
 After running all tests, verify:
