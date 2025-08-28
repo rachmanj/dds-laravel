@@ -3798,6 +3798,9 @@ public function getDaysSinceReceivedAttribute()
 -   **Visual Feedback**: Color coding and badges improve information scanning
 -   **Bulk Efficiency**: Select multiple invoices for batch processing
 -   **Search & Filtering**: Advanced search capabilities for large datasets
+-   **Paid Invoice Updates**: Edit payment dates and remarks for paid invoices
+-   **Status Reversal**: Revert paid invoices back to pending payment status
+-   **Comprehensive Management**: Single interface for all payment operations
 
 **Learning**: Logical interface organization significantly improves user adoption and workflow efficiency
 
@@ -3832,7 +3835,58 @@ const formData = {
 
 **Learning**: Manual form data handling provides better control and reliability than automatic serialization
 
-#### **7. Testing & Validation Strategy**
+#### **7. Paid Invoice Update Capability**
+
+**Decision**: Implement comprehensive update capabilities for paid invoices including status reversal
+**Implementation**:
+
+-   **Update Payment Details**: Modify payment dates and remarks for paid invoices
+-   **Status Reversal**: Change paid invoices back to pending payment status
+-   **Individual Updates**: Edit button for each paid invoice with current status display
+-   **Bulk Operations**: Support for updating multiple paid invoices simultaneously
+
+**Technical Implementation**:
+
+```php
+public function updatePaidInvoice(Request $request, Invoice $invoice)
+{
+    // Handle two actions: update_details or revert_to_pending
+    if ($request->action === 'revert_to_pending') {
+        // Revert to pending payment status
+        $invoice->update([
+            'payment_status' => 'pending',
+            'payment_date' => null,
+            'paid_by' => null,
+            'paid_at' => null,
+            'remarks' => $request->remarks ?: 'Reverted to pending payment status',
+        ]);
+    } else {
+        // Update payment details (date, remarks)
+        $invoice->update([
+            'payment_date' => $request->payment_date,
+            'remarks' => $request->remarks,
+        ]);
+    }
+}
+```
+
+**User Interface Features**:
+
+-   **Update Modal**: Edit payment date and remarks for paid invoices
+-   **Revert Modal**: Warning message and reason requirement for status reversal
+-   **Current Status Display**: Shows current payment status when updating
+-   **Action Buttons**: Edit and revert buttons for each paid invoice
+
+**Business Benefits**:
+
+-   **Error Correction**: Users can fix incorrect payment dates or details
+-   **Workflow Flexibility**: Support for payment process reversals
+-   **Audit Trail**: Complete tracking of all payment changes and reversals
+-   **Process Continuity**: Invoices can be reverted and paid again
+
+**Learning**: Payment management systems need flexibility for real-world business scenarios including corrections and reversals
+
+#### **8. Testing & Validation Strategy**
 
 **Decision**: Create comprehensive test data for system validation and user testing
 **Implementation**:
@@ -3863,7 +3917,7 @@ $testInvoices = [
 
 **Learning**: Comprehensive test data is essential for validating complex business logic and user workflows
 
-#### **8. Configuration Management**
+#### **9. Configuration Management**
 
 **Decision**: Implement environment-based configuration for flexible deployment
 **Implementation**:
@@ -3893,7 +3947,7 @@ return [
 
 **Learning**: Environment-based configuration provides flexibility while maintaining consistency
 
-#### **9. Business Impact & User Value**
+#### **10. Business Impact & User Value**
 
 **Decision**: Focus on workflow optimization and process visibility for business users
 **Implementation**:
@@ -3921,7 +3975,7 @@ return [
 
 **Learning**: Business process automation provides significant value through workflow visibility and optimization
 
-#### **10. Technical Architecture & Best Practices**
+#### **11. Technical Architecture & Best Practices**
 
 **Decision**: Implement robust architecture following Laravel best practices
 **Implementation**:
@@ -3956,7 +4010,7 @@ class InvoicePaymentController extends Controller
 
 **Learning**: Good architecture design prevents business logic errors and makes systems more reliable
 
-#### **11. Future Development Considerations**
+#### **12. Future Development Considerations**
 
 **Decision**: Plan for continued enhancement while maintaining current functionality
 **Implementation**:
@@ -3980,5 +4034,206 @@ class InvoicePaymentController extends Controller
 ---
 
 **Last Updated**: 2025-01-27  
-**Version**: 4.13  
-**Status**: ✅ Invoice Payment Management System Completed Successfully - Complete Implementation & Days Calculation Fix
+**Version**: 4.14  
+**Status**: ✅ Invoice Payment Management System Completed Successfully - Complete Implementation, Days Calculation Fix & Table Structure Enhancements
+
+---
+
+### **2025-01-27: Invoice Payment Table Structure Enhancements - Complete User Experience Optimization**
+
+**Version**: 4.14  
+**Status**: ✅ **Table Structure Enhancements Completed Successfully**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 0.5 hours (comprehensive table optimization)
+
+**Project Scope**: Enhance the Invoice Payment Management System table structure to improve information hierarchy, data relevance, and user experience through strategic column modifications and data display improvements
+
+#### **1. Project Overview & Success**
+
+**Decision**: Optimize table structure for better information organization and user workflow efficiency
+**Context**: Users needed clearer information hierarchy and more relevant data display in the waiting payment table
+**Implementation Date**: 2025-01-27
+**Actual Effort**: 0.5 hours
+**Status**: ✅ **COMPLETED** - All table enhancements implemented successfully
+
+**Learning**: Strategic table structure improvements significantly enhance user experience and workflow efficiency
+
+#### **2. Table Structure Enhancements Implementation**
+
+**Decision**: Implement three key table modifications for better information organization
+**Implementation**:
+
+**1. Invoice Project Column Addition**:
+
+-   **Position**: Added after Amount column for logical information flow
+-   **Display**: Shows project code as blue badge for visual prominence
+-   **Fallback**: Displays "-" if no project is assigned
+-   **Benefit**: Better categorization and project tracking
+
+**2. Enhanced Supplier Display**:
+
+-   **Before**: Supplier name + invoice `cur_loc` (department location)
+-   **After**: Supplier name + supplier `sap_code` (SAP identifier)
+-   **Benefit**: More relevant supplier identification information
+-   **Impact**: Users can identify suppliers by their business system codes
+
+**3. Cleaned Amount Column**:
+
+-   **Before**: Amount + currency underneath (duplicate information)
+-   **After**: Only formatted amount (currency already shown as prefix)
+-   **Benefit**: Eliminates redundant currency display
+-   **Example**: "USD 1,000.00" instead of "USD 1,000.00" + "USD"
+
+#### **3. Technical Implementation Details**
+
+**Column Structure Updates**:
+
+```blade
+<!-- Before: 6 columns -->
+<th>Invoice #</th>
+<th>Supplier</th>
+<th>PO Number</th>
+<th>Amount</th>
+<th>Invoice Status</th>
+<th>Days Since Received</th>
+
+<!-- After: 7 columns -->
+<th>Invoice #</th>
+<th>Supplier</th>
+<th>PO Number</th>
+<th>Amount</th>
+<th>Invoice Project</th>  <!-- NEW -->
+<th>Invoice Status</th>
+<th>Days Since Received</th>
+```
+
+**Data Display Improvements**:
+
+```blade
+<!-- Invoice Project Column -->
+<td>
+    @if ($invoice->invoice_project)
+        <span class="badge badge-primary">{{ $invoice->invoice_project }}</span>
+    @else
+        <span class="text-muted">-</span>
+    @endif
+</td>
+
+<!-- Enhanced Supplier Display -->
+<td>
+    {{ $invoice->supplier->name ?? 'N/A' }}
+    <br><small class="text-muted">{{ $invoice->supplier->sap_code ?? 'N/A' }}</small>
+</td>
+
+<!-- Clean Amount Display -->
+<td>
+    <strong>{{ $invoice->formatted_amount }}</strong>
+</td>
+```
+
+#### **4. User Experience & Information Hierarchy**
+
+**Improved Information Flow**:
+
+1. **Invoice #** → Invoice identification and date
+2. **Supplier** → Supplier name and SAP code for business identification
+3. **PO Number** → Purchase order reference
+4. **Amount** → Clean payment amount display
+5. **Invoice Project** → Project categorization and tracking
+6. **Invoice Status** → Workflow status (Open, Verify, Close)
+7. **Days Since Received** → Payment urgency indicators
+8. **Actions** → Update payment functionality
+
+**Visual Design Improvements**:
+
+-   **Project Badges**: Blue badges for project codes provide visual hierarchy
+-   **Status Badges**: Consistent badge styling across all status indicators
+-   **Information Density**: Better organized data without visual clutter
+-   **Mobile Responsiveness**: Improved table layout for small screens
+
+#### **5. Business Impact & Workflow Efficiency**
+
+**Immediate Benefits**:
+
+-   **Better Categorization**: Project codes help organize invoices by business unit
+-   **Relevant Supplier Info**: SAP codes are more useful than department locations
+-   **Cleaner Display**: No duplicate currency information reduces confusion
+-   **Improved Scanning**: Better information hierarchy for quick data review
+
+**Long-term Benefits**:
+
+-   **User Productivity**: Faster invoice identification and categorization
+-   **Process Efficiency**: Better organized data leads to improved workflows
+-   **Training Reduction**: Intuitive table structure reduces user confusion
+-   **Data Quality**: Consistent display format improves data accuracy
+
+**Workflow Improvements**:
+
+-   **Project Tracking**: Users can quickly identify invoices by project
+-   **Supplier Management**: SAP codes provide business system integration
+-   **Payment Prioritization**: Better organized data helps prioritize payments
+-   **Audit Trail**: Clearer information for compliance and reporting
+
+#### **6. Technical Architecture & Best Practices**
+
+**Implementation Strategy**:
+
+-   **Non-Destructive Changes**: Only table structure modifications, no data changes
+-   **View Cache Management**: Cleared view cache for immediate effect
+-   **Responsive Design**: Maintained mobile-friendly table layout
+-   **Consistent Styling**: Applied existing badge and styling patterns
+
+**Code Quality Improvements**:
+
+-   **Conditional Rendering**: Proper fallback values for optional fields
+-   **Badge Styling**: Consistent visual indicators across all data types
+-   **Responsive Tables**: Maintained mobile-friendly column layouts
+-   **Accessibility**: Clear visual hierarchy for better user scanning
+
+**Performance Considerations**:
+
+-   **Efficient Rendering**: No additional database queries required
+-   **View Caching**: Proper cache management for optimal performance
+-   **Mobile Optimization**: Responsive design maintains performance on small devices
+
+#### **7. Testing & Validation**
+
+**Implementation Verification**:
+
+-   ✅ **Column Addition**: Invoice Project column properly added and positioned
+-   ✅ **Supplier Display**: SAP code correctly displayed instead of department location
+-   ✅ **Amount Cleanup**: Currency duplication removed, clean amount display
+-   ✅ **Visual Consistency**: All badges and styling consistent with existing design
+-   ✅ **Responsive Design**: Table layout works properly on mobile devices
+-   ✅ **View Cache**: Changes immediately visible after cache clearing
+
+**User Experience Validation**:
+
+-   **Information Hierarchy**: Logical column flow from identification to actions
+-   **Visual Clarity**: Clear distinction between different data types
+-   **Data Relevance**: More useful information displayed (SAP codes vs. locations)
+-   **Professional Appearance**: Consistent with existing application design
+
+#### **8. Future Development Considerations**
+
+**Enhancement Opportunities**:
+
+-   **Project Filtering**: Add project-based filtering to waiting payment list
+-   **Supplier Grouping**: Group invoices by supplier for batch operations
+-   **Customizable Columns**: User-configurable column visibility
+-   **Export Enhancements**: Include project information in export formats
+
+**Monitoring Strategy**:
+
+-   **User Feedback**: Monitor user satisfaction with new table structure
+-   **Workflow Metrics**: Track payment processing efficiency improvements
+-   **Performance Impact**: Monitor table rendering performance
+-   **Mobile Usage**: Track mobile user experience improvements
+
+**Learning**: Table structure optimization provides significant user experience improvements with minimal technical complexity
+
+---
+
+**Last Updated**: 2025-01-27  
+**Version**: 4.14  
+**Status**: ✅ Invoice Payment Management System Completed Successfully - Complete Implementation, Days Calculation Fix & Table Structure Enhancements

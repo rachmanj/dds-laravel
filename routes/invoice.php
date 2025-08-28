@@ -26,6 +26,7 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
         Route::get('/waiting', [InvoicePaymentController::class, 'waitingPayment'])->name('waiting');
         Route::get('/paid', [InvoicePaymentController::class, 'paidInvoices'])->name('paid');
         Route::put('/{invoice}/update', [InvoicePaymentController::class, 'updatePayment'])->name('update');
+        Route::put('/{invoice}/update-paid', [InvoicePaymentController::class, 'updatePaidInvoice'])->name('update-paid');
         Route::post('/bulk-update', [InvoicePaymentController::class, 'bulkUpdatePayment'])->name('bulk-update');
     });
 

@@ -40,7 +40,6 @@ class InvoicePaymentController extends Controller
         $userLocationCode = $user->department_location_code;
 
         $query = Invoice::with(['supplier', 'type', 'creator.department'])
-            ->pendingPayment()
             ->inUserDepartment($userLocationCode)
             ->orderBy('receive_date', 'asc');
 
@@ -56,9 +55,17 @@ class InvoicePaymentController extends Controller
             });
         }
 
-        // Apply status filter
+        // Apply distribution status filter
         if ($request->filled('status')) {
             $query->withStatus($request->status);
+        }
+
+        // Apply payment status filter - only show pending invoices by default
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        } else {
+            // Default: only show pending invoices waiting for payment
+            $query->where('payment_status', 'pending');
         }
 
         $invoices = $query->paginate(15);
@@ -131,13 +138,25 @@ class InvoicePaymentController extends Controller
         try {
             DB::beginTransaction();
 
-            $invoice->update([
-                'payment_status' => $request->payment_status,
-                'payment_date' => $request->payment_date,
-                'paid_by' => $request->payment_status === 'paid' ? $user->id : null,
-                'paid_at' => $request->payment_status === 'paid' ? now() : null,
-                'remarks' => $request->remarks,
-            ]);
+            // Handle status reversal (paid -> pending)
+            if ($request->payment_status === 'pending' && $invoice->payment_status === 'paid') {
+                $invoice->update([
+                    'payment_status' => 'pending',
+                    'payment_date' => $request->payment_date,
+                    'paid_by' => null,
+                    'paid_at' => null,
+                    'remarks' => $request->remarks,
+                ]);
+            } else {
+                // Normal update (pending -> paid or paid -> paid with new date)
+                $invoice->update([
+                    'payment_status' => $request->payment_status,
+                    'payment_date' => $request->payment_date,
+                    'paid_by' => $request->payment_status === 'paid' ? $user->id : $invoice->paid_by,
+                    'paid_at' => $request->payment_status === 'paid' ? now() : $invoice->paid_at,
+                    'remarks' => $request->remarks,
+                ]);
+            }
 
             DB::commit();
 
@@ -151,6 +170,78 @@ class InvoicePaymentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update invoice payment status: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update paid invoice details (payment date, remarks, or revert to pending).
+     */
+    public function updatePaidInvoice(Request $request, Invoice $invoice)
+    {
+        $this->middleware('permission:update-invoice-payment');
+
+        $user = Auth::user();
+        $userLocationCode = $user->department_location_code;
+
+        // Check if user can update this invoice (must be in their department)
+        if ($invoice->cur_loc !== $userLocationCode) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only update invoices in your department.'
+            ], 403);
+        }
+
+        // Ensure invoice is currently paid
+        if ($invoice->payment_status !== 'paid') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This invoice is not currently marked as paid.'
+            ], 400);
+        }
+
+        $request->validate([
+            'action' => ['required', Rule::in(['update_details', 'revert_to_pending'])],
+            'payment_date' => 'required_if:action,update_details|date',
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            if ($request->action === 'revert_to_pending') {
+                // Revert to pending payment status
+                $invoice->update([
+                    'payment_status' => 'pending',
+                    'payment_date' => null,
+                    'paid_by' => null,
+                    'paid_at' => null,
+                    'remarks' => $request->remarks ?: 'Reverted to pending payment status',
+                ]);
+
+                $message = 'Invoice payment status reverted to pending successfully.';
+            } else {
+                // Update payment details (date, remarks)
+                $invoice->update([
+                    'payment_date' => $request->payment_date,
+                    'remarks' => $request->remarks,
+                ]);
+
+                $message = 'Invoice payment details updated successfully.';
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'invoice' => $invoice->fresh(['supplier', 'type', 'paidByUser'])
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update invoice: ' . $e->getMessage()
             ], 500);
         }
     }

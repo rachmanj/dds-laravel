@@ -48,6 +48,7 @@
 @endsection
 
 @section('styles')
+    @parent
     <style>
         .nav-tabs .nav-link {
             color: #6c757d;
@@ -72,4 +73,8 @@
             font-size: 0.9rem;
         }
     </style>
+@endsection
+
+@section('scripts')
+    @yield('scripts')
 @endsection

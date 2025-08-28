@@ -1,13 +1,19 @@
 @extends('invoice-payments.layout')
 
+@section('styles')
+    <!-- DataTables -->
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+@endsection
+
 @section('payment-content')
     <!-- Search and Filter -->
     <div class="row mb-3">
         <div class="col-md-8">
             <form method="GET" action="{{ route('invoices.payments.paid') }}" class="form-inline">
                 <div class="input-group mr-2">
-                    <input type="text" name="search" class="form-control" placeholder="Search invoice, PO, or supplier..."
-                        value="{{ request('search') }}">
+                    <input type="text" name="search" class="form-control"
+                        placeholder="Search invoice, PO, or supplier..." value="{{ request('search') }}">
                     <div class="input-group-append">
                         <button type="submit" class="btn btn-outline-secondary">
                             <i class="fas fa-search"></i>
@@ -59,6 +65,7 @@
                                 <th>Paid By</th>
                                 <th>Payment Status</th>
                                 <th>Days to Pay</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -112,6 +119,20 @@
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-sm btn-primary"
+                                                onclick="updatePaidInvoice({{ $invoice->id }}, '{{ $invoice->payment_date }}', '{{ $invoice->remarks ?? '' }}')"
+                                                title="Update Payment Details">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-warning"
+                                                onclick="revertToPending({{ $invoice->id }})"
+                                                title="Revert to Pending Payment">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
@@ -224,9 +245,97 @@
             </div>
         </div>
     @endif
+
+    <!-- Update Paid Invoice Modal -->
+    <div class="modal fade" id="update-paid-invoice-modal" tabindex="-1" role="dialog"
+        aria-labelledby="update-paid-invoice-modal-label" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="update-paid-invoice-modal-label">
+                        <i class="fas fa-edit mr-2"></i>Update Payment Details
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="update-paid-invoice-form">
+                    <div class="modal-body">
+                        <input type="hidden" id="update_invoice_id" name="invoice_id">
+
+                        <div class="form-group">
+                            <label for="update_payment_date">Payment Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="update_payment_date" name="payment_date"
+                                required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="update_remarks">Remarks</label>
+                            <textarea class="form-control" id="update_remarks" name="remarks" rows="3"
+                                placeholder="Optional remarks about the payment update..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save mr-2"></i>Update Payment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revert to Pending Modal -->
+    <div class="modal fade" id="revert-to-pending-modal" tabindex="-1" role="dialog"
+        aria-labelledby="revert-to-pending-modal-label" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="revert-to-pending-modal-label">
+                        <i class="fas fa-undo mr-2"></i>Revert to Pending Payment
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="revert-to-pending-form">
+                    <div class="modal-body">
+                        <input type="hidden" id="revert_invoice_id" name="invoice_id">
+
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            <strong>Warning:</strong> This action will revert the invoice payment status back to "Pending
+                            Payment".
+                            The invoice will no longer appear in the paid invoices list and will be available for payment
+                            again.
+                        </div>
+
+                        <div class="form-group">
+                            <label for="revert_remarks">Reason for Reverting <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="revert_remarks" name="remarks" rows="3"
+                                placeholder="Please provide a reason for reverting this invoice to pending status..." required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-undo mr-2"></i>Revert to Pending
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('scripts')
+    <!-- DataTables -->
+    <script src="{{ asset('adminlte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ asset('adminlte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+    <script src="{{ asset('adminlte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    <script src="{{ asset('adminlte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+
     <script>
         function exportToExcel() {
             // Get current filter parameters
@@ -266,6 +375,110 @@
                     }
                 });
             }
+
+            // Handle update paid invoice form submission
+            $('#update-paid-invoice-form').submit(function(e) {
+                e.preventDefault();
+
+                const form = $(this);
+                const submitBtn = form.find('button[type="submit"]');
+                const originalText = submitBtn.text();
+
+                submitBtn.prop('disabled', true).text('Updating...');
+
+                const formData = {
+                    action: 'update_details',
+                    payment_date: $('#update_payment_date').val(),
+                    remarks: $('#update_remarks').val(),
+                };
+
+                const invoiceId = $('#update_invoice_id').val();
+
+                $.ajax({
+                    url: `/invoices/payments/${invoiceId}/update-paid`,
+                    method: 'PUT',
+                    data: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            $('#update-paid-invoice-modal').modal('hide');
+                            setTimeout(() => location.reload(), 1000);
+                        } else {
+                            toastr.error(response.message || 'Failed to update invoice.');
+                        }
+                    },
+                    error: function(xhr) {
+                        const message = xhr.responseJSON?.message ||
+                            'An error occurred while updating the invoice.';
+                        toastr.error(message);
+                    },
+                    complete: function() {
+                        submitBtn.prop('disabled', false).text(originalText);
+                    }
+                });
+            });
+
+            // Handle revert to pending form submission
+            $('#revert-to-pending-form').submit(function(e) {
+                e.preventDefault();
+
+                const form = $(this);
+                const submitBtn = form.find('button[type="submit"]');
+                const originalText = submitBtn.text();
+
+                submitBtn.prop('disabled', true).text('Reverting...');
+
+                const formData = {
+                    action: 'revert_to_pending',
+                    remarks: $('#revert_remarks').val(),
+                };
+
+                const invoiceId = $('#revert_invoice_id').val();
+
+                $.ajax({
+                    url: `/invoices/payments/${invoiceId}/update-paid`,
+                    method: 'PUT',
+                    data: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            $('#revert-to-pending-modal').modal('hide');
+                            setTimeout(() => location.reload(), 1000);
+                        } else {
+                            toastr.error(response.message || 'Failed to revert invoice.');
+                        }
+                    },
+                    error: function(xhr) {
+                        const message = xhr.responseJSON?.message ||
+                            'An error occurred while reverting the invoice.';
+                        toastr.error(message);
+                    },
+                    complete: function() {
+                        submitBtn.prop('disabled', false).text(originalText);
+                    }
+                });
+            });
         });
+
+        // Function to open update paid invoice modal
+        function updatePaidInvoice(invoiceId, currentPaymentDate, currentRemarks) {
+            $('#update_invoice_id').val(invoiceId);
+            $('#update_payment_date').val(currentPaymentDate);
+            $('#update_remarks').val(currentRemarks);
+            $('#update-paid-invoice-modal').modal('show');
+        }
+
+        // Function to open revert to pending modal
+        function revertToPending(invoiceId) {
+            $('#revert_invoice_id').val(invoiceId);
+            $('#revert_remarks').val('');
+            $('#revert-to-pending-modal').modal('show');
+        }
     </script>
 @endsection

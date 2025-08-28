@@ -119,9 +119,10 @@ The Invoice Payment Management System provides comprehensive tracking and manage
     class InvoicePaymentController extends Controller
     {
         public function dashboard()           // Payment metrics and overview
-        public function waitingPayment()      // Invoices pending payment
+        public function waitingPayment()      // Invoices for payment management
         public function paidInvoices()        // Historical payment records
         public function updatePayment()       // Individual status updates
+        public function updatePaidInvoice()   // Update paid invoice details
         public function bulkUpdatePayment()   // Batch status updates
     }
     ```
@@ -151,6 +152,14 @@ public function getDaysSinceReceivedAttribute()
 -   **Real-time Updates**: AJAX-based operations with immediate feedback
 -   **Bulk Operations**: Checkbox selection with select-all functionality
 
+**Table Structure & Data Display**:
+
+-   **Invoice Project Column**: Added after Amount column for better categorization
+-   **Enhanced Supplier Display**: Shows supplier name + SAP code instead of department location
+-   **Clean Amount Display**: Removed duplicate currency since it's already shown as prefix
+-   **Information Hierarchy**: Logical column placement improves user experience and readability
+-   **Visual Indicators**: Project codes displayed as blue badges, status badges for workflow states
+
 **Data Flow**:
 
 ```
@@ -158,6 +167,13 @@ User Action → Frontend Validation → AJAX Request → Backend Validation → 
      ↓              ↓                    ↓              ↓                ↓              ↓          ↓
 Select Invoices → Check Required → Send Form Data → Validate Fields → Update Records → Success/Error → Show Result
 ```
+
+**Paid Invoice Update Capabilities**:
+
+-   **Update Payment Details**: Modify payment dates and remarks for paid invoices
+-   **Revert to Pending**: Change paid invoices back to pending payment status
+-   **Comprehensive Management**: Single interface for all payment operations
+-   **Audit Trail**: Complete tracking of payment status changes and reversals
 
 **Security & Access Control**:
 

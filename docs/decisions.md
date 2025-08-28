@@ -29,6 +29,8 @@ This created workflow inefficiencies and lack of visibility into payment statuse
 -   Calculate days since invoice received in department
 -   Visual alerts for overdue invoices (>15 days)
 -   Bulk update payment statuses for multiple invoices
+-   Update payment details for paid invoices (correct dates, remarks)
+-   Revert paid invoices back to pending payment status
 -   Department-based access control for payment management
 -   Comprehensive payment dashboard with metrics
 
@@ -106,6 +108,12 @@ public function getDaysSinceReceivedAttribute()
 -   **Chosen**: Manual data object construction with jQuery selectors
 -   **Reasoning**: More reliable, easier to debug, and better control over data format
 
+**5. Paid Invoice Update Capability**
+
+-   **Considered**: Read-only paid invoices vs. editable payment details
+-   **Chosen**: Full update capability including status reversal
+-   **Reasoning**: Users need to correct payment mistakes and manage workflow reversals
+
 **5. Configuration Management**
 
 ```php
@@ -118,6 +126,15 @@ return [
 ```
 
 **Reasoning**: Environment-based configuration provides flexibility for different deployment environments.
+
+**6. Table Structure & Data Display**
+
+-   **Invoice Project Column**: Added after Amount column for better categorization
+-   **Enhanced Supplier Display**: Shows supplier name + SAP code instead of department location
+-   **Clean Amount Display**: Removed duplicate currency since it's already shown as prefix
+-   **Information Hierarchy**: Logical column placement improves user experience and readability
+
+**Reasoning**: Better information organization and relevant data display improve user workflow efficiency and reduce confusion.
 
 #### **Technical Architecture**
 

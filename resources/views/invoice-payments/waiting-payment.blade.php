@@ -16,7 +16,7 @@
                 </div>
 
                 <select name="status" class="form-control mr-2">
-                    <option value="">All Statuses</option>
+                    <option value="">All Distribution Statuses</option>
                     <option value="open" {{ request('status') === 'open' ? 'selected' : '' }}>Open</option>
                     <option value="verify" {{ request('status') === 'verify' ? 'selected' : '' }}>Verify</option>
                     <option value="return" {{ request('status') === 'return' ? 'selected' : '' }}>Return</option>
@@ -24,6 +24,8 @@
                     <option value="close" {{ request('status') === 'close' ? 'selected' : '' }}>Close</option>
                     <option value="cancel" {{ request('status') === 'cancel' ? 'selected' : '' }}>Cancel</option>
                 </select>
+
+
 
                 <button type="submit" class="btn btn-primary mr-2">Filter</button>
                 <a href="{{ route('invoices.payments.waiting') }}" class="btn btn-outline-secondary">Clear</a>
@@ -46,6 +48,12 @@
                 <i class="fas fa-clock mr-2"></i>Invoices Waiting for Payment
                 <span class="badge badge-warning ml-2">{{ $invoices->total() }}</span>
             </h3>
+            <div class="card-tools">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Shows only invoices waiting for payment. Use filters to view specific distribution statuses.
+                </small>
+            </div>
         </div>
         <div class="card-body p-0">
             @if ($invoices->count() > 0)
@@ -62,7 +70,9 @@
                                 <th>Supplier</th>
                                 <th>PO Number</th>
                                 <th>Amount</th>
-                                <th>Status</th>
+                                <th>Invoice Project</th>
+                                <th>Invoice Status</th>
+
                                 <th>Days Since Received</th>
                                 <th>Actions</th>
                             </tr>
@@ -82,7 +92,7 @@
                                     </td>
                                     <td>
                                         {{ $invoice->supplier->name ?? 'N/A' }}
-                                        <br><small class="text-muted">{{ $invoice->cur_loc }}</small>
+                                        <br><small class="text-muted">{{ $invoice->supplier->sap_code ?? 'N/A' }}</small>
                                     </td>
                                     <td>
                                         @if ($invoice->po_no)
@@ -93,11 +103,18 @@
                                     </td>
                                     <td>
                                         <strong>{{ $invoice->formatted_amount }}</strong>
-                                        <br><small class="text-muted">{{ $invoice->currency }}</small>
+                                    </td>
+                                    <td>
+                                        @if ($invoice->invoice_project)
+                                            <span class="badge badge-primary">{{ $invoice->invoice_project }}</span>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
                                     </td>
                                     <td>
                                         {!! $invoice->status_badge !!}
                                     </td>
+
                                     <td>
                                         @if ($invoice->days_since_received !== null)
                                             <span
@@ -124,7 +141,9 @@
                                                 data-invoice="{{ $invoice->id }}"
                                                 data-invoice-number="{{ $invoice->invoice_number }}"
                                                 data-supplier="{{ $invoice->supplier->name ?? 'N/A' }}"
-                                                data-amount="{{ $invoice->formatted_amount }}">
+                                                data-amount="{{ $invoice->formatted_amount }}"
+                                                data-payment-status="{{ $invoice->payment_status }}"
+                                                data-payment-date="{{ $invoice->payment_date ?? '' }}">
                                                 <i class="fas fa-edit"></i> Update Payment
                                             </button>
                                         @endcan
@@ -141,9 +160,10 @@
                 </div>
             @else
                 <div class="text-center p-4">
-                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
-                    <p class="text-success">No invoices waiting for payment!</p>
-                    <p class="text-muted">All invoices in your department have been paid.</p>
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No invoices waiting for payment found.</p>
+                    <p class="text-muted">All invoices in your department have been paid or are not yet ready for payment.
+                    </p>
                 </div>
             @endif
         </div>
@@ -180,9 +200,12 @@
                             <div class="form-group">
                                 <label for="payment_status">Payment Status <span class="text-danger">*</span></label>
                                 <select class="form-control" id="payment_status" name="payment_status" required>
-                                    <option value="pending">Pending</option>
-                                    <option value="paid">Paid</option>
+                                    <option value="paid">Mark as Paid</option>
+                                    <option value="pending">Pending Payment</option>
                                 </select>
+                                <small class="form-text text-muted">
+                                    Current status: <span id="current-payment-status" class="font-weight-bold"></span>
+                                </small>
                             </div>
 
                             <div class="form-group">
@@ -300,10 +323,28 @@
                 const invoiceNumber = $(this).data('invoice-number');
                 const supplier = $(this).data('supplier');
                 const amount = $(this).data('amount');
+                const paymentStatus = $(this).data('payment-status');
+                const paymentDate = $(this).data('payment-date');
 
                 $('#modal-invoice-number').val(invoiceNumber);
                 $('#modal-supplier').val(supplier);
                 $('#modal-amount').val(amount);
+
+                // Set current payment status
+                const statusText = paymentStatus === 'paid' ? 'Paid' : 'Pending Payment';
+                $('#current-payment-status').text(statusText).removeClass().addClass('font-weight-bold');
+                if (paymentStatus === 'paid') {
+                    $('#current-payment-status').addClass('text-success');
+                } else {
+                    $('#current-payment-status').addClass('text-warning');
+                }
+
+                // Set current payment date if available
+                if (paymentDate) {
+                    $('#payment_date').val(paymentDate);
+                } else {
+                    $('#payment_date').val('{{ date('Y-m-d') }}');
+                }
 
                 // Set form action
                 $('#update-payment-form').attr('action', `/invoices/payments/${invoiceId}/update`);

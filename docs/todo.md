@@ -49,6 +49,13 @@
     -   Rounded to whole numbers with no decimals
     -   Debug information shows actual date used for calculation
 
+-   ✅ **Paid Invoice Update Capability**:
+
+    -   Update payment dates for paid invoices
+    -   Revert paid invoices back to pending payment status
+    -   Comprehensive payment management from single interface
+    -   Individual and bulk update operations supported
+
 -   ✅ **Routes & Navigation**:
 
     -   Added "Invoice Payments" sub-menu under Invoices group
@@ -90,6 +97,21 @@
 -   **User Productivity**: Intuitive interface reduces training needs
 
 **Testing & Validation**:
+
+-   ✅ **Table Structure Enhancements**:
+
+    -   Added "Invoice Project" column after Amount column for better categorization
+    -   Updated Supplier column to show SAP code instead of department location
+    -   Cleaned Amount column by removing duplicate currency display
+    -   Improved table readability and information hierarchy
+    -   All changes tested and view cache cleared for immediate effect
+
+**Table Structure Improvements**:
+
+-   **New Invoice Project Column**: Shows project code as blue badge for better categorization
+-   **Enhanced Supplier Display**: Shows supplier name + SAP code instead of department location
+-   **Cleaner Amount Display**: Removed duplicate currency since it's already shown as prefix
+-   **Better Information Organization**: Logical column placement improves user experience
 
 -   **Test Data**: 5 invoices with receive dates 1, 3, 8, 18, and 25 days ago
 -   **Days Calculation**: Verified whole number display with proper color coding

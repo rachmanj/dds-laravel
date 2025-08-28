@@ -322,6 +322,8 @@ class Invoice extends Model
         return '<span class="badge ' . $color . '">' . ucfirst($this->payment_status) . '</span>';
     }
 
+
+
     /**
      * Check if invoice number is unique for the given supplier.
      */
