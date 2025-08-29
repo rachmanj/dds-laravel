@@ -6,6 +6,40 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🔄 **Core Workflows**
 
+### **External API System**
+
+The system provides secure external API access for invoice data with comprehensive security and user accountability:
+
+**API Architecture**:
+
+-   **Authentication**: API key-based authentication using `DDS_API_KEY` environment variable
+-   **Rate Limiting**: Multi-tier rate limiting (hourly: 100, minute: 20, daily: 1000 requests)
+-   **Security Middleware**: Custom `ApiKeyMiddleware` and `ApiRateLimitMiddleware` for enterprise-grade security
+-   **Data Access**: Read-only access to invoice data with complete user accountability
+
+**API Endpoints**:
+
+-   **General Invoices**: `GET /api/v1/departments/{location_code}/invoices` - All invoices with comprehensive data
+-   **Wait-Payment Invoices**: `GET /api/v1/departments/{location_code}/wait-payment-invoices` - Invoices pending payment
+-   **Paid Invoices**: `GET /api/v1/departments/{location_code}/paid-invoices` - Invoices with completed payments
+-   **Payment Updates**: `PUT /api/v1/invoices/{invoice_id}/payment` - Update payment information
+-   **Department Reference**: `GET /api/v1/departments` - Available departments for API consumers
+
+**Data Structure**:
+
+-   **Invoice Fields**: Complete invoice data including `paid_by` field for user accountability
+-   **Additional Documents**: Nested document information with proper relationships
+-   **Distribution Data**: Latest distribution information to requested department
+-   **User Accountability**: `paid_by` field shows user who processed payment
+-   **Enhanced Filtering**: Project, supplier, date range, and status filtering capabilities
+
+**Security Features**:
+
+-   **API Key Validation**: Secure header-based authentication
+-   **Rate Limiting**: Prevents API abuse with configurable limits
+-   **Audit Logging**: Complete request logging with IP tracking and timestamps
+-   **Error Handling**: Comprehensive error responses with proper HTTP status codes
+
 ### **Distribution Workflow**
 
 ```

@@ -78,6 +78,14 @@ class Invoice extends Model
     }
 
     /**
+     * Get the user associated with the invoice (alias for paidByUser).
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'paid_by');
+    }
+
+    /**
      * Get the attachments for the invoice.
      */
     public function attachments(): HasMany

@@ -8,7 +8,7 @@ X-API-Key: mantapjiwa
 Accept: application/json
 
 ### Get Invoices by Department (Requires API Key)
-GET http://localhost:8000/api/v1/departments/000HACC/invoices
+GET http://localhost:8000/api/v1/departments/000HCASHO/invoices
 X-API-Key: mantapjiwa
 Accept: application/json
 
@@ -40,3 +40,26 @@ Accept: application/json
 GET http://localhost:8000/api/v1/departments//invoices
 X-API-Key: mantapjiwa
 Accept: application/json
+
+### wait payment invoices
+GET http://localhost:8000/api/v1/departments/000HCASHO/wait-payment-invoices
+X-API-Key: mantapjiwa
+Accept: application/json
+
+### paid invoices
+GET http://localhost:8000/api/v1/departments/000HCASHO/paid-invoices
+X-API-Key: mantapjiwa
+Accept: application/json
+
+### update payment date
+PUT http://localhost:8000/api/v1/invoices/2/payment
+X-API-Key: mantapjiwa
+Accept: application/json
+Content-Type: application/json
+
+{
+    "payment_date": "2025-08-20",
+    "payment_status": "paid",
+    "remarks": "Payment completed via bank transfer",
+    "paid_by": 2
+}

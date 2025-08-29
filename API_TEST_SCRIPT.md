@@ -468,6 +468,336 @@ Invoke-RestMethod -Uri "http://localhost:8000/api/v1/departments/000HACC/invoice
 -   ✅ User names are properly loaded from relationships
 -   ✅ If no distribution exists to the requested department, `distribution` will be `null`
 
+### **Test 7: Verify Wait-Payment Invoices Endpoint**
+
+**Purpose**: Verify that the new wait-payment invoices endpoint returns only invoices waiting for payment
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/departments/000HACC/wait-payment-invoices" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/departments/000HACC/wait-payment-invoices" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should include only invoices with `payment_date` IS NULL and `payment_status: "waiting_payment"` in meta:
+
+```json
+{
+    "success": true,
+    "data": {
+        "invoices": [
+            {
+                "id": 1,
+                "invoice_number": "1044/2025",
+                "payment_date": null,
+                "status": "open"
+            }
+        ]
+    },
+    "meta": {
+        "department_location": "000HACC",
+        "department_name": "Accounting",
+        "total_invoices": 1,
+        "payment_status": "waiting_payment",
+        "filters_applied": {}
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ Only invoices with `payment_date: null` are returned
+-   ✅ Meta includes `payment_status: "waiting_payment"`
+-   ✅ All invoice fields are present
+-   ✅ Distribution information is included
+-   ✅ Additional documents are included
+
+### **Test 8: Verify Paid Invoices Endpoint**
+
+**Purpose**: Verify that the new paid invoices endpoint returns only invoices that have been paid
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/departments/000HACC/paid-invoices" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/departments/000HACC/paid-invoices" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should include only invoices with `payment_date` IS NOT NULL and `payment_status: "paid"` in meta:
+
+```json
+{
+    "success": true,
+    "data": {
+        "invoices": [
+            {
+                "id": 2,
+                "invoice_number": "1045/2025",
+                "payment_date": "2025-01-20",
+                "status": "closed"
+            }
+        ]
+    },
+    "meta": {
+        "department_location": "000HACC",
+        "department_name": "Accounting",
+        "total_invoices": 1,
+        "payment_status": "paid",
+        "filters_applied": {}
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ Only invoices with `payment_date` containing a date are returned
+-   ✅ Meta includes `payment_status: "paid"`
+-   ✅ All invoice fields are present
+-   ✅ Distribution information is included
+-   ✅ Additional documents are included
+
+### **Test 9: Verify Wait-Payment Invoices with Filters**
+
+**Purpose**: Test wait-payment invoices endpoint with various query parameters
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/departments/000HACC/wait-payment-invoices?status=open&project=PRJ001&supplier=ABC" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/departments/000HACC/wait-payment-invoices?status=open&project=PRJ001&supplier=ABC" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should include filtered results with applied filters in meta:
+
+```json
+{
+    "success": true,
+    "meta": {
+        "filters_applied": {
+            "status": "open",
+            "project": "PRJ001",
+            "supplier": "ABC"
+        },
+        "payment_status": "waiting_payment"
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ Status filter applied (only open invoices)
+-   ✅ Project filter applied (only PRJ001 invoices)
+-   ✅ Supplier filter applied (only ABC supplier invoices)
+-   ✅ Filters shown in meta section
+-   ✅ All invoices still have `payment_date: null`
+
+### **Test 10: Verify Paid Invoices with Date Range**
+
+**Purpose**: Test paid invoices endpoint with date range filtering
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/departments/000HACC/paid-invoices?date_from=2025-01-01&date_to=2025-01-31" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/departments/000HACC/paid-invoices?date_from=2025-01-01&date_to=2025-01-31" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should include only paid invoices within the date range:
+
+```json
+{
+    "success": true,
+    "meta": {
+        "filters_applied": {
+            "date_from": "2025-01-01",
+            "date_to": "2025-01-31"
+        },
+        "payment_status": "paid"
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ Date range filter applied
+-   ✅ Only invoices with `invoice_date` between 2025-01-01 and 2025-01-31
+-   ✅ All returned invoices have `payment_date` with values
+-   ✅ Filters shown in meta section
+
+### **Test 11: Update Invoice Payment - Success Case**
+
+**Purpose**: Verify that the new payment update endpoint successfully updates invoice payment information
+
+**Request**:
+
+```bash
+curl -X PUT "http://localhost:8000/api/v1/invoices/1/payment" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payment_date": "2025-01-27",
+    "status": "closed",
+    "remarks": "Payment completed via bank transfer"
+  }'
+```
+
+**PowerShell**:
+
+```powershell
+$body = @{
+    payment_date = "2025-01-27"
+    status = "closed"
+    remarks = "Payment completed via bank transfer"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/invoices/1/payment" -Method PUT -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"; "Content-Type"="application/json"} -Body $body
+```
+
+**Expected Response**: Should return success with updated invoice data:
+
+```json
+{
+    "success": true,
+    "message": "Invoice payment updated successfully",
+    "data": {
+        "id": 1,
+        "invoice_number": "INV-001",
+        "payment_date": "2025-01-27",
+        "paid_by": "John Doe",
+        "status": "closed",
+        "remarks": "Payment completed via bank transfer"
+    },
+    "meta": {
+        "updated_at": "2025-01-27T10:30:00Z",
+        "payment_status": "paid"
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ Invoice payment_date updated to 2025-01-27
+-   ✅ Invoice status updated to "closed"
+-   ✅ Invoice remarks updated
+-   ✅ Meta shows payment_status as "paid"
+-   ✅ Meta shows updated_at timestamp
+
+### **Test 12: Update Invoice Payment - Validation Error**
+
+**Purpose**: Verify that the payment update endpoint properly validates required fields
+
+**Request**:
+
+```bash
+curl -X PUT "http://localhost:8000/api/v1/invoices/1/payment" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "closed"
+  }'
+```
+
+**PowerShell**:
+
+```powershell
+$body = @{
+    status = "closed"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/invoices/1/payment" -Method PUT -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"; "Content-Type"="application/json"} -Body $body
+```
+
+**Expected Response**: Should return validation error for missing payment_date:
+
+```json
+{
+    "success": false,
+    "error": "Validation failed",
+    "message": "Invalid request data",
+    "errors": {
+        "payment_date": ["The payment date field is required."]
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ Returns 400 Bad Request status
+-   ✅ Error message indicates validation failure
+-   ✅ Specific error for missing payment_date field
+
+### **Test 13: Update Invoice Payment - Invoice Not Found**
+
+**Purpose**: Verify that the payment update endpoint handles non-existent invoice IDs properly
+
+**Request**:
+
+```bash
+curl -X PUT "http://localhost:8000/api/v1/invoices/99999/payment" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payment_date": "2025-01-27"
+  }'
+```
+
+**PowerShell**:
+
+```powershell
+$body = @{
+    payment_date = "2025-01-27"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/invoices/99999/payment" -Method PUT -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"; "Content-Type"="application/json"} -Body $body
+```
+
+**Expected Response**: Should return 404 Not Found:
+
+```json
+{
+    "success": false,
+    "error": "Invoice not found",
+    "message": "Invoice with the specified ID not found"
+}
+```
+
+**Verification Points**:
+
+-   ✅ Returns 404 Not Found status
+-   ✅ Clear error message about invoice not found
+-   ✅ Proper error handling for invalid invoice IDs
+
 ## **Test Results Summary**
 
 After running all tests, verify:

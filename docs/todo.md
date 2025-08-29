@@ -714,7 +714,7 @@ DistributionHistory::create([
 
 ---
 
-## 🚀 **Recently Completed**
+## **Recently Completed**
 
 ### **2025-01-27: Transmittal Advice Print Table Structure Fix**
 
@@ -763,13 +763,45 @@ DistributionHistory::create([
 
 **Business Impact**: Complete workflow protection ensuring documents follow proper distribution lifecycle
 
-### **2025-01-27: API Distribution Information Enhancement**
+### **2025-01-27: API Distribution Information Enhancement** ✅
 
--   **Status**: ✅ **COMPLETED**
+-   **Date**: 2025-01-27
 -   **Description**: Enhanced external invoice API to include comprehensive distribution information
--   **Features**: Added distribution workflow data, department tracking, timeline information
--   **Business Value**: Complete workflow visibility for external applications
--   **Technical**: Enhanced eager loading, comprehensive distribution fields, updated documentation
+-   **Details**: Added distribution data with latest distribution to requested department, updated documentation and test scripts
+-   **Status**: ✅ **COMPLETED**
+
+### **2025-01-27: Payment Status API Endpoints Implementation** ✅
+
+-   **Date**: 2025-01-27
+-   **Description**: Implemented two new API endpoints for filtering invoices by payment status
+-   **Details**:
+    -   Wait-payment invoices endpoint (`payment_date IS NULL`)
+    -   Paid invoices endpoint (`payment_date IS NOT NULL`)
+    -   Enhanced filtering with project and supplier parameters
+    -   Updated API documentation and test scripts
+-   **Status**: ✅ **COMPLETED**
+
+### **2025-01-27: Invoice Paid By Field Enhancement** ✅
+
+-   **Date**: 2025-01-27
+-   **Description**: Enhanced all invoice API responses to include user accountability
+-   **Details**:
+    -   Added `paid_by` field showing user who processed payment
+    -   Implemented across all invoice endpoints (general, wait-payment, paid)
+    -   Enhanced payment update endpoint with user information
+    -   Updated API documentation and test scripts
+-   **Status**: ✅ **COMPLETED**
+
+### **2025-01-27: Invoice User Relationship Fix** ✅
+
+-   **Date**: 2025-01-27
+-   **Description**: Resolved critical API error by adding missing user relationship
+-   **Details**:
+    -   Fixed "Call to undefined relationship [user]" error in Invoice model
+    -   Added `user()` relationship method mapping to `paid_by` field
+    -   Restored API functionality for all invoice endpoints
+    -   Enhanced system reliability and data integrity
+-   **Status**: ✅ **COMPLETED**
 
 ### **2025-01-21: External Invoice API Implementation - Complete Secure API System**
 

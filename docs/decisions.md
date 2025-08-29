@@ -1609,6 +1609,52 @@ Need to prevent API abuse while allowing legitimate business usage patterns.
 
 ---
 
+### **2025-01-27: API User Accountability Enhancement**
+
+**Decision**: Add `paid_by` field to all invoice API responses for complete user accountability
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-04-27
+
+#### **Context**
+
+Business requirement to track and display who processed invoice payments, providing complete audit trail for payment processing workflows.
+
+#### **Alternatives Considered**
+
+1. **No User Tracking**: Continue without user accountability in API responses
+2. **User ID Only**: Return only user ID without name information
+3. **Complete User Info**: Return user name and additional user details
+4. **User Name Only**: Return user name for accountability without additional complexity
+
+#### **Chosen Solution**: User name only for accountability
+
+-   **Rationale**: Provides essential user accountability without exposing sensitive user information
+-   **Implementation**:
+    -   Added `user()` relationship method to `Invoice` model
+    -   Maps to `paid_by` field in invoices table
+    -   Returns user name in `paid_by` field across all API endpoints
+    -   Enhanced payment update endpoint with user information
+
+**Alternatives Rejected**:
+
+-   No User Tracking: Insufficient for audit and compliance requirements
+-   User ID Only: Not human-readable for external system users
+-   Complete User Info: Exposes unnecessary sensitive information
+
+**Consequences**:
+
+-   ✅ Complete payment tracking with user accountability
+-   ✅ Enhanced audit trail for compliance requirements
+-   ✅ Better workflow management and process transparency
+-   ✅ Professional API with enterprise-grade accountability
+-   ❌ Additional database relationship loading
+-   ❌ Need to maintain user relationship integrity
+
+**Learning**: Adding user accountability fields enhances business process transparency and audit capabilities, providing complete visibility into payment processing workflows.
+
+---
+
 ### **2025-01-21: API Data Structure Design**
 
 **Decision**: Return comprehensive invoice data with nested additional documents in standardized JSON format

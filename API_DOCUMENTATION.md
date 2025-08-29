@@ -157,6 +157,7 @@ curl -X GET "https://your-domain.com/api/v1/departments/000HACC/invoices?status=
     "data": {
         "invoices": [
             {
+                "id": 1,
                 "invoice_number": "INV-001",
                 "faktur_no": "FK-001",
                 "invoice_date": "2025-01-15",
@@ -171,6 +172,7 @@ curl -X GET "https://your-domain.com/api/v1/departments/000HACC/invoices?status=
                 "amount": 1000000.0,
                 "invoice_type": "regular",
                 "payment_date": "2025-02-15",
+                "paid_by": "John Doe",
                 "remarks": "Sample invoice",
                 "status": "open",
                 "sap_doc": "DOC001",
@@ -212,6 +214,179 @@ curl -X GET "https://your-domain.com/api/v1/departments/000HACC/invoices?status=
 }
 ```
 
+### **4. Get Wait-Payment Invoices by Department**
+
+Retrieve invoices that are waiting for payment (payment_date IS NULL) for a specific department.
+
+**Endpoint**: `GET /api/v1/departments/{location_code}/wait-payment-invoices`
+
+**Parameters**:
+
+-   `{location_code}` (path): Department location code (e.g., "000HACC", "001HFIN")
+
+**Query Parameters**:
+
+-   `status` (optional): Filter by invoice status
+    -   Values: `open`, `closed`, `overdue`, `cancelled`
+-   `date_from` (optional): Filter invoices from date (format: YYYY-MM-DD)
+-   `date_to` (optional): Filter invoices to date (format: YYYY-MM-DD)
+-   `project` (optional): Filter by project code (searches invoice_project, payment_project, receive_project)
+-   `supplier` (optional): Filter by supplier name or SAP code
+
+**Headers**:
+
+```
+X-API-Key: YOUR_DDS_API_KEY
+Accept: application/json
+```
+
+**Example Request**:
+
+```bash
+curl -X GET "https://your-domain.com/api/v1/departments/000HACC/wait-payment-invoices?status=open&project=PRJ001" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**Response**: Same structure as regular invoices endpoint, but with `payment_status: "waiting_payment"` in meta.
+
+### **5. Get Paid Invoices by Department**
+
+Retrieve invoices that have been paid (payment_date IS NOT NULL) for a specific department.
+
+**Endpoint**: `GET /api/v1/departments/{location_code}/paid-invoices`
+
+**Parameters**:
+
+-   `{location_code}` (path): Department location code (e.g., "000HACC", "001HFIN")
+
+**Query Parameters**:
+
+-   `status` (optional): Filter by invoice status
+    -   Values: `open`, `closed`, `overdue`, `cancelled`
+-   `date_from` (optional): Filter invoices from date (format: YYYY-MM-DD)
+-   `date_to` (optional): Filter invoices to date (format: YYYY-MM-DD)
+-   `project` (optional): Filter by project code (searches invoice_project, payment_project, receive_project)
+-   `supplier` (optional): Filter by supplier name or SAP code
+
+**Headers**:
+
+```
+X-API-Key: YOUR_DDS_API_KEY
+Accept: application/json
+```
+
+**Example Request**:
+
+```bash
+curl -X GET "https://your-domain.com/api/v1/departments/000HACC/paid-invoices?date_from=2025-01-01&date_to=2025-01-31" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**Response**: Same structure as regular invoices endpoint, but with `payment_status: "paid"` in meta.
+
+### **6. Update Invoice Payment**
+
+Update payment information for a specific invoice.
+
+**Endpoint**: `PUT /api/v1/invoices/{invoice_id}/payment`
+
+**Parameters**:
+
+-   `{invoice_id}` (path): Invoice ID (integer)
+
+**Request Body**:
+
+```json
+{
+    "payment_date": "2025-01-27",
+    "status": "closed",
+    "remarks": "Payment completed via bank transfer",
+    "payment_project": "PRJ001",
+    "sap_doc": "SAP-2025-001"
+}
+```
+
+**Required Fields**:
+
+-   `payment_date`: Date when payment was made (format: YYYY-MM-DD)
+
+**Optional Fields**:
+
+-   `status`: Invoice status (`open`, `closed`, `overdue`, `cancelled`)
+-   `remarks`: Additional notes about the payment
+-   `payment_project`: Project code for payment
+-   `sap_doc`: SAP document reference
+
+**Headers**:
+
+```
+X-API-Key: YOUR_DDS_API_KEY
+Accept: application/json
+Content-Type: application/json
+```
+
+**Example Request**:
+
+```bash
+curl -X PUT "https://your-domain.com/api/v1/invoices/1/payment" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payment_date": "2025-01-27",
+    "status": "closed",
+    "remarks": "Payment completed via bank transfer"
+  }'
+```
+
+**PowerShell**:
+
+```powershell
+$body = @{
+    payment_date = "2025-01-27"
+    status = "closed"
+    remarks = "Payment completed via bank transfer"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "https://your-domain.com/api/v1/invoices/1/payment" -Method PUT -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"; "Content-Type"="application/json"} -Body $body
+```
+
+**Response**:
+
+```json
+{
+    "success": true,
+    "message": "Invoice payment updated successfully",
+    "data": {
+        "id": 1,
+        "invoice_number": "INV-001",
+        "faktur_no": "FK-001",
+        "invoice_date": "2025-01-15",
+        "receive_date": "2025-01-20",
+        "supplier_name": "Supplier ABC",
+        "supplier_sap_code": "SUP001",
+        "po_no": "PO-001",
+        "receive_project": "PRJ001",
+        "invoice_project": "PRJ001",
+        "payment_project": "PRJ001",
+        "currency": "IDR",
+        "amount": 1000000.0,
+        "invoice_type": "regular",
+        "payment_date": "2025-01-27",
+        "paid_by": "John Doe",
+        "remarks": "Payment completed via bank transfer",
+        "status": "closed",
+        "sap_doc": "SAP-2025-001"
+    },
+    "meta": {
+        "updated_at": "2025-01-27T10:30:00Z",
+        "payment_status": "paid"
+    }
+}
+```
+
 ## **Available Department Location Codes**
 
 Based on your DepartmentSeeder, the following location codes are available:
@@ -245,25 +420,26 @@ Based on your DepartmentSeeder, the following location codes are available:
 
 ### **Invoice Fields**
 
-| Field               | Type    | Description                    |
-| ------------------- | ------- | ------------------------------ |
-| `invoice_number`    | string  | Internal invoice number        |
-| `faktur_no`         | string  | Official faktur number         |
-| `invoice_date`      | date    | Date when invoice was issued   |
-| `receive_date`      | date    | Date when invoice was received |
-| `supplier_name`     | string  | Name of the supplier           |
-| `supplier_sap_code` | string  | Supplier's SAP code            |
-| `po_no`             | string  | Purchase order number          |
-| `receive_project`   | string  | Project code for receiving     |
-| `invoice_project`   | string  | Project code for invoice       |
-| `payment_project`   | string  | Project code for payment       |
-| `currency`          | string  | Currency code (e.g., IDR, USD) |
-| `amount`            | decimal | Invoice amount                 |
-| `invoice_type`      | string  | Type of invoice                |
-| `payment_date`      | date    | Date when payment was made     |
-| `remarks`           | string  | Additional notes or comments   |
-| `status`            | string  | Current invoice status         |
-| `sap_doc`           | string  | SAP document reference         |
+| Field               | Type    | Description                           |
+| ------------------- | ------- | ------------------------------------- |
+| `invoice_number`    | string  | Internal invoice number               |
+| `faktur_no`         | string  | Official faktur number                |
+| `invoice_date`      | date    | Date when invoice was issued          |
+| `receive_date`      | date    | Date when invoice was received        |
+| `supplier_name`     | string  | Name of the supplier                  |
+| `supplier_sap_code` | string  | Supplier's SAP code                   |
+| `po_no`             | string  | Purchase order number                 |
+| `receive_project`   | string  | Project code for receiving            |
+| `invoice_project`   | string  | Project code for invoice              |
+| `payment_project`   | string  | Project code for payment              |
+| `currency`          | string  | Currency code (e.g., IDR, USD)        |
+| `amount`            | decimal | Invoice amount                        |
+| `invoice_type`      | string  | Type of invoice                       |
+| `payment_date`      | date    | Date when payment was made            |
+| `paid_by`           | string  | Name of the user who made the payment |
+| `remarks`           | string  | Additional notes or comments          |
+| `status`            | string  | Current invoice status                |
+| `sap_doc`           | string  | SAP document reference                |
 
 ### **Additional Document Fields**
 
