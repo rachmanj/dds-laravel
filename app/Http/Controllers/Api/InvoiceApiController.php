@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdditionalDocument;
 use App\Models\Department;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
@@ -75,6 +76,7 @@ class InvoiceApiController extends Controller
                 'additionalDocuments',
                 'type',
                 'user',
+                'department',
                 'distributions' => function ($query) use ($locationCode) {
                     $query->where('destination_department_id', function ($subQuery) use ($locationCode) {
                         $subQuery->select('id')
@@ -128,6 +130,9 @@ class InvoiceApiController extends Controller
                     'remarks' => $invoice->remarks,
                     'status' => $invoice->status,
                     'sap_doc' => $invoice->sap_doc,
+                    'cur_loc' => $invoice->cur_loc,
+                    'department_location_code' => $invoice->cur_loc,
+                    'department_name' => $invoice->department ? $invoice->department->name : null,
                     'additional_documents' => $invoice->additionalDocuments->map(function ($doc) {
                         return [
                             'id' => $doc->id,
@@ -669,6 +674,164 @@ class InvoiceApiController extends Controller
                 'success' => false,
                 'error' => 'Internal server error',
                 'message' => 'An error occurred while processing your request'
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Get invoice information by document number (invoice number or additional document number)
+     *
+     * @param Request $request
+     * @param string|null $documentNumber
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getInvoiceByDocumentNumber(Request $request, $documentNumber = null)
+    {
+        try {
+            if (empty($documentNumber)) {
+                Log::warning('API document search - empty document number', [
+                    'ip' => $request->ip(),
+                    'timestamp' => now()
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Bad request',
+                    'message' => 'Document number is required'
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Search for invoice by invoice number
+            $invoice = Invoice::with([
+                'supplier',
+                'additionalDocuments',
+                'type',
+                'user',
+                'department',
+                'distributions' => function ($query) {
+                    $query->orderBy('created_at', 'desc')->limit(1);
+                },
+                'distributions.type',
+                'distributions.originDepartment',
+                'distributions.destinationDepartment',
+                'distributions.creator'
+            ])->where('invoice_number', $documentNumber)->first();
+
+            // If not found by invoice number, search by additional document number
+            if (!$invoice) {
+                $additionalDocument = AdditionalDocument::with('invoice.supplier', 'invoice.type', 'invoice.user', 'invoice.distributions.type', 'invoice.distributions.originDepartment', 'invoice.distributions.destinationDepartment', 'invoice.distributions.creator')
+                    ->where('document_number', $documentNumber)
+                    ->first();
+
+                if ($additionalDocument && $additionalDocument->invoice) {
+                    $invoice = $additionalDocument->invoice;
+                    // Reload with all relationships
+                    $invoice->load([
+                        'supplier',
+                        'additionalDocuments',
+                        'type',
+                        'user',
+                        'department',
+                        'distributions' => function ($query) {
+                            $query->orderBy('created_at', 'desc')->limit(1);
+                        },
+                        'distributions.type',
+                        'distributions.originDepartment',
+                        'distributions.destinationDepartment',
+                        'distributions.creator'
+                    ]);
+                }
+            }
+
+            if (!$invoice) {
+                Log::info('API document search - document not found', [
+                    'document_number' => $documentNumber,
+                    'ip' => $request->ip(),
+                    'timestamp' => now()
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Not found',
+                    'message' => 'Document not found'
+                ], Response::HTTP_NOT_FOUND);
+            }
+
+            Log::info('API document search successful', [
+                'document_number' => $documentNumber,
+                'invoice_id' => $invoice->id,
+                'found_by' => $invoice->invoice_number === $documentNumber ? 'invoice_number' : 'additional_document_number',
+                'ip' => $request->ip(),
+                'timestamp' => now()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Document found successfully',
+                'data' => [
+                    'id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number ? str_replace(['\\', '\/', '\\\\'], ['/', '/', '/'], $invoice->invoice_number) : null,
+                    'faktur_no' => $invoice->faktur_no ? str_replace(['\\', '\/', '\\\\'], ['/', '/', '/'], $invoice->faktur_no) : null,
+                    'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : null,
+                    'receive_date' => $invoice->receive_date ? $invoice->receive_date->format('Y-m-d') : null,
+                    'supplier_name' => $invoice->supplier->name ?? null,
+                    'supplier_sap_code' => $invoice->supplier->sap_code ?? null,
+                    'po_no' => $invoice->po_no,
+                    'receive_project' => $invoice->receive_project,
+                    'invoice_project' => $invoice->invoice_project,
+                    'payment_project' => $invoice->payment_project,
+                    'currency' => $invoice->currency,
+                    'amount' => $invoice->amount,
+                    'invoice_type' => $invoice->type->type_name ?? null,
+                    'payment_date' => $invoice->payment_date ? $invoice->payment_date->format('Y-m-d') : null,
+                    'paid_by' => $invoice->user ? $invoice->user->name : null,
+                    'remarks' => $invoice->remarks,
+                    'status' => $invoice->status,
+                    'sap_doc' => $invoice->sap_doc,
+                    'cur_loc' => $invoice->cur_loc,
+                    'department_location_code' => $invoice->cur_loc,
+                    'department_name' => $invoice->department ? $invoice->department->name : null,
+                    'additional_documents' => $invoice->additionalDocuments->map(function ($doc) {
+                        return [
+                            'id' => $doc->id,
+                            'document_no' => $doc->document_number ? str_replace(['\\', '\/', '\\\\'], ['/', '/', '/'], $doc->document_number) : null,
+                            'document_date' => $doc->document_date ? $doc->document_date->format('Y-m-d') : null,
+                            'document_type' => $doc->type->type_name ?? '',
+                        ];
+                    })->toArray(),
+                    'distribution' => $invoice->distributions->first() ? [
+                        'id' => $invoice->distributions->first()->id,
+                        'distribution_number' => $invoice->distributions->first()->distribution_number,
+                        'type' => $invoice->distributions->first()->type->name ?? null,
+                        'origin_department' => $invoice->distributions->first()->originDepartment->name ?? null,
+                        'destination_department' => $invoice->distributions->first()->destinationDepartment->name ?? null,
+                        'status' => $invoice->distributions->first()->status,
+                        'created_by' => $invoice->distributions->first()->creator->name ?? null,
+                        'created_at' => $invoice->distributions->first()->created_at ? $invoice->distributions->first()->created_at->format('Y-m-d H:i:s') : null,
+                        'sender_verified_at' => $invoice->distributions->first()->sender_verified_at ? $invoice->distributions->first()->sender_verified_at->format('Y-m-d H:i:s') : null,
+                        'sent_at' => $invoice->distributions->first()->sent_at ? $invoice->distributions->first()->sent_at->format('Y-m-d H:i:s') : null,
+                        'received_at' => $invoice->distributions->first()->received_at ? $invoice->distributions->first()->received_at->format('Y-m-d H:i:s') : null,
+                        'receiver_verified_at' => $invoice->distributions->first()->receiver_verified_at ? $invoice->distributions->first()->receiver_verified_at->format('Y-m-d H:i:s') : null,
+                        'has_discrepancies' => $invoice->distributions->first()->has_discrepancies,
+                        'notes' => $invoice->distributions->first()->notes,
+                    ] : null,
+                ],
+                'meta' => [
+                    'document_number_searched' => $documentNumber,
+                    'found_by' => $invoice->invoice_number === $documentNumber ? 'invoice_number' : 'additional_document_number',
+                    'requested_at' => now()->toISOString()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('API document search error', [
+                'document_number' => $documentNumber,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'ip' => $request->ip(),
+                'timestamp' => now()
+            ]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Internal server error',
+                'message' => 'An error occurred while searching for document'
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

@@ -2692,3 +2692,82 @@ After implementing the comprehensive dashboard analytics system, we needed to cr
 -   **Mobile-Optimized**: Guides optimized for mobile devices
 
 ---
+
+## **Decision Record: API Documentation Organization** 📚
+
+**Date**: 2025-01-27  
+**Status**: ✅ **IMPLEMENTED**  
+**Review Date**: 2026-01-27
+
+### **Context**
+
+After implementing the comprehensive external invoice API system with multiple endpoints, comprehensive documentation, and testing scripts, we needed to organize the documentation files according to .cursorrules guidelines for better project structure and maintainability.
+
+### **Options Considered**
+
+1. **Keep in Root Directory**: Maintain API documentation in project root
+2. **Move to docs/ Folder**: Centralize all documentation in dedicated folder
+3. **Separate API Folder**: Create dedicated `api-docs/` folder
+4. **Hybrid Approach**: Keep some docs in root, others in docs/
+
+### **Chosen Solution**
+
+**Centralized Documentation in docs/ Folder**
+
+-   **Location**: Move all API documentation to `docs/` folder
+-   **Structure**: Maintain existing file names and content
+-   **Organization**: Follow .cursorrules guidelines for documentation structure
+-   **Consistency**: Align with existing documentation organization
+
+### **Implementation Details**
+
+#### **Files Moved**
+
+-   `API_DOCUMENTATION.md` → `docs/API_DOCUMENTATION.md`
+-   `API_TEST_SCRIPT.md` → `docs/API_TEST_SCRIPT.md`
+
+#### **Benefits of Centralization**
+
+-   **Better Organization**: All documentation now in one location
+-   **Easier Maintenance**: Developers know where to find documentation
+-   **Project Structure**: Follows Laravel 11+ best practices
+-   **Version Control**: Documentation changes tracked alongside code
+-   **Consistency**: Aligns with existing documentation structure
+
+### **Consequences**
+
+#### **Positive Outcomes**
+
+-   **Improved Maintainability**: Easier to find and update documentation
+-   **Better Project Structure**: Follows industry best practices
+-   **Developer Experience**: Clear organization reduces confusion
+-   **Documentation Consistency**: All docs follow same organizational pattern
+
+#### **Maintenance Considerations**
+
+-   **File References**: Update any hardcoded references to documentation files
+-   **Documentation Links**: Ensure internal links remain functional
+-   **README Updates**: Update project README to reflect new structure
+-   **Team Communication**: Inform team of new documentation location
+
+### **Success Metrics**
+
+-   **Organization**: All documentation now centralized in docs/ folder
+-   **Maintainability**: Easier to locate and update documentation
+-   **Consistency**: Documentation structure aligns with .cursorrules guidelines
+-   **Developer Experience**: Improved project organization and clarity
+
+### **Future Considerations**
+
+-   **Documentation Index**: Create master index of all documentation
+-   **Search Functionality**: Implement documentation search capabilities
+-   **Automated Updates**: Sync documentation with code changes
+-   **External Access**: Consider external documentation hosting for API consumers
+
+---
+
+**Last Updated**: 2025-01-27  
+**Version**: 4.4  
+**Status**: ✅ **Production Ready** - API documentation organized, comprehensive workflow protection & layout issues resolved
+
+---

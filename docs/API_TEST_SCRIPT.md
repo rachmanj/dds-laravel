@@ -119,6 +119,9 @@ curl -X GET "http://your-domain.com/api/v1/departments/000HACC/invoices" \
                 "remarks": "Sample invoice",
                 "status": "open",
                 "sap_doc": "DOC001",
+                "cur_loc": "000HACC",
+                "department_location_code": "000HACC",
+                "department_name": "Accounting",
                 "additional_documents": [
                     {
                         "document_no": "DOC-001",
@@ -420,6 +423,9 @@ Invoke-RestMethod -Uri "http://localhost:8000/api/v1/departments/000HACC/invoice
                 "remarks": "Sample invoice",
                 "status": "open",
                 "sap_doc": "DOC001",
+                "cur_loc": "000HACC",
+                "department_location_code": "000HACC",
+                "department_name": "Accounting",
                 "additional_documents": [
                     {
                         "id": 1,
@@ -812,7 +818,249 @@ After running all tests, verify:
 ✅ **Logging**: All API access properly logged  
 ✅ **Security**: Unauthorized access properly blocked  
 ✅ **Performance**: Response times are acceptable  
-✅ **Data Integrity**: Returned data matches database
+✅ **Data Integrity**: Returned data matches database  
+✅ **Payment Updates**: Invoice payment updates work correctly  
+✅ **Document Search**: Document number search works for both invoice and additional document numbers
+
+## **Test 14: Get Invoice by Document Number**
+
+### **Test 14.1: Search by Invoice Number**
+
+**Purpose**: Verify that the document search endpoint can find invoices by invoice number
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/documents/INV001" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/documents/INV001" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should return complete invoice data:
+
+```json
+{
+    "success": true,
+    "message": "Document found successfully",
+    "data": {
+        "id": 1,
+        "invoice_number": "INV001",
+        "faktur_no": null,
+        "invoice_date": "2025-08-20",
+        "receive_date": "2025-08-22",
+        "supplier_name": "ABADI TOWER",
+        "supplier_sap_code": "VABTOIDR01",
+        "po_no": "PO001",
+        "receive_project": "000H",
+        "invoice_project": "017C",
+        "payment_project": "001H",
+        "currency": "IDR",
+        "amount": "2350000.00",
+        "invoice_type": "Item",
+        "payment_date": "2025-08-27",
+        "paid_by": "John Doe",
+        "remarks": "Payment completed via bank transfer",
+        "status": "closed",
+        "sap_doc": null,
+        "additional_documents": [
+            {
+                "id": 1,
+                "document_no": "DOC001",
+                "document_date": "2025-08-25",
+                "document_type": "Supporting Document"
+            }
+        ],
+        "distribution": {
+            "id": 1,
+            "distribution_number": "DIST001",
+            "type": "Internal",
+            "origin_department": "Accounting",
+            "destination_department": "Finance",
+            "status": "completed",
+            "created_by": "John Doe",
+            "created_at": "2025-08-25 10:30:00",
+            "sender_verified_at": "2025-08-25 10:35:00",
+            "sent_at": "2025-08-25 10:40:00",
+            "received_at": "2025-08-25 14:20:00",
+            "receiver_verified_at": "2025-08-25 14:25:00",
+            "has_discrepancies": false,
+            "notes": null
+        }
+    },
+    "meta": {
+        "document_number_searched": "INV001",
+        "found_by": "invoice_number",
+        "requested_at": "2025-01-27T10:30:00Z"
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ Returns 200 OK status
+-   ✅ Complete invoice data structure
+-   ✅ Additional documents included
+-   ✅ Distribution information included
+-   ✅ Meta information shows search details
+-   ✅ Found_by indicates "invoice_number"
+
+### **Test 14.2: Search by Additional Document Number**
+
+**Purpose**: Verify that the document search endpoint can find invoices by additional document number
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/documents/DOC001" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/documents/DOC001" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should return the same invoice data but with different meta information:
+
+```json
+{
+    "success": true,
+    "message": "Document found successfully",
+    "data": {
+        "id": 1,
+        "invoice_number": "INV001",
+        "faktur_no": null,
+        "invoice_date": "2025-08-20",
+        "receive_date": "2025-08-22",
+        "supplier_name": "ABADI TOWER",
+        "supplier_sap_code": "VABTOIDR01",
+        "po_no": "PO001",
+        "receive_project": "000H",
+        "invoice_project": "017C",
+        "payment_project": "001H",
+        "currency": "IDR",
+        "amount": "2350000.00",
+        "invoice_type": "Item",
+        "payment_date": "2025-08-27",
+        "paid_by": "John Doe",
+        "remarks": "Payment completed via bank transfer",
+        "status": "closed",
+        "sap_doc": null,
+        "additional_documents": [
+            {
+                "id": 1,
+                "document_no": "DOC001",
+                "document_date": "2025-08-25",
+                "document_type": "Supporting Document"
+            }
+        ],
+        "distribution": {
+            "id": 1,
+            "distribution_number": "DIST001",
+            "type": "Internal",
+            "origin_department": "Accounting",
+            "destination_department": "Finance",
+            "status": "completed",
+            "created_by": "John Doe",
+            "created_at": "2025-08-25 10:30:00",
+            "sender_verified_at": "2025-08-25 10:35:00",
+            "sent_at": "2025-08-25 10:40:00",
+            "received_at": "2025-08-25 14:20:00",
+            "receiver_verified_at": "2025-08-25 14:25:00",
+            "has_discrepancies": false,
+            "notes": null
+        }
+    },
+    "meta": {
+        "document_number_searched": "DOC001",
+        "found_by": "additional_document_number",
+        "requested_at": "2025-01-27T10:30:00Z"
+    }
+}
+```
+
+**Verification Points**:
+
+-   ✅ Returns 200 OK status
+-   ✅ Same invoice data structure
+-   ✅ Found_by indicates "additional_document_number"
+-   ✅ Meta shows correct document number searched
+
+### **Test 14.3: Document Not Found**
+
+**Purpose**: Verify that the document search endpoint handles non-existent document numbers properly
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/documents/NONEXISTENT" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/documents/NONEXISTENT" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should return 404 Not Found:
+
+```json
+{
+    "success": false,
+    "error": "Not found",
+    "message": "Document not found"
+}
+```
+
+**Verification Points**:
+
+-   ✅ Returns 404 Not Found status
+-   ✅ Clear error message about document not found
+-   ✅ Proper error handling for non-existent documents
+
+### **Test 14.4: Empty Document Number**
+
+**Purpose**: Verify that the document search endpoint handles empty document numbers properly
+
+**Request**:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/documents/" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/documents/" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Expected Response**: Should return 400 Bad Request:
+
+```json
+{
+    "success": false,
+    "error": "Bad request",
+    "message": "Document number is required"
+}
+```
+
+**Verification Points**:
+
+-   ✅ Returns 400 Bad Request status
+-   ✅ Clear error message about required document number
+-   ✅ Proper validation for empty document numbers
 
 ## **Troubleshooting**
 

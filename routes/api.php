@@ -37,6 +37,9 @@ Route::prefix('v1')->middleware(['api.key', 'api.rate.limit'])->group(function (
     // Invoice payment update endpoint
     Route::put('/invoices/{invoice_id}/payment', [InvoiceApiController::class, 'updateInvoicePayment']);
 
+    // Get invoice by document number (invoice number or additional document number)
+    Route::get('/documents/{document_number?}', [InvoiceApiController::class, 'getInvoiceByDocumentNumber']);
+
     // Get available departments for reference
     Route::get('/departments', [InvoiceApiController::class, 'getDepartments']);
 });

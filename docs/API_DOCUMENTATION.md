@@ -176,6 +176,9 @@ curl -X GET "https://your-domain.com/api/v1/departments/000HACC/invoices?status=
                 "remarks": "Sample invoice",
                 "status": "open",
                 "sap_doc": "DOC001",
+                "cur_loc": "000HACC",
+                "department_location_code": "000HACC",
+                "department_name": "Accounting",
                 "additional_documents": [
                     {
                         "document_no": "DOC-001",
@@ -378,12 +381,128 @@ Invoke-RestMethod -Uri "https://your-domain.com/api/v1/invoices/1/payment" -Meth
         "paid_by": "John Doe",
         "remarks": "Payment completed via bank transfer",
         "status": "closed",
-        "sap_doc": "SAP-2025-001"
+        "sap_doc": "SAP-2025-001",
+        "cur_loc": "000HACC",
+        "department_location_code": "000HACC",
+        "department_name": "Accounting"
     },
     "meta": {
         "updated_at": "2025-01-27T10:30:00Z",
         "payment_status": "paid"
     }
+}
+```
+
+### **7. Get Invoice by Document Number**
+
+Retrieve invoice information by searching for a document number (invoice number or additional document number).
+
+**Endpoint**: `GET /api/v1/documents/{document_number}`
+
+**Parameters**:
+
+-   `document_number` (path, required): Document number to search for (can be invoice number or additional document number)
+
+**Headers**:
+
+```
+X-API-Key: YOUR_DDS_API_KEY
+Accept: application/json
+```
+
+**Example Request**:
+
+```bash
+curl -X GET "https://your-domain.com/api/v1/documents/INV001" \
+  -H "X-API-Key: YOUR_DDS_API_KEY" \
+  -H "Accept: application/json"
+```
+
+**PowerShell**:
+
+```powershell
+Invoke-RestMethod -Uri "https://your-domain.com/api/v1/documents/INV001" -Method GET -Headers @{"X-API-Key"="YOUR_DDS_API_KEY"; "Accept"="application/json"}
+```
+
+**Response**:
+
+```json
+{
+    "success": true,
+    "message": "Document found successfully",
+    "data": {
+        "id": 1,
+        "invoice_number": "INV001",
+        "faktur_no": null,
+        "invoice_date": "2025-08-20",
+        "receive_date": "2025-08-22",
+        "supplier_name": "ABADI TOWER",
+        "supplier_sap_code": "VABTOIDR01",
+        "po_no": "PO001",
+        "receive_project": "000H",
+        "invoice_project": "017C",
+        "payment_project": "001H",
+        "currency": "IDR",
+        "amount": "2350000.00",
+        "invoice_type": "Item",
+        "payment_date": "2025-08-27",
+        "paid_by": "John Doe",
+        "remarks": "Payment completed via bank transfer",
+        "status": "closed",
+        "sap_doc": null,
+        "cur_loc": "000HACC",
+        "department_location_code": "000HACC",
+        "department_name": "Accounting",
+        "additional_documents": [
+            {
+                "id": 1,
+                "document_no": "DOC001",
+                "document_date": "2025-08-25",
+                "document_type": "Supporting Document"
+            }
+        ],
+        "distribution": {
+            "id": 1,
+            "distribution_number": "DIST001",
+            "type": "Internal",
+            "origin_department": "Accounting",
+            "destination_department": "Finance",
+            "status": "completed",
+            "created_by": "John Doe",
+            "created_at": "2025-08-25 10:30:00",
+            "sender_verified_at": "2025-08-25 10:35:00",
+            "sent_at": "2025-08-25 10:40:00",
+            "received_at": "2025-08-25 14:20:00",
+            "receiver_verified_at": "2025-08-25 14:25:00",
+            "has_discrepancies": false,
+            "notes": null
+        }
+    },
+    "meta": {
+        "document_number_searched": "INV001",
+        "found_by": "invoice_number",
+        "requested_at": "2025-01-27T10:30:00Z"
+    }
+}
+```
+
+**Error Response (Document Not Found)**:
+
+```json
+{
+    "success": false,
+    "error": "Not found",
+    "message": "Document not found"
+}
+```
+
+**Error Response (Empty Document Number)**:
+
+```json
+{
+    "success": false,
+    "error": "Bad request",
+    "message": "Document number is required"
 }
 ```
 
@@ -420,26 +539,29 @@ Based on your DepartmentSeeder, the following location codes are available:
 
 ### **Invoice Fields**
 
-| Field               | Type    | Description                           |
-| ------------------- | ------- | ------------------------------------- |
-| `invoice_number`    | string  | Internal invoice number               |
-| `faktur_no`         | string  | Official faktur number                |
-| `invoice_date`      | date    | Date when invoice was issued          |
-| `receive_date`      | date    | Date when invoice was received        |
-| `supplier_name`     | string  | Name of the supplier                  |
-| `supplier_sap_code` | string  | Supplier's SAP code                   |
-| `po_no`             | string  | Purchase order number                 |
-| `receive_project`   | string  | Project code for receiving            |
-| `invoice_project`   | string  | Project code for invoice              |
-| `payment_project`   | string  | Project code for payment              |
-| `currency`          | string  | Currency code (e.g., IDR, USD)        |
-| `amount`            | decimal | Invoice amount                        |
-| `invoice_type`      | string  | Type of invoice                       |
-| `payment_date`      | date    | Date when payment was made            |
-| `paid_by`           | string  | Name of the user who made the payment |
-| `remarks`           | string  | Additional notes or comments          |
-| `status`            | string  | Current invoice status                |
-| `sap_doc`           | string  | SAP document reference                |
+| Field                      | Type    | Description                                     |
+| -------------------------- | ------- | ----------------------------------------------- |
+| `invoice_number`           | string  | Internal invoice number                         |
+| `faktur_no`                | string  | Official faktur number                          |
+| `invoice_date`             | date    | Date when invoice was issued                    |
+| `receive_date`             | date    | Date when invoice was received                  |
+| `supplier_name`            | string  | Name of the supplier                            |
+| `supplier_sap_code`        | string  | Supplier's SAP code                             |
+| `po_no`                    | string  | Purchase order number                           |
+| `receive_project`          | string  | Project code for receiving                      |
+| `invoice_project`          | string  | Project code for invoice                        |
+| `payment_project`          | string  | Project code for payment                        |
+| `currency`                 | string  | Currency code (e.g., IDR, USD)                  |
+| `amount`                   | decimal | Invoice amount                                  |
+| `invoice_type`             | string  | Type of invoice                                 |
+| `payment_date`             | date    | Date when payment was made                      |
+| `paid_by`                  | string  | Name of the user who made the payment           |
+| `remarks`                  | string  | Additional notes or comments                    |
+| `status`                   | string  | Current invoice status                          |
+| `sap_doc`                  | string  | SAP document reference                          |
+| `cur_loc`                  | string  | Current location code of the invoice            |
+| `department_location_code` | string  | Department location code (same as cur_loc)      |
+| `department_name`          | string  | Name of the department where invoice is located |
 
 ### **Additional Document Fields**
 

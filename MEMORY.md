@@ -2,6 +2,209 @@
 
 ## 📝 **Key Decisions & Learnings**
 
+### **2025-01-27: API Response Enhancement - cur_loc and Department Information**
+
+**Version**: 4.13  
+**Status**: ✅ **API Response Enhancement Completed Successfully**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 30 minutes (comprehensive API response update)
+
+### **2025-01-27: API Documentation Organization**
+
+**Version**: 4.14  
+**Status**: ✅ **API Documentation Organization Completed Successfully**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 15 minutes (documentation reorganization)
+
+**Project Scope**: Reorganize API documentation files into the `docs/` folder for better project structure and maintainability
+
+#### **1. Project Overview & Success**
+
+**Decision**: Move API documentation files to `docs/` folder for better organization  
+**Context**: Following .cursorrules guidelines for proper documentation structure  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 15 minutes
+
+#### **2. Implementation Details**
+
+**Files Moved**:
+
+-   `API_DOCUMENTATION.md` → `docs/API_DOCUMENTATION.md`
+-   `API_TEST_SCRIPT.md` → `docs/API_TEST_SCRIPT.md`
+
+**Benefits**:
+
+-   **Better Organization**: All documentation now centralized in `docs/` folder
+-   **Maintainability**: Easier to find and update documentation
+-   **Project Structure**: Follows Laravel 11+ best practices
+-   **Consistency**: Aligns with existing documentation structure
+
+**Learning**: Proper file organization improves project maintainability and developer experience
+
+**Project Scope**: Enhance all invoice API endpoints to include `cur_loc` (current location), `department_location_code`, and `department_name` fields for better data context and consistency
+
+#### **1. Project Overview & Success**
+
+**Decision**: Add department location and name information to all invoice API responses for better data context
+**Context**: External applications needed to know the current location and department of invoices for proper business logic
+**Implementation Date**: 2025-01-27
+**Actual Effort**: 30 minutes (systematic update across all API endpoints)
+**Status**: ✅ **COMPLETED** - All invoice API endpoints now include department location information
+
+**Learning**: Consistent data structure across all API endpoints improves developer experience and reduces integration complexity
+
+#### **2. New API Response Fields Implementation**
+
+**Decision**: Add three new fields to all invoice API responses
+**Implementation**:
+
+**New Fields Added**:
+
+1. **`cur_loc`**: Current location code of the invoice (e.g., "000HACC")
+2. **`department_location_code`**: Department location code (same as cur_loc for consistency)
+3. **`department_name`**: Name of the department where invoice is located (e.g., "Accounting")
+
+**API Endpoints Updated**:
+
+1. **`GET /api/v1/departments/{location_code}/invoices`** - Main invoices endpoint
+2. **`GET /api/v1/departments/{location_code}/wait-payment-invoices`** - Wait-payment invoices
+3. **`GET /api/v1/departments/{location_code}/paid-invoices`** - Paid invoices
+4. **`PUT /api/v1/invoices/{invoice_id}/payment`** - Payment update endpoint
+5. **`GET /api/v1/documents/{document_number}`** - Document search endpoint
+
+**Technical Implementation**:
+
+```php
+// New fields added to all invoice responses
+'cur_loc' => $invoice->cur_loc,
+'department_location_code' => $invoice->cur_loc,
+'department_name' => $invoice->department ? $invoice->department->name : null,
+
+// Department relationship added to eager loading
+$query = Invoice::with([
+    'supplier',
+    'additionalDocuments',
+    'type',
+    'user',
+    'department', // New relationship
+    'distributions' => function ($query) { /* ... */ }
+]);
+```
+
+**Learning**: Adding consistent data fields across all API endpoints improves developer experience and reduces integration complexity
+
+#### **3. Database Relationship Utilization**
+
+**Decision**: Leverage existing `department` relationship in Invoice model
+**Implementation**:
+
+**Existing Relationship Used**:
+
+-   **Invoice Model**: Already had `department()` relationship method
+-   **Database**: `cur_loc` field already existed in invoices table
+-   **Eager Loading**: Added `department` to all API endpoint queries
+
+**Benefits**:
+
+-   **No Database Changes**: Used existing data structure
+-   **Performance**: Efficient eager loading prevents N+1 queries
+-   **Consistency**: Same data available across all endpoints
+
+**Learning**: Leveraging existing database relationships and fields is more efficient than creating new ones
+
+#### **4. Documentation Updates**
+
+**Decision**: Update all API documentation to reflect new response fields
+**Implementation**:
+
+**Files Updated**:
+
+1. **`API_DOCUMENTATION.md`**: Added new fields to Invoice Fields table and example responses
+2. **`API_TEST_SCRIPT.md`**: Updated test examples to include new fields
+3. **`MEMORY.md`**: Documented implementation details and learnings
+
+**Documentation Consistency**:
+
+-   **Field Descriptions**: Clear explanations of each new field
+-   **Example Responses**: All examples now include the new fields
+-   **Test Scripts**: Test cases updated to verify new fields
+
+**Learning**: Comprehensive documentation updates ensure all stakeholders understand the new API capabilities
+
+#### **5. API Response Structure Enhancement**
+
+**Before Enhancement**:
+
+```json
+{
+    "id": 1,
+    "invoice_number": "INV-001",
+    "status": "open",
+    "sap_doc": "DOC001"
+}
+```
+
+**After Enhancement**:
+
+```json
+{
+    "id": 1,
+    "invoice_number": "INV-001",
+    "status": "open",
+    "sap_doc": "DOC001",
+    "cur_loc": "000HACC",
+    "department_location_code": "000HACC",
+    "department_name": "Accounting"
+}
+```
+
+**Benefits**:
+
+-   **Better Context**: External applications know invoice location
+-   **Business Logic**: Can implement location-based workflows
+-   **Data Consistency**: Same structure across all endpoints
+-   **Integration Ease**: Developers have all needed information
+
+**Learning**: Enhanced API responses with contextual information improve external system integration capabilities
+
+#### **6. System Impact & Performance**
+
+**Performance Impact**: Minimal
+
+-   **Database**: No additional queries (uses existing relationships)
+-   **Memory**: Slight increase in response size (3 new fields)
+-   **Processing**: No additional processing overhead
+
+**System Benefits**:
+
+-   **Developer Experience**: Better API documentation and examples
+-   **Integration**: External systems have complete invoice context
+-   **Maintenance**: Consistent data structure across all endpoints
+-   **Future Development**: Foundation for location-based features
+
+**Learning**: Small enhancements to API responses can significantly improve external system integration capabilities
+
+#### **7. Next Steps & Future Enhancements**
+
+**Immediate Benefits**:
+
+-   ✅ All invoice API endpoints now include department location information
+-   ✅ Consistent response structure across all endpoints
+-   ✅ Enhanced documentation and test examples
+
+**Future Opportunities**:
+
+-   **Location-Based Filtering**: Add filters by current location
+-   **Department Analytics**: Track invoice movement between departments
+-   **Workflow Automation**: Location-based business rule implementation
+-   **Audit Trail**: Enhanced tracking of invoice location changes
+
+**Learning**: Incremental API enhancements create foundation for more sophisticated business logic and automation
+
+---
+
+### **2025-01-27: File Upload Size Enhancement - Complete 50MB Limit Implementation**
+
 ### **2025-01-27: File Upload Size Enhancement - Complete 50MB Limit Implementation**
 
 **Version**: 4.12  

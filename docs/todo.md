@@ -716,6 +716,17 @@ DistributionHistory::create([
 
 ## **Recently Completed**
 
+### **2025-01-27: API Documentation Organization** ✅
+
+-   **Date**: 2025-01-27
+-   **Description**: Reorganized API documentation files into docs/ folder for better project structure
+-   **Details**:
+    -   Moved `API_DOCUMENTATION.md` to `docs/API_DOCUMENTATION.md`
+    -   Moved `API_TEST_SCRIPT.md` to `docs/API_TEST_SCRIPT.md`
+    -   Improved project organization and maintainability
+    -   Follows .cursorrules guidelines for documentation structure
+-   **Status**: ✅ **COMPLETED**
+
 ### **2025-01-27: Transmittal Advice Print Table Structure Fix**
 
 -   ✅ **Fixed critical issue** with empty invoice rows in Transmittal Advice print view

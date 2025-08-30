@@ -697,6 +697,46 @@ public function scopeUnaccountedFor($query)
 -   **Status Validation**: Workflow state validation before actions
 -   **Permission Checking**: Role and department-based access control
 
+## 📚 **Documentation Architecture**
+
+### **API Documentation Structure**
+
+**External API Documentation**:
+
+-   **Location**: `docs/API_DOCUMENTATION.md` - Comprehensive API reference for external developers
+-   **Content**: Complete endpoint documentation, authentication, rate limiting, and error handling
+-   **Examples**: Curl, PowerShell, and JavaScript examples for all endpoints
+-   **Error Scenarios**: Comprehensive error response documentation with troubleshooting
+
+**API Testing Documentation**:
+
+-   **Location**: `docs/API_TEST_SCRIPT.md` - Complete testing guide for API validation
+-   **Content**: Test cases for all endpoints, authentication, rate limiting, and edge cases
+-   **Platform Support**: Windows PowerShell and Unix/Linux command examples
+-   **Validation**: Expected responses and verification points for each test
+
+**Documentation Organization**:
+
+-   **Centralized Location**: All documentation now resides in `docs/` folder
+-   **Consistent Structure**: Follows .cursorrules guidelines for documentation organization
+-   **Maintainability**: Easier to find, update, and maintain documentation
+-   **Version Control**: Documentation changes tracked alongside code changes
+
+### **System Documentation**
+
+**Architecture Documentation**:
+
+-   **Location**: `docs/architecture.md` - System architecture and technical decisions
+-   **Content**: Workflow diagrams, component relationships, and implementation details
+-   **Decisions**: Architectural decisions and their rationale documented
+-   **Maintenance**: Regular updates to reflect current system state
+
+**User Documentation**:
+
+-   **Location**: `docs/User-Operating-Guide.md` - End-user operating instructions
+-   **Content**: Step-by-step workflows, screenshots, and troubleshooting
+-   **Updates**: Synchronized with system changes and new features
+
 ## 🔮 **Future Enhancements**
 
 ### **Scalability Considerations**

@@ -1,3 +1,11 @@
+# DDS Invoice API Testing - VS Code REST Client
+# 
+# For comprehensive API documentation, see:
+# - docs/API_DOCUMENTATION.md - Complete API reference
+# - docs/API_TEST_SCRIPT.md - Testing guide and examples
+#
+# This file contains quick test requests for development and testing
+
 ### Health Check (No Authentication Required)
 GET http://localhost:8000/api/health
 Accept: application/json
@@ -63,3 +71,29 @@ Content-Type: application/json
     "remarks": "Payment completed via bank transfer",
     "paid_by": 2
 }
+
+### Test Get Invoice by Document Number - Invoice Number
+GET http://localhost:8000/api/v1/documents/INV001
+X-API-Key: mantapjiwa
+Accept: application/json
+
+###
+
+### Test Get Invoice by Document Number - Additional Document Number
+GET http://localhost:8000/api/v1/documents/DOC001
+X-API-Key: mantapjiwa
+Accept: application/json
+
+###
+
+### Test Get Invoice by Document Number - Not Found
+GET http://localhost:8000/api/v1/documents/NONEXISTENT
+X-API-Key: mantapjiwa
+Accept: application/json
+
+###
+
+### Test Get Invoice by Document Number - Empty Document Number
+GET http://localhost:8000/api/v1/documents/
+X-API-Key: mantapjiwa
+Accept: application/json
