@@ -2,6 +2,137 @@
 
 ## 📝 **Decision Records**
 
+### **2025-01-27: Bulk Status Update Feature Fixes & Toastr Notifications**
+
+**Decision**: Fix bulk status update functionality and implement Toastr notifications for enhanced user experience
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+The bulk status update feature for document status management was experiencing issues with redundant filtering logic and poor user feedback through JavaScript alerts. Users reported that bulk operations were not working correctly and that alert dialogs were appearing after successful operations.
+
+#### **Requirements Analysis**
+
+**User Requirements**:
+
+-   Fix bulk status reset functionality for both invoices and additional documents
+-   Replace JavaScript alerts with professional notifications
+-   Maintain security and audit trail integrity
+-   Improve overall user experience
+
+**Technical Requirements**:
+
+-   Resolve redundant database filtering issues
+-   Implement proper security filtering for bulk operations
+-   Replace alert() calls with Toastr notifications
+-   Maintain fallback support for notification system
+-   Ensure consistent behavior across all document types
+
+#### **Decision Rationale**
+
+**Bulk Reset Logic Issues**:
+
+-   **Problem**: Redundant `where('distribution_status', 'unaccounted_for')` filter in initial query
+-   **Impact**: Potential performance issues and filtering conflicts
+-   **Solution**: Remove redundant filter and process eligibility in loop
+-   **Reasoning**: Cleaner logic flow and better performance
+
+**Security Enhancement**:
+
+-   **Problem**: Bulk operations lacked department filtering for non-admin users
+-   **Impact**: Potential security vulnerability
+-   **Solution**: Add proper department/location filtering in bulk operations
+-   **Reasoning**: Maintain security consistency across all operations
+
+**Notification System Selection**:
+
+-   **Considered**: Custom notification system vs. Toastr vs. SweetAlert
+-   **Chosen**: Toastr with alert() fallback
+-   **Reasoning**: Toastr provides professional appearance, good integration with AdminLTE, and fallback ensures reliability
+
+#### **Implementation Decisions**
+
+**1. Controller Logic Optimization**:
+
+```php
+// Before: Redundant filtering
+$documents = Invoice::whereIn('id', $documentIds)
+    ->where('distribution_status', 'unaccounted_for')  // Redundant
+    ->get();
+
+// After: Clean filtering with security
+$documents = Invoice::whereIn('id', $documentIds);
+if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+    $userLocationCode = $user->department_location_code;
+    if ($userLocationCode) {
+        $documents->where('cur_loc', $userLocationCode);
+    }
+}
+$documents = $documents->get();
+
+// Process eligibility in loop
+foreach ($documents as $document) {
+    if ($document->distribution_status === 'unaccounted_for') {
+        // Process reset
+    }
+}
+```
+
+**2. Toastr Integration Strategy**:
+
+```javascript
+// Configuration with optimal settings
+toastr.options = {
+    closeButton: true,
+    progressBar: true,
+    positionClass: "toast-top-right",
+    timeOut: 5000,
+    extendedTimeOut: 1000,
+    preventDuplicates: true,
+};
+
+// Fallback pattern for reliability
+if (typeof toastr !== "undefined") {
+    toastr.success("Operation completed successfully");
+} else {
+    alert("Operation completed successfully");
+}
+```
+
+**3. Notification Timing**:
+
+-   **Immediate Feedback**: Toastr notifications appear instantly
+-   **Delayed Reload**: Page reloads after 1.5 seconds to show notification
+-   **Non-Blocking**: Users can continue working while notifications display
+
+#### **Technical Benefits**
+
+**Performance Improvements**:
+
+-   Eliminated redundant database queries
+-   Reduced server load with optimized filtering
+-   Improved response times for bulk operations
+
+**Security Enhancements**:
+
+-   Proper access control for bulk operations
+-   Department-based filtering maintained
+-   Audit trail integrity preserved
+
+**User Experience**:
+
+-   Professional notification system
+-   Non-blocking user feedback
+-   Consistent experience across all pages
+
+#### **Files Modified**
+
+-   `app/Http/Controllers/Admin/DocumentStatusController.php` - Bulk reset logic fixes
+-   `resources/views/admin/document-status/invoices.blade.php` - Toastr integration
+-   `resources/views/admin/document-status/additional-documents.blade.php` - Toastr integration
+
 ### **2025-01-27: Database Query Investigation - MCP vs Laravel Database Access**
 
 **Decision**: Investigate and document database query capabilities for user-project relationships

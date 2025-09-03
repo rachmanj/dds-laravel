@@ -2,6 +2,297 @@
 
 ## 📝 **Key Decisions & Learnings**
 
+### **2025-01-27: Document Status Management - Tabbed Interface Implementation**
+
+**Version**: 4.16  
+**Status**: ✅ **Completed**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 2 hours (routes, controller, views, and documentation)
+
+**Project Scope**: Separate document status management into distinct pages for invoices and additional documents with tabbed navigation
+
+#### **1. Implementation Overview**
+
+**Decision**: Create separate pages for invoice and additional document status management with tab navigation  
+**Context**: User requested improved document status update feature with separation and tab navigation  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 2 hours (comprehensive implementation)
+
+#### **2. Technical Implementation**
+
+**Routes Added**:
+
+```php
+// New routes for separate document type management
+Route::get('document-status/invoices', [DocumentStatusController::class, 'invoices'])->name('document-status.invoices');
+Route::get('document-status/additional-documents', [DocumentStatusController::class, 'additionalDocuments'])->name('document-status.additional-documents');
+```
+
+**Controller Methods Added**:
+
+-   `invoices()` - Handles invoice status management with filtering and pagination
+-   `additionalDocuments()` - Handles additional document status management with filtering and pagination
+-   `getInvoiceStatusCounts()` - Returns status counts for invoices only
+-   `getAdditionalDocumentStatusCounts()` - Returns status counts for additional documents only
+
+**Views Created**:
+
+-   `resources/views/admin/document-status/invoices.blade.php` - Invoice-specific status management
+-   `resources/views/admin/document-status/additional-documents.blade.php` - Additional document status management
+-   Updated `resources/views/admin/document-status/index.blade.php` - Main overview with tab navigation
+
+#### **3. Features Implemented**
+
+**Tab Navigation**:
+
+-   Main overview page with status cards and navigation tabs
+-   Tabs link to separate pages (not same-page tabs)
+-   Active tab highlighting based on current route
+-   Back to overview navigation from individual pages
+
+**Status Management Features**:
+
+-   Individual status reset with reason logging
+-   Bulk status reset (unaccounted_for → available only)
+-   Status filtering (available, in_transit, distributed, unaccounted_for, all)
+-   Search functionality for document numbers, PO numbers, suppliers
+-   Pagination for large datasets
+-   Department/location filtering for non-admin users
+
+**Status Values**:
+
+-   `available` - Available for distribution
+-   `in_transit` - Currently in transit
+-   `distributed` - Successfully distributed
+-   `unaccounted_for` - Missing or unaccounted for
+
+#### **4. User Experience Improvements**
+
+**Navigation Flow**:
+
+1. Main overview page shows combined status counts
+2. Tab navigation to specific document type management
+3. Separate pages with focused functionality
+4. Consistent breadcrumb navigation
+5. Back to overview buttons
+
+**Visual Design**:
+
+-   Status overview cards with icons and counts
+-   Tabbed interface with active state highlighting
+-   Consistent styling across all pages
+-   Responsive design for different screen sizes
+-   Clear action buttons and status badges
+
+#### **5. Technical Architecture**
+
+**Database Integration**:
+
+-   Maintains existing `distribution_status` field usage
+-   Separate queries for invoice and additional document counts
+-   Proper relationship loading (supplier, type, creator)
+-   Department-based filtering for security
+
+**Security & Permissions**:
+
+-   Maintains existing `reset-document-status` permission requirement
+-   Department/location filtering for non-admin users
+-   Audit logging for all status changes
+
+### **2025-01-27: Bulk Status Update Feature Fixes & Toastr Notifications**
+
+**Version**: 4.17  
+**Status**: ✅ **Completed**  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 1 hour (bug fixes and notification improvements)
+
+**Project Scope**: Fix bulk status update functionality and implement Toastr notifications for better user experience
+
+#### **1. Issues Identified & Resolved**
+
+**Bulk Reset Logic Issues**:
+
+-   **Problem**: Redundant filtering in controller query causing potential issues
+-   **Solution**: Removed redundant `where('distribution_status', 'unaccounted_for')` filter from initial query
+-   **Impact**: Improved performance and eliminated potential filtering conflicts
+
+**Security Enhancement**:
+
+-   **Problem**: Bulk operations lacked department filtering for non-admin users
+-   **Solution**: Added proper department/location filtering in `bulkResetStatus()` method
+-   **Impact**: Ensures users can only reset documents they have access to
+
+**JavaScript Alert Issues**:
+
+-   **Problem**: Alert dialogs appearing after successful bulk operations before page reload
+-   **Solution**: Replaced JavaScript alerts with Toastr notifications
+-   **Impact**: Better user experience with non-blocking, styled notifications
+
+#### **2. Technical Implementation**
+
+**Controller Fixes** (`DocumentStatusController.php`):
+
+```php
+// Enhanced bulk reset with proper filtering
+public function bulkResetStatus(Request $request): JsonResponse
+{
+    // ... validation ...
+
+    if ($documentType === 'invoice') {
+        $documents = Invoice::whereIn('id', $documentIds);
+
+        // Apply department filtering for non-admin users
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+            $userLocationCode = $user->department_location_code;
+            if ($userLocationCode) {
+                $documents->where('cur_loc', $userLocationCode);
+            }
+        }
+
+        $documents = $documents->get();
+    }
+
+    // Process only unaccounted_for documents
+    foreach ($documents as $document) {
+        if ($document->distribution_status === 'unaccounted_for') {
+            // ... status update logic ...
+        }
+    }
+}
+```
+
+**Toastr Integration**:
+
+**CSS & JS Includes**:
+
+```html
+<!-- Added to both invoice and additional document views -->
+<link
+    rel="stylesheet"
+    href="{{ asset('adminlte/plugins/toastr/toastr.min.css') }}"
+/>
+<script src="{{ asset('adminlte/plugins/toastr/toastr.min.js') }}"></script>
+```
+
+**Toastr Configuration**:
+
+```javascript
+// Initialize Toastr with optimal settings
+if (typeof toastr !== "undefined") {
+    toastr.options = {
+        closeButton: true,
+        progressBar: true,
+        positionClass: "toast-top-right",
+        timeOut: 5000,
+        extendedTimeOut: 1000,
+        preventDuplicates: true,
+    };
+}
+```
+
+**Notification Types Implemented**:
+
+-   **Success**: Status updates, bulk operations completed
+-   **Warning**: Validation errors (missing selections, empty fields)
+-   **Error**: AJAX failures, server errors
+
+#### **3. User Experience Improvements**
+
+**Notification Flow**:
+
+1. **Before Action**: Warning notifications for validation issues
+2. **During Action**: Progress indication through AJAX
+3. **After Success**: Success notification with operation summary
+4. **After Error**: Error notification with retry guidance
+
+**Bulk Operation Feedback**:
+
+```javascript
+// Enhanced success message with detailed feedback
+const successMsg = `Successfully updated ${response.updated_count} invoice(s).`;
+if (response.skipped_count > 0) {
+    successMsg += ` Skipped ${response.skipped_count} invoice(s) (not eligible for bulk reset).`;
+}
+toastr.success(successMsg);
+```
+
+**Timing Improvements**:
+
+-   **Immediate Feedback**: Toastr notifications appear instantly
+-   **Delayed Reload**: Page reloads after 1.5 seconds to show notification
+-   **Non-Blocking**: Users can continue working while notifications display
+
+#### **4. Technical Benefits**
+
+**Performance Improvements**:
+
+-   Eliminated redundant database queries
+-   Reduced server load with optimized filtering
+-   Improved response times for bulk operations
+
+**Security Enhancements**:
+
+-   Proper access control for bulk operations
+-   Department-based filtering maintained
+-   Audit trail integrity preserved
+
+**Code Quality**:
+
+-   Consistent error handling across all operations
+-   Fallback to alerts if Toastr unavailable
+-   Clean separation of concerns
+
+#### **5. Files Modified**
+
+**Controller**:
+
+-   `app/Http/Controllers/Admin/DocumentStatusController.php` - Bulk reset logic fixes
+
+**Views**:
+
+-   `resources/views/admin/document-status/invoices.blade.php` - Toastr integration
+-   `resources/views/admin/document-status/additional-documents.blade.php` - Toastr integration
+
+**Key Changes**:
+
+-   Added Toastr CSS and JS includes
+-   Replaced all `alert()` calls with `toastr` notifications
+-   Enhanced bulk operation feedback
+-   Improved error handling and user feedback
+-   CSRF protection on all forms
+
+**Performance Considerations**:
+
+-   Pagination to handle large datasets
+-   Efficient queries with proper relationships
+-   Caching of status counts where appropriate
+-   Optimized database queries with proper indexing
+
+#### **6. Business Impact**
+
+**Operational Benefits**:
+
+-   Clear separation of invoice vs additional document management
+-   Improved user experience with focused interfaces
+-   Better organization of document status workflows
+-   Enhanced audit trail for status changes
+
+**Maintenance Benefits**:
+
+-   Modular code structure for easier maintenance
+-   Separate concerns for different document types
+-   Consistent patterns across all status management pages
+-   Well-documented implementation for future development
+
+**Future Enhancements**:
+
+-   Potential for document type-specific features
+-   Enhanced reporting capabilities
+-   Integration with distribution workflows
+-   Advanced filtering and search options
+
+### **2025-01-27: Database Query Investigation - Project 000H Users**
+
 ### **2025-01-27: Database Query Investigation - Project 000H Users**
 
 **Version**: 4.15  

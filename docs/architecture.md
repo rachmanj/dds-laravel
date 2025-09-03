@@ -533,7 +533,86 @@ return [
 
 **System Architecture**:
 
-The Document Status Management system provides comprehensive control over document distribution statuses, allowing administrators to reset and manage document states for workflow continuity.
+The Document Status Management system provides comprehensive control over document distribution statuses through a tabbed interface with separate pages for invoices and additional documents, featuring bulk operations and Toastr notifications.
+
+**Page Structure**:
+
+```
+Document Status Management
+├── Main Overview Page (index.blade.php)
+│   ├── Combined Status Cards
+│   ├── Navigation Tabs
+│   └── Quick Access Buttons
+├── Invoice Status Management (invoices.blade.php)
+│   ├── Invoice-specific Status Cards
+│   ├── Filter & Search Interface
+│   ├── Invoice Table with Pagination
+│   ├── Individual Status Reset Modal
+│   └── Bulk Reset Modal
+└── Additional Document Status Management (additional-documents.blade.php)
+    ├── Document-specific Status Cards
+    ├── Filter & Search Interface
+    ├── Document Table with Pagination
+    ├── Individual Status Reset Modal
+    └── Bulk Reset Modal
+```
+
+**Controller Architecture**:
+
+```php
+DocumentStatusController
+├── index() - Main overview with combined status counts
+├── invoices() - Invoice-specific management with filtering
+├── additionalDocuments() - Additional document management with filtering
+├── resetStatus() - Individual status reset with audit logging
+├── bulkResetStatus() - Bulk operations with security filtering
+├── getStatusCounts() - Combined counts for overview
+├── getInvoiceStatusCounts() - Invoice-specific counts
+└── getAdditionalDocumentStatusCounts() - Document-specific counts
+```
+
+**Status Management Features**:
+
+-   **Individual Reset**: Single document status changes with reason logging
+-   **Bulk Operations**: Mass status reset (unaccounted_for → available only)
+-   **Security Filtering**: Department-based access control for non-admin users
+-   **Audit Trail**: Complete logging of all status changes with reasons
+-   **Toastr Notifications**: Professional notification system with fallback support
+
+**Notification System**:
+
+```javascript
+// Toastr Configuration
+toastr.options = {
+    closeButton: true,
+    progressBar: true,
+    positionClass: "toast-top-right",
+    timeOut: 5000,
+    extendedTimeOut: 1000,
+    preventDuplicates: true,
+};
+
+// Notification Types
+toastr.success("Status updated successfully");
+toastr.warning("Please select documents and provide a reason.");
+toastr.error("Error performing bulk reset. Please try again.");
+```
+
+**Security Architecture**:
+
+-   **Permission Control**: `reset-document-status` permission required
+-   **Department Filtering**: Non-admin users restricted to their department/location
+-   **Bulk Operation Security**: Enhanced filtering for bulk operations
+-   **Audit Compliance**: Complete audit trail for regulatory compliance
+
+**User Experience Flow**:
+
+1. **Overview Access**: Users see combined status counts and navigation tabs
+2. **Type Selection**: Click tabs to access specific document type management
+3. **Filtering**: Apply status filters and search for specific documents
+4. **Operations**: Perform individual or bulk status resets with reason logging
+5. **Feedback**: Receive immediate Toastr notifications for all operations
+6. **Audit**: All changes logged with user, timestamp, and reason
 
 ### **File Upload System**
 

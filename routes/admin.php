@@ -32,10 +32,8 @@ Route::prefix('admin')->name('admin.')->middleware(['role:superadmin|admin'])->g
 
     // Document Status Management
     Route::get('document-status', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'index'])->name('document-status.index');
+    Route::get('document-status/invoices', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'invoices'])->name('document-status.invoices');
+    Route::get('document-status/additional-documents', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'additionalDocuments'])->name('document-status.additional-documents');
     Route::post('document-status/reset', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'resetStatus'])->name('document-status.reset');
     Route::post('document-status/bulk-reset', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'bulkResetStatus'])->name('document-status.bulk-reset');
-    Route::get('document-status/test', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'test'])->name('document-status.test');
-    Route::get('document-status/minimal', function () {
-        return view('admin.document-status.minimal');
-    })->name('document-status.minimal');
 });

@@ -20,25 +20,55 @@ class DocumentStatusController extends Controller
     }
 
     /**
-     * Display the document status management page
+     * Display the main document status management page with tabs
      */
     public function index(Request $request)
     {
         try {
             $user = Auth::user();
-            $statusFilter = $request->get('status', 'all');
-            $documentType = $request->get('document_type', 'all');
-            $search = $request->get('search', '');
 
             // Debug logging
-            Log::info('Document status page accessed', [
+            Log::info('Document status main page accessed', [
                 'user_id' => $user->id,
                 'user_name' => $user->name,
                 'department_location_code' => $user->department_location_code,
                 'roles' => $user->roles->pluck('name')->toArray()
             ]);
 
-            // Build queries for invoices
+            // Get status counts for overview
+            $statusCounts = $this->getStatusCounts($user);
+
+            return view('admin.document-status.index', compact('statusCounts'));
+        } catch (\Exception $e) {
+            Log::error('Document status main page error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->view('errors.500', [], 500);
+        }
+    }
+
+    /**
+     * Display the invoice document status management page
+     */
+    public function invoices(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $statusFilter = $request->get('status', 'all');
+            $search = $request->get('search', '');
+
+            // Debug logging
+            Log::info('Invoice document status page accessed', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'department_location_code' => $user->department_location_code,
+                'roles' => $user->roles->pluck('name')->toArray()
+            ]);
+
+            // Build query for invoices
             $invoicesQuery = Invoice::query()
                 ->with(['supplier', 'creator'])
                 ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
@@ -54,7 +84,64 @@ class DocumentStatusController extends Controller
                     });
                 });
 
-            // Build queries for additional documents
+            // Apply department filtering for non-admin users
+            if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+                $userLocationCode = $user->department_location_code;
+                if ($userLocationCode) {
+                    $invoicesQuery->where('cur_loc', $userLocationCode);
+                }
+            }
+
+            // Get paginated results
+            $invoices = $invoicesQuery->orderBy('created_at', 'desc')->paginate(15);
+
+            // Get status counts for invoices only
+            $statusCounts = $this->getInvoiceStatusCounts($user);
+
+            // Debug logging for view data
+            Log::info('Invoice document status view data', [
+                'invoices_count' => $invoices->count(),
+                'status_counts' => $statusCounts,
+                'status_filter' => $statusFilter,
+                'search' => $search
+            ]);
+
+            return view('admin.document-status.invoices', compact(
+                'invoices',
+                'statusCounts',
+                'statusFilter',
+                'search'
+            ));
+        } catch (\Exception $e) {
+            Log::error('Invoice document status page error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->view('errors.500', [], 500);
+        }
+    }
+
+    /**
+     * Display the additional document status management page
+     */
+    public function additionalDocuments(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $statusFilter = $request->get('status', 'all');
+            $search = $request->get('search', '');
+
+            // Debug logging
+            Log::info('Additional document status page accessed', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'department_location_code' => $user->department_location_code,
+                'roles' => $user->roles->pluck('name')->toArray()
+            ]);
+
+            // Build query for additional documents
             $additionalDocumentsQuery = AdditionalDocument::query()
                 ->with(['type', 'creator'])
                 ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
@@ -71,38 +158,32 @@ class DocumentStatusController extends Controller
             if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
                 $userLocationCode = $user->department_location_code;
                 if ($userLocationCode) {
-                    $invoicesQuery->where('cur_loc', $userLocationCode);
                     $additionalDocumentsQuery->where('cur_loc', $userLocationCode);
                 }
             }
 
             // Get paginated results
-            $invoices = $invoicesQuery->orderBy('created_at', 'desc')->paginate(15);
             $additionalDocuments = $additionalDocumentsQuery->orderBy('created_at', 'desc')->paginate(15);
 
-            // Get status counts for filtering
-            $statusCounts = $this->getStatusCounts($user);
+            // Get status counts for additional documents only
+            $statusCounts = $this->getAdditionalDocumentStatusCounts($user);
 
             // Debug logging for view data
-            Log::info('Document status view data', [
-                'invoices_count' => $invoices->count(),
+            Log::info('Additional document status view data', [
                 'additional_documents_count' => $additionalDocuments->count(),
                 'status_counts' => $statusCounts,
                 'status_filter' => $statusFilter,
-                'document_type' => $documentType,
                 'search' => $search
             ]);
 
-            return view('admin.document-status.index', compact(
-                'invoices',
+            return view('admin.document-status.additional-documents', compact(
                 'additionalDocuments',
                 'statusCounts',
                 'statusFilter',
-                'documentType',
                 'search'
             ));
         } catch (\Exception $e) {
-            Log::error('Document status page error', [
+            Log::error('Additional document status page error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => Auth::id()
@@ -193,13 +274,23 @@ class DocumentStatusController extends Controller
             $updatedCount = 0;
             $skippedCount = 0;
 
+            // Apply department filtering for non-admin users
+            $userLocationCode = null;
+            if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+                $userLocationCode = $user->department_location_code;
+            }
+
             if ($documentType === 'invoice') {
                 $documents = Invoice::whereIn('id', $documentIds)
-                    ->where('distribution_status', 'unaccounted_for')
+                    ->when($userLocationCode, function ($query) use ($userLocationCode) {
+                        return $query->where('cur_loc', $userLocationCode);
+                    })
                     ->get();
             } else {
                 $documents = AdditionalDocument::whereIn('id', $documentIds)
-                    ->where('distribution_status', 'unaccounted_for')
+                    ->when($userLocationCode, function ($query) use ($userLocationCode) {
+                        return $query->where('cur_loc', $userLocationCode);
+                    })
                     ->get();
             }
 
@@ -244,21 +335,13 @@ class DocumentStatusController extends Controller
     }
 
     /**
-     * Get status counts for filtering
+     * Get status counts for all document types (combined)
      */
     private function getStatusCounts($user): array
     {
         $userLocationCode = null;
         if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
             $userLocationCode = $user->department_location_code;
-        }
-
-        $invoicesQuery = Invoice::query();
-        $additionalQuery = AdditionalDocument::query();
-
-        if ($userLocationCode) {
-            $invoicesQuery->where('cur_loc', $userLocationCode);
-            $additionalQuery->where('cur_loc', $userLocationCode);
         }
 
         $statuses = ['available', 'in_transit', 'distributed', 'unaccounted_for'];
@@ -271,6 +354,54 @@ class DocumentStatusController extends Controller
                 })
                 ->count() +
                 AdditionalDocument::where('distribution_status', $status)
+                ->when($userLocationCode, function ($query) use ($userLocationCode) {
+                    return $query->where('cur_loc', $userLocationCode);
+                })
+                ->count();
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Get status counts for invoices only
+     */
+    private function getInvoiceStatusCounts($user): array
+    {
+        $userLocationCode = null;
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+            $userLocationCode = $user->department_location_code;
+        }
+
+        $statuses = ['available', 'in_transit', 'distributed', 'unaccounted_for'];
+        $counts = [];
+
+        foreach ($statuses as $status) {
+            $counts[$status] = Invoice::where('distribution_status', $status)
+                ->when($userLocationCode, function ($query) use ($userLocationCode) {
+                    return $query->where('cur_loc', $userLocationCode);
+                })
+                ->count();
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Get status counts for additional documents only
+     */
+    private function getAdditionalDocumentStatusCounts($user): array
+    {
+        $userLocationCode = null;
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+            $userLocationCode = $user->department_location_code;
+        }
+
+        $statuses = ['available', 'in_transit', 'distributed', 'unaccounted_for'];
+        $counts = [];
+
+        foreach ($statuses as $status) {
+            $counts[$status] = AdditionalDocument::where('distribution_status', $status)
                 ->when($userLocationCode, function ($query) use ($userLocationCode) {
                     return $query->where('cur_loc', $userLocationCode);
                 })
@@ -318,13 +449,5 @@ class DocumentStatusController extends Controller
             'operation_type' => $operationType,
             'timestamp' => now()
         ]);
-    }
-
-    /**
-     * Test method to check basic functionality
-     */
-    public function test()
-    {
-        return view('admin.document-status.test');
     }
 }
