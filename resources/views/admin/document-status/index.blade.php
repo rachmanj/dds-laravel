@@ -10,260 +10,153 @@
 @section('content')
     <section class="content">
         <div class="container-fluid">
-            <!-- Status Overview Cards -->
-            <div class="row">
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h3>{{ $statusCounts['available'] ?? 0 }}</h3>
-                            <p>Available for Distribution</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-info">
-                        <div class="inner">
-                            <h3>{{ $statusCounts['in_transit'] ?? 0 }}</h3>
-                            <p>In Transit</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-truck"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-primary">
-                        <div class="inner">
-                            <h3>{{ $statusCounts['distributed'] ?? 0 }}</h3>
-                            <p>Distributed</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-box"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-warning">
-                        <div class="inner">
-                            <h3>{{ $statusCounts['unaccounted_for'] ?? 0 }}</h3>
-                            <p>Unaccounted For</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Filters and Search -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Filters & Search</h3>
-                        </div>
-                        <div class="card-body">
-                            <form method="GET" action="{{ route('admin.document-status.index') }}" id="filterForm">
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <div class="form-group">
-                                            <label for="status">Status Filter</label>
-                                            <select name="status" id="status" class="form-control">
-                                                <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>All
-                                                    Statuses</option>
-                                                <option value="available"
-                                                    {{ $statusFilter === 'available' ? 'selected' : '' }}>Available</option>
-                                                <option value="in_transit"
-                                                    {{ $statusFilter === 'in_transit' ? 'selected' : '' }}>In Transit
-                                                </option>
-                                                <option value="distributed"
-                                                    {{ $statusFilter === 'distributed' ? 'selected' : '' }}>Distributed
-                                                </option>
-                                                <option value="unaccounted_for"
-                                                    {{ $statusFilter === 'unaccounted_for' ? 'selected' : '' }}>Unaccounted
-                                                    For</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-group">
-                                            <label for="document_type">Document Type</label>
-                                            <select name="document_type" id="document_type" class="form-control">
-                                                <option value="all" {{ $documentType === 'all' ? 'selected' : '' }}>All
-                                                    Types</option>
-                                                <option value="invoice"
-                                                    {{ $documentType === 'invoice' ? 'selected' : '' }}>Invoices</option>
-                                                <option value="additional_document"
-                                                    {{ $documentType === 'additional_document' ? 'selected' : '' }}>
-                                                    Additional Documents</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-group">
-                                            <label for="search">Search</label>
-                                            <input type="text" name="search" id="search" class="form-control"
-                                                placeholder="Search by document number, PO, supplier..."
-                                                value="{{ $search }}">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <div class="form-group">
-                                            <label>&nbsp;</label>
-                                            <button type="submit" class="btn btn-primary btn-block">
-                                                <i class="fas fa-search"></i> Filter
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Invoices Section -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                Invoices
-                                <span class="badge badge-primary">{{ $invoices->total() }}</span>
-                            </h3>
-                            <div class="card-tools">
-                                @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
-                                    <button type="button" class="btn btn-success btn-sm" id="bulkResetInvoices">
-                                        <i class="fas fa-sync-alt"></i> Bulk Reset to Available
-                                    </button>
-                                @endif
+            @if (isset($invoices) && isset($additionalDocuments) && isset($statusCounts))
+                <!-- Status Overview Cards -->
+                <div class="row">
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-success">
+                            <div class="inner">
+                                <h3>{{ $statusCounts['available'] ?? 0 }}</h3>
+                                <p>Available for Distribution</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-check-circle"></i>
                             </div>
                         </div>
-                        <div class="card-body table-responsive p-0">
-                            <table id="invoices-table" class="table table-hover text-nowrap">
-                                <thead>
-                                    <tr>
-                                        <th width="30">
-                                            @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
-                                                <input type="checkbox" id="selectAllInvoices">
-                                            @endif
-                                        </th>
-                                        <th>Invoice #</th>
-                                        <th>PO Number</th>
-                                        <th>Supplier</th>
-                                        <th>Project</th>
-                                        <th>Current Location</th>
-                                        <th>Status</th>
-                                        <th>Created</th>
-                                        <th width="150">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse($invoices as $invoice)
-                                        <tr>
-                                            <td>
-                                                @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
-                                                    <input type="checkbox" class="invoice-checkbox"
-                                                        value="{{ $invoice->id }}">
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <strong>{{ $invoice->invoice_number }}</strong>
-                                                @if ($invoice->po_no)
-                                                    <br><small class="text-muted">PO: {{ $invoice->po_no }}</small>
-                                                @endif
-                                            </td>
-                                            <td>{{ $invoice->po_no ?? 'N/A' }}</td>
-                                            <td>{{ $invoice->supplier->name ?? 'N/A' }}</td>
-                                            <td>{{ $invoice->invoiceProjectInfo->code ?? ($invoice->invoice_project ?? 'N/A') }}
-                                            </td>
-                                            <td>
-                                                <span class="badge badge-info">{{ $invoice->cur_loc ?? 'N/A' }}</span>
-                                            </td>
-                                            <td>
-                                                @switch($invoice->distribution_status)
-                                                    @case('available')
-                                                        <span class="badge badge-success">Available</span>
-                                                    @break
+                    </div>
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-info">
+                            <div class="inner">
+                                <h3>{{ $statusCounts['in_transit'] ?? 0 }}</h3>
+                                <p>In Transit</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-truck"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-primary">
+                            <div class="inner">
+                                <h3>{{ $statusCounts['distributed'] ?? 0 }}</h3>
+                                <p>Distributed</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-box"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-warning">
+                            <div class="inner">
+                                <h3>{{ $statusCounts['unaccounted_for'] ?? 0 }}</h3>
+                                <p>Unaccounted For</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                                                    @case('in_transit')
-                                                        <span class="badge badge-info">In Transit</span>
-                                                    @break
-
-                                                    @case('distributed')
-                                                        <span class="badge badge-primary">Distributed</span>
-                                                    @break
-
-                                                    @case('unaccounted_for')
-                                                        <span class="badge badge-warning">Unaccounted For</span>
-                                                    @break
-
-                                                    @default
-                                                        <span
-                                                            class="badge badge-secondary">{{ $invoice->distribution_status }}</span>
-                                                @endswitch
-                                            </td>
-                                            <td>{{ $invoice->created_at->format('d M Y') }}</td>
-                                            <td>
-                                                <button type="button" class="btn btn-sm btn-primary reset-status-btn"
-                                                    data-document-id="{{ $invoice->id }}" data-document-type="invoice"
-                                                    data-current-status="{{ $invoice->distribution_status }}">
-                                                    <i class="fas fa-edit"></i> Reset Status
+                <!-- Filters and Search -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Filters & Search</h3>
+                            </div>
+                            <div class="card-body">
+                                <form method="GET" action="{{ route('admin.document-status.index') }}" id="filterForm">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="status">Status Filter</label>
+                                                <select name="status" id="status" class="form-control">
+                                                    <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>
+                                                        All Statuses</option>
+                                                    <option value="available"
+                                                        {{ $statusFilter === 'available' ? 'selected' : '' }}>Available
+                                                    </option>
+                                                    <option value="in_transit"
+                                                        {{ $statusFilter === 'in_transit' ? 'selected' : '' }}>In Transit
+                                                    </option>
+                                                    <option value="distributed"
+                                                        {{ $statusFilter === 'distributed' ? 'selected' : '' }}>Distributed
+                                                    </option>
+                                                    <option value="unaccounted_for"
+                                                        {{ $statusFilter === 'unaccounted_for' ? 'selected' : '' }}>
+                                                        Unaccounted For</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="document_type">Document Type</label>
+                                                <select name="document_type" id="document_type" class="form-control">
+                                                    <option value="all" {{ $documentType === 'all' ? 'selected' : '' }}>
+                                                        All Types</option>
+                                                    <option value="invoice"
+                                                        {{ $documentType === 'invoice' ? 'selected' : '' }}>Invoices
+                                                    </option>
+                                                    <option value="additional_document"
+                                                        {{ $documentType === 'additional_document' ? 'selected' : '' }}>
+                                                        Additional Documents</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-group">
+                                                <label for="search">Search</label>
+                                                <input type="text" name="search" id="search" class="form-control"
+                                                    placeholder="Search by document number, PO, supplier..."
+                                                    value="{{ $search }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="form-group">
+                                                <label>&nbsp;</label>
+                                                <button type="submit" class="btn btn-primary btn-block">
+                                                    <i class="fas fa-search"></i> Filter
                                                 </button>
-                                            </td>
-                                        </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="9" class="text-center text-muted py-4">
-                                                    <i class="fas fa-inbox fa-2x mb-2"></i>
-                                                    <p>No invoices found with the current filters.</p>
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
                             </div>
-                            @if ($invoices->hasPages())
-                                <div class="card-footer clearfix">
-                                    {{ $invoices->links() }}
-                                </div>
-                            @endif
                         </div>
                     </div>
                 </div>
 
-                <!-- Additional Documents Section -->
+                <!-- Invoices Section -->
                 <div class="row">
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title">
-                                    Additional Documents
-                                    <span class="badge badge-primary">{{ $additionalDocuments->total() }}</span>
+                                    Invoices
+                                    <span class="badge badge-primary">{{ $invoices->total() }}</span>
                                 </h3>
                                 <div class="card-tools">
                                     @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
-                                        <button type="button" class="btn btn-success btn-sm" id="bulkResetAdditionalDocs">
+                                        <button type="button" class="btn btn-success btn-sm" id="bulkResetInvoices">
                                             <i class="fas fa-sync-alt"></i> Bulk Reset to Available
                                         </button>
                                     @endif
                                 </div>
                             </div>
                             <div class="card-body table-responsive p-0">
-                                <table id="additional-docs-table" class="table table-hover text-nowrap">
+                                <table id="invoices-table" class="table table-hover text-nowrap">
                                     <thead>
                                         <tr>
                                             <th width="30">
                                                 @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
-                                                    <input type="checkbox" id="selectAllAdditionalDocs">
+                                                    <input type="checkbox" id="selectAllInvoices">
                                                 @endif
                                             </th>
-                                            <th>Document #</th>
-                                            <th>Type</th>
+                                            <th>Invoice #</th>
                                             <th>PO Number</th>
+                                            <th>Supplier</th>
                                             <th>Project</th>
                                             <th>Current Location</th>
                                             <th>Status</th>
@@ -272,28 +165,28 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @forelse($additionalDocuments as $doc)
+                                        @forelse($invoices as $invoice)
                                             <tr>
                                                 <td>
                                                     @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
-                                                        <input type="checkbox" class="additional-doc-checkbox"
-                                                            value="{{ $doc->id }}">
+                                                        <input type="checkbox" class="invoice-checkbox"
+                                                            value="{{ $invoice->id }}">
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <strong>{{ $doc->document_number }}</strong>
-                                                    @if ($doc->po_no)
-                                                        <br><small class="text-muted">PO: {{ $doc->po_no }}</small>
+                                                    <strong>{{ $invoice->invoice_number }}</strong>
+                                                    @if ($invoice->po_no)
+                                                        <br><small class="text-muted">PO: {{ $invoice->po_no }}</small>
                                                     @endif
                                                 </td>
-                                                <td>{{ $doc->type->type_name ?? 'N/A' }}</td>
-                                                <td>{{ $doc->po_no ?? 'N/A' }}</td>
-                                                <td>{{ $doc->project ?? 'N/A' }}</td>
+                                                <td>{{ $invoice->po_no ?? 'N/A' }}</td>
+                                                <td>{{ $invoice->supplier->name ?? 'N/A' }}</td>
+                                                <td>{{ $invoice->invoice_project ?? 'N/A' }}</td>
                                                 <td>
-                                                    <span class="badge badge-info">{{ $doc->cur_loc ?? 'N/A' }}</span>
+                                                    <span class="badge badge-info">{{ $invoice->cur_loc ?? 'N/A' }}</span>
                                                 </td>
                                                 <td>
-                                                    @switch($doc->distribution_status)
+                                                    @switch($invoice->distribution_status)
                                                         @case('available')
                                                             <span class="badge badge-success">Available</span>
                                                         @break
@@ -311,15 +204,16 @@
                                                         @break
 
                                                         @default
-                                                            <span class="badge badge-secondary">{{ $doc->distribution_status }}</span>
+                                                            <span
+                                                                class="badge badge-secondary">{{ $invoice->distribution_status }}</span>
                                                     @endswitch
                                                 </td>
-                                                <td>{{ $doc->created_at->format('d M Y') }}</td>
+                                                <td>{{ $invoice->created_at->format('d M Y') }}</td>
                                                 <td>
                                                     <button type="button" class="btn btn-sm btn-primary reset-status-btn"
-                                                        data-document-id="{{ $doc->id }}"
-                                                        data-document-type="additional_document"
-                                                        data-current-status="{{ $doc->distribution_status }}">
+                                                        data-document-id="{{ $invoice->id }}"
+                                                        data-document-type="invoice"
+                                                        data-current-status="{{ $invoice->distribution_status }}">
                                                         <i class="fas fa-edit"></i> Reset Status
                                                     </button>
                                                 </td>
@@ -327,22 +221,161 @@
                                             @empty
                                                 <tr>
                                                     <td colspan="9" class="text-center text-muted py-4">
-                                                        <i class="fas fa-file-alt fa-2x mb-2"></i>
-                                                        <p>No additional documents found with the current filters.</p>
+                                                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                                                        <p>No invoices found with the current filters.</p>
                                                     </td>
                                                 </tr>
                                             @endforelse
                                         </tbody>
                                     </table>
                                 </div>
-                                @if ($additionalDocuments->hasPages())
+                                @if ($invoices->hasPages())
                                     <div class="card-footer clearfix">
-                                        {{ $additionalDocuments->links() }}
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <small class="text-muted">
+                                                    Showing {{ $invoices->firstItem() }} to {{ $invoices->lastItem() }} of
+                                                    {{ $invoices->total() }} results
+                                                </small>
+                                            </div>
+                                            <div>
+                                                {{ $invoices->appends(request()->query())->links('pagination::bootstrap-4') }}
+                                            </div>
+                                        </div>
                                     </div>
                                 @endif
                             </div>
                         </div>
                     </div>
+
+                    <!-- Additional Documents Section -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">
+                                        Additional Documents
+                                        <span class="badge badge-primary">{{ $additionalDocuments->total() }}</span>
+                                    </h3>
+                                    <div class="card-tools">
+                                        @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
+                                            <button type="button" class="btn btn-success btn-sm"
+                                                id="bulkResetAdditionalDocs">
+                                                <i class="fas fa-sync-alt"></i> Bulk Reset to Available
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="card-body table-responsive p-0">
+                                    <table id="additional-docs-table" class="table table-hover text-nowrap">
+                                        <thead>
+                                            <tr>
+                                                <th width="30">
+                                                    @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
+                                                        <input type="checkbox" id="selectAllAdditionalDocs">
+                                                    @endif
+                                                </th>
+                                                <th>Document #</th>
+                                                <th>Type</th>
+                                                <th>PO Number</th>
+                                                <th>Project</th>
+                                                <th>Current Location</th>
+                                                <th>Status</th>
+                                                <th>Created</th>
+                                                <th width="150">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($additionalDocuments as $doc)
+                                                <tr>
+                                                    <td>
+                                                        @if ($statusFilter === 'unaccounted_for' || $statusFilter === 'all')
+                                                            <input type="checkbox" class="additional-doc-checkbox"
+                                                                value="{{ $doc->id }}">
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <strong>{{ $doc->document_number }}</strong>
+                                                        @if ($doc->po_no)
+                                                            <br><small class="text-muted">PO: {{ $doc->po_no }}</small>
+                                                        @endif
+                                                    </td>
+                                                    <td>{{ $doc->type->type_name ?? 'N/A' }}</td>
+                                                    <td>{{ $doc->po_no ?? 'N/A' }}</td>
+                                                    <td>{{ $doc->project ?? 'N/A' }}</td>
+                                                    <td>
+                                                        <span class="badge badge-info">{{ $doc->cur_loc ?? 'N/A' }}</span>
+                                                    </td>
+                                                    <td>
+                                                        @switch($doc->distribution_status)
+                                                            @case('available')
+                                                                <span class="badge badge-success">Available</span>
+                                                            @break
+
+                                                            @case('in_transit')
+                                                                <span class="badge badge-info">In Transit</span>
+                                                            @break
+
+                                                            @case('distributed')
+                                                                <span class="badge badge-primary">Distributed</span>
+                                                            @break
+
+                                                            @case('unaccounted_for')
+                                                                <span class="badge badge-warning">Unaccounted For</span>
+                                                            @break
+
+                                                            @default
+                                                                <span
+                                                                    class="badge badge-secondary">{{ $doc->distribution_status }}</span>
+                                                        @endswitch
+                                                    </td>
+                                                    <td>{{ $doc->created_at->format('d M Y') }}</td>
+                                                    <td>
+                                                        <button type="button" class="btn btn-sm btn-primary reset-status-btn"
+                                                            data-document-id="{{ $doc->id }}"
+                                                            data-document-type="additional_document"
+                                                            data-current-status="{{ $doc->distribution_status }}">
+                                                            <i class="fas fa-edit"></i> Reset Status
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="9" class="text-center text-muted py-4">
+                                                            <i class="fas fa-file-alt fa-2x mb-2"></i>
+                                                            <p>No additional documents found with the current filters.</p>
+                                                        </td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    @if ($additionalDocuments->hasPages())
+                                        <div class="card-footer clearfix">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <small class="text-muted">
+                                                        Showing {{ $additionalDocuments->firstItem() }} to
+                                                        {{ $additionalDocuments->lastItem() }} of
+                                                        {{ $additionalDocuments->total() }} results
+                                                    </small>
+                                                </div>
+                                                <div>
+                                                    {{ $additionalDocuments->appends(request()->query())->links('pagination::bootstrap-4') }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @else
+                        <div class="alert alert-danger">
+                            <h4><i class="fas fa-exclamation-triangle"></i> Error Loading Data</h4>
+                            <p>Unable to load document status data. Please try refreshing the page or contact support if the problem
+                                persists.</p>
+                        </div>
+                    @endif
                 </div>
             </section>
 
@@ -427,214 +460,103 @@
         @endsection
 
         @section('styles')
-            <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-            <link rel="stylesheet"
-                href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+            <style>
+                .status-badge {
+                    display: inline-block;
+                    padding: 0.25em 0.6em;
+                    font-size: 75%;
+                    font-weight: 700;
+                    line-height: 1;
+                    text-align: center;
+                    white-space: nowrap;
+                    vertical-align: baseline;
+                    border-radius: 0.25rem;
+                }
+
+                .status-available {
+                    background-color: #28a745;
+                    color: white;
+                }
+
+                .status-in_transit {
+                    background-color: #17a2b8;
+                    color: white;
+                }
+
+                .status-distributed {
+                    background-color: #007bff;
+                    color: white;
+                }
+
+                .status-unaccounted_for {
+                    background-color: #ffc107;
+                    color: black;
+                }
+
+                /* Fix pagination arrow size and style */
+                .pagination .page-link {
+                    font-size: 14px !important;
+                    padding: 0.375rem 0.75rem !important;
+                    line-height: 1.25 !important;
+                }
+
+                /* Hide large SVG icons in pagination */
+                .pagination .page-link svg {
+                    display: none !important;
+                }
+
+                /* Replace with text-based arrows */
+                .pagination .page-item:first-child .page-link {
+                    font-size: 14px !important;
+                }
+
+                .pagination .page-item:first-child .page-link::after {
+                    content: "‹ Previous" !important;
+                    font-size: 14px !important;
+                }
+
+                .pagination .page-item:last-child .page-link {
+                    font-size: 14px !important;
+                }
+
+                .pagination .page-item:last-child .page-link::after {
+                    content: "Next ›" !important;
+                    font-size: 14px !important;
+                }
+
+                /* Ensure pagination doesn't create large elements */
+                .pagination {
+                    font-size: 14px !important;
+                }
+
+                .pagination .page-item .page-link {
+                    max-height: 38px !important;
+                    overflow: hidden !important;
+                }
+            </style>
         @endsection
 
         @section('scripts')
-            <script src="{{ asset('adminlte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
-            <script src="{{ asset('adminlte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-            <script src="{{ asset('adminlte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-            <script src="{{ asset('adminlte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-
             <script>
                 $(document).ready(function() {
-                    // Initialize DataTable for better table functionality
-                    var table = $('#invoices-table').DataTable({
-                        responsive: true,
-                        autoWidth: false,
-                        pageLength: 15,
-                        order: [
-                            [0, 'asc']
-                        ],
-                        language: {
-                            search: "Search:",
-                            lengthMenu: "Show _MENU_ entries per page",
-                            info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                            paginate: {
-                                first: "First",
-                                last: "Last",
-                                next: "Next",
-                                previous: "Previous"
-                            }
-                        }
-                    });
+                    console.log('Document status page loaded successfully');
 
-                    var table2 = $('#additional-docs-table').DataTable({
-                        responsive: true,
-                        autoWidth: false,
-                        pageLength: 15,
-                        order: [
-                            [0, 'asc']
-                        ],
-                        language: {
-                            search: "Search:",
-                            lengthMenu: "Show _MENU_ entries per page",
-                            info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                            paginate: {
-                                first: "First",
-                                last: "Last",
-                                next: "Next",
-                                previous: "Previous"
-                            }
-                        }
-                    });
-
-                    let currentDocumentId = null;
-                    let currentDocumentType = null;
-                    let currentDocumentStatus = null;
-
-                    // Individual status reset
+                    // Basic modal functionality
                     $('.reset-status-btn').click(function() {
-                        currentDocumentId = $(this).data('document-id');
-                        currentDocumentType = $(this).data('document-type');
-                        currentDocumentStatus = $(this).data('current-status');
+                        const documentId = $(this).data('document-id');
+                        const documentType = $(this).data('document-type');
+                        const currentStatus = $(this).data('current-status');
 
-                        // Set current status as default in dropdown
-                        $('#newStatus').val(currentDocumentStatus);
-
+                        $('#resetStatusModal').data('document-id', documentId);
+                        $('#resetStatusModal').data('document-type', documentType);
+                        $('#newStatus').val(currentStatus);
                         $('#resetStatusModal').modal('show');
                     });
 
-                    // Handle individual status reset form submission
+                    // Basic form submission
                     $('#resetStatusForm').submit(function(e) {
                         e.preventDefault();
-
-                        const formData = {
-                            document_id: currentDocumentId,
-                            document_type: currentDocumentType,
-                            new_status: $('#newStatus').val(),
-                            reason: $('#reason').val(),
-                            _token: '{{ csrf_token() }}'
-                        };
-
-                        $.ajax({
-                            url: '{{ route('admin.document-status.reset') }}',
-                            method: 'POST',
-                            data: formData,
-                            success: function(response) {
-                                if (response.success) {
-                                    toastr.success(response.message);
-                                    $('#resetStatusModal').modal('hide');
-                                    location.reload(); // Refresh to show updated status
-                                } else {
-                                    toastr.error(response.message);
-                                }
-                            },
-                            error: function(xhr) {
-                                toastr.error('Failed to update document status. Please try again.');
-                            }
-                        });
-                    });
-
-                    // Select all checkboxes for invoices
-                    $('#selectAllInvoices').change(function() {
-                        $('.invoice-checkbox').prop('checked', $(this).is(':checked'));
-                        updateSelectedDocumentsList();
-                    });
-
-                    // Select all checkboxes for additional documents
-                    $('#selectAllAdditionalDocs').change(function() {
-                        $('.additional-doc-checkbox').prop('checked', $(this).is(':checked'));
-                        updateSelectedDocumentsList();
-                    });
-
-                    // Individual checkbox change
-                    $('.invoice-checkbox, .additional-doc-checkbox').change(function() {
-                        updateSelectedDocumentsList();
-                    });
-
-                    // Update selected documents list
-                    function updateSelectedDocumentsList() {
-                        const selectedInvoices = $('.invoice-checkbox:checked').length;
-                        const selectedAdditionalDocs = $('.additional-doc-checkbox:checked').length;
-                        const total = selectedInvoices + selectedAdditionalDocs;
-
-                        if (total > 0) {
-                            $('#selectedDocumentsList').html(`
-                        <p class="mb-1"><strong>Total Selected:</strong> ${total}</p>
-                        <p class="mb-0 text-muted">Invoices: ${selectedInvoices} | Additional Documents: ${selectedAdditionalDocs}</p>
-                    `);
-                        } else {
-                            $('#selectedDocumentsList').html('<p class="text-muted mb-0">No documents selected</p>');
-                        }
-                    }
-
-                    // Bulk reset for invoices
-                    $('#bulkResetInvoices').click(function() {
-                        const selectedIds = $('.invoice-checkbox:checked').map(function() {
-                            return $(this).val();
-                        }).get();
-
-                        if (selectedIds.length === 0) {
-                            toastr.warning('Please select at least one invoice to reset.');
-                            return;
-                        }
-
-                        showBulkResetModal('invoice', selectedIds);
-                    });
-
-                    // Bulk reset for additional documents
-                    $('#bulkResetAdditionalDocs').click(function() {
-                        const selectedIds = $('.additional-doc-checkbox:checked').map(function() {
-                            return $(this).val();
-                        }).get();
-
-                        if (selectedIds.length === 0) {
-                            toastr.warning('Please select at least one additional document to reset.');
-                            return;
-                        }
-
-                        showBulkResetModal('additional_document', selectedIds);
-                    });
-
-                    function showBulkResetModal(documentType, documentIds) {
-                        $('#bulkResetModal').data('document-type', documentType);
-                        $('#bulkResetModal').data('document-ids', documentIds);
-                        $('#bulkResetModal').modal('show');
-                    }
-
-                    // Handle bulk reset form submission
-                    $('#bulkResetForm').submit(function(e) {
-                        e.preventDefault();
-
-                        const documentType = $('#bulkResetModal').data('document-type');
-                        const documentIds = $('#bulkResetModal').data('document-ids');
-
-                        const formData = {
-                            document_ids: documentIds,
-                            document_type: documentType,
-                            reason: $('#bulkReason').val(),
-                            _token: '{{ csrf_token() }}'
-                        };
-
-                        $.ajax({
-                            url: '{{ route('admin.document-status.bulk-reset') }}',
-                            method: 'POST',
-                            data: formData,
-                            success: function(response) {
-                                if (response.success) {
-                                    toastr.success(response.message);
-                                    $('#bulkResetModal').modal('hide');
-                                    location.reload(); // Refresh to show updated statuses
-                                } else {
-                                    toastr.error(response.message);
-                                }
-                            },
-                            error: function(xhr) {
-                                toastr.error(
-                                    'Failed to bulk reset document statuses. Please try again.');
-                            }
-                        });
-                    });
-
-                    // Clear form when modal is hidden
-                    $('#resetStatusModal, #bulkResetModal').on('hidden.bs.modal', function() {
-                        $(this).find('form')[0].reset();
-                        currentDocumentId = null;
-                        currentDocumentType = null;
-                        currentDocumentStatus = null;
+                        alert('Status reset functionality - form submitted');
                     });
                 });
             </script>

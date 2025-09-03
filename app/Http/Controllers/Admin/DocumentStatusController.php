@@ -24,64 +24,92 @@ class DocumentStatusController extends Controller
      */
     public function index(Request $request)
     {
-        $user = Auth::user();
-        $statusFilter = $request->get('status', 'all');
-        $documentType = $request->get('document_type', 'all');
-        $search = $request->get('search', '');
+        try {
+            $user = Auth::user();
+            $statusFilter = $request->get('status', 'all');
+            $documentType = $request->get('document_type', 'all');
+            $search = $request->get('search', '');
 
-        // Build queries for invoices
-        $invoicesQuery = Invoice::query()
-            ->with(['supplier', 'invoiceProjectInfo', 'creator.department'])
-            ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
-                return $query->where('distribution_status', $statusFilter);
-            })
-            ->when($search, function ($query) use ($search) {
-                return $query->where(function ($q) use ($search) {
-                    $q->where('invoice_number', 'like', "%{$search}%")
-                        ->orWhere('po_no', 'like', "%{$search}%")
-                        ->orWhereHas('supplier', function ($sq) use ($search) {
-                            $sq->where('name', 'like', "%{$search}%");
-                        });
+            // Debug logging
+            Log::info('Document status page accessed', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'department_location_code' => $user->department_location_code,
+                'roles' => $user->roles->pluck('name')->toArray()
+            ]);
+
+            // Build queries for invoices
+            $invoicesQuery = Invoice::query()
+                ->with(['supplier', 'creator'])
+                ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
+                    return $query->where('distribution_status', $statusFilter);
+                })
+                ->when($search, function ($query) use ($search) {
+                    return $query->where(function ($q) use ($search) {
+                        $q->where('invoice_number', 'like', "%{$search}%")
+                            ->orWhere('po_no', 'like', "%{$search}%")
+                            ->orWhereHas('supplier', function ($sq) use ($search) {
+                                $sq->where('name', 'like', "%{$search}%");
+                            });
+                    });
                 });
-            });
 
-        // Build queries for additional documents
-        $additionalDocumentsQuery = AdditionalDocument::query()
-            ->with(['type', 'creator.department'])
-            ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
-                return $query->where('distribution_status', $statusFilter);
-            })
-            ->when($search, function ($query) use ($search) {
-                return $query->where(function ($q) use ($search) {
-                    $q->where('document_number', 'like', "%{$search}%")
-                        ->orWhere('po_no', 'like', "%{$search}%");
+            // Build queries for additional documents
+            $additionalDocumentsQuery = AdditionalDocument::query()
+                ->with(['type', 'creator'])
+                ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
+                    return $query->where('distribution_status', $statusFilter);
+                })
+                ->when($search, function ($query) use ($search) {
+                    return $query->where(function ($q) use ($search) {
+                        $q->where('document_number', 'like', "%{$search}%")
+                            ->orWhere('po_no', 'like', "%{$search}%");
+                    });
                 });
-            });
 
-        // Apply department filtering for non-admin users
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
-            $userLocationCode = $user->department->location_code ?? null;
-            if ($userLocationCode) {
-                $invoicesQuery->where('cur_loc', $userLocationCode);
-                $additionalDocumentsQuery->where('cur_loc', $userLocationCode);
+            // Apply department filtering for non-admin users
+            if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+                $userLocationCode = $user->department_location_code;
+                if ($userLocationCode) {
+                    $invoicesQuery->where('cur_loc', $userLocationCode);
+                    $additionalDocumentsQuery->where('cur_loc', $userLocationCode);
+                }
             }
+
+            // Get paginated results
+            $invoices = $invoicesQuery->orderBy('created_at', 'desc')->paginate(15);
+            $additionalDocuments = $additionalDocumentsQuery->orderBy('created_at', 'desc')->paginate(15);
+
+            // Get status counts for filtering
+            $statusCounts = $this->getStatusCounts($user);
+
+            // Debug logging for view data
+            Log::info('Document status view data', [
+                'invoices_count' => $invoices->count(),
+                'additional_documents_count' => $additionalDocuments->count(),
+                'status_counts' => $statusCounts,
+                'status_filter' => $statusFilter,
+                'document_type' => $documentType,
+                'search' => $search
+            ]);
+
+            return view('admin.document-status.index', compact(
+                'invoices',
+                'additionalDocuments',
+                'statusCounts',
+                'statusFilter',
+                'documentType',
+                'search'
+            ));
+        } catch (\Exception $e) {
+            Log::error('Document status page error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->view('errors.500', [], 500);
         }
-
-        // Get paginated results
-        $invoices = $invoicesQuery->orderBy('created_at', 'desc')->paginate(15);
-        $additionalDocuments = $additionalDocumentsQuery->orderBy('created_at', 'desc')->paginate(15);
-
-        // Get status counts for filtering
-        $statusCounts = $this->getStatusCounts($user);
-
-        return view('admin.document-status.index', compact(
-            'invoices',
-            'additionalDocuments',
-            'statusCounts',
-            'statusFilter',
-            'documentType',
-            'search'
-        ));
     }
 
     /**
@@ -222,7 +250,7 @@ class DocumentStatusController extends Controller
     {
         $userLocationCode = null;
         if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
-            $userLocationCode = $user->department->location_code ?? null;
+            $userLocationCode = $user->department_location_code;
         }
 
         $invoicesQuery = Invoice::query();
@@ -290,5 +318,13 @@ class DocumentStatusController extends Controller
             'operation_type' => $operationType,
             'timestamp' => now()
         ]);
+    }
+
+    /**
+     * Test method to check basic functionality
+     */
+    public function test()
+    {
+        return view('admin.document-status.test');
     }
 }
