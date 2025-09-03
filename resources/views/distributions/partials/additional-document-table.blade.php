@@ -9,7 +9,6 @@
             <th class="text-right">AMOUNT</th>
             <th>PO NO</th>
             <th>PROJECT</th>
-            <th>STATUS</th>
         </tr>
     </thead>
     <tbody>
@@ -32,11 +31,6 @@
                 <td class="text-right">N/A</td>
                 <td>{{ $additionalDoc->po_no ?? 'N/A' }}</td>
                 <td>{{ $additionalDoc->project ?? 'N/A' }}</td>
-                <td>
-                    <span class="status-badge status-{{ $doc->verification_status ?? 'pending' }}">
-                        {{ ucwords(str_replace('_', ' ', $doc->verification_status ?? 'pending')) }}
-                    </span>
-                </td>
             </tr>
         @endforeach
     </tbody>

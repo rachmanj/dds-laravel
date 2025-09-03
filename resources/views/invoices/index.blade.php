@@ -151,19 +151,20 @@
                                                 </div>
                                             </div>
                                             <div class="row">
-                                                <div class="col-md-6">
-                                                    <div class="form-group">
-                                                        <label for="show_all_records">
-                                                            <input type="checkbox" id="show_all_records"
-                                                                data-bootstrap-switch>
-                                                            Show All Records (Admin Only)
-                                                        </label>
-                                                        <small class="form-text text-muted">
-                                                            Toggle to view all invoices across all locations
-                                                            (Admin/Superadmin only)
-                                                        </small>
+                                                @can('see-all-record-switch')
+                                                    <div class="col-md-6">
+                                                        <div class="form-group">
+                                                            <label for="show_all_records">
+                                                                <input type="checkbox" id="show_all_records"
+                                                                    data-bootstrap-switch>
+                                                                Show All Records
+                                                            </label>
+                                                            <small class="form-text text-muted">
+                                                                Toggle to view all invoices across all locations
+                                                            </small>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                @endcan
                                                 <div class="col-md-6 text-right">
                                                     <button type="button" class="btn btn-info" id="apply_search">
                                                         <i class="fas fa-search"></i> Apply Search
@@ -190,6 +191,7 @@
                                         <th>PO Number</th>
                                         <th>Amount</th>
                                         <th>Status</th>
+                                        <th>Current Location</th>
                                         <th>Days</th>
                                         <th>Actions</th>
                                     </tr>
@@ -283,7 +285,8 @@
                 ajax: {
                     url: '{{ route('invoices.data') }}',
                     data: function(d) {
-                        d.show_all = $('#show_all_records').is(':checked') ? 1 : 0;
+                        d.show_all = $('#show_all_records').length > 0 && $('#show_all_records').is(
+                            ':checked') ? 1 : 0;
                         d.search_supplier = $('#search_supplier').val();
                         d.search_invoice_project = $('#search_invoice_project').val();
                     }
@@ -331,6 +334,10 @@
                         name: 'status'
                     },
                     {
+                        data: 'cur_loc',
+                        name: 'cur_loc'
+                    },
+                    {
                         data: 'days_difference',
                         name: 'days_difference'
                     },
@@ -361,7 +368,9 @@
                 $('#search_type').val('');
                 $('#search_status').val('');
                 $('#search_invoice_project').val('');
-                $('#show_all_records').bootstrapSwitch('state', false);
+                if ($('#show_all_records').length > 0) {
+                    $('#show_all_records').bootstrapSwitch('state', false);
+                }
                 table.search('').columns().search('').draw();
             });
 
@@ -399,15 +408,15 @@
                     return false;
                 }
 
-
-
                 return true;
             });
 
             // Toggle show all records
-            $('#show_all_records').on('switchChange.bootstrapSwitch', function() {
-                table.ajax.reload();
-            });
+            if ($('#show_all_records').length > 0) {
+                $('#show_all_records').on('switchChange.bootstrapSwitch', function() {
+                    table.ajax.reload();
+                });
+            }
 
             // Handle search card collapse
             $('.search-card .card-tools button').click(function() {

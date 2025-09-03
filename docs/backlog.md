@@ -2,6 +2,48 @@
 
 ## 🎯 **Planned Features**
 
+### **Database & Query System Enhancements**
+
+-   [ ] **MCP MySQL Configuration Fix**
+
+    -   **Priority**: High
+    -   **Description**: Resolve environment variable resolution in MCP configuration for direct database access
+    -   **Components**: Fix `.cursor-mcp.json` configuration, test MCP integration, document working setup
+    -   **Estimated Effort**: 1-2 hours
+    -   **Dependencies**: Environment variable resolution, MCP server configuration
+
+-   [ ] **Database Query Utilities**
+
+    -   **Priority**: Medium
+    -   **Description**: Create reusable artisan commands for common database queries
+    -   **Components**: Complete `ListUsersByProject` command, create additional query utilities, document patterns
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: Laravel artisan commands, database schema understanding
+
+-   [ ] **User-Project Management Interface**
+
+    -   **Priority**: Medium
+    -   **Description**: Web interface for managing user-project assignments and queries
+    -   **Components**: User management views, project assignment interface, query results display
+    -   **Estimated Effort**: 3-4 days
+    -   **Dependencies**: Database query utilities, permission system
+
+-   [ ] **Database Query Documentation**
+
+    -   **Priority**: Low
+    -   **Description**: Comprehensive documentation of database query patterns and best practices
+    -   **Components**: Query reference guide, troubleshooting procedures, performance optimization tips
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: Database schema documentation, query utilities
+
+-   [ ] **Database Performance Monitoring**
+
+    -   **Priority**: Low
+    -   **Description**: Monitor and optimize database query performance
+    -   **Components**: Query logging, performance metrics, optimization recommendations
+    -   **Estimated Effort**: 2-3 days
+    -   **Dependencies**: Database monitoring tools, performance analysis
+
 ### **API Enhancement & Integration**
 
 -   [ ] **Webhook Support**

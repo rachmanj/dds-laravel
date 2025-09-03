@@ -33,7 +33,7 @@ class AdditionalDocumentController extends Controller
     public function data(Request $request)
     {
         $user = Auth::user();
-        $showAllRecords = $request->get('show_all_records', false);
+        $showAllRecords = $request->get('show_all', false);
 
         $query = AdditionalDocument::with(['type', 'creator']);
 
@@ -67,42 +67,22 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        // Apply location-based filtering and distribution status filtering
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
-            // Regular users - department-based access
+        // Apply location-based filtering unless user is admin/superadmin and show_all is requested
+        if (!$showAllRecords && !array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
             $locationCode = $user->department_location_code;
-
             if ($locationCode) {
-                // Filter by current location (user's department)
                 $query->where('cur_loc', $locationCode);
-
-                // Filter by distribution status:
-                // - Show 'available' documents (ready for new distribution)
-                // - Show 'distributed' documents (physically present in department)
-                // - Hide 'in_transit' documents (on the way to department)
-                if (!$showAllRecords) {
-                    $query->whereIn('distribution_status', ['available', 'distributed']);
-                }
-                // If show_all_records is enabled, show all documents in department including in_transit
-            } else {
-                // If user has no department, show documents with no location or 'DEFAULT' location
-                $query->where(function ($q) {
-                    $q->whereNull('cur_loc')
-                        ->orWhere('cur_loc', 'DEFAULT');
-                });
-
-                // Apply same distribution status logic
-                if (!$showAllRecords) {
-                    $query->whereIn('distribution_status', ['available', 'distributed']);
-                }
             }
-        } else {
-            // Admin/superadmin users - can see all documents
-            if (!$showAllRecords) {
-                // By default, only show available and distributed documents
-                $query->whereIn('distribution_status', ['available', 'distributed']);
-            }
-            // If show_all_records is enabled, show all documents regardless of status
+        }
+
+        // Apply distribution status filtering for non-admin users when show_all is false
+        if (!$showAllRecords && !array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+            $query->whereIn('distribution_status', ['available', 'distributed']);
+        }
+
+        // Show all records for users with see-all-record-switch permission if requested
+        if ($showAllRecords && $user->can('see-all-record-switch')) {
+            // Don't apply additional filters - show all documents
         }
 
         $documents = $query->orderBy('created_at', 'desc')->get();

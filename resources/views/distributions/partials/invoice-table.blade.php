@@ -9,7 +9,6 @@
             <th class="text-right">AMOUNT</th>
             <th>PO NO</th>
             <th>PROJECT</th>
-            <th>STATUS</th>
         </tr>
     </thead>
     <tbody>
@@ -39,11 +38,6 @@
                 </td>
                 <td>{{ $invoice->po_no ?? 'N/A' }}</td>
                 <td>{{ $invoice->invoice_project ?? 'N/A' }}</td>
-                <td>
-                    <span class="status-badge status-{{ $doc->verification_status ?? 'pending' }}">
-                        {{ ucwords(str_replace('_', ' ', $doc->verification_status ?? 'pending')) }}
-                    </span>
-                </td>
             </tr>
 
             {{-- Show additional documents attached to this invoice --}}
@@ -59,11 +53,6 @@
                         <td class="text-right">N/A</td>
                         <td>{{ $addDoc->po_no ?? 'N/A' }}</td>
                         <td>{{ $addDoc->project ?? 'N/A' }}</td>
-                        <td>
-                            <span class="status-badge status-{{ $addDoc->distribution_status ?? 'available' }}">
-                                {{ ucwords(str_replace('_', ' ', $addDoc->distribution_status ?? 'available')) }}
-                            </span>
-                        </td>
                     </tr>
                 @endforeach
             @endif

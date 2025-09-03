@@ -78,6 +78,9 @@ class RolePermissionSeeder extends Seeder
 
             // Document Status Management
             'reset-document-status',
+
+            // See All Records Switch
+            'see-all-record-switch',
         ];
 
         foreach ($permissions as $permission) {
@@ -121,6 +124,7 @@ class RolePermissionSeeder extends Seeder
             'delete-distributions',
             'view-distributions-numbering-stats',
             'reset-document-status',
+            'see-all-record-switch',
             'view-master',
             'view-admin',
         ]);
@@ -189,6 +193,7 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
+            'see-all-record-switch',
             'view-master',
             'view-admin',
         ]);

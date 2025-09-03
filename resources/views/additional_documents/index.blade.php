@@ -149,16 +149,19 @@
                                         placeholder="Select date range">
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="show_all_records">Show All Records</label>
-                                    <div class="custom-control custom-switch">
-                                        <input type="checkbox" class="custom-control-input" id="show_all_records">
-                                        <label class="custom-control-label" for="show_all_records">Include in-transit
-                                            documents</label>
+                            @can('see-all-record-switch')
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="show_all_records">
+                                            <input type="checkbox" id="show_all_records" data-bootstrap-switch>
+                                            Show All Records
+                                        </label>
+                                        <small class="form-text text-muted">
+                                            Toggle to view all documents across all locations
+                                        </small>
                                     </div>
                                 </div>
-                            </div>
+                            @endcan
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label>&nbsp;</label>
@@ -241,7 +244,9 @@
     <script>
         $(document).ready(function() {
             // Initialize Bootstrap Switch
-            $('input[data-bootstrap-switch]').bootstrapSwitch();
+            $("input[data-bootstrap-switch]").each(function() {
+                $(this).bootstrapSwitch();
+            });
 
             // Initialize Date Range Picker
             $('#date_range').daterangepicker({
@@ -267,7 +272,8 @@
                         d.filter_status = $('#filter_status').val();
                         d.filter_project = $('#filter_project').val();
                         d.date_range = $('#date_range').val();
-                        d.show_all_records = $('#show_all_records').is(':checked') ? 1 : 0;
+                        d.show_all = $('#show_all_records').length > 0 && $('#show_all_records').is(
+                            ':checked') ? 1 : 0;
                     }
                 },
                 columns: [{
@@ -374,13 +380,18 @@
             $('#reset-search').on('click', function() {
                 $('#search-form')[0].reset();
                 $('#date_range').val(''); // Clear date range input
+                if ($('#show_all_records').length > 0) {
+                    $('#show_all_records').bootstrapSwitch('state', false);
+                }
                 table.ajax.reload();
             });
 
             // Toggle show all records
-            $('#show_all_records').on('switchChange.bootstrapSwitch', function() {
-                table.ajax.reload();
-            });
+            if ($('#show_all_records').length > 0) {
+                $('#show_all_records').on('switchChange.bootstrapSwitch', function() {
+                    table.ajax.reload();
+                });
+            }
 
             // Handle search card collapse
             $('.search-card .card-tools button').click(function() {

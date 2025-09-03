@@ -63,7 +63,7 @@ class UserSeeder extends Seeder
             'email' => 'cashho@ninja.com',
             'password' => Hash::make('123456'),
             'project' => '000H',
-            'department_id' => 10,
+            'department_id' => 16,
             'is_active' => 1,
         ]);
         $cashierho->assignRole('cashierho');

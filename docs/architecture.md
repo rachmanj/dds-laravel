@@ -98,24 +98,121 @@ $.ajax({
         selectedDocs[newDoc.id] = newDoc;
         // Refresh table and update UI
         searchAdditionalDocuments();
-        renderSelectedTable();
-    }
+```
+
+### **Distribution UI/UX Architecture**
+
+**Overview**: Enhanced user interface for distribution management with improved visual hierarchy and document relationship clarity
+
+**Table Structure Simplification**:
+
+-   **Partial Tables**: Removed STATUS columns from both invoice and additional document table partials
+-   **Consistent Layout**: 8-column structure across all distribution tables
+-   **Cleaner Appearance**: Reduced visual clutter and improved table scanability
+-   **Performance**: Lightweight table rendering with minimal overhead
+
+**Document Display Restructuring**:
+
+-   **Logical Grouping**: Invoices displayed first, followed by their attached additional documents
+-   **Relationship Visibility**: Clear parent-child hierarchy between invoices and attached documents
+-   **Standalone Documents**: Additional documents not attached to any invoice displayed separately
+-   **Status Preservation**: All verification status columns maintained for compliance
+
+**Visual Styling System**:
+
+```css
+.attached-document-row {
+    background-color: #f8f9fa !important;
+    border-left: 4px solid #007bff;
+}
+
+.attached-document-row:nth-child(even) {
+    background-color: #e9ecef !important;
+}
+
+.attached-document-row td:first-child {
+    padding-left: 30px;
+    position: relative;
+}
+
+.attached-document-row td:first-child::before {
+    content: "↳";
+    position: absolute;
+    left: 10px;
+    color: #007bff;
+    font-weight: bold;
+}
+```
+
+**Key Features**:
+
+-   **Visual Hierarchy**: Light gray background with blue left border for attached documents
+-   **Indentation System**: 30px left padding with arrow indicator (↳) for clear relationship
+-   **Striped Rows**: Alternating background colors for better row distinction
+-   **Hover Management**: Disabled hover effects to maintain striped appearance
+-   **Responsive Design**: Mobile-friendly styling across all device sizes
+
+**Workflow Progress Enhancement**:
+
+-   **Complete Timeline**: Enhanced date format from `'d-M'` to `'d-M-Y H:i'` for all workflow steps
+-   **Detailed Tracking**: Full date and time information for audit and compliance purposes
+-   **Consistent Formatting**: Uniform date/time display across all 5 workflow steps
+-   **Workflow Analysis**: Better understanding of workflow efficiency and bottlenecks
+
+**Technical Implementation**:
+
+```php
+// Document grouping logic
+$invoiceDocuments = $distribution->documents->filter(function ($doc) {
+    return $doc->document_type === 'App\Models\Invoice';
 });
+
+$additionalDocumentDocuments = $distribution->documents->filter(function ($doc) {
+    return $doc->document_type === 'App\Models\AdditionalDocument';
+});
+
+// Attached documents grouping
+$attachedAdditionalDocs = collect();
+foreach ($invoiceDocuments as $invoiceDoc) {
+    $invoice = $invoiceDoc->document;
+    if ($invoice->additionalDocuments && $invoice->additionalDocuments->count() > 0) {
+        // Group attached documents with parent invoice
+    }
+}
+
+// Standalone documents
+$standaloneAdditionalDocs = $additionalDocumentDocuments->filter(function ($doc) use ($attachedAdditionalDocs) {
+    return !$attachedAdditionalDocs->contains('distribution_doc.id', $doc->id);
+});
+```
+
+**User Experience Benefits**:
+
+-   **Visual Clarity**: Clear distinction between invoices and attached documents
+-   **Logical Organization**: Related documents grouped together for easier understanding
+-   **Workflow Efficiency**: Users can quickly identify and manage document relationships
+-   **Professional Appearance**: Modern, clean interface design with proper visual hierarchy
+-   **Reduced Training**: Intuitive interface reduces user confusion and training needs
+    renderSelectedTable();
+    }
+    });
 
 // Backend: Document creation with validation
 public function createOnTheFly(Request $request) {
-    // Permission check
-    if (!Auth::user()->can('on-the-fly-addoc-feature')) {
-        return response()->json(['success' => false, 'message' => 'Unauthorized']);
-    }
+// Permission check
+if (!Auth::user()->can('on-the-fly-addoc-feature')) {
+return response()->json(['success' => false, 'message' => 'Unauthorized']);
+}
 
     // Validation and creation
     $validated = $request->validate([...]);
     $document = AdditionalDocument::create([...]);
 
     return response()->json(['success' => true, 'document' => $document]);
+
 }
-```
+
+````
 
 **Permission Integration**:
 
@@ -177,7 +274,7 @@ public function getDaysSinceReceivedAttribute()
     $days = $dateToUse->diffInDays(now());
     return (int) round($days);
 }
-```
+````
 
 **User Interface Architecture**:
 
@@ -532,6 +629,16 @@ if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'adm
 
 ## 🗄️ **Database Architecture**
 
+### **Database Overview**
+
+**Current Database Status**:
+
+-   **Database Name**: `dds_laravel`
+-   **Total Tables**: 101 tables
+-   **Database Size**: 30.36 MB
+-   **Connection**: MySQL 9.2.0 on 127.0.0.1:3306
+-   **Access Methods**: Laravel Eloquent, MCP MySQL (configuration issues), Direct SQL
+
 ### **Core Tables**
 
 **Distributions**:
@@ -555,9 +662,55 @@ if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'adm
 
 **Users & Departments**:
 
--   `users`: System users with role assignments
+-   `users`: System users with role assignments and project associations
 -   `departments`: Department locations with location codes
 -   `roles`: User roles (superadmin, admin, user)
+-   `projects`: Project definitions with unique codes
+
+### **User-Project Relationship**
+
+**Users Table Structure**:
+
+```sql
+users: id, name, nik, username, email, password, project, department_id, is_active, timestamps
+```
+
+**Projects Table Structure**:
+
+```sql
+projects: id, code, owner, location, is_active, timestamps
+```
+
+**Relationship Pattern**:
+
+-   **Users.project** → **Projects.code** (many-to-one relationship)
+-   **Project Codes**: Unique identifiers like '000H' for specific projects
+-   **Department Association**: Users also belong to departments via `department_id`
+
+**Query Pattern for Project Users**:
+
+```sql
+SELECT u.name, u.email, u.project, d.name as department_name
+FROM users u
+LEFT JOIN departments d ON u.department_id = d.id
+WHERE u.project = '000H'
+```
+
+**Laravel Model Relationships**:
+
+```php
+// User model relationship
+public function projectInfo()
+{
+    return $this->belongsTo(Project::class, 'project', 'code');
+}
+
+// Project model
+class Project extends Model
+{
+    protected $fillable = ['code', 'owner', 'location', 'is_active'];
+}
+```
 
 ### **Key Relationships**
 

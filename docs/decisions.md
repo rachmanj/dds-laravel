@@ -2,6 +2,353 @@
 
 ## 📝 **Decision Records**
 
+### **2025-01-27: Database Query Investigation - MCP vs Laravel Database Access**
+
+**Decision**: Investigate and document database query capabilities for user-project relationships
+**Status**: 🔍 **INVESTIGATION COMPLETED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+User requested to list users associated with project 000H. This required investigating the best approach for database queries in the DDS Laravel system, considering multiple access methods:
+
+-   MCP MySQL integration for direct database queries
+-   Laravel Eloquent models for ORM-based queries
+-   Laravel artisan commands for database operations
+-   Direct SQL queries through Laravel's DB facade
+
+#### **Requirements Analysis**
+
+**User Requirements**:
+
+-   Query users associated with specific project codes (e.g., '000H')
+-   Include user details (name, email) and department information
+-   Provide efficient and reliable database access method
+-   Document query patterns for future development
+
+**Technical Requirements**:
+
+-   Understand database schema and relationships
+-   Evaluate MCP MySQL integration capabilities
+-   Test Laravel database connection and query methods
+-   Document findings for future reference
+
+#### **Investigation Results**
+
+**1. Database Schema Discovery**:
+
+-   **Users Table**: Contains `project` field linking to project codes
+-   **Projects Table**: Contains `code` field with unique project identifiers
+-   **Relationship**: Users.project → Projects.code (many-to-one)
+-   **Database**: 101 tables in `dds_laravel` database (30.36 MB)
+
+**2. MCP MySQL Integration Status**:
+
+-   **Configuration**: `.cursor-mcp.json` properly configured
+-   **Issue**: Environment variable resolution not working (`${DB_HOST:-127.0.0.1}`)
+-   **Error**: `getaddrinfo ENOTFOUND ${DB_HOST:-127.0.0.1}`
+-   **Status**: ❌ **Not Working** - Requires configuration fix
+
+**3. Laravel Database Access Status**:
+
+-   **Connection**: ✅ **Working** via `php artisan db:show`
+-   **Database**: MySQL 9.2.0 on 127.0.0.1:3306
+-   **Tables**: All 101 tables accessible
+-   **Status**: ✅ **Working** - Reliable database access
+
+#### **Decision Rationale**
+
+**MCP Configuration Issue**:
+
+-   **Problem**: Environment variable resolution in MCP configuration
+-   **Impact**: Cannot use MCP for direct database queries
+-   **Workaround**: Laravel artisan commands provide reliable access
+
+**Query Method Selection**:
+
+-   **Considered**: MCP MySQL vs. Laravel Eloquent vs. Direct SQL
+-   **Chosen**: Laravel Eloquent with artisan commands
+-   **Reasoning**: Most reliable, well-integrated, and maintainable approach
+
+**Documentation Strategy**:
+
+-   **Decision**: Document all findings and query patterns
+-   **Reasoning**: Provides foundation for future database operations and troubleshooting
+
+#### **Implementation Decisions**
+
+**1. Database Query Pattern Documentation**:
+
+```sql
+-- Standard query for project users
+SELECT u.name, u.email, u.project, d.name as department_name
+FROM users u
+LEFT JOIN departments d ON u.department_id = d.id
+WHERE u.project = '000H'
+```
+
+**2. Laravel Model Relationships**:
+
+```php
+// User model relationship
+public function projectInfo()
+{
+    return $this->belongsTo(Project::class, 'project', 'code');
+}
+```
+
+### **2025-01-27: Distribution Feature UI/UX Enhancement Strategy**
+
+**Decision**: Implement comprehensive UI/UX improvements to distribution feature for better user experience and visual clarity
+**Status**: ✅ **IMPLEMENTED**
+**Implementation Date**: 2025-01-27
+**Review Date**: 2025-02-27
+
+#### **Context**
+
+Users needed cleaner table layouts and better visual hierarchy for document relationships in the distribution feature. The current interface had visual clutter and unclear document relationships that made workflow management difficult.
+
+#### **Requirements Analysis**
+
+**User Requirements**:
+
+-   Cleaner table layouts with reduced visual clutter
+-   Clear visual hierarchy for document relationships
+-   Better organization of invoices and their attached additional documents
+-   Improved workflow progress visibility with detailed timeline information
+-   Professional appearance consistent with existing design patterns
+
+**Technical Requirements**:
+
+-   Maintain existing functionality while improving visual design
+-   Ensure responsive design across all device sizes
+-   Implement lightweight CSS with minimal performance impact
+-   Preserve all existing status information for compliance purposes
+
+#### **Alternatives Considered**
+
+**1. Table Structure Options**:
+
+-   **Option A**: Keep STATUS columns in partial tables (current state)
+-   **Option B**: Remove STATUS columns for cleaner layout
+-   **Option C**: Move STATUS columns to different positions
+-   **Chosen**: Option B - Remove STATUS columns for cleaner appearance
+
+**2. Document Display Options**:
+
+-   **Option A**: Flat list of all documents (current state)
+-   **Option B**: Group by document type (invoices first, then additional documents)
+-   **Option C**: Group by relationship (invoices with their attached documents)
+-   **Chosen**: Option C - Logical grouping by relationship for better understanding
+
+**3. Visual Styling Options**:
+
+-   **Option A**: No special styling for attached documents
+-   **Option B**: Simple indentation without visual indicators
+-   **Option C**: Comprehensive styling with background, borders, and icons
+-   **Chosen**: Option C - Full visual styling for clear hierarchy
+
+**4. Timeline Enhancement Options**:
+
+-   **Option A**: Keep current date format (`d-M`)
+-   **Option B**: Add year only (`d-M-Y`)
+-   **Option C**: Add year and time (`d-M-Y H:i`)
+-   **Chosen**: Option C - Complete timeline information for better tracking
+
+#### **Decision Rationale**
+
+**Table Structure Simplification**:
+
+-   **Problem**: STATUS columns added visual clutter without providing essential information
+-   **Solution**: Remove STATUS columns from partial tables for cleaner layout
+-   **Benefit**: Improved table scanability and reduced visual complexity
+-   **Risk**: Minimal - status information still available in main show page
+
+**Document Display Restructuring**:
+
+-   **Problem**: Flat document list made relationships unclear
+-   **Solution**: Group documents by relationship (invoices with attached documents)
+-   **Benefit**: Clear parent-child hierarchy and logical organization
+-   **Risk**: None - improves user understanding without functional changes
+
+**Visual Styling Implementation**:
+
+-   **Problem**: No visual distinction between invoices and attached documents
+-   **Solution**: Comprehensive CSS styling with background, borders, and indentation
+-   **Benefit**: Clear visual hierarchy and professional appearance
+-   **Risk**: Minimal - lightweight CSS with no performance impact
+
+**Workflow Progress Enhancement**:
+
+-   **Problem**: Limited timeline information for workflow analysis
+-   **Solution**: Enhanced date format with year and time information
+-   **Benefit**: Complete timeline for audit, compliance, and workflow analysis
+-   **Risk**: None - provides more information without functional changes
+
+#### **Implementation Decisions**
+
+**1. Table Structure Changes**:
+
+```html
+<!-- BEFORE: 9 columns including STATUS -->
+<th>STATUS</th>
+<td>
+    <span
+        class="status-badge status-{{ $doc->verification_status ?? 'pending' }}"
+    ></span>
+</td>
+
+<!-- AFTER: 8 columns without STATUS -->
+<!-- Cleaner, more focused table structure -->
+```
+
+**2. Document Grouping Logic**:
+
+```php
+// Separate invoices and additional documents
+$invoiceDocuments = $distribution->documents->filter(function ($doc) {
+    return $doc->document_type === 'App\Models\Invoice';
+});
+
+// Group attached documents with parent invoices
+$attachedAdditionalDocs = collect();
+foreach ($invoiceDocuments as $invoiceDoc) {
+    $invoice = $invoiceDoc->document;
+    if ($invoice->additionalDocuments && $invoice->additionalDocuments->count() > 0) {
+        // Find and group attached documents
+    }
+}
+
+// Handle standalone documents separately
+$standaloneAdditionalDocs = $additionalDocumentDocuments->filter(function ($doc) use ($attachedAdditionalDocs) {
+    return !$attachedAdditionalDocs->contains('distribution_doc.id', $doc->id);
+});
+```
+
+**3. Visual Styling System**:
+
+```css
+.attached-document-row {
+    background-color: #f8f9fa !important;
+    border-left: 4px solid #007bff;
+}
+
+.attached-document-row:nth-child(even) {
+    background-color: #e9ecef !important;
+}
+
+.attached-document-row td:first-child {
+    padding-left: 30px;
+    position: relative;
+}
+
+.attached-document-row td:first-child::before {
+    content: "↳";
+    position: absolute;
+    left: 10px;
+    color: #007bff;
+    font-weight: bold;
+}
+```
+
+**4. Timeline Enhancement**:
+
+```php
+// BEFORE: Limited date format
+{{ $distribution->local_created_at->format('d-M') }}
+
+// AFTER: Complete date and time format
+{{ $distribution->local_created_at->format('d-M-Y H:i') }}
+```
+
+#### **Success Metrics**
+
+**User Experience Improvements**:
+
+-   **Visual Clarity**: Clear distinction between invoices and attached documents
+-   **Logical Organization**: Related documents grouped together for easier understanding
+-   **Workflow Efficiency**: Users can quickly identify and manage document relationships
+-   **Professional Appearance**: Modern, clean interface design with proper visual hierarchy
+-   **Reduced Training**: Intuitive interface reduces user confusion and training needs
+
+**Technical Achievements**:
+
+-   **Efficient Queries**: Optimized document filtering and relationship queries
+-   **Lightweight CSS**: Minimal performance impact with comprehensive styling
+-   **Responsive Design**: Mobile-friendly styling that works across all device sizes
+-   **Cross-browser Compatibility**: Consistent appearance across different browsers
+
+**Business Impact**:
+
+-   **Workflow Clarity**: Clear visual hierarchy helps users understand document relationships
+-   **Better Compliance**: Clear status tracking and timeline information
+-   **Improved Efficiency**: Users can quickly identify and manage document relationships
+-   **System Adoption**: Better user experience leads to increased system usage
+
+#### **Lessons Learned**
+
+**UI/UX Design Principles**:
+
+-   **Visual Hierarchy**: Clear visual indicators significantly improve user understanding
+-   **Logical Organization**: Grouping related items together improves workflow efficiency
+-   **Consistent Styling**: Uniform design patterns reduce cognitive load
+-   **Performance Balance**: UI improvements can be implemented without performance degradation
+
+**Technical Implementation**:
+
+-   **Incremental Changes**: Small, focused improvements provide significant user value
+-   **CSS Efficiency**: Lightweight styling with proper specificity prevents conflicts
+-   **Responsive Design**: Mobile-first approach ensures broad device compatibility
+-   **Maintainable Code**: Clear, documented CSS structure supports future enhancements
+
+**User Experience**:
+
+-   **Reduced Complexity**: Removing unnecessary elements improves usability
+-   **Clear Relationships**: Visual indicators help users understand data connections
+-   **Complete Information**: Providing full context improves decision-making
+-   **Professional Appearance**: Modern design increases user confidence and adoption
+
+**3. Artisan Command Creation**:
+
+-   Created `ListUsersByProject` command for future use
+-   Provides reusable database query utility
+-   Enables consistent query patterns across the application
+
+#### **Next Steps**
+
+**1. MCP Configuration Fix**:
+
+-   Resolve environment variable resolution in `.cursor-mcp.json`
+-   Test MCP MySQL integration once fixed
+-   Document working MCP configuration
+
+**2. Query Utility Development**:
+
+-   Complete `ListUsersByProject` command implementation
+-   Create additional database query utilities
+-   Document common query patterns
+
+**3. Documentation Updates**:
+
+-   Update architecture documentation with database findings
+-   Create database query reference guide
+-   Document troubleshooting procedures
+
+#### **Impact Assessment**
+
+**Positive Impacts**:
+
+-   **Database Understanding**: Clear understanding of user-project relationships
+-   **Query Capabilities**: Confirmed ability to query user data effectively
+-   **Documentation**: Comprehensive documentation of database structure
+-   **Future Development**: Foundation for user management features
+
+**Technical Debt**:
+
+-   **MCP Configuration**: Needs resolution for direct database access
+-   **Query Utilities**: Need development of reusable query commands
+
 ### **2025-01-27: Invoice Payment Management System Implementation**
 
 **Decision**: Implement comprehensive invoice payment management system with days calculation and overdue alerts

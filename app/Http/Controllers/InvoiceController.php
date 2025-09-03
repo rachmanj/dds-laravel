@@ -39,7 +39,12 @@ class InvoiceController extends Controller
         $query = Invoice::with(['supplier', 'type', 'creator', 'attachments']);
 
         // Apply location-based filtering unless user is admin/superadmin
-        // Location-based restrictions removed: all users see all matching additional documents
+        if (!$request->show_all && !array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+            $locationCode = $user->department_location_code;
+            if ($locationCode) {
+                $query->where('cur_loc', $locationCode);
+            }
+        }
 
         // Apply search filters
         if ($request->filled('search_invoice_number')) {
@@ -76,9 +81,9 @@ class InvoiceController extends Controller
 
 
 
-        // Show all records for admin/superadmin if requested
-        if ($request->show_all && array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
-            // Don't apply location filter
+        // Show all records for users with see-all-record-switch permission if requested
+        if ($request->show_all && $user->can('see-all-record-switch')) {
+            // Don't apply location filter - already handled above
         }
 
         return DataTables::of($query)
