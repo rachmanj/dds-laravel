@@ -45,12 +45,12 @@
                 @foreach ($invoice->additionalDocuments as $addDoc)
                     <tr class="additional-doc-row">
                         <td></td>
-                        <td><strong>{{ $addDoc->type->type_name ?? 'Additional Document' }}</strong></td>
+                        <td style="padding-left: 20px;">{{ $addDoc->type->type_name ?? 'Additional Document' }}</td>
                         <td></td>
-                        <td><strong>{{ $addDoc->document_number ?? 'N/A' }}</strong></td>
+                        <td>{{ $addDoc->document_number ?? 'N/A' }}</td>
                         <td>{{ $addDoc->document_date ? \Carbon\Carbon::parse($addDoc->document_date)->setTimezone('Asia/Singapore')->format('d-M-Y') : 'N/A' }}
                         </td>
-                        <td class="text-right">N/A</td>
+                        <td class="text-right"></td>
                         <td>{{ $addDoc->po_no ?? 'N/A' }}</td>
                         <td>{{ $addDoc->project ?? 'N/A' }}</td>
                     </tr>

@@ -6,6 +6,85 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Print Layout Optimization System**
+
+**Pattern**: Comprehensive print layout optimization for professional document output
+
+**Implementation**:
+
+-   **Margin Reduction**: Systematic reduction of excessive margins (20-40px → 10-15px)
+-   **Print Media Queries**: Specialized CSS rules for print output optimization
+-   **Table Layout**: Optimized cell padding and spacing for better content density
+-   **Content Flow**: Eliminated excessive white space between sections
+
+**Technical Architecture**:
+
+```css
+/* Print Layout Optimization */
+@media print {
+    body {
+        margin: 0;
+        padding: 10px; /* Reduced from 20px */
+    }
+
+    .documents-table th,
+    .documents-table td {
+        padding: 4px; /* Reduced from 6px */
+        font-size: 12px; /* Smaller fonts for print */
+    }
+
+    .info-section {
+        margin-bottom: 10px;
+    }
+    .info-row {
+        margin-bottom: 5px;
+    }
+
+    .row {
+        margin-bottom: 10px;
+    }
+    .col-12,
+    .col-6 {
+        padding: 0 5px;
+    }
+}
+```
+
+**Benefits**:
+
+-   **Professional Output**: Business-standard document appearance
+-   **Content Visibility**: Table content no longer cut off at page bottom
+-   **Reduced Paper Usage**: More content fits on single page
+-   **Better Readability**: Optimized content density and visual hierarchy
+
+### **Document Hierarchy Visualization**
+
+**Pattern**: Visual indentation and hierarchy display for document relationships
+
+**Implementation**:
+
+-   **Indentation System**: 20px left padding for additional document rows
+-   **Empty Field Handling**: Proper handling of non-applicable fields (empty vs "N/A")
+-   **Visual Hierarchy**: Clear distinction between parent invoices and attached documents
+-   **Professional Layout**: Clean table structure suitable for business printing
+
+**Technical Implementation**:
+
+```php
+// Visual indentation for additional documents
+<td style="padding-left: 20px;">{{ $addDoc->type->type_name ?? 'Additional Document' }}</td>
+
+// Empty amount fields instead of "N/A"
+<td class="text-right"></td> // was <td class="text-right">N/A</td>
+```
+
+**Benefits**:
+
+-   **Hierarchical Display**: Additional documents clearly indented under parent invoices
+-   **Clean Amount Column**: Empty cells instead of "N/A" for documents without monetary values
+-   **Better Visual Flow**: Improved table scanability and document relationship clarity
+-   **Professional Appearance**: More appropriate for business document printing
+
 ### **Table Structure Simplification**
 
 **Pattern**: Remove unnecessary columns to improve visual clarity and user experience

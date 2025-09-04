@@ -18,7 +18,7 @@
         @media print {
             body {
                 margin: 0;
-                padding: 20px;
+                padding: 10px;
             }
 
             .no-print {
@@ -32,12 +32,35 @@
             table {
                 page-break-inside: avoid;
             }
+
+            .row {
+                margin-bottom: 10px;
+            }
+
+            .col-12,
+            .col-6 {
+                padding: 0 5px;
+            }
+
+            .documents-table th,
+            .documents-table td {
+                padding: 4px;
+                font-size: 12px;
+            }
+
+            .info-section {
+                margin-bottom: 10px;
+            }
+
+            .info-row {
+                margin-bottom: 5px;
+            }
         }
 
         .transmittal-header {
             border-bottom: 2px solid #333;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
         }
 
         .company-info {
@@ -50,7 +73,7 @@
             font-size: 24px;
             font-weight: bold;
             text-align: center;
-            margin: 20px 0;
+            margin: 10px 0;
             color: #333;
         }
 
@@ -58,17 +81,17 @@
             font-size: 16px;
             font-weight: bold;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             color: #666;
         }
 
         .info-section {
-            margin-bottom: 25px;
+            margin-bottom: 15px;
         }
 
         .info-row {
             display: flex;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .info-label {
@@ -84,13 +107,13 @@
         .documents-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 10px 0;
         }
 
         .documents-table th,
         .documents-table td {
             border: 1px solid #ddd;
-            padding: 8px;
+            padding: 6px;
             text-align: left;
         }
 
@@ -127,8 +150,24 @@
             border-right: 1px solid #dee2e6;
         }
 
+        /* Ensure proper table layout */
+        .table-responsive {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Reduce spacing between sections */
+        .row {
+            margin-bottom: 10px;
+        }
+
+        .col-12,
+        .col-6 {
+            padding: 0 5px;
+        }
+
         .signature-section {
-            margin-top: 40px;
+            margin-top: 20px;
         }
 
         .signature-row {
@@ -290,8 +329,8 @@
                 </div>
             </div>
 
-            <!-- Workflow Status Information -->
-            @if ($distribution->status !== 'draft')
+            {{-- Workflow Status Information - Commented out for later use --}}
+            {{-- @if ($distribution->status !== 'draft')
                 <div class="row">
                     <div class="col-12">
                         <div class="info-section">
@@ -338,7 +377,7 @@
                         </div>
                     </div>
                 </div>
-            @endif
+            @endif --}}
 
             <!-- Signature Section -->
             <div class="row">
