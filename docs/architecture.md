@@ -6,6 +6,228 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Global Page Title Alignment System**
+
+**Pattern**: Consistent page title alignment across all pages for professional visual hierarchy
+
+**Implementation**:
+
+-   **Global CSS Solution**: Centralized styling in `layouts/partials/head.blade.php`
+-   **Precise Alignment**: 27.5px left padding to match card content exactly
+-   **Bootstrap Integration**: Works with existing Bootstrap grid system
+-   **Future-Proof**: Applied globally to prevent individual page fixes
+
+**Technical Architecture**:
+
+```css
+/* Global page title alignment with content */
+.content-header {
+    padding-left: 27.5px; /* Matches container-fluid (7.5px) + card-body (20px) */
+    padding-right: 7.5px;
+}
+
+.content-header .col-sm-6:first-child {
+    padding-left: 0; /* Remove default column padding for precise alignment */
+}
+```
+
+**Root Cause Analysis**:
+
+-   **Bootstrap Defaults**: `.content-header` had `padding: 15px .5rem` (8px left)
+-   **Container Padding**: `.container-fluid` had `padding-left: 7.5px`
+-   **Card Body Padding**: `.card-body` added additional 20px padding
+-   **Total Offset**: 27.5px difference between title and content alignment
+
+**Benefits**:
+
+-   **Visual Consistency**: All pages have properly aligned titles and content
+-   **Professional Appearance**: Clean visual hierarchy enhances application credibility
+-   **User Experience**: Consistent interface reduces user confusion
+-   **Maintainability**: Global solution prevents future alignment issues
+
+### **Layout Structure Standardization**
+
+**Pattern**: Consistent layout structure across all pages for maintainability and user experience
+
+**Implementation**:
+
+-   **Standard Sections**: All pages use `@section('title_page')` and `@section('breadcrumb_title')`
+-   **Content Structure**: Consistent `section class="content"` with `container-fluid` wrapper
+-   **Breadcrumb Integration**: Proper breadcrumb navigation in standard location
+-   **Future Development**: New pages automatically get proper structure
+
+**Standard Layout Template**:
+
+```blade
+@extends('layouts.main')
+
+@section('title_page')
+    Page Title
+@endsection
+
+@section('breadcrumb_title')
+    <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+    <li class="breadcrumb-item active">Current Page</li>
+@endsection
+
+@section('content')
+    <section class="content">
+        <div class="container-fluid">
+            {{-- Page content here --}}
+        </div>
+    </section>
+@endsection
+```
+
+**Benefits**:
+
+-   **Consistent Structure**: All pages follow same layout pattern
+-   **Maintainable Code**: Standard structure easier to understand and modify
+-   **Future Development**: New pages automatically get proper alignment
+-   **User Experience**: Consistent visual hierarchy across entire application
+
+### **Enhanced User Dropdown Menu System**
+
+**Pattern**: Modern dropdown menu with user information display and safety features
+
+**Implementation**:
+
+-   **User Information Display**: Name, department, and email prominently shown
+-   **Modern Design**: Gradient background with user avatar and professional styling
+-   **Action Buttons**: Change Password and Sign Out with descriptive icons
+-   **Safety Features**: SweetAlert2 confirmation for logout to prevent accidents
+
+**Technical Architecture**:
+
+```html
+<!-- Enhanced dropdown structure -->
+<li class="nav-item dropdown user-menu">
+    <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
+        <i class="fas fa-user-circle mr-1"></i>
+        <span class="d-none d-md-inline">{{ Auth::user()->name }}</span>
+        <i class="fas fa-chevron-down ml-1"></i>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+        <!-- User header with information -->
+        <li class="user-header bg-primary">
+            <div class="text-center">
+                <div class="user-avatar mb-2">
+                    <i class="fas fa-user-circle fa-3x text-white-50"></i>
+                </div>
+                <h6 class="text-white mb-1">{{ Auth::user()->name }}</h6>
+                <small class="text-white-50"
+                    >{{ Auth::user()->department_location_code }}</small
+                ><br />
+                <small class="text-white-50">{{ Auth::user()->email }}</small>
+            </div>
+        </li>
+
+        <!-- Action buttons -->
+        <li class="user-body">
+            <div class="row">
+                <div class="col-6 text-center">
+                    <a
+                        href="{{ route('profile.change-password') }}"
+                        class="btn btn-link btn-sm"
+                    >
+                        <i class="fas fa-key text-primary"></i><br />
+                        <small>Change Password</small>
+                    </a>
+                </div>
+                <div class="col-6 text-center">
+                    <a
+                        href="#"
+                        class="btn btn-link btn-sm"
+                        onclick="confirmLogout()"
+                    >
+                        <i class="fas fa-sign-out-alt text-danger"></i><br />
+                        <small>Sign Out</small>
+                    </a>
+                </div>
+            </div>
+        </li>
+    </ul>
+</li>
+```
+
+**CSS Styling**:
+
+```css
+/* Enhanced User Dropdown Menu */
+.user-menu .dropdown-menu {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: 0.5rem;
+    min-width: 280px;
+}
+
+.user-menu .user-header {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    padding: 1.5rem 1rem;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.user-menu .btn-link {
+    text-decoration: none;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    transition: all 0.2s ease;
+}
+
+.user-menu .btn-link:hover {
+    background-color: #f8f9fa;
+    text-decoration: none;
+}
+```
+
+**Benefits**:
+
+-   **Professional Appearance**: Modern design enhances application credibility
+-   **User Information**: Clear display of user context and department
+-   **Safety Features**: Confirmation dialogs prevent accidental actions
+-   **Better Navigation**: Intuitive action buttons with descriptive icons
+
+### **SweetAlert2 Confirmation System**
+
+**Pattern**: User confirmation dialogs for destructive actions to prevent accidents
+
+**Implementation**:
+
+-   **Logout Confirmation**: Prevents accidental logouts with professional dialog
+-   **SweetAlert2 Integration**: Uses existing SweetAlert2 library for consistent styling
+-   **Form Handling**: Hidden form submission after user confirmation
+-   **Global Function**: Available on all pages through scripts partial
+
+**Technical Implementation**:
+
+```javascript
+// Logout confirmation function
+function confirmLogout() {
+    Swal.fire({
+        title: "Are you sure?",
+        text: "You will be logged out of the system.",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, logout!",
+        cancelButtonText: "Cancel",
+        reverseButtons: true,
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById("logout-form").submit();
+        }
+    });
+}
+```
+
+**Benefits**:
+
+-   **Accident Prevention**: Confirmation prevents accidental workflow interruption
+-   **Professional Dialog**: Clear messaging with proper button styling
+-   **User Experience**: Prevents frustration from accidental clicks
+-   **Accessibility**: Proper button labeling and keyboard navigation
+
 ### **Print Layout Optimization System**
 
 **Pattern**: Comprehensive print layout optimization for professional document output

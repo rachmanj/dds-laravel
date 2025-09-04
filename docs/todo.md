@@ -2,6 +2,152 @@
 
 ## 🎯 **Current Sprint**
 
+### **UI/UX Enhancement - Page Title Alignment & Global Layout Consistency** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED** - Global page title alignment and enhanced user dropdown menu  
+**Implementation Date**: 2025-01-27  
+**Actual Effort**: 2 hours (comprehensive UI/UX improvements)
+
+**Feature Overview**: Implemented global page title alignment consistency across all pages and enhanced user dropdown menu with modern design and logout confirmation.
+
+**Critical Issues Resolved**:
+
+-   ✅ **Page Title Alignment**:
+
+    -   **Problem**: Page titles not aligned with content cards below them, creating visual inconsistency
+    -   **Root Cause**: CSS structure differences between `.content-header` and `.container-fluid` padding
+    -   **Solution**: Added global CSS with precise 27.5px left padding to align with card content
+    -   **Impact**: All pages now have consistent visual hierarchy and professional appearance
+
+-   ✅ **Layout Structure Standardization**:
+
+    -   **Custom Layout Issue**: Some pages (like import.blade.php) used custom content header structure
+    -   **Standardization**: Converted all pages to use consistent layout structure with proper sections
+    -   **Future-Proof**: New pages automatically get proper alignment and structure
+    -   **Maintainability**: Standard structure easier to understand and modify
+
+-   ✅ **Enhanced User Dropdown Menu**:
+
+    -   **Modern Design**: Professional gradient background with user avatar and information display
+    -   **User Information**: Clear display of name, department, and email
+    -   **Action Buttons**: Change Password and Sign Out with descriptive icons
+    -   **Hover Effects**: Smooth transitions and visual feedback for better user experience
+
+-   ✅ **SweetAlert2 Logout Confirmation**:
+
+    -   **Safety Feature**: Confirmation dialog prevents accidental logouts
+    -   **Professional Dialog**: Clear messaging with proper button styling
+    -   **User Experience**: Prevents workflow interruption from accidental clicks
+    -   **Accessibility**: Proper button labeling and keyboard navigation
+
+**Technical Implementation**:
+
+**Global CSS Solution**:
+
+```css
+/* Global page title alignment with content */
+.content-header {
+    padding-left: 27.5px;
+    padding-right: 7.5px;
+}
+
+.content-header .col-sm-6:first-child {
+    padding-left: 0;
+}
+
+/* Enhanced User Dropdown Menu */
+.user-menu .dropdown-menu {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: 0.5rem;
+    min-width: 280px;
+}
+
+.user-menu .user-header {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    padding: 1.5rem 1rem;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+```
+
+**Layout Standardization**:
+
+```blade
+{{-- Standard layout structure for all pages --}}
+@extends('layouts.main')
+
+@section('title_page')
+    Page Title
+@endsection
+
+@section('breadcrumb_title')
+    <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+    <li class="breadcrumb-item active">Current Page</li>
+@endsection
+
+@section('content')
+    <section class="content">
+        <div class="container-fluid">
+            {{-- Page content here --}}
+        </div>
+    </section>
+@endsection
+```
+
+**SweetAlert2 Integration**:
+
+```javascript
+// Logout confirmation function
+function confirmLogout() {
+    Swal.fire({
+        title: "Are you sure?",
+        text: "You will be logged out of the system.",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, logout!",
+        cancelButtonText: "Cancel",
+        reverseButtons: true,
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById("logout-form").submit();
+        }
+    });
+}
+```
+
+**User Experience Improvements**:
+
+-   **Visual Consistency**: All pages now have properly aligned titles and content
+-   **Professional Appearance**: Modern dropdown design enhances application credibility
+-   **User Safety**: Logout confirmation prevents accidental workflow interruption
+-   **Better Navigation**: Clear user information and action buttons
+-   **Responsive Design**: Works well on all screen sizes
+
+**Technical Benefits**:
+
+-   **Global Solution**: Centralized CSS prevents individual page fixes
+-   **Maintainable Code**: Standard layout structure easier to understand and modify
+-   **Future-Proof**: New pages automatically get proper alignment and structure
+-   **Performance**: Efficient CSS and JavaScript implementation
+
+**Business Impact**:
+
+-   **User Satisfaction**: Professional interface improves user perception
+-   **Reduced Support**: Clear interface reduces user confusion and support requests
+-   **System Adoption**: Better user experience leads to increased system usage
+-   **Maintenance Efficiency**: Standardized layout structure easier to maintain
+
+**Files Modified**:
+
+-   `resources/views/layouts/partials/head.blade.php` - Added global page title alignment and dropdown styling
+-   `resources/views/additional_documents/import.blade.php` - Converted to standard layout structure
+-   `resources/views/layouts/partials/navbar.blade.php` - Enhanced dropdown menu design
+-   `resources/views/layouts/partials/scripts.blade.php` - Added logout confirmation function
+
+---
+
 ### **Distribution Print Layout Optimization & Invoice Table Enhancements** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED** - Print layout issues resolved and invoice table enhanced  

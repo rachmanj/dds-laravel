@@ -5,28 +5,12 @@
 @endsection
 
 @section('breadcrumb_title')
-    admin / users / edit
+    <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('admin.users.index') }}">Users</a></li>
+    <li class="breadcrumb-item active">Edit</li>
 @endsection
 
 @section('content')
-    <!-- Content Header (Page header) -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">Edit User</h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="{{ route('admin.users.index') }}">Users</a></li>
-                        <li class="breadcrumb-item active">Edit</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Main content -->
     <section class="content">
         <div class="container-fluid">
@@ -163,9 +147,8 @@
 
                                 <div class="form-group">
                                     <div class="custom-control custom-switch">
-                                        <input type="checkbox" class="custom-control-input" id="is_active"
-                                            name="is_active" value="1"
-                                            {{ old('is_active', $user->is_active) ? 'checked' : '' }}>
+                                        <input type="checkbox" class="custom-control-input" id="is_active" name="is_active"
+                                            value="1" {{ old('is_active', $user->is_active) ? 'checked' : '' }}>
                                         <label class="custom-control-label" for="is_active">Active User</label>
                                     </div>
                                     @error('is_active')

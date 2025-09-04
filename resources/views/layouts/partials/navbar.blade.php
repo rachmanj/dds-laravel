@@ -13,38 +13,52 @@
         <!-- User Dropdown Menu -->
         <li class="nav-item dropdown user-menu">
             <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
+                <i class="fas fa-user-circle mr-1"></i>
                 <span class="d-none d-md-inline">
                     {{ Auth::user()->name }}
                     @if (Auth::user()->department_location_code)
-                        <small>({{ Auth::user()->department_location_code }})</small>
+                        <small class="text-light">({{ Auth::user()->department_location_code }})</small>
                     @endif
                 </span>
+                <i class="fas fa-chevron-down ml-1"></i>
             </a>
             <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
-                <!-- User image -->
-                {{-- <li class="user-header bg-primary">
-                    <img src="{{ asset('adminlte/dist/img/user2-160x160.jpg') }}" class="img-circle elevation-2"
-                        alt="User Image">
-                    <p>
-                        {{ Auth::user()->name }}
+                <!-- User Header -->
+                <li class="user-header bg-primary">
+                    <div class="text-center">
+                        <div class="user-avatar mb-2">
+                            <i class="fas fa-user-circle fa-3x text-white-50"></i>
+                        </div>
+                        <h6 class="text-white mb-1">{{ Auth::user()->name }}</h6>
                         @if (Auth::user()->department_location_code)
-                            <br><small class="text-white-50">({{ Auth::user()->department_location_code }})</small>
+                            <small class="text-white-50">{{ Auth::user()->department_location_code }}</small><br>
                         @endif
-                        <br><small>{{ Auth::user()->email }}</small>
-                    </p>
-                </li> --}}
-                <!-- Menu Footer-->
-                <li class="user-footer">
-                    <a href="{{ route('profile.change-password') }}" class="btn btn-default btn-flat">
-                        <i class="fas fa-key mr-2"></i>Change Password
-                    </a>
-                    <form method="POST" action="{{ route('logout') }}" class="d-inline">
-                        @csrf
-                        <button type="submit" class="btn btn-default btn-flat float-right">
-                            <i class="fas fa-sign-out-alt mr-2"></i>Sign out
-                        </button>
-                    </form>
+                        <small class="text-white-50">{{ Auth::user()->email }}</small>
+                    </div>
                 </li>
+
+                <!-- User Menu Items -->
+                <li class="user-body">
+                    <div class="row">
+                        <div class="col-6 text-center">
+                            <a href="{{ route('profile.change-password') }}" class="btn btn-link btn-sm">
+                                <i class="fas fa-key text-primary"></i><br>
+                                <small>Change Password</small>
+                            </a>
+                        </div>
+                        <div class="col-6 text-center">
+                            <a href="#" class="btn btn-link btn-sm" onclick="confirmLogout()">
+                                <i class="fas fa-sign-out-alt text-danger"></i><br>
+                                <small>Sign Out</small>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+
+                <!-- Hidden Logout Form -->
+                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                    @csrf
+                </form>
             </ul>
         </li>
 

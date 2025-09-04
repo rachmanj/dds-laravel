@@ -9,49 +9,6 @@
     <li class="breadcrumb-item active">Invoices</li>
 @endsection
 
-@section('styles')
-    <!-- DataTables -->
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-    <!-- Toastr -->
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/toastr/toastr.min.css') }}">
-    <!-- Bootstrap Switch -->
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/bootstrap-switch/css/bootstrap4-switch.min.css') }}">
-    <!-- Select2 -->
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
-
-
-    <style>
-        /* Start search card in collapsed state */
-        .search-card .card-body {
-            display: none;
-        }
-
-        .search-card.collapsed .card-body {
-            display: block;
-        }
-
-        /* Days column badge styling */
-        .badge.badge-success {
-            background-color: #28a745;
-        }
-
-        .badge.badge-warning {
-            background-color: #ffc107;
-            color: #212529;
-        }
-
-        .badge.badge-danger {
-            background-color: #dc3545;
-        }
-
-        .badge.badge-info {
-            background-color: #17a2b8;
-        }
-    </style>
-@endsection
-
 @section('content')
     <section class="content">
         <div class="container-fluid">
@@ -206,6 +163,49 @@
         </div>
     </section>
     </div>
+@endsection
+
+@section('styles')
+    <!-- DataTables -->
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+    <!-- Toastr -->
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/toastr/toastr.min.css') }}">
+    <!-- Bootstrap Switch -->
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/bootstrap-switch/css/bootstrap4-switch.min.css') }}">
+    <!-- Select2 -->
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+
+
+    <style>
+        /* Start search card in collapsed state */
+        .search-card .card-body {
+            display: none;
+        }
+
+        .search-card.collapsed .card-body {
+            display: block;
+        }
+
+        /* Days column badge styling */
+        .badge.badge-success {
+            background-color: #28a745;
+        }
+
+        .badge.badge-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .badge.badge-danger {
+            background-color: #dc3545;
+        }
+
+        .badge.badge-info {
+            background-color: #17a2b8;
+        }
+    </style>
 @endsection
 
 @section('scripts')
