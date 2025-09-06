@@ -12,6 +12,8 @@ class DistributionDocument extends Model
         'distribution_id',
         'document_type',
         'document_id',
+        'origin_cur_loc',
+        'skip_verification',
         'sender_verified',
         'sender_verification_status',
         'sender_verification_notes',
@@ -22,7 +24,8 @@ class DistributionDocument extends Model
 
     protected $casts = [
         'sender_verified' => 'boolean',
-        'receiver_verified' => 'boolean'
+        'receiver_verified' => 'boolean',
+        'skip_verification' => 'boolean',
     ];
 
     // Relationships

@@ -167,6 +167,7 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-master',
+            'see-all-record-switch',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance']);
@@ -196,6 +197,7 @@ class RolePermissionSeeder extends Seeder
             'see-all-record-switch',
             'view-master',
             'view-admin',
+            'see-all-record-switch',
         ]);
 
         $cashierho = Role::firstOrCreate(['name' => 'cashierho']);
@@ -211,6 +213,7 @@ class RolePermissionSeeder extends Seeder
             'view-distributions',
             'create-distributions',
             'edit-distributions',
+            'see-all-record-switch',
         ]);
     }
 }

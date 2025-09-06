@@ -1231,6 +1231,16 @@ $query = Invoice::with([
 
 **Learning**: Comprehensive documentation updates ensure all stakeholders understand the new API capabilities
 
+### 2025-09-05: Out-of-Origin Additional Documents Handling
+
+-   Problem: Invoices can link additional documents from other departments; auto-including them in distributions caused unintended status/cur_loc updates and confusing verification.
+-   Solution: Added `origin_cur_loc` and `skip_verification` on `distribution_documents`. When `skip_verification = true` (doc not in origin department at creation), we:
+    -   Disable sender/receiver verification inputs in UI
+    -   Skip changing `distribution_status` on Send/Receive
+    -   Skip changing `cur_loc` on Receive/Complete
+    -   Keep such docs visible for awareness
+-   Impact: Accurate audit trail; prevents false movement; preserves visibility of needed documents.
+
 #### **5. API Response Structure Enhancement**
 
 **Before Enhancement**:
@@ -1302,6 +1312,17 @@ $query = Invoice::with([
 **Learning**: Incremental API enhancements create foundation for more sophisticated business logic and automation
 
 ---
+
+### 2025-09-05: Out-of-Origin Additional Documents – UI and Workflow Clarifications
+
+-   Implemented `origin_cur_loc` and `skip_verification` on `distribution_documents` to mark additional documents not in origin department at distribution creation.
+-   Controller logic: skipped docs do not change distribution_status/cur_loc; verification endpoints ignore them.
+-   UI updates:
+    -   Distributed Documents table shows "Not included in this distribution" in Sender/Receiver/Overall for skipped docs
+    -   Verification modals disable inputs for skipped docs; “Select All as Verified” ignores them
+    -   Summary counters/progress bars exclude skipped docs
+    -   Added Type column (ITO/BAST/BAPP) to Sender/Receiver verification tables
+-   Outcome: Accurate audit trail, clear operator guidance, preserved visibility without implying responsibility.
 
 ### **2025-01-27: File Upload Size Enhancement - Complete 50MB Limit Implementation**
 

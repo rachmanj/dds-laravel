@@ -1,3 +1,17 @@
+### 2025-09-05: Clarify Out-of-Origin Additional Documents in UI and Workflow
+
+-   Decision: Skipped (out-of-origin) additional documents should be visible but clearly marked, not verifiable, and excluded from bulk actions and metrics.
+-   Status: IMPLEMENTED
+-   Context: Incomplete invoices pull linked documents from other departments. Treating them as part of the distribution caused confusion.
+-   Changes:
+    -   Added `origin_cur_loc`, `skip_verification` to `distribution_documents`
+    -   Disabled verification inputs for skipped docs; show "Not included in this distribution" in summary table columns
+    -   Excluded skipped docs from sender/receiver counts and progress bars
+    -   Updated "Select All as Verified" to ignore skipped docs
+    -   Added Type column (ITO/BAST/BAPP etc.) in Sender/Receiver Verification modals
+-   Implications: Preserves visibility without implying responsibility; maintains accurate audit/location status.
+-   Review: 2025-10-05
+
 # DDS Laravel Development Decisions
 
 ## 📝 **Decision Records**
@@ -3635,5 +3649,24 @@ After implementing the comprehensive external invoice API system with multiple e
 **Last Updated**: 2025-01-27  
 **Version**: 4.4  
 **Status**: ✅ **Production Ready** - API documentation organized, comprehensive workflow protection & layout issues resolved
+
+---
+
+### **2025-09-05: Out-of-Origin Additional Documents Handling**
+
+-   Decision: Do not update status/cur_loc for additional documents not in origin department at distribution creation; disable verification for them.
+-   Status: IMPLEMENTED
+-   Context: When invoices auto-include linked additional documents, some may physically reside in other departments ("incomplete" invoices). Updating their status/location during this distribution created misleading trails.
+-   Alternatives Considered:
+    -   Update all linked docs anyway (Rejected: inaccurate physical trail)
+    -   Exclude linked docs entirely (Rejected: destination loses visibility)
+    -   Mark and exclude from verification/updates (Chosen)
+-   Implementation:
+    -   Added `origin_cur_loc`, `skip_verification` to `distribution_documents`
+    -   Set `skip_verification` if `origin_cur_loc` != origin department location
+    -   Disabled verification inputs in UI for skipped docs
+    -   Filtered Send/Receive status and location updates to ignore skipped docs
+-   Implications: Clearer audit trail, avoids false movement; maintains visibility of out-of-origin docs
+-   Review Date: 2025-10-05
 
 ---

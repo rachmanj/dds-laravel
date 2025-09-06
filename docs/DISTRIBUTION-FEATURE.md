@@ -65,6 +65,8 @@ Main Fields (distributions table)
 -   distribution_id (Foreign Key → distributions)
 -   document_type (Polymorphic: 'App\Models\Invoice' | 'App\Models\AdditionalDocument')
 -   document_id (Polymorphic ID for the actual document)
+-   origin_cur_loc (string, nullable) — snapshot of document location when distribution created
+-   skip_verification (boolean, default false) — if document was not in origin department at creation
 
 // Document-Level Verification
 
@@ -129,8 +131,24 @@ Business Rules:
 
 Only allowed if status is 'sent'
 KEY FEATURE: Automatically updates document locations to destination department
-This is the core business logic - documents physically "move" between departments History Entry: 'received' action with location change details 5. Receiver Verification Stage
-Triggered by: POST /api/distributions/{id}/verify-receiver Fields Updated:
+Exceptions for Out-of-Origin Additional Documents:
+
+-   Additional documents that were not in the origin department at creation (skip_verification = true) are informational only in this distribution:
+    -   No distribution_status change on Send/Receive
+    -   No cur_loc change on Receive/Complete
+    -   Verification inputs disabled in sender/receiver modals
+    -   Sender/Receiver/Overall columns show a neutral badge: "Not included in this distribution"
+    -   Summary counters and progress bars exclude skipped documents
+    -   "Select All as Verified" ignores skipped documents in both modals
+        This is the core business logic - documents physically "move" between departments
+
+UI Enhancements (2025-09-05):
+
+-   Sender/Receiver Verification modals include a Type column (e.g., ITO, BAST, BAPP)
+-   Out-of-origin attached additional documents display an "Out of origin dept" badge near the document name
+
+5. Receiver Verification Stage
+   Triggered by: POST /api/distributions/{id}/verify-receiver Fields Updated:
 
 'status' => 'verified_by_receiver'
 'receiver_verified_at' => now()
@@ -204,6 +222,7 @@ Key Business Logic Features
 3. Granular Verification System
    Distribution-Level: Overall verification with timestamps and notes
    Document-Level: Individual document verification with status (verified/missing/damaged)
+   Out-of-Origin Additional Documents: Verification inputs are disabled and labeled; they do not participate in status/location changes
    Discrepancy Management: Detailed tracking and notification system
 4. Comprehensive Audit Trail
    Every action logged in distribution_histories table

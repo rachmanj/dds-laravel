@@ -546,7 +546,7 @@ class DistributionController extends Controller
                     ->where('document_id', $verification['document_id'])
                     ->first();
 
-                if ($distributionDocument) {
+                if ($distributionDocument && !$distributionDocument->skip_verification) {
                     $distributionDocument->markAsSenderVerified(
                         $verification['status'],
                         $verification['notes'] ?? null
@@ -788,7 +788,7 @@ class DistributionController extends Controller
                     ->where('document_id', $verification['document_id'])
                     ->first();
 
-                if ($distributionDocument) {
+                if ($distributionDocument && !$distributionDocument->skip_verification) {
                     $distributionDocument->markAsReceiverVerified(
                         $verification['status'],
                         $verification['notes'] ?? null
@@ -971,11 +971,20 @@ class DistributionController extends Controller
      */
     private function attachDocuments(Distribution $distribution, string $documentType, array $documentIds): void
     {
+        $originLocationCode = $distribution->originDepartment->location_code;
+
         foreach ($documentIds as $documentId) {
+            $isInvoice = $documentType === 'invoice';
+            $documentModel = $isInvoice ? Invoice::find($documentId) : AdditionalDocument::find($documentId);
+            $originCurLoc = $documentModel?->cur_loc;
+            $skipVerification = !$isInvoice && $originCurLoc !== $originLocationCode;
+
             DistributionDocument::create([
                 'distribution_id' => $distribution->id,
-                'document_type' => $documentType === 'invoice' ? Invoice::class : AdditionalDocument::class,
-                'document_id' => $documentId
+                'document_type' => $isInvoice ? Invoice::class : AdditionalDocument::class,
+                'document_id' => $documentId,
+                'origin_cur_loc' => $originCurLoc,
+                'skip_verification' => $skipVerification,
             ]);
         }
     }
@@ -986,6 +995,8 @@ class DistributionController extends Controller
      */
     private function attachInvoiceAdditionalDocuments(Distribution $distribution, array $invoiceIds): void
     {
+        $originLocationCode = $distribution->originDepartment->location_code;
+
         foreach ($invoiceIds as $invoiceId) {
             $invoice = Invoice::find($invoiceId);
             if ($invoice && $invoice->additionalDocuments()->count() > 0) {
@@ -1000,7 +1011,9 @@ class DistributionController extends Controller
                         DistributionDocument::create([
                             'distribution_id' => $distribution->id,
                             'document_type' => AdditionalDocument::class,
-                            'document_id' => $additionalDocument->id
+                            'document_id' => $additionalDocument->id,
+                            'origin_cur_loc' => $additionalDocument->cur_loc,
+                            'skip_verification' => ($additionalDocument->cur_loc !== $originLocationCode),
                         ]);
                     }
                 }
@@ -1032,10 +1045,18 @@ class DistributionController extends Controller
                     Invoice::where('id', $distributionDocument->document_id)
                         ->update(['distribution_status' => $status]);
 
-                    // Also update status of any additional documents attached to this invoice
-                    $invoice = Invoice::find($distributionDocument->document_id);
-                    if ($invoice && $invoice->additionalDocuments()->count() > 0) {
-                        $invoice->additionalDocuments()->update(['distribution_status' => $status]);
+                    // Also update status of any additional documents attached to this invoice (but not skipped)
+                    $invoiceId = $distributionDocument->document_id;
+                    $invoiceAdditionalDocIds = Invoice::find($invoiceId)?->additionalDocuments()->pluck('additional_documents.id') ?? collect();
+                    if ($invoiceAdditionalDocIds->isNotEmpty()) {
+                        $attachedNonSkippedIds = DistributionDocument::where('distribution_id', $distribution->id)
+                            ->where('document_type', AdditionalDocument::class)
+                            ->where('skip_verification', false)
+                            ->whereIn('document_id', $invoiceAdditionalDocIds)
+                            ->pluck('document_id');
+                        if ($attachedNonSkippedIds->isNotEmpty()) {
+                            AdditionalDocument::whereIn('id', $attachedNonSkippedIds)->update(['distribution_status' => $status]);
+                        }
                     }
                 } elseif ($status === 'distributed') {
                     // ✅ When RECEIVED: Only update documents that were actually verified
@@ -1043,21 +1064,31 @@ class DistributionController extends Controller
                         Invoice::where('id', $distributionDocument->document_id)
                             ->update(['distribution_status' => $status]);
 
-                        // Also update status of any additional documents attached to this invoice
-                        $invoice = Invoice::find($distributionDocument->document_id);
-                        if ($invoice && $invoice->additionalDocuments()->count() > 0) {
-                            $invoice->additionalDocuments()->update(['distribution_status' => $status]);
+                        // Also update status of any additional documents attached to this invoice (but not skipped)
+                        $invoiceId = $distributionDocument->document_id;
+                        $invoiceAdditionalDocIds = Invoice::find($invoiceId)?->additionalDocuments()->pluck('additional_documents.id') ?? collect();
+                        if ($invoiceAdditionalDocIds->isNotEmpty()) {
+                            $attachedNonSkippedIds = DistributionDocument::where('distribution_id', $distribution->id)
+                                ->where('document_type', AdditionalDocument::class)
+                                ->where('skip_verification', false)
+                                ->whereIn('document_id', $invoiceAdditionalDocIds)
+                                ->pluck('document_id');
+                            if ($attachedNonSkippedIds->isNotEmpty()) {
+                                AdditionalDocument::whereIn('id', $attachedNonSkippedIds)->update(['distribution_status' => $status]);
+                            }
                         }
                     }
                 }
             } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
                 if ($status === 'in_transit') {
-                    // ✅ When SENT: Update ALL documents to 'in_transit'
-                    AdditionalDocument::where('id', $distributionDocument->document_id)
-                        ->update(['distribution_status' => $status]);
+                    // ✅ When SENT: Update ALL documents to 'in_transit' (except skipped)
+                    if (!$distributionDocument->skip_verification) {
+                        AdditionalDocument::where('id', $distributionDocument->document_id)
+                            ->update(['distribution_status' => $status]);
+                    }
                 } elseif ($status === 'distributed') {
                     // ✅ When RECEIVED: Only update verified documents
-                    if ($distributionDocument->receiver_verification_status === 'verified') {
+                    if ($distributionDocument->receiver_verification_status === 'verified' && !$distributionDocument->skip_verification) {
                         AdditionalDocument::where('id', $distributionDocument->document_id)
                             ->update(['distribution_status' => $status]);
                     }
@@ -1075,6 +1106,9 @@ class DistributionController extends Controller
         foreach ($distribution->documents as $distributionDocument) {
             // Check if document was marked as missing or damaged by receiver
             if (in_array($distributionDocument->receiver_verification_status, ['missing', 'damaged'])) {
+                if ($distributionDocument->skip_verification) {
+                    continue;
+                }
 
                 // Update document distribution status to reflect reality
                 if ($distributionDocument->document_type === Invoice::class) {
@@ -1138,14 +1172,24 @@ class DistributionController extends Controller
                     Invoice::where('id', $distributionDocument->document_id)
                         ->update(['cur_loc' => $destinationLocationCode]);
 
-                    // Also update location of any additional documents attached to this invoice
-                    $invoice = Invoice::find($distributionDocument->document_id);
-                    if ($invoice && $invoice->additionalDocuments()->count() > 0) {
-                        $invoice->additionalDocuments()->update(['cur_loc' => $destinationLocationCode]);
+                    // Also update location of any additional documents attached to this invoice (but not skipped)
+                    $invoiceId = $distributionDocument->document_id;
+                    $invoiceAdditionalDocIds = Invoice::find($invoiceId)?->additionalDocuments()->pluck('additional_documents.id') ?? collect();
+                    if ($invoiceAdditionalDocIds->isNotEmpty()) {
+                        $attachedNonSkippedIds = DistributionDocument::where('distribution_id', $distribution->id)
+                            ->where('document_type', AdditionalDocument::class)
+                            ->where('skip_verification', false)
+                            ->whereIn('document_id', $invoiceAdditionalDocIds)
+                            ->pluck('document_id');
+                        if ($attachedNonSkippedIds->isNotEmpty()) {
+                            AdditionalDocument::whereIn('id', $attachedNonSkippedIds)->update(['cur_loc' => $destinationLocationCode]);
+                        }
                     }
                 } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
-                    AdditionalDocument::where('id', $distributionDocument->document_id)
-                        ->update(['cur_loc' => $destinationLocationCode]);
+                    if (!$distributionDocument->skip_verification) {
+                        AdditionalDocument::where('id', $distributionDocument->document_id)
+                            ->update(['cur_loc' => $destinationLocationCode]);
+                    }
                 }
             }
             // ❌ Missing/damaged documents keep their original location

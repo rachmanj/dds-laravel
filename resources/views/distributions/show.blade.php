@@ -373,16 +373,15 @@
                                 </div>
                                 <div class="card-body">
                                     @php
-                                        $senderVerified = $distribution->documents
-                                            ->where('sender_verified', true)
-                                            ->count();
-                                        $senderMissing = $distribution->documents
+                                        $includedDocs = $distribution->documents->where('skip_verification', false);
+                                        $senderVerified = $includedDocs->where('sender_verified', true)->count();
+                                        $senderMissing = $includedDocs
                                             ->where('sender_verification_status', 'missing')
                                             ->count();
-                                        $senderDamaged = $distribution->documents
+                                        $senderDamaged = $includedDocs
                                             ->where('sender_verification_status', 'damaged')
                                             ->count();
-                                        $senderPending = $distribution->documents->count() - $senderVerified;
+                                        $senderPending = $includedDocs->count() - $senderVerified;
                                     @endphp
 
                                     <div class="row text-center">
@@ -415,11 +414,11 @@
                                     @if ($senderVerified > 0)
                                         <div class="progress mt-3" style="height: 8px;">
                                             <div class="progress-bar bg-success"
-                                                style="width: {{ ($senderVerified / $distribution->documents->count()) * 100 }}%">
+                                                style="width: {{ $includedDocs->count() > 0 ? ($senderVerified / $includedDocs->count()) * 100 : 0 }}%">
                                             </div>
                                         </div>
                                         <small
-                                            class="text-muted">{{ round(($senderVerified / $distribution->documents->count()) * 100) }}%
+                                            class="text-muted">{{ $includedDocs->count() > 0 ? round(($senderVerified / $includedDocs->count()) * 100) : 0 }}%
                                             verified</small>
                                     @endif
                                 </div>
@@ -436,16 +435,15 @@
                                 </div>
                                 <div class="card-body">
                                     @php
-                                        $receiverVerified = $distribution->documents
-                                            ->where('receiver_verified', true)
-                                            ->count();
-                                        $receiverMissing = $distribution->documents
+                                        $includedDocsR = $distribution->documents->where('skip_verification', false);
+                                        $receiverVerified = $includedDocsR->where('receiver_verified', true)->count();
+                                        $receiverMissing = $includedDocsR
                                             ->where('receiver_verification_status', 'missing')
                                             ->count();
-                                        $receiverDamaged = $distribution->documents
+                                        $receiverDamaged = $includedDocsR
                                             ->where('receiver_verification_status', 'damaged')
                                             ->count();
-                                        $receiverPending = $distribution->documents->count() - $receiverVerified;
+                                        $receiverPending = $includedDocsR->count() - $receiverVerified;
                                     @endphp
 
                                     <div class="row text-center">
@@ -478,11 +476,11 @@
                                     @if ($receiverVerified > 0)
                                         <div class="progress mt-3" style="height: 8px;">
                                             <div class="progress-bar bg-success"
-                                                style="width: {{ ($receiverVerified / $distribution->documents->count()) * 100 }}%">
+                                                style="width: {{ $includedDocsR->count() > 0 ? ($receiverVerified / $includedDocsR->count()) * 100 : 0 }}%">
                                             </div>
                                         </div>
                                         <small
-                                            class="text-muted">{{ round(($receiverVerified / $distribution->documents->count()) * 100) }}%
+                                            class="text-muted">{{ $includedDocsR->count() > 0 ? round(($receiverVerified / $includedDocsR->count()) * 100) : 0 }}%
                                             verified</small>
                                     @endif
                                 </div>
@@ -581,29 +579,44 @@
                                             <span class="badge badge-primary">Invoice</span>
                                         </td>
                                         <td>
-                                            @if ($doc->sender_verified)
-                                                <span
-                                                    class="badge badge-{{ $doc->sender_verification_status === 'verified' ? 'success' : ($doc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                    {{ ucfirst($doc->sender_verification_status) }}
-                                                </span>
+                                            @if ($doc->skip_verification)
+                                                <span class="badge badge-secondary">Not included in this
+                                                    distribution</span>
                                             @else
-                                                <span class="badge badge-secondary">Pending</span>
+                                                @if ($doc->sender_verified)
+                                                    <span
+                                                        class="badge badge-{{ $doc->sender_verification_status === 'verified' ? 'success' : ($doc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
+                                                        {{ ucfirst($doc->sender_verification_status) }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge badge-secondary">Pending</span>
+                                                @endif
                                             @endif
                                         </td>
                                         <td>
-                                            @if ($doc->receiver_verified)
-                                                <span
-                                                    class="badge badge-{{ $doc->receiver_verification_status === 'verified' ? 'success' : ($doc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                    {{ ucfirst($doc->receiver_verification_status) }}
-                                                </span>
+                                            @if ($doc->skip_verification)
+                                                <span class="badge badge-secondary">Not included in this
+                                                    distribution</span>
                                             @else
-                                                <span class="badge badge-secondary">Pending</span>
+                                                @if ($doc->receiver_verified)
+                                                    <span
+                                                        class="badge badge-{{ $doc->receiver_verification_status === 'verified' ? 'success' : ($doc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
+                                                        {{ ucfirst($doc->receiver_verification_status) }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge badge-secondary">Pending</span>
+                                                @endif
                                             @endif
                                         </td>
                                         <td>
-                                            <span class="badge {{ $doc->verification_status_badge_class }}">
-                                                {{ $doc->verification_status_display }}
-                                            </span>
+                                            @if ($doc->skip_verification)
+                                                <span class="badge badge-secondary">Not included in this
+                                                    distribution</span>
+                                            @else
+                                                <span class="badge {{ $doc->verification_status_badge_class }}">
+                                                    {{ $doc->verification_status_display }}
+                                                </span>
+                                            @endif
                                         </td>
                                     </tr>
 
@@ -624,6 +637,12 @@
                                                         <br>
                                                         <small
                                                             class="text-muted">{{ $addDoc->type->type_name ?? 'N/A' }}</small>
+                                                        @if ($distDoc->skip_verification)
+                                                            <br>
+                                                            <span class="badge badge-secondary"
+                                                                title="Document was not in origin department at creation">Out
+                                                                of origin dept</span>
+                                                        @endif
                                                     </div>
                                                 </div>
                                             </td>
@@ -631,7 +650,10 @@
                                                 <span class="badge badge-info">Additional Document</span>
                                             </td>
                                             <td>
-                                                @if ($distDoc->sender_verified)
+                                                @if ($distDoc->skip_verification)
+                                                    <span class="badge badge-secondary">Not included in this
+                                                        distribution</span>
+                                                @elseif ($distDoc->sender_verified)
                                                     <span
                                                         class="badge badge-{{ $distDoc->sender_verification_status === 'verified' ? 'success' : ($distDoc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
                                                         {{ ucfirst($distDoc->sender_verification_status) }}
@@ -641,7 +663,10 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                @if ($distDoc->receiver_verified)
+                                                @if ($distDoc->skip_verification)
+                                                    <span class="badge badge-secondary">Not included in this
+                                                        distribution</span>
+                                                @elseif ($distDoc->receiver_verified)
                                                     <span
                                                         class="badge badge-{{ $distDoc->receiver_verification_status === 'verified' ? 'success' : ($distDoc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
                                                         {{ ucfirst($distDoc->receiver_verification_status) }}
@@ -651,9 +676,14 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <span class="badge {{ $distDoc->verification_status_badge_class }}">
-                                                    {{ $distDoc->verification_status_display }}
-                                                </span>
+                                                @if ($distDoc->skip_verification)
+                                                    <span class="badge badge-secondary">Not included in this
+                                                        distribution</span>
+                                                @else
+                                                    <span class="badge {{ $distDoc->verification_status_badge_class }}">
+                                                        {{ $distDoc->verification_status_display }}
+                                                    </span>
+                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach
@@ -679,7 +709,10 @@
                                                 <span class="badge badge-info">Additional Document</span>
                                             </td>
                                             <td>
-                                                @if ($doc->sender_verified)
+                                                @if ($doc->skip_verification)
+                                                    <span class="badge badge-secondary">Not included in this
+                                                        distribution</span>
+                                                @elseif ($doc->sender_verified)
                                                     <span
                                                         class="badge badge-{{ $doc->sender_verification_status === 'verified' ? 'success' : ($doc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
                                                         {{ ucfirst($doc->sender_verification_status) }}
@@ -689,7 +722,10 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                @if ($doc->receiver_verified)
+                                                @if ($doc->skip_verification)
+                                                    <span class="badge badge-secondary">Not included in this
+                                                        distribution</span>
+                                                @elseif ($doc->receiver_verified)
                                                     <span
                                                         class="badge badge-{{ $doc->receiver_verification_status === 'verified' ? 'success' : ($doc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
                                                         {{ ucfirst($doc->receiver_verification_status) }}
@@ -699,9 +735,14 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <span class="badge {{ $doc->verification_status_badge_class }}">
-                                                    {{ $doc->verification_status_display }}
-                                                </span>
+                                                @if ($doc->skip_verification)
+                                                    <span class="badge badge-secondary">Not included in this
+                                                        distribution</span>
+                                                @else
+                                                    <span class="badge {{ $doc->verification_status_badge_class }}">
+                                                        {{ $doc->verification_status_display }}
+                                                    </span>
+                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach
@@ -856,7 +897,7 @@
 
     <!-- Sender Verification Modal -->
     <div class="modal fade" id="senderVerificationModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Sender Verification</h5>
@@ -894,6 +935,7 @@
                                             <input type="checkbox" id="selectAll" class="form-check-input">
                                         </th>
                                         <th>Document</th>
+                                        <th>Type</th>
                                         <th>Status</th>
                                         <th>Notes</th>
                                     </tr>
@@ -907,14 +949,27 @@
                                             </td>
                                             <td>
                                                 <strong>{{ $doc->document->document_number ?? ($doc->document->invoice_number ?? 'N/A') }}</strong>
-                                                <br>
-                                                <small
-                                                    class="text-muted">{{ class_basename($doc->document_type) }}</small>
                                             </td>
                                             <td>
+                                                @php
+                                                    $docTypeLabel =
+                                                        class_basename($doc->document_type) === 'Invoice'
+                                                            ? $doc->document->type->type_name ?? 'Invoice'
+                                                            : $doc->document->type->type_name ?? 'AdditionalDocument';
+                                                @endphp
+                                                <small class="text-muted">{{ $docTypeLabel }}</small>
+                                            </td>
+                                            <td>
+                                                @php $isSkipped = $doc->skip_verification ?? false; @endphp
+                                                @if ($isSkipped)
+                                                    <span class="badge badge-secondary"
+                                                        title="Document was not in origin department at creation">Out of
+                                                        origin dept</span>
+                                                @endif
                                                 <select class="form-control document-status"
                                                     name="document_verifications[{{ $doc->document_id }}][status]"
-                                                    data-document-id="{{ $doc->document_id }}" required>
+                                                    data-document-id="{{ $doc->document_id }}"
+                                                    @if ($isSkipped) disabled @else required @endif>
                                                     <option value="">Select Status</option>
                                                     <option value="verified">Verified</option>
                                                     <option value="missing">Missing</option>
@@ -928,7 +983,8 @@
                                                 <input type="text" class="form-control document-notes"
                                                     name="document_verifications[{{ $doc->document_id }}][notes]"
                                                     placeholder="Notes required for Missing/Damaged status"
-                                                    data-document-id="{{ $doc->document_id }}">
+                                                    data-document-id="{{ $doc->document_id }}"
+                                                    @if ($isSkipped) disabled @endif>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -992,7 +1048,7 @@
 
     <!-- Receiver Verification Modal -->
     <div class="modal fade" id="receiverVerificationModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Receiver Verification</h5>
@@ -1041,6 +1097,7 @@
                                             <input type="checkbox" id="selectAllReceiver" class="form-check-input">
                                         </th>
                                         <th>Document</th>
+                                        <th>Type</th>
                                         <th>Status</th>
                                         <th>Notes</th>
                                     </tr>
@@ -1054,14 +1111,27 @@
                                             </td>
                                             <td>
                                                 <strong>{{ $doc->document->document_number ?? ($doc->document->invoice_number ?? 'N/A') }}</strong>
-                                                <br>
-                                                <small
-                                                    class="text-muted">{{ class_basename($doc->document_type) }}</small>
                                             </td>
                                             <td>
+                                                @php
+                                                    $docTypeLabelR =
+                                                        class_basename($doc->document_type) === 'Invoice'
+                                                            ? $doc->document->type->type_name ?? 'Invoice'
+                                                            : $doc->document->type->type_name ?? 'AdditionalDocument';
+                                                @endphp
+                                                <small class="text-muted">{{ $docTypeLabelR }}</small>
+                                            </td>
+                                            <td>
+                                                @php $isSkippedR = $doc->skip_verification ?? false; @endphp
+                                                @if ($isSkippedR)
+                                                    <span class="badge badge-secondary"
+                                                        title="Document was not in origin department at creation">Out of
+                                                        origin dept</span>
+                                                @endif
                                                 <select class="form-control document-status-receiver"
                                                     name="document_verifications[{{ $doc->document_id }}][status]"
-                                                    data-document-id="{{ $doc->document_id }}" required>
+                                                    data-document-id="{{ $doc->document_id }}"
+                                                    @if ($isSkippedR) disabled @else required @endif>
                                                     <option value="">Select Status</option>
                                                     <option value="verified">Verified</option>
                                                     <option value="missing">Missing</option>
@@ -1075,7 +1145,8 @@
                                                 <input type="text" class="form-control document-notes-receiver"
                                                     name="document_verifications[{{ $doc->document_id }}][notes]"
                                                     placeholder="Notes required for Missing/Damaged status"
-                                                    data-document-id="{{ $doc->document_id }}">
+                                                    data-document-id="{{ $doc->document_id }}"
+                                                    @if ($isSkippedR) disabled @endif>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -1353,14 +1424,26 @@
                 console.log('=== SELECT ALL AS VERIFIED CLICKED ===');
                 console.log('Total documents found:', $('.document-checkbox').length);
 
-                $('.document-checkbox').prop('checked', true);
-                $('.document-status').val('verified');
-                $('.document-notes').val('').prop('required', false);
+                // Only affect non-skipped rows
+                $('.document-checkbox').each(function() {
+                    const row = $(this).closest('tr');
+                    const select = row.find('.document-status');
+                    const isDisabled = select.is(':disabled');
+                    if (!isDisabled) {
+                        $(this).prop('checked', true);
+                        select.val('verified');
+                        row.find('.document-notes').val('').prop('required', false);
+                    }
+                });
 
                 selectedDocuments.clear();
                 $('.document-checkbox').each(function() {
                     const docId = $(this).data('document-id');
-                    selectedDocuments.add(docId);
+                    const row = $(this).closest('tr');
+                    const select = row.find('.document-status');
+                    if (!select.is(':disabled')) {
+                        selectedDocuments.add(docId);
+                    }
                     console.log('Added document ID to selection:', docId);
                 });
 
@@ -1610,14 +1693,26 @@
                 console.log('=== RECEIVER SELECT ALL AS VERIFIED CLICKED ===');
                 console.log('Total documents found:', $('.document-checkbox-receiver').length);
 
-                $('.document-checkbox-receiver').prop('checked', true);
-                $('.document-status-receiver').val('verified');
-                $('.document-notes-receiver').val('').prop('required', false);
+                // Only affect non-skipped rows
+                $('.document-checkbox-receiver').each(function() {
+                    const row = $(this).closest('tr');
+                    const select = row.find('.document-status-receiver');
+                    const isDisabled = select.is(':disabled');
+                    if (!isDisabled) {
+                        $(this).prop('checked', true);
+                        select.val('verified');
+                        row.find('.document-notes-receiver').val('').prop('required', false);
+                    }
+                });
 
                 selectedDocumentsReceiver.clear();
                 $('.document-checkbox-receiver').each(function() {
                     const docId = $(this).data('document-id');
-                    selectedDocumentsReceiver.add(docId);
+                    const row = $(this).closest('tr');
+                    const select = row.find('.document-status-receiver');
+                    if (!select.is(':disabled')) {
+                        selectedDocumentsReceiver.add(docId);
+                    }
                     console.log('Added document ID to selection:', docId);
                 });
 
