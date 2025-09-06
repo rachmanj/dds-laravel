@@ -511,6 +511,35 @@ $query->when($request->get('show_all_records') === 'true', function ($query) {
 
 ## 🔄 **Core Workflows**
 
+### **Authentication Flow (Email or Username)**
+
+The system supports logging in using either email or username with a single `login` field. The backend resolves the credential field dynamically and requires `is_active = true`.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant B as Browser (Login Form)
+    participant A as App (LoginController)
+    participant DB as Database
+
+    U->>B: Enter login (email or username) + password
+    B->>A: POST /login { login, password }
+    A->>A: Detect field (email vs username)
+    A->>DB: Auth::attempt({ field: value, password, is_active: true })
+    alt Success
+        A->>B: 302 Redirect /dashboard
+    else Failure
+        A->>B: 422 Error on 'login'
+    end
+```
+
+Implementation references:
+
+-   Controller: `app/Http/Controllers/Auth/LoginController.php`
+-   View: `resources/views/auth/login.blade.php`
+-   Tests: `tests/Feature/LoginTest.php`
+-   Decision: `docs/decisions.md` (2025-09-06)
+
 ### **External API System**
 
 The system provides secure external API access for invoice data with comprehensive security and user accountability:
@@ -1492,6 +1521,6 @@ public function scopeUnaccountedFor($query)
 
 ---
 
-**Last Updated**: 2025-01-27  
-**Version**: 4.3  
-**Status**: ✅ **Production Ready** - Critical fixes implemented, comprehensive workflow protection & layout issues resolved
+**Last Updated**: 2025-09-06  
+**Version**: 4.4  
+**Status**: ✅ **Production Ready** - Auth flow now supports email or username login

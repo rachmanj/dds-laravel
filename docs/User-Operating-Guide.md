@@ -10,7 +10,7 @@ This guide is designed for end users who will be operating the Document Distribu
 
 1. **Open your web browser** (Chrome, Firefox, Safari, or Edge)
 2. **Navigate to**: `https://your-company-dds.com` (or the URL provided by your IT department)
-3. **Login** using your company credentials
+3. **Login** using your email or username and password
 4. **Set your password** if prompted for first-time setup
 
 ### **Browser Requirements**

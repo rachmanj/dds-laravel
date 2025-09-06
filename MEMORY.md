@@ -1,3 +1,11 @@
+## 2025-09-06 — Authentication Login Method Enhancement
+
+-   Change: Users can now log in using either email or username via a single `login` field.
+-   Why: Improve UX and support legacy username-based accounts without schema changes.
+-   How: `LoginController@login` detects email vs username and authenticates with `is_active = true`; login view replaced email input with `login`; Remember Me preserved.
+-   Impact: No DB migration needed (users.username exists). Added tests for email path, username path, and inactive user rejection.
+-   Files: `app/Http/Controllers/Auth/LoginController.php`, `resources/views/auth/login.blade.php`, `tests/Feature/LoginTest.php`, `docs/authentication.md`, `docs/decisions.md`, `docs/architecture.md`.
+
 # DDS Laravel Development Memory
 
 ## 📝 **Key Decisions & Learnings**

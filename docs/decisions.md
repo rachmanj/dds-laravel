@@ -1,3 +1,17 @@
+## 2025-09-06 — Login via Email or Username
+
+-   Context: Users requested ability to log in using either email address or username.
+-   Decision: Accept a single `login` input; detect if it is an email (using filter validation). If email → authenticate with `email`; otherwise → authenticate with `username`. Require `is_active = true` during authentication.
+-   Implementation:
+    -   `app/Http/Controllers/Auth/LoginController@login`: switched validation to `login` + `password`; dynamic field resolution; added `is_active` in credentials.
+    -   `resources/views/auth/login.blade.php`: replaced email field with unified `login` field labeled “Email or Username”; added Remember Me checkbox.
+    -   Tests added for email path, username path, and inactive user rejection.
+-   Alternatives considered:
+    -   Two separate inputs or toggle (more UI complexity, same outcome).
+    -   Trying both fields sequentially without detection (unnecessary extra query attempts).
+-   Implications: No schema changes required; `users.username` already exists. Improves UX and supports legacy usernames.
+-   Review date: 2026-03-01
+
 ### 2025-09-05: Clarify Out-of-Origin Additional Documents in UI and Workflow
 
 -   Decision: Skipped (out-of-origin) additional documents should be visible but clearly marked, not verifiable, and excluded from bulk actions and metrics.

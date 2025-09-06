@@ -16,10 +16,19 @@ class LoginController extends Controller
 
     public function login(Request $request)
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
+        $validated = $request->validate([
+            'login' => ['required', 'string'],
             'password' => ['required'],
         ]);
+
+        $loginInput = $validated['login'];
+        $loginField = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        $credentials = [
+            $loginField => $loginInput,
+            'password' => $validated['password'],
+            'is_active' => true,
+        ];
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
@@ -28,7 +37,7 @@ class LoginController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'email' => __('The provided credentials do not match our records.'),
+            'login' => __('The provided credentials do not match our records.'),
         ]);
     }
 }

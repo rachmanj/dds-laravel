@@ -2,6 +2,26 @@
 
 ## 🎯 **Current Sprint**
 
+### **Authentication - Email or Username Login** ✅ **COMPLETED**
+
+Status: ✅ COMPLETED - Unified login input and backend logic
+Implementation Date: 2025-09-06
+
+Summary:
+
+-   Login now accepts email or username via single `login` field
+-   Backend resolves credential field dynamically and enforces `is_active`
+-   Remember Me restored on login form
+-   Feature tests added (email, username, inactive user)
+
+Files Updated:
+
+-   `app/Http/Controllers/Auth/LoginController.php`
+-   `resources/views/auth/login.blade.php`
+-   `tests/Feature/LoginTest.php`
+-   `docs/authentication.md`
+-   `docs/decisions.md`
+
 ### **UI/UX Enhancement - Page Title Alignment & Global Layout Consistency** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED** - Global page title alignment and enhanced user dropdown menu  

@@ -6,7 +6,7 @@ This document describes the authentication system implemented in the DDS Laravel
 
 ## Features
 
--   User login with email and password
+-   User login with email or username and password
 -   User registration
 -   Remember me functionality
 -   Form validation
@@ -17,7 +17,9 @@ This document describes the authentication system implemented in the DDS Laravel
 
 ### Controllers
 
--   `app/Http/Controllers/Auth/AuthController.php` - Handles authentication logic including login, registration, and logout.
+-   `app/Http/Controllers/Auth/LoginController.php` - Handles login form display and authentication attempts
+-   `app/Http/Controllers/Auth/RegisterController.php` - Handles user registration
+-   `app/Http/Controllers/Auth/LogoutController.php` - Handles logout
 
 ### Routes
 
@@ -26,14 +28,14 @@ Authentication routes are defined in `routes/web.php`:
 ```php
 // Authentication routes
 Route::middleware('guest')->group(function () {
-    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::get('/register', [AuthController::class, 'showRegistrationForm'])->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login']);
+    Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+    Route::post('/register', [RegisterController::class, 'register']);
 });
 
 Route::middleware('auth')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::post('/logout', [LogoutController::class, 'logout'])->name('logout');
 
     // Protected routes will go here
 });
@@ -59,9 +61,9 @@ The authentication system uses AdminLTE 3.2 for the UI components. The following
 
 ### Login
 
-Users can log in at `/login` with their email and password. The form includes:
+Users can log in at `/login` with their email or username and password. The form includes:
 
--   Email field
+-   Email or Username field (`login`)
 -   Password field
 -   Remember me checkbox
 -   Sign in button
