@@ -228,3 +228,14 @@ Key Business Logic Features
    Every action logged in distribution_histories table
    Includes user, action type, notes, and metadata
    Discrepancies get individual history entries
+
+### Draft-only Sync Linked Documents (2025-09-06)
+
+-   Purpose: Attach any newly linked additional documents for invoices already included in a draft distribution.
+-   Trigger: Button “Sync linked documents” on distribution show page (only visible in draft).
+-   Behavior:
+    -   Uses existing attachInvoiceAdditionalDocuments logic
+    -   Sets `origin_cur_loc` and `skip_verification` per current location vs origin department
+    -   Avoids duplicates if already attached
+-   Endpoint: `POST /distributions/{distribution}/sync-linked-documents`
+-   Controller: `DistributionController@syncLinkedDocuments`

@@ -32,6 +32,9 @@ Route::prefix('distributions')->name('distributions.')->group(function () {
     Route::post('/{distribution}/verify-receiver', [DistributionController::class, 'verifyByReceiver'])->name('verify-receiver');
     Route::post('/{distribution}/complete', [DistributionController::class, 'complete'])->name('complete');
 
+    // Sync newly linked additional documents for invoices in draft distribution
+    Route::post('/{distribution}/sync-linked-documents', [DistributionController::class, 'syncLinkedDocuments'])->name('sync-linked-documents');
+
     // Additional routes
     Route::get('/{distribution}/history', [DistributionController::class, 'history'])->name('history');
     Route::get('/{distribution}/discrepancy-summary', [DistributionController::class, 'discrepancySummary'])->name('discrepancy-summary');

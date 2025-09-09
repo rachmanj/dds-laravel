@@ -1,3 +1,18 @@
+## 2025-09-06 — Draft Distribution: Sync Linked Documents
+
+-   Context: Invoices can get new additional documents after a distribution is created (still draft). Users expected those new links to appear in the draft distribution without manual re-attach.
+-   Decision: Add a draft-only “Sync linked documents” action to pull any currently linked additional documents for invoices already attached to the distribution.
+-   Implementation:
+    -   Route: `POST /distributions/{distribution}/sync-linked-documents`
+    -   Controller: `DistributionController@syncLinkedDocuments` uses `attachInvoiceAdditionalDocuments`
+    -   UI: Button on distribution show visible when status is `draft`
+    -   Safety: Honors `origin_cur_loc` snapshot and `skip_verification` rules; prevents duplicates
+-   Alternatives:
+    -   Auto-sync on every show/load (risk of surprise changes)
+    -   Sync during verify/send (too late for review)
+-   Implications: Makes draft review complete and accurate; preserves explicit control via user action.
+-   Review date: 2025-10-15
+
 ## 2025-09-06 — Login via Email or Username
 
 -   Context: Users requested ability to log in using either email address or username.

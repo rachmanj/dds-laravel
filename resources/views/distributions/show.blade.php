@@ -87,6 +87,12 @@
                                     <i class="fas fa-ban"></i> Cancel
                                 </button>
                             @endrole
+                            @if ($distribution->status === 'draft')
+                                <button type="button" class="btn btn-secondary btn-sm" id="syncLinkedDocsBtn"
+                                    title="Attach newly linked additional documents for invoices in this draft distribution">
+                                    <i class="fas fa-sync"></i> Sync linked documents
+                                </button>
+                            @endif
                         @endif
                     </div>
                 </div>
@@ -1939,6 +1945,30 @@
                         }
                     });
                 }
+            });
+
+            // Sync linked documents (draft only)
+            $('#syncLinkedDocsBtn').click(function() {
+                $.ajax({
+                    url: '{{ route('distributions.sync-linked-documents', $distribution) }}',
+                    type: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message || 'Linked documents synced');
+                            setTimeout(function() {
+                                location.reload();
+                            }, 800);
+                        } else {
+                            toastr.error(response.message || 'Failed to sync linked documents');
+                        }
+                    },
+                    error: function(xhr) {
+                        toastr.error('Failed to sync linked documents');
+                    }
+                });
             });
         });
     </script>

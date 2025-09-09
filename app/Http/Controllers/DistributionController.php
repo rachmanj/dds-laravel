@@ -1500,4 +1500,54 @@ class DistributionController extends Controller
             'stats' => $stats
         ]);
     }
+
+    /**
+     * Sync newly linked additional documents for invoices already in a draft distribution
+     */
+    public function syncLinkedDocuments(Request $request, Distribution $distribution): JsonResponse|RedirectResponse
+    {
+        if ($distribution->status !== 'draft') {
+            $message = 'Sync is only available for draft distributions.';
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+            return back()->with('error', $message);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Find invoice docs already attached to this distribution
+            $invoiceDocIds = $distribution->documents
+                ->where('document_type', Invoice::class)
+                ->pluck('document_id')
+                ->all();
+
+            if (!empty($invoiceDocIds)) {
+                // Attach any currently linked additional documents for these invoices
+                $this->attachInvoiceAdditionalDocuments($distribution, $invoiceDocIds);
+            }
+
+            // Reload documents relationship for UI consistency
+            $distribution->load(['documents.document']);
+
+            DB::commit();
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Linked documents synced successfully.',
+                    'distribution' => $distribution
+                ]);
+            }
+
+            return back()->with('success', 'Linked documents synced successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            }
+            return back()->with('error', 'Failed to sync linked documents: ' . $e->getMessage());
+        }
+    }
 }

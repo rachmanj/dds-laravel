@@ -1332,6 +1332,13 @@ $query = Invoice::with([
     -   Added Type column (ITO/BAST/BAPP) to Sender/Receiver verification tables
 -   Outcome: Accurate audit trail, clear operator guidance, preserved visibility without implying responsibility.
 
+### 2025-09-06 — Draft Distribution Sync Linked Documents
+
+-   Feature: Added draft-only “Sync linked documents” action to pull any newly linked additional documents for invoices already attached to the distribution.
+-   Behavior: Uses existing invoice → additional documents auto-attach logic; sets `origin_cur_loc` and `skip_verification` appropriately; skips duplicates.
+-   UI: Button on distribution show when status is `draft`; AJAX with Toastr feedback; reloads on success.
+-   Rationale: Ensure the draft reflects current invoice linkages without manual re-attachment.
+
 ### **2025-01-27: File Upload Size Enhancement - Complete 50MB Limit Implementation**
 
 ### **2025-01-27: File Upload Size Enhancement - Complete 50MB Limit Implementation**
