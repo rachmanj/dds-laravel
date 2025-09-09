@@ -18,6 +18,7 @@ class UserSeeder extends Seeder
         $admin = User::create([
             'name' => 'Omanof Sullivan',
             'email' => 'admin@ninja.com',
+            'username' => 'superadmin',
             'password' => Hash::make('123456'),
             'project' => '000H',
             'department_id' => 21,

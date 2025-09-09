@@ -239,3 +239,18 @@ Key Business Logic Features
     -   Avoids duplicates if already attached
 -   Endpoint: `POST /distributions/{distribution}/sync-linked-documents`
 -   Controller: `DistributionController@syncLinkedDocuments`
+
+### Cancel Sent (Not Received) Workflow (2025-09-09)
+
+-   Purpose: Allow admins to cancel a distribution after it has been sent but before it is received, reverting all attached documents back to `available`.
+-   Guardrails:
+    -   Allowed only when `status = 'sent'` and `received_at IS NULL`
+    -   Allowed roles: `superadmin`, `admin`
+-   Effects:
+    -   Revert `distribution_status` from `in_transit` → `available` for all attached invoices and additional documents
+    -   Write workflow history entry for audit
+    -   Delete the distribution record
+-   Endpoint: `POST /distributions/{distribution}/cancel-sent`
+-   Route Protection: `role:superadmin|admin`
+-   Controller: `DistributionController@cancelSent`
+-   UI: Button "Cancel (Sent)" visible only when sent and not received; SweetAlert2 confirmation before action

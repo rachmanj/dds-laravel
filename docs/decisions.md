@@ -1,5 +1,19 @@
 ## 2025-09-06 — Draft Distribution: Sync Linked Documents
 
+-   ## 2025-09-09 — Cancel Sent (Not Received) Distributions
+
+-   Context: Distributions may be sent prematurely. Admins need to cancel before receipt while maintaining data integrity.
+-   Decision: Add a dedicated cancel workflow for `sent` (not received) distributions that reverts document statuses and removes the distribution.
+-   Implementation:
+    -   Route: `POST /distributions/{distribution}/cancel-sent` with `role:superadmin|admin`
+    -   Controller: `DistributionController@cancelSent` reverts attached documents `in_transit → available`, logs history, then deletes
+    -   UI: "Cancel (Sent)" button with SweetAlert2 confirmation, visible only when status is `sent` and not received
+-   Alternatives:
+    -   Soft-cancel flag (keeps record; more complexity w/o clear benefit)
+    -   Allow cancel at any stage (risk of history/location inconsistency)
+-   Implications: Safe rollback path pre-receipt; preserves audit via history logging; avoids stale in_transit documents
+-   Review date: 2025-10-20
+
 -   Context: Invoices can get new additional documents after a distribution is created (still draft). Users expected those new links to appear in the draft distribution without manual re-attach.
 -   Decision: Add a draft-only “Sync linked documents” action to pull any currently linked additional documents for invoices already attached to the distribution.
 -   Implementation:

@@ -1,3 +1,10 @@
+### 2025-09-09 — Cancel Sent (Not Received) Distributions
+
+-   Feature: Admin-only workflow to cancel distributions that are sent but not yet received.
+-   Behavior: Reverts attached documents `in_transit → available`, logs a workflow history entry, then deletes the distribution.
+-   Security: Route protected by `role:superadmin|admin`; UI button only visible in eligible state.
+-   UX: SweetAlert2 confirmation prior to execution; success redirects back to index.
+
 ## 2025-09-06 — Authentication Login Method Enhancement
 
 -   Change: Users can now log in using either email or username via a single `login` field.

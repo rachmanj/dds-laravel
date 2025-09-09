@@ -79,20 +79,22 @@
                                     <i class="fas fa-trash"></i> Delete
                                 </button>
                             @endcan
-                        @else
-                            @role('superadmin|admin')
-                                <button type="button" class="btn btn-danger btn-sm cancel-distribution"
-                                    data-id="{{ $distribution->id }}" data-number="{{ $distribution->distribution_number }}"
-                                    title="Only admins can cancel non-draft distributions">
-                                    <i class="fas fa-ban"></i> Cancel
-                                </button>
-                            @endrole
-                            @if ($distribution->status === 'draft')
+                            @can('edit-distributions')
                                 <button type="button" class="btn btn-secondary btn-sm" id="syncLinkedDocsBtn"
                                     title="Attach newly linked additional documents for invoices in this draft distribution">
                                     <i class="fas fa-sync"></i> Sync linked documents
                                 </button>
-                            @endif
+                            @endcan
+                        @else
+                            @role('superadmin|admin')
+                                @if ($distribution->status === 'sent' && !$distribution->received_at)
+                                    <button type="button" class="btn btn-danger btn-sm cancel-distribution-sent"
+                                        data-id="{{ $distribution->id }}" data-number="{{ $distribution->distribution_number }}"
+                                        title="Cancel a sent (not received) distribution and revert documents to available">
+                                        <i class="fas fa-ban"></i> Cancel (Sent)
+                                    </button>
+                                @endif
+                            @endrole
                         @endif
                     </div>
                 </div>
@@ -1907,14 +1909,87 @@
                 $('#completeModal').modal('hide');
             });
 
-            // Cancel Distribution (Admin only)
+            // Cancel (Sent but not Received) with SweetAlert2 confirmation
+            $('.cancel-distribution-sent').click(function() {
+                const distributionId = $(this).data('id');
+                const distributionNumber = $(this).data('number');
+
+                Swal.fire({
+                    title: 'Cancel sent distribution?',
+                    html: `<small>Distribution <strong>${distributionNumber}</strong> will be cancelled and documents reverted to <strong>available</strong>. This action cannot be undone.</small>`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, cancel and revert',
+                    cancelButtonText: 'No, keep it',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (!result.isConfirmed) return;
+
+                    $.ajax({
+                        url: '{{ route('distributions.cancel-sent', $distribution) }}',
+                        type: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Cancelled',
+                                    text: response.message ||
+                                        'Distribution cancelled and documents reverted',
+                                    timer: 1500,
+                                    showConfirmButton: false
+                                });
+                                setTimeout(function() {
+                                    window.location =
+                                        '{{ route('distributions.index') }}';
+                                }, 1500);
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Failed',
+                                    text: response.message ||
+                                        'Failed to cancel distribution'
+                                });
+                            }
+                        },
+                        error: function(xhr) {
+                            let msg = 'Failed to cancel distribution';
+                            if (xhr.status === 403) msg =
+                                'You do not have permission to cancel this distribution';
+                            if (xhr.status === 422) msg =
+                                'Only sent (not received) distributions can be cancelled';
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: msg
+                            });
+                        }
+                    });
+                });
+            });
+
+            // (Deprecated) Cancel Distribution (draft-only) remains below for legacy paths
             $('.cancel-distribution').click(function() {
                 const distributionId = $(this).data('id');
                 const distributionNumber = $(this).data('number');
 
-                if (confirm(
-                        `Are you sure you want to cancel distribution ${distributionNumber}? This action cannot be undone.`
-                    )) {
+                Swal.fire({
+                    title: 'Cancel this distribution?',
+                    html: `<small>Distribution <strong>${distributionNumber}</strong> will be cancelled. This action cannot be undone.</small>`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, cancel it',
+                    cancelButtonText: 'No, keep it',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (!result.isConfirmed) return;
+
                     $.ajax({
                         url: '{{ url('distributions') }}/' + distributionId,
                         type: 'DELETE',
@@ -1923,28 +1998,43 @@
                         },
                         success: function(response) {
                             if (response.success) {
-                                toastr.success(response.message);
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Cancelled',
+                                    text: response.message ||
+                                        'Distribution cancelled successfully',
+                                    timer: 1200,
+                                    showConfirmButton: false
+                                });
                                 setTimeout(function() {
-                                    location.reload();
-                                }, 1000);
+                                    location.href =
+                                        '{{ route('distributions.index') }}';
+                                }, 1200);
                             } else {
-                                toastr.error(response.message ||
-                                    'Failed to cancel distribution');
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Failed',
+                                    text: response.message ||
+                                        'Failed to cancel distribution'
+                                });
                             }
                         },
                         error: function(xhr) {
+                            let msg = 'Failed to cancel distribution';
                             if (xhr.status === 403) {
-                                toastr.error(
-                                    'You do not have permission to cancel this distribution'
-                                );
+                                msg =
+                                    'You do not have permission to cancel this distribution';
                             } else if (xhr.status === 422) {
-                                toastr.error('This distribution cannot be cancelled');
-                            } else {
-                                toastr.error('Failed to cancel distribution');
+                                msg = 'This distribution cannot be cancelled';
                             }
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: msg
+                            });
                         }
                     });
-                }
+                });
             });
 
             // Sync linked documents (draft only)

@@ -62,6 +62,7 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-distributions-numbering-stats',
+            'view-document-distribution-history',
 
             // Suppliers
             'view-suppliers',
@@ -123,6 +124,7 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-distributions-numbering-stats',
+            'view-document-distribution-history',
             'reset-document-status',
             'see-all-record-switch',
             'view-master',
@@ -194,7 +196,6 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
-            'see-all-record-switch',
             'view-master',
             'view-admin',
             'see-all-record-switch',

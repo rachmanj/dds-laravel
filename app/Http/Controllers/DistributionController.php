@@ -1502,6 +1502,81 @@ class DistributionController extends Controller
     }
 
     /**
+     * Cancel a distribution that has been sent but not yet received.
+     * Reverts document distribution_status from in_transit -> available, logs, then deletes.
+     * Only superadmin/admin can perform this action.
+     */
+    public function cancelSent(Request $request, Distribution $distribution): JsonResponse|RedirectResponse
+    {
+        $user = Auth::user();
+
+        // Role check: only superadmin/admin
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+            $message = 'You do not have permission to cancel this distribution';
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $message], 403);
+            }
+            return back()->with('error', $message);
+        }
+
+        // State check: only allow when sent and not received
+        if ($distribution->status !== 'sent' || $distribution->received_at) {
+            $message = 'Only distributions in "sent" status and not yet received can be cancelled';
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+            return back()->with('error', $message);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Revert distribution_status on all attached documents to 'available'
+            foreach ($distribution->documents as $distributionDocument) {
+                if ($distributionDocument->document_type === Invoice::class) {
+                    Invoice::where('id', $distributionDocument->document_id)
+                        ->update(['distribution_status' => 'available']);
+                } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+                    AdditionalDocument::where('id', $distributionDocument->document_id)
+                        ->update(['distribution_status' => 'available']);
+                }
+            }
+
+            // Log cancellation
+            DistributionHistory::logWorkflowTransition(
+                $distribution,
+                $user,
+                $distribution->status,
+                'deleted',
+                'Distribution cancelled and documents reverted to available'
+            );
+
+            // Delete the distribution
+            $distribution->delete();
+
+            DB::commit();
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Distribution cancelled successfully'
+                ]);
+            }
+
+            return redirect()->route('distributions.index')->with('success', 'Distribution cancelled successfully');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to cancel distribution: ' . $e->getMessage()
+                ], 500);
+            }
+            return back()->with('error', 'Failed to cancel distribution: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Sync newly linked additional documents for invoices already in a draft distribution
      */
     public function syncLinkedDocuments(Request $request, Distribution $distribution): JsonResponse|RedirectResponse
