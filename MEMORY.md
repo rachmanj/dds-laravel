@@ -7,7 +7,8 @@
 -   **Security**: Permission assigned to `superadmin`, `admin`, `accounting`, `finance` roles.
 -   **UX**: Individual SAP doc updates only (no bulk operations), real-time validation, Toastr notifications.
 -   **Dashboard Integration**: Added department-wise SAP completion summary to main dashboard with progress indicators.
--   **Files**: `SapUpdateController.php`, `routes/invoice.php`, `views/invoices/sap-update/`, `Department.php` (added invoices relationship), `RolePermissionSeeder.php`, migration for unique constraint.
+-   **Invoice Forms Integration**: Added SAP document validation to create/edit forms with real-time uniqueness checking.
+-   **Files**: `SapUpdateController.php`, `InvoiceController.php` (added SAP validation), `routes/invoice.php`, `views/invoices/sap-update/`, `views/invoices/create.blade.php`, `views/invoices/edit.blade.php`, `Department.php` (added invoices relationship), `RolePermissionSeeder.php`, migration for unique constraint.
 
 ### 2025-09-09 — Cancel Sent (Not Received) Distributions
 

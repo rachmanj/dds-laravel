@@ -15,6 +15,9 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
     // Invoice validation endpoint
     Route::post('/validate-invoice-number', [InvoiceController::class, 'validateInvoiceNumber'])->name('validate-invoice-number');
 
+    // SAP document validation endpoint
+    Route::post('/validate-sap-doc', [InvoiceController::class, 'validateSapDoc'])->name('validate-sap-doc');
+
     // Session check endpoint
     Route::get('/check-session', [InvoiceController::class, 'checkSession'])->name('check-session');
 

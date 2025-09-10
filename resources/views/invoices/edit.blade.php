@@ -876,6 +876,86 @@
             $('#invoice_number').on('input', validateInvoiceNumber);
             $('#supplier_id').on('change', validateInvoiceNumber);
 
+            // Real-time SAP document validation (exclude current invoice)
+            var sapValidationTimeout;
+
+            function validateSapDoc() {
+                var sapDoc = $('#sap_doc').val().trim();
+                var currentInvoiceId = {{ $invoice->id }};
+
+                if (sapDoc.length > 0) {
+                    clearTimeout(sapValidationTimeout);
+                    sapValidationTimeout = setTimeout(function() {
+                        // First check if session is still valid
+                        $.ajax({
+                            url: '{{ route('invoices.check-session') }}',
+                            type: 'GET',
+                            success: function() {
+                                // Session is valid, proceed with validation
+                                $.ajax({
+                                    url: '{{ route('invoices.validate-sap-doc') }}',
+                                    type: 'POST',
+                                    data: {
+                                        _token: '{{ csrf_token() }}',
+                                        sap_doc: sapDoc,
+                                        invoice_id: currentInvoiceId
+                                    },
+                                    success: function(response) {
+                                        var sapField = $('#sap_doc');
+                                        var feedback = sapField.next('.invalid-feedback');
+
+                                        if (!response.valid) {
+                                            sapField.addClass('is-invalid');
+                                            if (feedback.length === 0) {
+                                                sapField.after(
+                                                    '<span class="invalid-feedback">' +
+                                                    response.message + '</span>'
+                                                );
+                                            } else {
+                                                feedback.text(response.message);
+                                            }
+                                        } else {
+                                            sapField.removeClass('is-invalid');
+                                            feedback.remove();
+                                        }
+                                    },
+                                    error: function(xhr) {
+                                        if (xhr.status === 401 || xhr.status === 419) {
+                                            // Session expired, redirect to login
+                                            toastr.error(
+                                                'Your session has expired. Redirecting to login page...'
+                                            );
+                                            setTimeout(function() {
+                                                window.location.href =
+                                                    '{{ route('login') }}';
+                                            }, 1500);
+                                        } else {
+                                            console.log('SAP validation request failed');
+                                        }
+                                    }
+                                });
+                            },
+                            error: function(xhr) {
+                                if (xhr.status === 401 || xhr.status === 419) {
+                                    // Session expired, redirect to login
+                                    toastr.error(
+                                        'Your session has expired. Redirecting to login page...');
+                                    setTimeout(function() {
+                                        window.location.href = '{{ route('login') }}';
+                                    }, 1500);
+                                }
+                            }
+                        });
+                    }, 500); // Debounce validation
+                } else {
+                    // Clear validation if field is empty
+                    $('#sap_doc').removeClass('is-invalid').next('.invalid-feedback').remove();
+                }
+            }
+
+            // Trigger SAP validation when sap_doc changes
+            $('#sap_doc').on('input', validateSapDoc);
+
             // Payment date validation
             $('#receive_date').on('change', function() {
                 var receiveDate = $(this).val();

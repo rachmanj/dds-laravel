@@ -124,6 +124,32 @@ Each page includes navigation cards showing:
 -   Toastr notifications
 -   Form validation
 
+### **Invoice Create/Edit Forms Integration**
+
+**Features**:
+
+-   **Real-time Validation**: SAP document uniqueness checking as user types
+-   **Session Management**: Proper session validation before AJAX requests
+-   **Error Handling**: User-friendly error messages with Bootstrap styling
+-   **Debounced Input**: 500ms delay to prevent excessive API calls
+-   **Edit Form Support**: Excludes current invoice from uniqueness check
+
+**Implementation Details**:
+
+```javascript
+// Real-time SAP document validation
+function validateSapDoc() {
+    var sapDoc = $('#sap_doc').val().trim();
+    var currentInvoiceId = {{ $invoice->id ?? 'null' }};
+
+    if (sapDoc.length > 0) {
+        // AJAX validation with debouncing
+        // Session check for edit forms
+        // Real-time feedback with Bootstrap styling
+    }
+}
+```
+
 ## 🔐 **Security & Permissions**
 
 ### **Permission System**
@@ -211,11 +237,19 @@ $("#sap-doc-input").on("input", function () {
 ```
 app/Http/Controllers/
 ├── SapUpdateController.php (new)
+└── InvoiceController.php (updated - added SAP validation)
 
 resources/views/invoices/sap-update/
 ├── dashboard.blade.php (new)
 ├── without-sap.blade.php (new)
 └── with-sap.blade.php (new)
+
+resources/views/invoices/
+├── create.blade.php (updated - added SAP validation)
+└── edit.blade.php (updated - added SAP validation)
+
+routes/
+└── invoice.php (updated - added SAP validation route)
 
 database/migrations/
 └── 2025_09_10_012032_add_unique_constraint_to_sap_doc_in_invoices_table.php (new)
@@ -231,10 +265,12 @@ database/seeders/
 -   [ ] Menu visibility based on permissions
 -   [ ] DataTables rendering and functionality
 -   [ ] SAP document update workflow
--   [ ] Real-time validation
+-   [ ] Real-time validation in SAP Update pages
+-   [ ] Real-time validation in invoice create/edit forms
 -   [ ] Dashboard integration
 -   [ ] Department filtering
 -   [ ] Error handling
+-   [ ] Session management in edit forms
 
 ### **Key Test Scenarios**
 
@@ -243,6 +279,9 @@ database/seeders/
 3. **Update Workflow**: Test SAP document updates and validation
 4. **Dashboard Integration**: Verify department summary accuracy
 5. **Error Handling**: Test duplicate SAP document scenarios
+6. **Invoice Forms Testing**: Test SAP document validation in create/edit forms
+7. **Session Management**: Test session validation in edit forms
+8. **Real-time Validation**: Test debounced input validation
 
 ## 🔮 **Future Enhancements**
 

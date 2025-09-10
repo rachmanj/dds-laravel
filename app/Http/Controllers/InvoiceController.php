@@ -175,6 +175,7 @@ class InvoiceController extends Controller
             'payment_date' => ['nullable', 'date', 'after_or_equal:receive_date'],
             'remarks' => ['nullable', 'string'],
             'cur_loc' => ['required', 'string', 'max:30'],
+            'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc'],
         ]);
 
         // Auto-populate receive_project from user's project if not provided
@@ -201,6 +202,7 @@ class InvoiceController extends Controller
             'payment_date' => $request->payment_date,
             'remarks' => $request->remarks,
             'cur_loc' => $request->cur_loc,
+            'sap_doc' => $request->sap_doc,
             'status' => 'open', // Always set to 'open' for new invoices
             'created_by' => Auth::id(),
         ]);
@@ -290,6 +292,7 @@ class InvoiceController extends Controller
             'remarks' => ['nullable', 'string'],
             'cur_loc' => ['required', 'string', 'max:30'],
             'status' => ['required', 'string', 'in:open,verify,return,sap,close,cancel'],
+            'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc,' . $invoice->id],
         ]);
 
         $invoice->update([
@@ -308,6 +311,7 @@ class InvoiceController extends Controller
             'payment_date' => $request->payment_date,
             'remarks' => $request->remarks,
             'cur_loc' => $request->cur_loc,
+            'sap_doc' => $request->sap_doc,
             'status' => $request->status,
         ]);
 
@@ -434,6 +438,30 @@ class InvoiceController extends Controller
         return response()->json([
             'is_duplicate' => $isDuplicate,
             'message' => $isDuplicate ? 'Invoice number already exists for this supplier.' : 'Invoice number is available.'
+        ]);
+    }
+
+    /**
+     * Validate SAP document number uniqueness
+     */
+    public function validateSapDoc(Request $request)
+    {
+        $request->validate([
+            'sap_doc' => 'required|string|max:20',
+            'invoice_id' => 'nullable|exists:invoices,id'
+        ]);
+
+        $query = Invoice::where('sap_doc', $request->sap_doc);
+
+        if ($request->filled('invoice_id')) {
+            $query->where('id', '!=', $request->invoice_id);
+        }
+
+        $exists = $query->exists();
+
+        return response()->json([
+            'valid' => !$exists,
+            'message' => $exists ? 'SAP document number already exists.' : 'SAP document number is available.'
         ]);
     }
 

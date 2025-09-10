@@ -794,6 +794,56 @@
             $('#invoice_number').on('input', validateInvoiceNumber);
             $('#supplier_id').on('change', validateInvoiceNumber);
 
+            // Real-time SAP document validation
+            var sapValidationTimeout;
+
+            function validateSapDoc() {
+                var sapDoc = $('#sap_doc').val().trim();
+
+                if (sapDoc.length > 0) {
+                    clearTimeout(sapValidationTimeout);
+                    sapValidationTimeout = setTimeout(function() {
+                        $.ajax({
+                            url: '{{ route('invoices.validate-sap-doc') }}',
+                            type: 'POST',
+                            data: {
+                                _token: '{{ csrf_token() }}',
+                                sap_doc: sapDoc,
+                                invoice_id: null // Create form has no current invoice
+                            },
+                            success: function(response) {
+                                var sapField = $('#sap_doc');
+                                var feedback = sapField.next('.invalid-feedback');
+
+                                if (!response.valid) {
+                                    sapField.addClass('is-invalid');
+                                    if (feedback.length === 0) {
+                                        sapField.after(
+                                            '<span class="invalid-feedback">' + response.message +
+                                            '</span>'
+                                        );
+                                    } else {
+                                        feedback.text(response.message);
+                                    }
+                                } else {
+                                    sapField.removeClass('is-invalid');
+                                    feedback.remove();
+                                }
+                            },
+                            error: function() {
+                                console.log('SAP validation request failed');
+                            }
+                        });
+                    }, 500); // Debounce validation
+                } else {
+                    // Clear validation if field is empty
+                    $('#sap_doc').removeClass('is-invalid').next('.invalid-feedback').remove();
+                }
+            }
+
+            // Trigger SAP validation when sap_doc changes
+            $('#sap_doc').on('input', validateSapDoc);
+
             // Payment date validation
             $('#receive_date').on('change', function() {
                 var receiveDate = $(this).val();
