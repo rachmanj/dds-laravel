@@ -8,6 +8,7 @@ use App\Models\Distribution;
 use App\Models\Invoice;
 use App\Models\AdditionalDocument;
 use App\Models\DistributionHistory;
+use App\Models\Department;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -30,11 +31,15 @@ class DashboardController extends Controller
         // Get recent activity
         $recentActivity = $this->getRecentActivity($user, $userLocationCode);
 
+        // Get SAP document metrics by department
+        $sapDocumentMetrics = $this->getSapDocumentMetrics($user, $userLocationCode);
+
         return view('dashboard', compact(
             'metrics',
             'documentAgeBreakdown',
             'pendingDistributions',
-            'recentActivity'
+            'recentActivity',
+            'sapDocumentMetrics'
         ))->with([
             'getActivityIcon' => fn($action) => $this->getActivityIcon($action),
             'getActivityColor' => fn($action) => $this->getActivityColor($action)
@@ -182,6 +187,51 @@ class DashboardController extends Controller
         }
 
         return $query->get();
+    }
+
+    private function getSapDocumentMetrics($user, $userLocationCode)
+    {
+        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+
+        // Get all departments that have invoices
+        $departmentsQuery = Department::whereHas('invoices');
+
+        if (!$isAdmin && $userLocationCode) {
+            // For non-admin users, only show their department
+            $departmentsQuery->where('location_code', $userLocationCode);
+        }
+
+        $departments = $departmentsQuery->get();
+
+        $sapMetrics = [];
+
+        foreach ($departments as $department) {
+            // Get invoices for this department
+            $invoicesQuery = Invoice::where('cur_loc', $department->location_code);
+
+            $totalInvoices = $invoicesQuery->count();
+            $invoicesWithoutSap = $invoicesQuery->clone()->whereNull('sap_doc')->count();
+            $invoicesWithSap = $invoicesQuery->clone()->whereNotNull('sap_doc')->count();
+
+            // Only include departments that have invoices
+            if ($totalInvoices > 0) {
+                $sapMetrics[] = [
+                    'department_name' => $department->name,
+                    'location_code' => $department->location_code,
+                    'total_invoices' => $totalInvoices,
+                    'without_sap_doc' => $invoicesWithoutSap,
+                    'with_sap_doc' => $invoicesWithSap,
+                    'completion_percentage' => $totalInvoices > 0 ? round(($invoicesWithSap / $totalInvoices) * 100, 1) : 0
+                ];
+            }
+        }
+
+        // Sort by completion percentage (ascending) to show departments needing attention first
+        usort($sapMetrics, function ($a, $b) {
+            return $a['completion_percentage'] <=> $b['completion_percentage'];
+        });
+
+        return $sapMetrics;
     }
 
     public function getActivityIcon($action)

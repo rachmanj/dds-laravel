@@ -283,6 +283,154 @@
                 </div>
             </div>
 
+            <!-- SAP Document Update Summary -->
+            @if (count($sapDocumentMetrics) > 0)
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fas fa-file-invoice-dollar mr-2"></i>
+                                    SAP Document Update Summary by Department
+                                </h3>
+                                <div class="card-tools">
+                                    @can('view-sap-update')
+                                        <a href="{{ route('invoices.sap-update.index') }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-external-link-alt"></i> Manage SAP Updates
+                                        </a>
+                                    @endcan
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Department</th>
+                                                <th>Location Code</th>
+                                                <th>Total Invoices</th>
+                                                <th>Without SAP Doc</th>
+                                                <th>With SAP Doc</th>
+                                                <th>Completion Rate</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach ($sapDocumentMetrics as $metric)
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ $metric['department_name'] }}</strong>
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            class="badge badge-info">{{ $metric['location_code'] }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            class="badge badge-secondary">{{ $metric['total_invoices'] }}</span>
+                                                    </td>
+                                                    <td>
+                                                        @if ($metric['without_sap_doc'] > 0)
+                                                            <span
+                                                                class="badge badge-warning">{{ $metric['without_sap_doc'] }}</span>
+                                                        @else
+                                                            <span
+                                                                class="badge badge-success">{{ $metric['without_sap_doc'] }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            class="badge badge-success">{{ $metric['with_sap_doc'] }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="progress progress-sm">
+                                                            <div class="progress-bar 
+                                                                @if ($metric['completion_percentage'] >= 80) bg-success
+                                                                @elseif($metric['completion_percentage'] >= 50) bg-warning
+                                                                @else bg-danger @endif"
+                                                                style="width: {{ $metric['completion_percentage'] }}%">
+                                                            </div>
+                                                        </div>
+                                                        <small
+                                                            class="text-muted">{{ $metric['completion_percentage'] }}%</small>
+                                                    </td>
+                                                    <td>
+                                                        @if ($metric['completion_percentage'] >= 80)
+                                                            <span class="badge badge-success">
+                                                                <i class="fas fa-check-circle"></i> Complete
+                                                            </span>
+                                                        @elseif($metric['completion_percentage'] >= 50)
+                                                            <span class="badge badge-warning">
+                                                                <i class="fas fa-clock"></i> In Progress
+                                                            </span>
+                                                        @else
+                                                            <span class="badge badge-danger">
+                                                                <i class="fas fa-exclamation-triangle"></i> Needs Attention
+                                                            </span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Summary Statistics -->
+                                <div class="row mt-3">
+                                    <div class="col-md-3">
+                                        <div class="info-box bg-info">
+                                            <span class="info-box-icon">
+                                                <i class="fas fa-building"></i>
+                                            </span>
+                                            <div class="info-box-content">
+                                                <span class="info-box-text">Departments</span>
+                                                <span class="info-box-number">{{ count($sapDocumentMetrics) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="info-box bg-primary">
+                                            <span class="info-box-icon">
+                                                <i class="fas fa-file-invoice"></i>
+                                            </span>
+                                            <div class="info-box-content">
+                                                <span class="info-box-text">Total Invoices</span>
+                                                <span
+                                                    class="info-box-number">{{ array_sum(array_column($sapDocumentMetrics, 'total_invoices')) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="info-box bg-warning">
+                                            <span class="info-box-icon">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                            </span>
+                                            <div class="info-box-content">
+                                                <span class="info-box-text">Without SAP Doc</span>
+                                                <span
+                                                    class="info-box-number">{{ array_sum(array_column($sapDocumentMetrics, 'without_sap_doc')) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="info-box bg-success">
+                                            <span class="info-box-icon">
+                                                <i class="fas fa-check-circle"></i>
+                                            </span>
+                                            <div class="info-box-content">
+                                                <span class="info-box-text">With SAP Doc</span>
+                                                <span
+                                                    class="info-box-number">{{ array_sum(array_column($sapDocumentMetrics, 'with_sap_doc')) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Quick Actions -->
             <div class="row">
                 <div class="col-12">

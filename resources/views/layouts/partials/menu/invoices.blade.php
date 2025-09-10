@@ -53,5 +53,16 @@
                 </a>
             </li>
         @endcan
+
+        <!-- SAP Update -->
+        @can('view-sap-update')
+            <li class="nav-item">
+                <a href="{{ route('invoices.sap-update.index') }}"
+                    class="nav-link {{ request()->routeIs('invoices.sap-update.*') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>SAP Update</p>
+                </a>
+            </li>
+        @endcan
     </ul>
 </li>

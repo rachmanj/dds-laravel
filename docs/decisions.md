@@ -1,3 +1,63 @@
+## 2025-09-10 — SAP Document Update Feature Architecture
+
+-   **Context**: Need to implement SAP document number management for invoices with filtering, individual updates, and dashboard integration.
+-   **Decision**: Use standalone pages approach instead of tabbed interface to avoid DataTables rendering issues.
+-   **Implementation**:
+    -   **Standalone Pages**: Separate pages for Dashboard, Without SAP Doc, and With SAP Doc views
+    -   **Navigation Cards**: Visual navigation between pages with active state indicators
+    -   **Individual Updates**: No bulk operations to maintain SAP document uniqueness
+    -   **Real-time Validation**: AJAX validation for SAP document uniqueness
+    -   **Dashboard Integration**: Department-wise completion summary in main dashboard
+    -   **Permission Control**: `view-sap-update` permission for role-based access
+-   **Alternatives Considered**:
+    -   Tabbed interface (rejected due to DataTables rendering issues in hidden tabs)
+    -   Bulk update operations (rejected due to SAP document uniqueness requirements)
+    -   Single page with all functionality (rejected due to complexity and performance)
+-   **Implications**:
+    -   Better DataTables reliability and performance
+    -   Clear navigation and user experience
+    -   Maintainable code structure
+    -   Scalable architecture for future SAP features
+-   **Review Date**: 2025-12-10
+
+## 2025-09-10 — SAP Document Uniqueness Constraint
+
+-   **Context**: SAP document numbers must be unique across all invoices but allow multiple NULL values.
+-   **Decision**: Implement database-level unique constraint that allows multiple NULL values but enforces uniqueness for non-null values.
+-   **Implementation**:
+    -   **Migration**: `add_unique_constraint_to_sap_doc_in_invoices_table`
+    -   **Constraint**: `UNIQUE (sap_doc) WHERE sap_doc IS NOT NULL`
+    -   **Validation**: Real-time AJAX validation in frontend
+    -   **Error Handling**: User-friendly error messages for duplicate SAP documents
+-   **Alternatives Considered**:
+    -   Application-level validation only (rejected due to race condition risks)
+    -   Separate table for SAP documents (rejected due to unnecessary complexity)
+-   **Implications**:
+    -   Data integrity at database level
+    -   Prevents duplicate SAP document numbers
+    -   Allows multiple invoices without SAP documents
+    -   Real-time user feedback for validation
+-   **Review Date**: 2025-12-10
+
+## 2025-09-10 — Department-Invoice Relationship Implementation
+
+-   **Context**: Dashboard integration requires relationship between Department and Invoice models for SAP completion metrics.
+-   **Decision**: Add `invoices()` relationship to Department model using `cur_loc` and `location_code` as foreign keys.
+-   **Implementation**:
+    -   **Department Model**: Added `invoices(): HasMany` relationship
+    -   **Foreign Key**: `cur_loc` (invoices table) ↔ `location_code` (departments table)
+    -   **Dashboard Integration**: Department-wise SAP completion summary
+    -   **Permission Filtering**: Non-admin users only see their department
+-   **Alternatives Considered**:
+    -   Direct query without relationship (rejected due to code duplication)
+    -   Different foreign key structure (rejected due to existing Invoice model structure)
+-   **Implications**:
+    -   Clean Eloquent relationships
+    -   Reusable relationship for other features
+    -   Consistent with existing Invoice model structure
+    -   Better code maintainability
+-   **Review Date**: 2025-12-10
+
 ## 2025-09-06 — Draft Distribution: Sync Linked Documents
 
 -   ## 2025-09-09 — Cancel Sent (Not Received) Distributions

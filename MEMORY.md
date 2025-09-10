@@ -1,3 +1,14 @@
+### 2025-09-10 — SAP Document Update Feature Implementation
+
+-   **Feature**: Complete SAP Document Update management system with standalone pages and dashboard integration.
+-   **Scope**: Menu item under Invoices group, permission-based access (`view-sap-update`), three main views (Dashboard, Without SAP Doc, With SAP Doc).
+-   **Architecture**: Standalone pages approach to resolve DataTables rendering issues in tabbed interfaces.
+-   **Database**: Added unique constraint to `sap_doc` field, allowing multiple NULL values but unique non-null values.
+-   **Security**: Permission assigned to `superadmin`, `admin`, `accounting`, `finance` roles.
+-   **UX**: Individual SAP doc updates only (no bulk operations), real-time validation, Toastr notifications.
+-   **Dashboard Integration**: Added department-wise SAP completion summary to main dashboard with progress indicators.
+-   **Files**: `SapUpdateController.php`, `routes/invoice.php`, `views/invoices/sap-update/`, `Department.php` (added invoices relationship), `RolePermissionSeeder.php`, migration for unique constraint.
+
 ### 2025-09-09 — Cancel Sent (Not Received) Distributions
 
 -   Feature: Admin-only workflow to cancel distributions that are sent but not yet received.

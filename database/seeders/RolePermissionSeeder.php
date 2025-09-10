@@ -82,6 +82,9 @@ class RolePermissionSeeder extends Seeder
 
             // See All Records Switch
             'see-all-record-switch',
+
+            // SAP Update
+            'view-sap-update',
         ];
 
         foreach ($permissions as $permission) {
@@ -127,6 +130,7 @@ class RolePermissionSeeder extends Seeder
             'view-document-distribution-history',
             'reset-document-status',
             'see-all-record-switch',
+            'view-sap-update',
             'view-master',
             'view-admin',
         ]);
@@ -168,6 +172,7 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
+            'view-sap-update',
             'view-master',
             'see-all-record-switch',
         ]);
@@ -196,6 +201,7 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
+            'view-sap-update',
             'view-master',
             'view-admin',
             'see-all-record-switch',

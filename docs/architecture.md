@@ -6,6 +6,83 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **SAP Document Update System Architecture**
+
+**Pattern**: Standalone pages approach for complex DataTables functionality to avoid rendering issues
+
+**Implementation**:
+
+-   **Standalone Pages**: Separate pages for Dashboard, Without SAP Doc, and With SAP Doc views
+-   **DataTables Integration**: Each page has its own DataTable initialization without tab switching conflicts
+-   **Navigation Cards**: Visual navigation between related pages with active state indicators
+-   **Permission-Based Access**: Role-based visibility and functionality control
+
+**Technical Architecture**:
+
+```php
+// Controller Structure
+SapUpdateController
+├── index() → Dashboard view
+├── withoutSapPage() → Without SAP Doc view
+├── withSapPage() → With SAP Doc view
+├── dashboard() → Dashboard data API
+├── withoutSap() → Without SAP Doc DataTables API
+├── withSap() → With SAP Doc DataTables API
+├── updateSapDoc() → Update SAP document number
+└── validateSapDoc() → Real-time validation API
+```
+
+**Route Structure**:
+
+```php
+Route::prefix('sap-update')->name('sap-update.')->group(function () {
+    Route::get('/', [SapUpdateController::class, 'index'])->name('index');
+    Route::get('/without-sap', [SapUpdateController::class, 'withoutSapPage'])->name('without-sap-page');
+    Route::get('/with-sap', [SapUpdateController::class, 'withSapPage'])->name('with-sap-page');
+    Route::get('/dashboard-data', [SapUpdateController::class, 'dashboard'])->name('dashboard-data');
+    Route::get('/without-sap-data', [SapUpdateController::class, 'withoutSap'])->name('without-sap');
+    Route::get('/with-sap-data', [SapUpdateController::class, 'withSap'])->name('with-sap');
+    Route::put('/{invoice}/update-sap-doc', [SapUpdateController::class, 'updateSapDoc'])->name('update-sap-doc');
+    Route::post('/validate-sap-doc', [SapUpdateController::class, 'validateSapDoc'])->name('validate-sap-doc');
+});
+```
+
+**Database Architecture**:
+
+```sql
+-- Unique constraint allowing multiple NULL values
+ALTER TABLE invoices ADD CONSTRAINT unique_sap_doc_non_null
+UNIQUE (sap_doc) WHERE sap_doc IS NOT NULL;
+
+-- Department-Invoice relationship
+Department (location_code) ←→ Invoice (cur_loc)
+```
+
+**View Architecture**:
+
+```
+resources/views/invoices/sap-update/
+├── dashboard.blade.php → Main dashboard with metrics and charts
+├── without-sap.blade.php → Invoices without SAP document numbers
+└── with-sap.blade.php → Invoices with SAP document numbers
+```
+
+**Key Design Decisions**:
+
+-   **Standalone Pages**: Avoided tab-based interface due to DataTables rendering issues in hidden tabs
+-   **Individual Updates**: No bulk operations to maintain SAP document uniqueness
+-   **Real-time Validation**: AJAX validation for SAP document uniqueness
+-   **Dashboard Integration**: Department-wise completion summary in main dashboard
+-   **Permission Control**: `view-sap-update` permission for role-based access
+
+**Benefits**:
+
+-   **Reliable Rendering**: DataTables work correctly without tab switching conflicts
+-   **Better Performance**: Each page loads only necessary data and scripts
+-   **Clear Navigation**: Visual indicators show current page and related functions
+-   **Maintainable Code**: Separate files for each functionality area
+-   **Scalable Architecture**: Easy to add new SAP-related features
+
 ### **Global Page Title Alignment System**
 
 **Pattern**: Consistent page title alignment across all pages for professional visual hierarchy
