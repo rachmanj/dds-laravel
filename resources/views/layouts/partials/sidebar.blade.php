@@ -42,7 +42,7 @@
                 @endcan
 
                 <!-- Reports Section -->
-                @can('view-settings')
+                @can('view-reconcile')
                     @include('layouts.partials.menu.reports')
                 @endcan
 

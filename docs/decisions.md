@@ -1,3 +1,43 @@
+## 2025-09-11 — Reconciliation Feature Architecture
+
+-   **Context**: Need to implement a financial reconciliation system to match external invoice data against internal records.
+-   **Decision**: Create a dedicated reconciliation module with Excel import/export, AJAX-powered interface, and user data isolation.
+-   **Implementation**:
+    -   **Excel Integration**: Flexible column name handling for various Excel formats
+    -   **User Isolation**: Each user's reconciliation data is isolated to prevent conflicts
+    -   **AJAX Interface**: Real-time statistics, supplier loading, and DataTables integration
+    -   **Form Submission**: Standard HTML form submission with AJAX handling for better reliability
+    -   **Permission Control**: Granular permissions (`view-reconcile`, `upload-reconcile`, `export-reconcile`, `delete-reconcile`)
+-   **Alternatives Considered**:
+    -   Batch processing (rejected for poorer UX and lack of immediate feedback)
+    -   Shared reconciliation data (rejected due to potential conflicts between users)
+    -   Complex matching algorithms (rejected for initial version in favor of simple pattern matching)
+-   **Implications**:
+    -   Better user experience with immediate feedback
+    -   Isolated data prevents conflicts between users
+    -   Flexible import system accommodates various Excel formats
+    -   Extensible architecture for future enhancements
+-   **Review Date**: 2025-12-11
+
+## 2025-09-11 — Reconciliation Data Model Design
+
+-   **Context**: Need to store external invoice data for reconciliation against internal records.
+-   **Decision**: Create a `reconcile_details` table with appropriate relationships and flexible matching capabilities.
+-   **Implementation**:
+    -   **Table Structure**: `id`, `invoice_no`, `invoice_date`, `vendor_id`, `user_id`, `flag`
+    -   **Relationships**: BelongsTo relationships with `users` and `suppliers` tables
+    -   **Matching Logic**: Custom accessor `getMatchingInvoiceAttribute()` for fuzzy matching with internal invoices
+    -   **Status Logic**: Custom accessor `getReconciliationStatusAttribute()` for determining match status
+-   **Alternatives Considered**:
+    -   Storing in existing invoice table (rejected due to need for separation between external and internal data)
+    -   More complex schema with additional fields (rejected for initial version to keep it simple)
+-   **Implications**:
+    -   Clean separation between external and internal invoice data
+    -   Flexible matching logic that can be enhanced over time
+    -   User-specific data isolation
+    -   Efficient querying through appropriate indexes
+-   **Review Date**: 2025-12-11
+
 ## 2025-09-10 — SAP Document Update Feature Architecture
 
 -   **Context**: Need to implement SAP document number management for invoices with filtering, individual updates, and dashboard integration.

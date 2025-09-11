@@ -85,6 +85,12 @@ class RolePermissionSeeder extends Seeder
 
             // SAP Update
             'view-sap-update',
+
+            // Reconcile Feature
+            'view-reconcile',
+            'upload-reconcile',
+            'export-reconcile',
+            'delete-reconcile',
         ];
 
         foreach ($permissions as $permission) {
@@ -131,6 +137,10 @@ class RolePermissionSeeder extends Seeder
             'reset-document-status',
             'see-all-record-switch',
             'view-sap-update',
+            'view-reconcile',
+            'upload-reconcile',
+            'export-reconcile',
+            'delete-reconcile',
             'view-master',
             'view-admin',
         ]);
@@ -173,6 +183,10 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-sap-update',
+            'view-reconcile',
+            'upload-reconcile',
+            'export-reconcile',
+            'delete-reconcile',
             'view-master',
             'see-all-record-switch',
         ]);
@@ -202,6 +216,10 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-sap-update',
+            'view-reconcile',
+            'upload-reconcile',
+            'export-reconcile',
+            'delete-reconcile',
             'view-master',
             'view-admin',
             'see-all-record-switch',

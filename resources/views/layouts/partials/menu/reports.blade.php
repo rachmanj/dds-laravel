@@ -1,26 +1,19 @@
-<li class="nav-item {{ request()->is('settings*') ? 'menu-open' : '' }}">
-    <a href="#" class="nav-link {{ request()->is('settings*') ? 'active' : '' }}">
-        <i class="nav-icon fas fa-cog"></i>
+<li class="nav-item {{ request()->routeIs('reconcile.*') ? 'menu-open' : '' }}">
+    <a href="#" class="nav-link {{ request()->routeIs('reconcile.*') ? 'active' : '' }}">
+        <i class="nav-icon fas fa-chart-line"></i>
         <p>
-            Settings
+            Reports
             <i class="right fas fa-angle-left"></i>
         </p>
     </a>
     <ul class="nav nav-treeview">
+        <!-- Reconciliation Report -->
         <li class="nav-item">
-            <a href="/settings" class="nav-link {{ request()->is('settings') ? 'active' : '' }}">
+            <a href="{{ route('reconcile.index') }}"
+                class="nav-link {{ request()->routeIs('reconcile.*') ? 'active' : '' }}">
                 <i class="far fa-circle nav-icon"></i>
-                <p>General Settings</p>
+                <p>Reconciliation</p>
             </a>
         </li>
-        @can('edit-settings')
-            <li class="nav-item">
-                <a href="/settings/permissions"
-                    class="nav-link {{ request()->is('settings/permissions') ? 'active' : '' }}">
-                    <i class="far fa-circle nav-icon"></i>
-                    <p>Permission Settings</p>
-                </a>
-            </li>
-        @endcan
     </ul>
 </li>

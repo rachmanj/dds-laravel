@@ -1,0 +1,422 @@
+@extends('layouts.main')
+
+@section('title_page')
+    Reconciliation Report
+@endsection
+
+@section('breadcrumb_title')
+    <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="#">Reports</a></li>
+    <li class="breadcrumb-item active">Reconciliation</li>
+@endsection
+
+@section('content')
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Reconciliation Data</h3>
+                        <div class="card-tools">
+                            <button type="button" class="btn btn-primary btn-sm" data-toggle="modal"
+                                data-target="#uploadModal">
+                                <i class="fas fa-upload"></i> Upload File
+                            </button>
+                            <a href="{{ route('reconcile.export') }}" class="btn btn-success btn-sm">
+                                <i class="fas fa-file-export"></i> Export
+                            </a>
+                            <a href="{{ route('reconcile.delete') }}" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Are you sure you want to delete all your reconciliation data?');">
+                                <i class="fas fa-trash"></i> Delete All
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="info-box">
+                                    <span class="info-box-icon bg-info"><i class="fas fa-file-alt"></i></span>
+                                    <div class="info-box-content">
+                                        <span class="info-box-text">Total Records</span>
+                                        <span class="info-box-number" id="total-records">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="info-box">
+                                    <span class="info-box-icon bg-success"><i class="fas fa-check"></i></span>
+                                    <div class="info-box-content">
+                                        <span class="info-box-text">Matched Records</span>
+                                        <span class="info-box-number" id="matched-records">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="info-box">
+                                    <span class="info-box-icon bg-warning"><i
+                                            class="fas fa-exclamation-triangle"></i></span>
+                                    <div class="info-box-content">
+                                        <span class="info-box-text">Unmatched Records</span>
+                                        <span class="info-box-number" id="unmatched-records">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="info-box">
+                                    <span class="info-box-icon bg-danger"><i class="fas fa-times"></i></span>
+                                    <div class="info-box-content">
+                                        <span class="info-box-text">Match Rate</span>
+                                        <span class="info-box-number" id="match-rate">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <table id="reconcileTable" class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Supplier</th>
+                                    <th>Invoice Date</th>
+                                    <th>Matching Status</th>
+                                    <th>Uploaded By</th>
+                                    <th>Uploaded At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data will be loaded via AJAX -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" role="dialog" aria-labelledby="uploadModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel">
+                        <i class="fas fa-upload"></i> Upload Reconciliation File
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="uploadForm" action="{{ route('reconcile.upload') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="vendor_id">Supplier <span class="text-danger">*</span></label>
+                            <select class="form-control" id="vendor_id" name="vendor_id" required>
+                                <option value="">Select Supplier</option>
+                                @php
+                                    $suppliers = \App\Models\Supplier::active()
+                                        ->orderBy('name')
+                                        ->get(['id', 'name']);
+                                @endphp
+                                @foreach ($suppliers as $supplier)
+                                    <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('vendor_id')
+                                <span class="text-danger">{{ $message }}</span>
+                            @enderror
+                        </div>
+                        <div class="form-group">
+                            <label for="file_upload">Excel File <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="file" class="form-control" id="file_upload" name="file_upload"
+                                    accept=".xls,.xlsx" required>
+                            </div>
+                            <small class="form-text text-muted">
+                                Supported formats: .xls, .xlsx (Max: 10MB)<br>
+                                Required columns: invoice_no (or invoice_number), invoice_date (optional)<br>
+                                <a href="{{ route('reconcile.template') }}" class="text-info" target="_blank">
+                                    <i class="fas fa-download"></i> Download Excel Template
+                                </a>
+                            </small>
+                            @error('file_upload')
+                                <span class="text-danger">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="uploadBtn">
+                            <i class="fas fa-upload"></i> Upload & Process
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal fade" id="detailModal" tabindex="-1" role="dialog" aria-labelledby="detailModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="detailModalLabel">
+                        <i class="fas fa-info-circle"></i> Reconciliation Details
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="detailContent">
+                        <!-- Details will be loaded via AJAX -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('styles')
+    <!-- DataTables -->
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+    <!-- Toastr -->
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/toastr/toastr.min.css') }}">
+
+    <style>
+        .table-success {
+            background-color: #d4edda !important;
+            transition: background-color 0.3s ease;
+        }
+
+        .table-success tbody tr {
+            background-color: #d4edda !important;
+        }
+    </style>
+@endsection
+
+@section('scripts')
+    <!-- DataTables -->
+    <script src="{{ asset('adminlte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ asset('adminlte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+    <script src="{{ asset('adminlte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    <script src="{{ asset('adminlte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+    <!-- SweetAlert2 -->
+    <script src="{{ asset('adminlte/plugins/sweetalert2/sweetalert2.min.js') }}"></script>
+    <!-- Toastr -->
+    <script src="{{ asset('adminlte/plugins/toastr/toastr.min.js') }}"></script>
+
+    <script>
+        // Cache busting - force reload of JavaScript
+
+        // Global functions for direct access
+        function viewDetails(id) {
+            if (!id) {
+                alert('Error: Invalid record ID');
+                return;
+            }
+
+
+            // Use a properly constructed URL with the ID parameter
+            var baseUrl = "{{ url('reconcile/invoice') }}";
+            var url = baseUrl + '/' + id;
+
+            $.ajax({
+                url: url,
+                type: 'GET',
+                dataType: 'html',
+                beforeSend: function() {
+                    $('#detailContent').html(
+                        '<div class="text-center p-5"><i class="fas fa-spinner fa-spin fa-3x"></i><p class="mt-2">Loading details...</p></div>'
+                    );
+                    $('#detailModal').modal('show');
+                },
+                success: function(data) {
+                    $('#detailContent').html(data);
+                },
+                error: function(xhr, status, error) {
+
+                    $('#detailContent').html(
+                        '<div class="alert alert-danger">' +
+                        '<h5><i class="fas fa-exclamation-triangle"></i> Error Loading Details</h5>' +
+                        '<p>There was a problem loading the record details. Please try again later.</p>' +
+                        '<p>Error: ' + error + '</p>' +
+                        '</div>'
+                    );
+                }
+            });
+        }
+
+        function exportData() {
+            window.location.href = "{{ route('reconcile.export') }}";
+        }
+
+        function deleteMyData() {
+            if (confirm('Are you sure you want to delete all your reconciliation data?')) {
+                window.location.href = "{{ route('reconcile.delete') }}";
+            }
+        }
+
+        $(document).ready(function() {
+            // Handle file selection
+            $('#file_upload').on('change', function() {
+                var fileName = $(this).val().split('\\').pop();
+            });
+
+            // Load suppliers for dropdown
+            function loadSuppliers() {
+                $.get("{{ route('reconcile.suppliers') }}", function(data) {
+
+                    if (Array.isArray(data) && data.length > 0) {
+                        var options = '<option value="">Select Supplier</option>';
+                        $.each(data, function(index, supplier) {
+                            if (supplier.id && supplier.name) {
+                                options += '<option value="' + supplier.id + '">' + supplier.name +
+                                    '</option>';
+                            }
+                        });
+                        $('#vendor_id').html(options);
+                    } else {
+                        console.warn('No suppliers data received or empty array');
+                        $('#vendor_id').html('<option value="">No suppliers available</option>');
+                    }
+                }).fail(function(xhr, status, error) {
+
+                    // Fallback: show error message in dropdown
+                    $('#vendor_id').html(
+                        '<option value="">Error loading suppliers - Please refresh</option>');
+                    toastr.error('Error loading suppliers. Please refresh the page.');
+                });
+            }
+
+            // Load statistics
+            function loadStats() {
+                $.get("{{ route('reconcile.stats') }}", function(data) {
+                    $('#total-records').text(data.total_records);
+                    $('#matched-records').text(data.matched_records);
+                    $('#unmatched-records').text(data.total_records - data.matched_records);
+                    $('#match-rate').text(data.match_rate + '%');
+                });
+            }
+
+            // Initialize DataTable
+            $('#reconcileTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: "{{ route('reconcile.data') }}",
+                    type: 'GET'
+                },
+                columns: [{
+                        data: 'invoice_no',
+                        name: 'invoice_no'
+                    },
+                    {
+                        data: 'supplier_name',
+                        name: 'supplier_name'
+                    },
+                    {
+                        data: 'invoice_date',
+                        name: 'invoice_date'
+                    },
+                    {
+                        data: 'reconciliation_status',
+                        name: 'reconciliation_status'
+                    },
+                    {
+                        data: 'user_name',
+                        name: 'user_name'
+                    },
+                    {
+                        data: 'created_at',
+                        name: 'created_at'
+                    },
+                    {
+                        data: 'actions',
+                        name: 'actions',
+                        orderable: false,
+                        searchable: false
+                    }
+                ],
+                order: [
+                    [5, 'desc']
+                ],
+                responsive: true,
+                lengthChange: true,
+                autoWidth: false,
+                pageLength: 10,
+                lengthMenu: [
+                    [10, 25, 50, -1],
+                    [10, 25, 50, "All"]
+                ]
+            });
+
+            // Load initial data
+            loadSuppliers();
+            loadStats();
+
+            // Handle form submission
+            $('#uploadForm').on('submit', function(e) {
+                e.preventDefault(); // Prevent default form submission
+                var formData = new FormData($('#uploadForm')[0]);
+                var submitBtn = $('#uploadBtn');
+                var originalText = submitBtn.html();
+
+                // Validate form
+                var fileInput = $('#file_upload')[0];
+                var vendorId = $('#vendor_id').val();
+
+                if (!vendorId) {
+                    toastr.error('Please select a supplier');
+                    return;
+                }
+
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    toastr.error('Please select a file to upload');
+                    return;
+                }
+
+                // Disable button and show loading
+                submitBtn.prop('disabled', true).html(
+                    '<i class="fas fa-spinner fa-spin"></i> Processing...');
+
+                $.ajax({
+                    url: "{{ route('reconcile.upload') }}",
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+
+                        if (response.success) {
+                            toastr.success(response.message || 'File uploaded successfully!');
+                            $('#uploadModal').modal('hide');
+                            $('#reconcileTable').DataTable().ajax.reload();
+                            loadStats();
+                            $('#uploadForm')[0].reset();
+                        } else {
+                            toastr.error(response.message ||
+                                'Upload failed. Please try again.');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        toastr.error('Upload failed. Please try again.');
+                    },
+                    complete: function() {
+                        // Re-enable button
+                        submitBtn.prop('disabled', false).html(originalText);
+                    }
+                });
+            });
+
+            // No need to redefine functions that are already global
+        });
+    </script>
+@endsection

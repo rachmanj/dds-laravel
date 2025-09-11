@@ -45,4 +45,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
 
     // Include Admin Routes
     require __DIR__ . '/admin.php';
+
+    // Include Reconcile Routes
+    require __DIR__ . '/reconcile.php';
 });

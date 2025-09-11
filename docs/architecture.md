@@ -6,6 +6,63 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Reconciliation System Architecture**
+
+**Pattern**: AJAX-powered data reconciliation system with Excel import/export and real-time statistics
+
+**Implementation**:
+
+-   **Excel Integration**: Import external invoice data with flexible column name handling
+-   **Matching Algorithm**: Fuzzy matching between external data and internal invoices
+-   **Real-time Statistics**: Dashboard with total, matched, unmatched records and match rate
+-   **User Isolation**: Data is isolated by user to prevent conflicts
+-   **Permission-Based Access**: Role-based visibility and functionality control
+
+**Technical Architecture**:
+
+```php
+// Controller Structure
+ReportsReconcileController
+├── index() → Main reconciliation view
+├── upload() → Excel file upload and import
+├── data() → DataTables API for reconciliation data
+├── getSuppliers() → Supplier dropdown data API
+├── getStats() → Statistics dashboard data API
+├── downloadTemplate() → Excel template download
+├── export() → Export reconciliation data to Excel
+├── deleteMine() → Delete user's reconciliation data
+└── getInvoiceDetails() → Detailed view for specific record
+```
+
+**Route Structure**:
+
+```php
+Route::prefix('reconcile')->name('reconcile.')->group(function () {
+    Route::get('/', [ReportsReconcileController::class, 'index'])->name('index');
+    Route::post('/upload', [ReportsReconcileController::class, 'upload'])->name('upload');
+    Route::get('/data', [ReportsReconcileController::class, 'data'])->name('data');
+    Route::get('/suppliers', [ReportsReconcileController::class, 'getSuppliers'])->name('suppliers');
+    Route::get('/stats', [ReportsReconcileController::class, 'getStats'])->name('stats');
+    Route::get('/template', [ReportsReconcileController::class, 'downloadTemplate'])->name('template');
+    Route::get('/export', [ReportsReconcileController::class, 'export'])->name('export');
+    Route::get('/delete', [ReportsReconcileController::class, 'deleteMine'])->name('delete');
+    Route::get('/invoice/{id}', [ReportsReconcileController::class, 'getInvoiceDetails'])->name('invoice');
+});
+```
+
+**Database Architecture**:
+
+```
+reconcile_details
+├── id (primary key)
+├── invoice_no (string, indexed)
+├── invoice_date (date, nullable)
+├── vendor_id (foreign key to suppliers.id)
+├── user_id (foreign key to users.id)
+├── flag (string, nullable)
+└── timestamps (created_at, updated_at)
+```
+
 ### **SAP Document Update System Architecture**
 
 **Pattern**: Standalone pages approach for complex DataTables functionality to avoid rendering issues
