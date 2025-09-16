@@ -21,8 +21,16 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             AdditionalDocumentTypeSeeder::class,
             InvoiceTypeSeeder::class,
-            // SupplierSeeder::class,
+            SupplierSeeder::class,
             DistributionTypeSeeder::class,
         ]);
+
+        // For training purposes only - comment out in production
+        // if (app()->environment('local')) {
+        //     $this->call([
+        //         TrainingUserSeeder::class,
+        //         TrainingScenarioSeeder::class,
+        //     ]);
+        // }
     }
 }
