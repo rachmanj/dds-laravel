@@ -88,7 +88,106 @@ DDS is built on a modern, secure web-based platform that:
 
 ---
 
-# 4. Key Features & Benefits
+# 4. Application & Distribution Workflow
+
+## Document Distribution Workflow
+
+```
+Draft → Verified by Sender → Sent → Received → Verified by Receiver → Completed
+  ↑           ↑              ↑        ↑           ↑                    ↑
+  |           |              |        |           |                    |
+Create    Sender         Send to   Receive at  Final              Workflow
+Distribution Verify    Destination Destination  Verify            Complete
+```
+
+## Extended Workflow with Discrepancies
+
+```
+                                                 ┌─────────────────────┐
+                                                 │                     │
+                                                 ▼                     │
+Draft → Verified by Sender → Sent → Received → Verified by Receiver → Completed
+  ↑           ↑              ↑        ↑           ↑                    ↑
+  |           |              |        |           |                    |
+Create    Sender         Send to   Receive at  Document            Workflow
+Distribution Verify    Destination Destination  Verification        Complete
+                                                 │
+                                                 ▼
+                                      Completed with Discrepancies
+                                                 │
+                                                 ▼
+                                      Create Replacement Documents
+                                                 │
+                                                 ▼
+                                      Send Replacement Distribution
+```
+
+## Step-by-Step Workflow Process
+
+### 1. Create Distribution (Draft)
+
+-   Select document type (invoice or additional document)
+-   Choose destination department
+-   Select documents to distribute
+-   Add notes and references
+-   Save as draft
+
+### 2. Sender Verification
+
+-   Review documents for accuracy and completeness
+-   Verify each document individually
+-   Add verification notes
+-   Submit verification
+
+### 3. Send Distribution
+
+-   System updates document status to "Sent"
+-   Documents marked as "in transit"
+-   Notification sent to destination department
+-   Sender department maintains visibility
+
+### 4. Receive Distribution
+
+-   Destination department acknowledges receipt
+-   Physical documents match system records
+-   System updates status to "Received"
+-   Documents remain in verification state
+
+### 5. Receiver Verification
+
+-   Destination department verifies each document
+-   Options to mark as "Verified," "Missing," or "Damaged"
+-   Add verification notes
+-   Submit verification
+
+### 6. Complete Distribution
+
+-   Final step in the workflow
+-   Documents officially transferred to destination
+-   System updates document location
+-   Complete audit trail maintained
+
+## Discrepancy Handling Process
+
+### Identifying Discrepancies
+
+-   During receiver verification, documents can be marked:
+    -   **Verified**: Document received in good condition
+    -   **Missing**: Document not found in the package
+    -   **Damaged**: Document unusable or illegible
+
+### Processing Discrepancies
+
+1. Receiver marks documents with issues
+2. Distribution flagged with "Discrepancies"
+3. Sender department notified
+4. Replacement documents created
+5. New distribution created for replacements
+6. Complete tracking of original and replacement documents
+
+---
+
+# 5. Key Features & Benefits
 
 ## Document Lifecycle Management
 
@@ -120,7 +219,7 @@ DDS is built on a modern, secure web-based platform that:
 
 ---
 
-# 5. Unique Differentiators
+# 6. Unique Differentiators
 
 ## Dual-Direction Visibility
 
@@ -145,7 +244,7 @@ Fully responsive design allows for document tracking and basic actions from any 
 
 ---
 
-# 6. Implementation & ROI
+# 7. Implementation & ROI
 
 ## Implementation Timeline
 
@@ -177,7 +276,7 @@ Fully responsive design allows for document tracking and basic actions from any 
 
 ---
 
-# 7. Case Studies & Scenarios
+# 8. Case Studies & Scenarios
 
 ## Case Study 1: Logistics to Accounting Document Flow
 
@@ -235,7 +334,7 @@ Fully responsive design allows for document tracking and basic actions from any 
 
 ---
 
-# 8. User Experience & Adoption
+# 9. User Experience & Adoption
 
 ## Intuitive User Interface
 
@@ -260,7 +359,7 @@ Fully responsive design allows for document tracking and basic actions from any 
 
 ---
 
-# 9. Security & Compliance
+# 10. Security & Compliance
 
 ## Enterprise-Grade Security
 
@@ -285,7 +384,7 @@ Fully responsive design allows for document tracking and basic actions from any 
 
 ---
 
-# 10. Next Steps & Call to Action
+# 11. Next Steps & Call to Action
 
 ## Implementation Roadmap
 
