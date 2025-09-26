@@ -76,6 +76,8 @@
 
     @include('layouts.partials.scripts')
 
+    @stack('js')
+
 </body>
 
 </html>

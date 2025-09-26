@@ -1,3 +1,48 @@
+## 2025-09-26 — User Messaging System Architecture
+
+-   **Context**: Need to implement internal messaging system for user-to-user communication within the DDS application.
+-   **Decision**: Create comprehensive messaging system with direct messaging, file attachments, real-time notifications, and enhanced user experience features.
+-   **Implementation**:
+    -   **Core Messaging**: Direct user-to-user communication with inbox/sent management and message threading
+    -   **File Attachments**: Support for multiple file uploads with 10MB size validation and proper storage
+    -   **Real-time Notifications**: AJAX-powered unread count updates every 30 seconds with Toastr integration
+    -   **Enhanced UX**: Select2 recipient selection, send animations, and extended success feedback
+    -   **Menu Organization**: Proper placement under MAIN group for better navigation structure
+    -   **Security**: Authentication-based access with user isolation and soft delete functionality
+-   **Alternatives Considered**:
+    -   Simple text-only messaging (rejected for insufficient functionality)
+    -   External messaging service integration (rejected for data privacy and control)
+    -   Email-based notifications (rejected in favor of real-time in-app notifications)
+-   **Implications**:
+    -   Complete internal communication system for DDS users
+    -   Enhanced collaboration capabilities with file sharing
+    -   Professional messaging interface with modern UX patterns
+    -   Seamless integration with existing DDS workflows
+    -   Real-time communication improves user productivity
+-   **Review Date**: 2025-12-26
+
+## 2025-09-26 — Messaging System UX Enhancements
+
+-   **Context**: User feedback requested menu relocation and send animation improvements for better user experience.
+-   **Decision**: Implement comprehensive UX enhancements including menu reorganization, send animations, and Select2 integration.
+-   **Implementation**:
+    -   **Menu Relocation**: Moved Messages menu from Master Data to MAIN group for better organization
+    -   **Send Animation**: AJAX-based message sending with loading states, success animations, and smooth transitions
+    -   **Select2 Integration**: Enhanced recipient selection with Bootstrap 4 theme and search functionality
+    -   **Extended Feedback**: Increased success toast visibility to 3.5s and fallback redirect delay to 2.5s
+    -   **Layout Enhancement**: Added `@stack('js')` to main layout for proper script loading
+-   **Alternatives Considered**:
+    -   Keep menu in Master Data (rejected per user feedback)
+    -   Simple form submission without animations (rejected for poor UX)
+    -   Basic select dropdown (rejected in favor of enhanced Select2 functionality)
+-   **Implications**:
+    -   Better menu organization improves navigation efficiency
+    -   Professional animations enhance user experience and system credibility
+    -   Enhanced recipient selection improves usability and reduces errors
+    -   Extended feedback provides better user confirmation
+    -   Proper script loading ensures all enhancements work correctly
+-   **Review Date**: 2025-12-26
+
 ## 2025-09-11 — Reconciliation Feature Architecture
 
 -   **Context**: Need to implement a financial reconciliation system to match external invoice data against internal records.

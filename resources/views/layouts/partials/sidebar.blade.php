@@ -46,6 +46,43 @@
                     @include('layouts.partials.menu.reports')
                 @endcan
 
+                <!-- Messages Section -->
+                <li class="nav-item {{ request()->is('messages*') ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ request()->is('messages*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-envelope"></i>
+                        <p>
+                            Messages
+                            <span class="badge badge-warning right" id="sidebar-unread-count">
+                                {{ Auth::user()->unread_messages_count }}
+                            </span>
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="{{ route('messages.index') }}"
+                                class="nav-link {{ request()->is('messages') && !request()->is('messages/sent') && !request()->is('messages/create') ? 'active' : '' }}">
+                                <i class="far fa-circle nav-icon"></i>
+                                <p>Inbox</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('messages.sent') }}"
+                                class="nav-link {{ request()->is('messages/sent') ? 'active' : '' }}">
+                                <i class="far fa-circle nav-icon"></i>
+                                <p>Sent</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('messages.create') }}"
+                                class="nav-link {{ request()->is('messages/create') ? 'active' : '' }}">
+                                <i class="far fa-circle nav-icon"></i>
+                                <p>Compose</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
                 @can('view-master')
                     @include('layouts.partials.menu.master')
                 @endcan

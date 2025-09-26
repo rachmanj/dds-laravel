@@ -10,6 +10,32 @@
     <!-- Right navbar links -->
     <ul class="navbar-nav ml-auto">
 
+        <!-- Messages Dropdown -->
+        <li class="nav-item dropdown">
+            <a class="nav-link" data-toggle="dropdown" href="#" aria-expanded="false">
+                <i class="fas fa-envelope"></i>
+                <span class="badge badge-warning navbar-badge" id="unread-messages-count">
+                    {{ Auth::user()->unread_messages_count }}
+                </span>
+            </a>
+            <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+                <span class="dropdown-item dropdown-header">
+                    {{ Auth::user()->unread_messages_count }} Unread Messages
+                </span>
+                <div class="dropdown-divider"></div>
+                <a href="{{ route('messages.index') }}" class="dropdown-item">
+                    <i class="fas fa-inbox mr-2"></i> Inbox
+                </a>
+                <a href="{{ route('messages.sent') }}" class="dropdown-item">
+                    <i class="fas fa-paper-plane mr-2"></i> Sent Messages
+                </a>
+                <div class="dropdown-divider"></div>
+                <a href="{{ route('messages.create') }}" class="dropdown-item dropdown-footer">
+                    <i class="fas fa-plus mr-1"></i> New Message
+                </a>
+            </div>
+        </li>
+
         <!-- User Dropdown Menu -->
         <li class="nav-item dropdown user-menu">
             <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">

@@ -48,4 +48,19 @@ Route::middleware(['auth', 'active.user'])->group(function () {
 
     // Include Reconcile Routes
     require __DIR__ . '/reconcile.php';
+
+    // Message Routes
+    Route::prefix('messages')->name('messages.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\MessageController::class, 'index'])->name('index');
+        Route::get('/sent', [\App\Http\Controllers\MessageController::class, 'sent'])->name('sent');
+        Route::get('/create', [\App\Http\Controllers\MessageController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\MessageController::class, 'store'])->name('store');
+        Route::get('/{message}', [\App\Http\Controllers\MessageController::class, 'show'])->name('show');
+        Route::delete('/{message}', [\App\Http\Controllers\MessageController::class, 'destroy'])->name('destroy');
+
+        // AJAX Routes
+        Route::get('/unread-count', [\App\Http\Controllers\MessageController::class, 'unreadCount'])->name('unread-count');
+        Route::post('/{message}/mark-read', [\App\Http\Controllers\MessageController::class, 'markAsRead'])->name('mark-read');
+        Route::get('/search-users', [\App\Http\Controllers\MessageController::class, 'searchUsers'])->name('search-users');
+    });
 });

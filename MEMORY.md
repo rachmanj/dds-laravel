@@ -1,3 +1,23 @@
+### 2025-09-26 — User Messaging System Implementation
+
+-   **Feature**: Complete internal messaging system for user-to-user communication within the DDS application.
+-   **Scope**: Direct messaging with inbox/sent management, file attachments, message threading, and real-time notifications.
+-   **Architecture**: Standalone messaging system with AdminLTE integration, AJAX-powered notifications, and soft-delete functionality.
+-   **Database**: Created `messages` and `message_attachments` tables with proper foreign key relationships, indexes, and soft-delete support.
+-   **Security**: Authentication-based access, user isolation, and proper authorization checks for message access.
+-   **UX**: Modern messaging interface with unread count badges, Toastr notifications, and responsive design.
+-   **Integration**: Added to main navigation with dropdown menu, integrates with existing User model and authentication system.
+-   **Files**: `Message.php`, `MessageAttachment.php` (models), `MessageController.php`, `routes/web.php` (message routes), `views/messages/` (inbox, sent, create, show), `layouts/partials/navbar.blade.php`, `layouts/partials/sidebar.blade.php`, `layouts/partials/scripts.blade.php`, migrations for messages and message_attachments tables.
+-   **Key Features**: Message composition with user selection, file attachments (10MB limit), message threading/replies, read status tracking, soft-delete with user-specific deletion, real-time unread count updates, searchable user list.
+-   **Notification System**: AJAX-powered unread count updates every 30 seconds, Toastr integration for success/error messages, navbar and sidebar badge integration.
+-   **Improvements (2025-09-26)**:
+    -   **Menu Relocation**: Moved Messages menu item from main sidebar to MAIN group menu for better organization.
+    -   **Send Animation**: Added AJAX-based message sending with loading states, success animations, and smooth transitions.
+    -   **Enhanced UX**: Button shows spinner during sending, success pulse animation, and Toastr notification before redirect.
+    -   **Files Updated**: `MessageController.php` (AJAX response handling), `resources/views/messages/create.blade.php` (animation logic and CSS), `resources/views/layouts/partials/sidebar.blade.php` (menu relocation to MAIN group).
+    -   **Testing Completed**: End-to-end testing verified send/receive flow, mark-as-read functionality, reply system, and animation features working correctly.
+    -   **Select2 Enhancement**: Applied select2bs4 class to recipient selection dropdown with Bootstrap 4 theme, search functionality, and improved UX.
+
 ### 2025-09-11 — Reconcile Feature Implementation
 
 -   **Feature**: Complete Invoice Reconciliation system for matching external invoice data with internal records.

@@ -6,6 +6,145 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **User Messaging System Architecture**
+
+**Pattern**: Internal messaging system with real-time notifications, file attachments, and enhanced user experience
+
+**Implementation**:
+
+-   **Direct Messaging**: User-to-user communication with inbox/sent management
+-   **File Attachments**: Support for multiple file uploads with 10MB size validation
+-   **Message Threading**: Reply functionality with parent-child message relationships
+-   **Real-time Notifications**: AJAX-powered unread count updates and Toastr notifications
+-   **Soft Delete**: User-specific message deletion with database cleanup
+-   **Enhanced UX**: Select2 recipient selection, send animations, and extended success feedback
+
+**Technical Architecture**:
+
+```php
+// Controller Structure
+MessageController
+├── index() → Inbox view (received messages)
+├── sent() → Sent messages view
+├── create() → Compose message form
+├── store() → Save new message with attachments
+├── show() → View message details and mark as read
+├── destroy() → Soft delete message
+├── unreadCount() → AJAX API for unread count
+├── markAsRead() → AJAX API to mark message as read
+└── searchUsers() → AJAX API for user search
+```
+
+**Route Structure**:
+
+```php
+Route::prefix('messages')->name('messages.')->group(function () {
+    Route::get('/', [MessageController::class, 'index'])->name('index');
+    Route::get('/sent', [MessageController::class, 'sent'])->name('sent');
+    Route::get('/create', [MessageController::class, 'create'])->name('create');
+    Route::post('/', [MessageController::class, 'store'])->name('store');
+    Route::get('/{message}', [MessageController::class, 'show'])->name('show');
+    Route::delete('/{message}', [MessageController::class, 'destroy'])->name('destroy');
+
+    // AJAX Routes
+    Route::get('/unread-count', [MessageController::class, 'unreadCount'])->name('unread-count');
+    Route::post('/{message}/mark-read', [MessageController::class, 'markAsRead'])->name('mark-read');
+    Route::get('/search-users', [MessageController::class, 'searchUsers'])->name('search-users');
+});
+```
+
+**Database Architecture**:
+
+```
+messages
+├── id (primary key)
+├── sender_id (foreign key to users.id)
+├── receiver_id (foreign key to users.id)
+├── subject (string)
+├── body (text)
+├── read_at (timestamp, nullable)
+├── deleted_by_sender (boolean)
+├── deleted_by_receiver (boolean)
+├── parent_id (foreign key to messages.id, nullable)
+└── timestamps (created_at, updated_at)
+
+message_attachments
+├── id (primary key)
+├── message_id (foreign key to messages.id)
+├── file_path (string)
+├── file_name (string)
+├── file_original_name (string)
+├── mime_type (string)
+├── file_size (unsigned big integer)
+└── timestamps (created_at, updated_at)
+```
+
+**Model Relationships**:
+
+```php
+// User Model
+public function sentMessages(): HasMany
+public function receivedMessages(): HasMany
+public function getUnreadMessagesCountAttribute(): int
+public function getRecentMessages($limit = 10)
+
+// Message Model
+public function sender(): BelongsTo
+public function receiver(): BelongsTo
+public function parent(): BelongsTo
+public function replies(): HasMany
+public function attachments(): HasMany
+public function markAsRead()
+public function isRead(): bool
+public function isReply(): bool
+
+// MessageAttachment Model
+public function message(): BelongsTo
+public function getFileSizeHumanAttribute(): string
+```
+
+**Notification System**:
+
+```javascript
+// Real-time unread count updates
+function updateUnreadMessageCount() {
+    $.get("/messages/unread-count", function (data) {
+        const count = data.count;
+        $("#unread-messages-count").text(count);
+        $("#sidebar-unread-count").text(count);
+
+        if (count === 0) {
+            $("#unread-messages-count").hide();
+            $("#sidebar-unread-count").hide();
+        } else {
+            $("#unread-messages-count").show();
+            $("#sidebar-unread-count").show();
+        }
+    });
+}
+
+// Update every 30 seconds
+setInterval(updateUnreadMessageCount, 30000);
+```
+
+**UI Components**:
+
+-   **Navbar Integration**: Message dropdown with unread count badge
+-   **Sidebar Integration**: Messages menu with sub-navigation (MAIN group placement)
+-   **Inbox View**: Table layout with sender info, subject, date, and status
+-   **Sent View**: Table layout with recipient info and read status
+-   **Compose View**: Form with Select2 recipient selection, subject, body, and file upload
+-   **Show View**: Message details with attachments and reply functionality
+-   **Enhanced UX**: Send animations, extended success feedback, and responsive design
+
+**Key Enhancements**:
+
+-   **Select2 Integration**: Bootstrap 4 themed recipient selection with search functionality
+-   **Send Animation**: AJAX-based submission with loading states and success animations
+-   **Extended Feedback**: 3.5s success toast visibility with 2.5s fallback redirect delay
+-   **Menu Organization**: Proper placement under MAIN group for better navigation
+-   **Real-time Updates**: 30-second interval unread count updates across navbar and sidebar
+
 ### **Reconciliation System Architecture**
 
 **Pattern**: AJAX-powered data reconciliation system with Excel import/export and real-time statistics
