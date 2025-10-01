@@ -118,11 +118,25 @@
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label for="po_no">PO Number</label>
-                                            <input type="text" class="form-control @error('po_no') is-invalid @enderror"
-                                                id="po_no" name="po_no" value="{{ old('po_no') }}" maxlength="30">
+                                            <div class="input-group">
+                                                <input type="text"
+                                                    class="form-control @error('po_no') is-invalid @enderror" id="po_no"
+                                                    name="po_no" value="{{ old('po_no') }}" maxlength="30"
+                                                    placeholder="Enter PO number">
+                                                <div class="input-group-append">
+                                                    <button type="button" class="btn btn-outline-secondary"
+                                                        id="search-docs-btn" title="Search Additional Documents">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                             @error('po_no')
-                                                <span class="invalid-feedback">{{ $message }}</span>
+                                                <span class="invalid-feedback d-block">{{ $message }}</span>
                                             @enderror
+                                            <small class="form-text text-muted">
+                                                <i class="fas fa-info-circle"></i> Enter PO number and click search to find
+                                                related additional documents
+                                            </small>
                                         </div>
                                     </div>
                                 </div>
@@ -153,13 +167,17 @@
                                             <label for="currency">Currency <span class="text-danger">*</span></label>
                                             <select class="form-control @error('currency') is-invalid @enderror"
                                                 id="currency" name="currency" required>
-                                                <option value="IDR" {{ old('currency') == 'IDR' ? 'selected' : '' }}>IDR
+                                                <option value="IDR" {{ old('currency') == 'IDR' ? 'selected' : '' }}>
+                                                    IDR
                                                 </option>
-                                                <option value="USD" {{ old('currency') == 'USD' ? 'selected' : '' }}>USD
+                                                <option value="USD" {{ old('currency') == 'USD' ? 'selected' : '' }}>
+                                                    USD
                                                 </option>
-                                                <option value="EUR" {{ old('currency') == 'EUR' ? 'selected' : '' }}>EUR
+                                                <option value="EUR" {{ old('currency') == 'EUR' ? 'selected' : '' }}>
+                                                    EUR
                                                 </option>
-                                                <option value="SGD" {{ old('currency') == 'SGD' ? 'selected' : '' }}>SGD
+                                                <option value="SGD" {{ old('currency') == 'SGD' ? 'selected' : '' }}>
+                                                    SGD
                                                 </option>
                                             </select>
                                             @error('currency')
@@ -170,13 +188,19 @@
                                     <div class="col-md-5">
                                         <div class="form-group">
                                             <label for="amount">Amount <span class="text-danger">*</span></label>
-                                            <input type="text" name="amount_display" id="amount_display"
-                                                class="form-control @error('amount') is-invalid @enderror"
-                                                value="{{ old('amount') }}" onkeyup="formatNumber(this)" required>
-                                            <input type="hidden" name="amount" id="amount"
-                                                value="{{ old('amount') }}">
+                                            <div class="input-group">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text" id="currency-prefix">IDR</span>
+                                                </div>
+                                                <input type="text" name="amount_display" id="amount_display"
+                                                    class="form-control @error('amount') is-invalid @enderror"
+                                                    value="{{ old('amount') }}" onkeyup="formatNumber(this)"
+                                                    placeholder="0.00" required>
+                                                <input type="hidden" name="amount" id="amount"
+                                                    value="{{ old('amount') }}">
+                                            </div>
                                             @error('amount')
-                                                <span class="invalid-feedback">{{ $message }}</span>
+                                                <span class="invalid-feedback d-block">{{ $message }}</span>
                                             @enderror
                                         </div>
                                     </div>
@@ -688,6 +712,10 @@
                     contentType: false,
                     success: function(response) {
                         if (response.success) {
+                            // Clear draft after successful submission
+                            localStorage.removeItem('invoice_create_draft');
+                            $(document).trigger('invoice-created-success');
+
                             toastr.success(response.message || 'Invoice created successfully.');
                             // Redirect to index page after short delay
                             setTimeout(function() {
@@ -1030,6 +1058,59 @@
             // Handle blur on PO number
             $('#po_no').on('blur', searchAdditionalDocuments);
 
+            // ENHANCEMENT: PO Search Button - Manual search trigger
+            $('#search-docs-btn').on('click', function() {
+                var po = $('#po_no').val().trim();
+                if (!po) {
+                    toastr.warning('Please enter a PO number first.');
+                    $('#po_no').focus();
+                    return;
+                }
+                searchAdditionalDocuments();
+                toastr.info('Searching for documents with PO: ' + po);
+            });
+
+            // Allow Enter key to trigger search without leaving field
+            $('#po_no').on('keypress', function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    var po = $(this).val().trim();
+                    if (po) {
+                        searchAdditionalDocuments();
+                    }
+                }
+            });
+
+            // ENHANCEMENT: Update currency prefix when currency changes
+            $('#currency').on('change', function() {
+                var selectedCurrency = $(this).val();
+                $('#currency-prefix').text(selectedCurrency);
+            });
+
+            // ENHANCEMENT: Smart Field Dependencies - Auto-populate Invoice Project based on Current Location
+            $('#cur_loc').on('change', function() {
+                var selectedOption = $(this).find('option:selected');
+                var locationText = selectedOption.text();
+
+                // Extract project code from location text (e.g., "000HACC - Accounting (000H)" -> "000H")
+                var projectMatch = locationText.match(/\(([^)]+)\)$/);
+                if (projectMatch && projectMatch[1]) {
+                    var projectCode = projectMatch[1];
+
+                    // Auto-select invoice project if not already selected
+                    if (!$('#invoice_project').val()) {
+                        $('#invoice_project').val(projectCode);
+                        toastr.info('Invoice Project auto-set to ' + projectCode + ' based on selected location');
+                    }
+                }
+            });
+
+            // ENHANCEMENT: Initialize currency prefix on page load
+            var initialCurrency = $('#currency').val();
+            if (initialCurrency) {
+                $('#currency-prefix').text(initialCurrency);
+            }
+
             // Row checkbox toggle
             $(document).on('change', '.doc-checkbox', function() {
                 var id = $(this).data('id');
@@ -1224,6 +1305,132 @@
                     return false;
                 }
             });
+
+            // ENHANCEMENT: Auto-save Draft Feature
+            var DRAFT_KEY = 'invoice_create_draft';
+            var AUTO_SAVE_INTERVAL = 30000; // 30 seconds
+
+            // Function to save current form data to localStorage
+            function saveDraft() {
+                var formData = {
+                    supplier_id: $('#supplier_id').val(),
+                    invoice_number: $('#invoice_number').val(),
+                    invoice_date: $('#invoice_date').val(),
+                    receive_date: $('#receive_date').val(),
+                    po_no: $('#po_no').val(),
+                    type_id: $('#type_id').val(),
+                    currency: $('#currency').val(),
+                    amount: $('#amount').val(),
+                    invoice_project: $('#invoice_project').val(),
+                    payment_project: $('#payment_project').val(),
+                    faktur_no: $('#faktur_no').val(),
+                    sap_doc: $('#sap_doc').val(),
+                    remarks: $('#remarks').val(),
+                    additional_document_ids: Object.keys(selectedDocs),
+                    timestamp: new Date().toISOString()
+                };
+
+                // Only save if at least one field has data
+                var hasData = Object.values(formData).some(function(val) {
+                    return val && val.length > 0;
+                });
+
+                if (hasData) {
+                    localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+                    console.log('Draft auto-saved at ' + new Date().toLocaleTimeString());
+                }
+            }
+
+            // Function to restore draft from localStorage
+            function restoreDraft() {
+                var draftJson = localStorage.getItem(DRAFT_KEY);
+                if (!draftJson) return;
+
+                try {
+                    var draft = JSON.parse(draftJson);
+                    var draftDate = new Date(draft.timestamp);
+                    var minutesAgo = Math.round((new Date() - draftDate) / 60000);
+
+                    // Ask user if they want to restore
+                    Swal.fire({
+                        title: 'Draft Found',
+                        html: 'Found an unsaved invoice draft from ' + minutesAgo +
+                            ' minutes ago.<br>Do you want to restore it?',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: 'Yes, Restore Draft',
+                        cancelButtonText: 'No, Start Fresh',
+                        confirmButtonColor: '#007bff',
+                        cancelButtonColor: '#6c757d'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            // Restore form fields
+                            if (draft.supplier_id) $('#supplier_id').val(draft.supplier_id).trigger('change');
+                            if (draft.invoice_number) $('#invoice_number').val(draft.invoice_number);
+                            if (draft.invoice_date) $('#invoice_date').val(draft.invoice_date);
+                            if (draft.receive_date) $('#receive_date').val(draft.receive_date);
+                            if (draft.po_no) $('#po_no').val(draft.po_no);
+                            if (draft.type_id) $('#type_id').val(draft.type_id);
+                            if (draft.currency) {
+                                $('#currency').val(draft.currency).trigger('change');
+                            }
+                            if (draft.amount) {
+                                $('#amount').val(draft.amount);
+                                $('#amount_display').val(draft.amount);
+                                formatNumber(document.getElementById('amount_display'));
+                            }
+                            if (draft.invoice_project) $('#invoice_project').val(draft.invoice_project);
+                            if (draft.payment_project) $('#payment_project').val(draft.payment_project);
+                            if (draft.faktur_no) $('#faktur_no').val(draft.faktur_no);
+                            if (draft.sap_doc) $('#sap_doc').val(draft.sap_doc);
+                            if (draft.remarks) $('#remarks').val(draft.remarks);
+
+                            toastr.success('Draft restored successfully!');
+
+                            // If PO number exists, trigger search for additional documents
+                            if (draft.po_no) {
+                                setTimeout(function() {
+                                    searchAdditionalDocuments();
+                                }, 500);
+                            }
+                        } else {
+                            // User chose to start fresh, clear the draft
+                            localStorage.removeItem(DRAFT_KEY);
+                            toastr.info('Starting with a fresh form');
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error restoring draft:', error);
+                    localStorage.removeItem(DRAFT_KEY);
+                }
+            }
+
+            // Auto-save every 30 seconds
+            var autoSaveTimer = setInterval(saveDraft, AUTO_SAVE_INTERVAL);
+
+            // Save draft when user makes changes (debounced)
+            var saveTimeout;
+            $('form :input').on('change input', function() {
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(saveDraft, 2000); // Save 2 seconds after last change
+            });
+
+            // Clear draft on successful submission
+            var originalAjaxSuccess = submitFormWithAjax;
+
+            // Restore draft on page load (after a short delay to let everything initialize)
+            setTimeout(restoreDraft, 1000);
+
+            // Clear draft when form is successfully submitted
+            $(document).on('invoice-created-success', function() {
+                localStorage.removeItem(DRAFT_KEY);
+                clearInterval(autoSaveTimer);
+                console.log('Draft cleared after successful submission');
+            });
+
+            // ENHANCEMENT: Manual save draft button (optional - shown in console for now)
+            console.log('💾 Auto-save is enabled. Your work is automatically saved every 30 seconds.');
+            console.log('💡 To manually clear draft: localStorage.removeItem("' + DRAFT_KEY + '")');
         }
 
         // Start initialization when DOM is ready
