@@ -11643,3 +11643,49 @@ public function user(): BelongsTo
 **Version**: 4.14  
 **Status**: ✅ **Table Structure Enhancements Completed Successfully**  
 \*\*Implementation
+
+## Invoice Create Page - Advanced UX Enhancements (October 1, 2025)
+
+### Improvements Implemented:
+
+**1. Keyboard Shortcuts**
+- Ctrl+S: Save invoice (with validation check)
+- Esc: Cancel and return to list
+- Ctrl+Enter (in PO field): Trigger document search
+- Visual guide alert bar at top showing shortcuts
+
+**2. Enhanced Submit Button**
+- Larger buttons (btn-lg) with Cancel button next to Submit
+- Loading state during submission with spinner
+- Disable buttons during submission to prevent double-submit
+- Visual feedback: button turns gray with 'Creating Invoice...' text
+
+**3. Form Progress Indicator**
+- Real-time progress bar showing completion percentage
+- Color-coded: Red (<40%), Yellow (40-79%), Green (80-100%)
+- Text counter: 'X/8 required fields completed'
+- Animated striped bar when 100% complete
+
+**4. Collapsed Additional Documents Card**
+- Card starts collapsed by default (cleaner UI)
+- Auto-expands when PO search finds documents
+- Collapse/expand button in header
+- Badge showing 'Optional' status
+
+**5. SweetAlert2 Warning for Already-Linked Documents**
+- Beautiful warning dialog when selecting documents already linked to other invoices
+- Shows count and list of invoices the document is linked to
+- Allows user to confirm or cancel the action
+- Prevents accidental duplicate linking
+
+**6. Enhanced Supplier Dropdown**
+- Shows SAP Code in parentheses next to supplier name
+- Example: 'Supplier Name (SAP123)'
+- data-sap-code attribute for potential future use
+
+**7. Enhanced Project Dropdowns**
+- Invoice Project: Shows project owner and NOW REQUIRED
+- Payment Project: Shows project owner
+- Format: '001H - Owner Name'
+
+All features tested and working correctly. Total required fields now: 8 (was 7).

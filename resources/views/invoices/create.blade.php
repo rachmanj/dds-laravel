@@ -53,6 +53,7 @@
                 opacity: 0;
                 transform: translateY(-50%) translateX(-10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(-50%) translateX(0);
@@ -65,8 +66,13 @@
         }
 
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Success state for input fields */
@@ -125,6 +131,44 @@
     <!-- Main content -->
     <section class="content">
         <div class="container-fluid">
+            <!-- ENHANCEMENT: Keyboard Shortcuts Help Alert -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-info alert-dismissible fade show">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                        <strong><i class="fas fa-keyboard"></i> Keyboard Shortcuts:</strong>
+                        <span class="ml-3">
+                            <kbd>Tab</kbd> Navigate fields |
+                            <kbd>Ctrl+S</kbd> Save invoice |
+                            <kbd>Esc</kbd> Cancel & return |
+                            <kbd>Ctrl+Enter</kbd> in PO field = Search docs
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ENHANCEMENT: Form Progress Indicator -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card bg-light">
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong><i class="fas fa-tasks"></i> Form Progress:</strong>
+                                    <span id="progress-text" class="ml-2">0/8 required fields completed</span>
+                                </div>
+                                <div class="progress" style="width: 300px; height: 25px;">
+                                    <div class="progress-bar progress-bar-striped" id="form-progress-bar" role="progressbar"
+                                        style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                        0%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row">
                 <div class="col-12">
                     <div class="card">
@@ -148,8 +192,11 @@
                                                 <option value="">Select Supplier</option>
                                                 @foreach ($suppliers as $supplier)
                                                     <option value="{{ $supplier->id }}"
+                                                        data-sap-code="{{ $supplier->sap_code ?? '' }}"
                                                         {{ old('supplier_id') == $supplier->id ? 'selected' : '' }}>
-                                                        {{ $supplier->name }}
+                                                        {{ $supplier->name }}@if ($supplier->sap_code)
+                                                            ({{ $supplier->sap_code }})
+                                                        @endif
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -203,12 +250,17 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="po_no">PO Number</label>
+                                            <label for="po_no">
+                                                PO Number
+                                                <i class="fas fa-question-circle text-info ml-1" data-toggle="tooltip"
+                                                    data-placement="top"
+                                                    title="Purchase Order number. Enter and click search to automatically find and link related additional documents (ITO, BAST, BAPP)."></i>
+                                            </label>
                                             <div class="input-group">
                                                 <input type="text"
-                                                    class="form-control @error('po_no') is-invalid @enderror" id="po_no"
-                                                    name="po_no" value="{{ old('po_no') }}" maxlength="30"
-                                                    placeholder="Enter PO number">
+                                                    class="form-control @error('po_no') is-invalid @enderror"
+                                                    id="po_no" name="po_no" value="{{ old('po_no') }}"
+                                                    maxlength="30" placeholder="Enter PO number">
                                                 <div class="input-group-append">
                                                     <button type="button" class="btn btn-outline-secondary"
                                                         id="search-docs-btn" title="Search Additional Documents">
@@ -232,7 +284,12 @@
                                 <div class="row">
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="type_id">Invoice Type <span class="text-danger">*</span></label>
+                                            <label for="type_id">
+                                                Invoice Type <span class="text-danger">*</span>
+                                                <i class="fas fa-question-circle text-info ml-1" data-toggle="tooltip"
+                                                    data-placement="top"
+                                                    title="Category of the invoice: Service, Item (goods), Rental, Catering, Consultants, Expedition, or Others."></i>
+                                            </label>
                                             <select class="form-control @error('type_id') is-invalid @enderror"
                                                 id="type_id" name="type_id" required>
                                                 <option value="">Select Invoice Type</option>
@@ -250,7 +307,12 @@
                                     </div>
                                     <div class="col-md-3">
                                         <div class="form-group">
-                                            <label for="currency">Currency <span class="text-danger">*</span></label>
+                                            <label for="currency">
+                                                Currency <span class="text-danger">*</span>
+                                                <i class="fas fa-question-circle text-info ml-1" data-toggle="tooltip"
+                                                    data-placement="top"
+                                                    title="Invoice currency. The amount prefix will update automatically to match your selection."></i>
+                                            </label>
                                             <select class="form-control @error('currency') is-invalid @enderror"
                                                 id="currency" name="currency" required>
                                                 <option value="IDR" {{ old('currency') == 'IDR' ? 'selected' : '' }}>
@@ -273,7 +335,12 @@
                                     </div>
                                     <div class="col-md-5">
                                         <div class="form-group">
-                                            <label for="amount">Amount <span class="text-danger">*</span></label>
+                                            <label for="amount">
+                                                Amount <span class="text-danger">*</span>
+                                                <i class="fas fa-question-circle text-info ml-1" data-toggle="tooltip"
+                                                    data-placement="top"
+                                                    title="Invoice total amount. Enter numbers only - thousand separators will be added automatically."></i>
+                                            </label>
                                             <div class="input-group">
                                                 <div class="input-group-prepend">
                                                     <span class="input-group-text" id="currency-prefix">IDR</span>
@@ -306,14 +373,21 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="invoice_project">Invoice Project</label>
+                                            <label for="invoice_project">
+                                                Invoice Project <span class="text-danger">*</span>
+                                                <i class="fas fa-question-circle text-info ml-1" data-toggle="tooltip"
+                                                    data-placement="top"
+                                                    title="The project code associated with this invoice. Usually matches your current location's project and will auto-populate when you select a location."></i>
+                                            </label>
                                             <select class="form-control @error('invoice_project') is-invalid @enderror"
-                                                id="invoice_project" name="invoice_project">
+                                                id="invoice_project" name="invoice_project" required>
                                                 <option value="">Select Project</option>
                                                 @foreach ($projects as $project)
                                                     <option value="{{ $project->code }}"
                                                         {{ old('invoice_project') == $project->code ? 'selected' : '' }}>
-                                                        {{ $project->code }} - {{ $project->name }}
+                                                        {{ $project->code }}@if ($project->owner)
+                                                            - {{ $project->owner }}
+                                                        @endif
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -324,14 +398,21 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="payment_project">Payment Project</label>
+                                            <label for="payment_project">
+                                                Payment Project
+                                                <i class="fas fa-question-circle text-info ml-1" data-toggle="tooltip"
+                                                    data-placement="top"
+                                                    title="The project code that will be charged for this invoice payment. Defaults to 001H (Head Office)."></i>
+                                            </label>
                                             <select class="form-control @error('payment_project') is-invalid @enderror"
                                                 id="payment_project" name="payment_project">
                                                 <option value="">Select Project</option>
                                                 @foreach ($projects as $project)
                                                     <option value="{{ $project->code }}"
                                                         {{ old('payment_project') == $project->code || $project->code == '001H' ? 'selected' : '' }}>
-                                                        {{ $project->code }} - {{ $project->name }}
+                                                        {{ $project->code }}@if ($project->owner)
+                                                            - {{ $project->owner }}
+                                                        @endif
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -380,10 +461,16 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="faktur_no">Faktur No</label>
+                                            <label for="faktur_no">
+                                                Faktur No
+                                                <i class="fas fa-question-circle text-info ml-1" data-toggle="tooltip"
+                                                    data-placement="top"
+                                                    title="Tax invoice number from the supplier. This is optional and can be added later."></i>
+                                            </label>
                                             <input type="text"
                                                 class="form-control @error('faktur_no') is-invalid @enderror"
-                                                id="faktur_no" name="faktur_no" value="{{ old('faktur_no') }}">
+                                                id="faktur_no" name="faktur_no" value="{{ old('faktur_no') }}"
+                                                placeholder="e.g., 010.000-25.00000123">
                                             @error('faktur_no')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
@@ -391,10 +478,16 @@
                                     </div>
                                     <div class="col-md-3">
                                         <div class="form-group">
-                                            <label for="sap_doc">SAP Document</label>
+                                            <label for="sap_doc">
+                                                SAP Document
+                                                <i class="fas fa-question-circle text-info ml-1" data-toggle="tooltip"
+                                                    data-placement="top"
+                                                    title="SAP system reference number for tracking. Optional - can be added now or updated later via SAP Update feature."></i>
+                                            </label>
                                             <input type="text"
                                                 class="form-control @error('sap_doc') is-invalid @enderror"
-                                                id="sap_doc" name="sap_doc" value="{{ old('sap_doc') }}">
+                                                id="sap_doc" name="sap_doc" value="{{ old('sap_doc') }}"
+                                                placeholder="e.g., 5000012345">
                                             @error('sap_doc')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
@@ -413,9 +506,13 @@
 
 
                                 <!-- Link Additional Documents (optional) -->
-                                <div class="card card-outline card-secondary mt-3" id="additional-docs-card">
+                                <div class="card card-outline card-secondary mt-3 collapsed-card"
+                                    id="additional-docs-card">
                                     <div class="card-header">
-                                        <h3 class="card-title">Link Additional Documents (optional)</h3>
+                                        <h3 class="card-title">
+                                            <i class="fas fa-link"></i> Link Additional Documents
+                                            <span class="badge badge-secondary">Optional</span>
+                                        </h3>
                                         <div class="card-tools">
                                             @if (auth()->user()->can('on-the-fly-addoc-feature'))
                                                 <button type="button" class="btn btn-sm btn-success mr-2"
@@ -427,10 +524,13 @@
                                                 id="refresh-docs-btn" style="display:none;">
                                                 <i class="fas fa-sync-alt"></i> Refresh
                                             </button>
-                                            <span class="badge badge-info" id="selected-count">Selected: 0</span>
+                                            <span class="badge badge-info mr-2" id="selected-count">Selected: 0</span>
+                                            <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="card-body">
+                                    <div class="card-body" style="display: none;">
                                         <div id="additional-docs-loading" style="display:none;">
                                             <i class="fas fa-spinner fa-spin"></i> Searching by PO No...
                                         </div>
@@ -481,10 +581,25 @@
                             </div>
 
                             <div class="card-footer">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Create Invoice
-                                </button>
-
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <button type="submit" class="btn btn-primary btn-lg" id="submit-invoice-btn">
+                                            <i class="fas fa-save"></i> Create Invoice
+                                        </button>
+                                        <a href="{{ route('invoices.index') }}"
+                                            class="btn btn-outline-secondary btn-lg ml-2" id="cancel-btn">
+                                            <i class="fas fa-times"></i> Cancel
+                                        </a>
+                                    </div>
+                                    <div id="save-status" class="text-muted" style="display:none;">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <strong>Creating invoice...</strong>
+                                    </div>
+                                </div>
+                                <small class="text-muted mt-2 d-block">
+                                    <i class="fas fa-info-circle"></i>
+                                    Tip: Press <kbd>Ctrl+S</kbd> to save or <kbd>Esc</kbd> to cancel
+                                </small>
                             </div>
                         </form>
                     </div>
@@ -715,17 +830,53 @@
                 console.error('Toastr not loaded');
             }
 
-            // Initialize Select2 Bootstrap 4 for supplier
-            console.log('Initializing Select2 for supplier');
+            // ENHANCEMENT: Initialize Select2 for all select fields
+            console.log('Initializing Select2 for all select fields');
             try {
                 if (typeof $.fn.select2 !== 'undefined') {
-                    $('.select2bs4').select2({
+                    // Supplier dropdown with search
+                    $('#supplier_id').select2({
                         theme: 'bootstrap4',
                         placeholder: 'Select Supplier',
                         allowClear: true,
                         width: '100%'
                     });
-                    console.log('Select2 initialized successfully');
+
+                    // Invoice Type dropdown
+                    $('#type_id').select2({
+                        theme: 'bootstrap4',
+                        placeholder: 'Select Invoice Type',
+                        allowClear: true,
+                        width: '100%',
+                        minimumResultsForSearch: -1 // Disable search for short lists
+                    });
+
+                    // Invoice Project dropdown
+                    $('#invoice_project').select2({
+                        theme: 'bootstrap4',
+                        placeholder: 'Select Project',
+                        allowClear: true,
+                        width: '100%'
+                    });
+
+                    // Payment Project dropdown
+                    $('#payment_project').select2({
+                        theme: 'bootstrap4',
+                        placeholder: 'Select Project',
+                        allowClear: true,
+                        width: '100%'
+                    });
+
+                    // Current Location dropdown (if enabled for admin)
+                    if (!$('#cur_loc').prop('disabled')) {
+                        $('#cur_loc').select2({
+                            theme: 'bootstrap4',
+                            placeholder: 'Select Location',
+                            width: '100%'
+                        });
+                    }
+
+                    console.log('Select2 initialized successfully for all fields');
                 } else {
                     console.error('Select2 plugin not loaded');
                 }
@@ -875,7 +1026,7 @@
                         '<span class="validation-spinner text-muted small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
                         '<i class="fas fa-spinner fa-spin"></i> Checking...</span>'
                     );
-                    
+
                     clearTimeout(validationTimeout);
                     validationTimeout = setTimeout(function() {
                         $.ajax({
@@ -889,33 +1040,35 @@
                             success: function(response) {
                                 // Remove loading spinner
                                 $('.validation-spinner').remove();
-                                
+
                                 var invoiceField = $('#invoice_number');
                                 var feedback = invoiceField.next('.invalid-feedback');
 
                                 if (response.is_duplicate) {
                                     // Show error state
                                     invoiceField.removeClass('is-valid').addClass('is-invalid');
-                                    
+
                                     // Add error icon indicator
                                     invoiceField.after(
                                         '<span class="validation-result text-danger small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
                                         '<i class="fas fa-times-circle"></i> Duplicate</span>'
                                     );
-                                    
+
                                     // Update or create error message
                                     if (feedback.length === 0) {
                                         invoiceField.after(
                                             '<span class="invalid-feedback d-block">This invoice number is already used for this supplier.</span>'
                                         );
                                     } else {
-                                        feedback.text('This invoice number is already used for this supplier.');
+                                        feedback.text(
+                                            'This invoice number is already used for this supplier.'
+                                        );
                                     }
                                 } else {
                                     // Show success state
                                     invoiceField.removeClass('is-invalid').addClass('is-valid');
                                     feedback.remove();
-                                    
+
                                     // Add success icon indicator
                                     invoiceField.after(
                                         '<span class="validation-result text-success small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
@@ -958,7 +1111,7 @@
                         '<span class="sap-validation-spinner text-muted small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
                         '<i class="fas fa-spinner fa-spin"></i> Checking...</span>'
                     );
-                    
+
                     clearTimeout(sapValidationTimeout);
                     sapValidationTimeout = setTimeout(function() {
                         $.ajax({
@@ -972,24 +1125,25 @@
                             success: function(response) {
                                 // Remove loading spinner
                                 $('.sap-validation-spinner').remove();
-                                
+
                                 var sapField = $('#sap_doc');
                                 var feedback = sapField.next('.invalid-feedback');
 
                                 if (!response.valid) {
                                     // Show error state
                                     sapField.removeClass('is-valid').addClass('is-invalid');
-                                    
+
                                     // Add error icon indicator
                                     sapField.after(
                                         '<span class="sap-validation-result text-danger small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
                                         '<i class="fas fa-times-circle"></i> Duplicate</span>'
                                     );
-                                    
+
                                     // Update or create error message
                                     if (feedback.length === 0) {
                                         sapField.after(
-                                            '<span class="invalid-feedback d-block">' + response.message + '</span>'
+                                            '<span class="invalid-feedback d-block">' + response
+                                            .message + '</span>'
                                         );
                                     } else {
                                         feedback.text(response.message);
@@ -998,7 +1152,7 @@
                                     // Show success state
                                     sapField.removeClass('is-invalid').addClass('is-valid');
                                     feedback.remove();
-                                    
+
                                     // Add success icon indicator
                                     sapField.after(
                                         '<span class="sap-validation-result text-success small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
@@ -1022,19 +1176,70 @@
             // Trigger SAP validation when sap_doc changes
             $('#sap_doc').on('input', validateSapDoc);
 
-            // Payment date validation
-            $('#receive_date').on('change', function() {
-                var receiveDate = $(this).val();
-                if (receiveDate && $('#payment_date').val()) {
-                    if ($('#payment_date').val() < receiveDate) {
-                        $('#payment_date').val('');
-                        if (typeof toastr !== 'undefined') {
-                            toastr.warning('Payment date cannot be earlier than receive date.');
-                        }
+            // ENHANCEMENT: Date Field Logical Validation
+
+            // Ensure Receive Date cannot be before Invoice Date
+            $('#invoice_date').on('change', function() {
+                var invoiceDate = $(this).val();
+                var receiveDate = $('#receive_date').val();
+
+                if (invoiceDate) {
+                    // Set minimum receive date to invoice date
+                    $('#receive_date').attr('min', invoiceDate);
+
+                    // Auto-adjust if receive date is before invoice date
+                    if (receiveDate && receiveDate < invoiceDate) {
+                        $('#receive_date').val(invoiceDate);
+                        toastr.info('Receive date adjusted to match invoice date', 'Date Validation');
+                    }
+
+                    // Validate date is not too far in future (max 1 year)
+                    var maxDate = new Date();
+                    maxDate.setFullYear(maxDate.getFullYear() + 1);
+                    var selectedDate = new Date(invoiceDate);
+
+                    if (selectedDate > maxDate) {
+                        $(this).val('');
+                        toastr.warning('Invoice date cannot be more than 1 year in the future', 'Date Validation');
                     }
                 }
             });
 
+            // Validate Receive Date when changed
+            $('#receive_date').on('change', function() {
+                var receiveDate = $(this).val();
+                var invoiceDate = $('#invoice_date').val();
+
+                if (receiveDate && invoiceDate) {
+                    // Receive date cannot be before invoice date
+                    if (receiveDate < invoiceDate) {
+                        $(this).val(invoiceDate);
+                        toastr.warning(
+                            'Receive date cannot be earlier than invoice date. Auto-adjusted to invoice date.',
+                            'Date Validation');
+                    }
+
+                    // Validate not too far in future
+                    var maxDate = new Date();
+                    maxDate.setFullYear(maxDate.getFullYear() + 1);
+                    var selectedDate = new Date(receiveDate);
+
+                    if (selectedDate > maxDate) {
+                        $(this).val('');
+                        toastr.warning('Receive date cannot be more than 1 year in the future', 'Date Validation');
+                    }
+                }
+
+                // Check payment date if exists
+                if (receiveDate && $('#payment_date').val()) {
+                    if ($('#payment_date').val() < receiveDate) {
+                        $('#payment_date').val('');
+                        toastr.warning('Payment date cannot be earlier than receive date.');
+                    }
+                }
+            });
+
+            // Payment date validation
             $('#payment_date').on('change', function() {
                 var paymentDate = $(this).val();
                 var receiveDate = $('#receive_date').val();
@@ -1172,6 +1377,12 @@
                     $('#additional-docs-card').hide();
                     return;
                 }
+
+                // ENHANCEMENT: Expand the card if it's collapsed
+                if ($('#additional-docs-card').hasClass('collapsed-card')) {
+                    $('#additional-docs-card').find('[data-card-widget="collapse"]').click();
+                }
+
                 $('#additional-docs-card').show();
                 $('#additional-docs-loading').show();
                 $('#additional-docs-table-wrapper').hide();
@@ -1261,21 +1472,200 @@
                 $('#currency-prefix').text(initialCurrency);
             }
 
-            // Row checkbox toggle
+            // ENHANCEMENT: Initialize tooltips for help icons
+            $('[data-toggle="tooltip"]').tooltip({
+                trigger: 'hover',
+                html: true,
+                boundary: 'window'
+            });
+
+            // ENHANCEMENT: Keyboard Shortcuts
+            $(document).on('keydown', function(e) {
+                // Ctrl+S to submit form
+                if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+
+                    // Check if form has required fields filled
+                    var requiredFilled = true;
+                    $('[required]:visible').each(function() {
+                        if (!$(this).val() || $(this).val() === '') {
+                            requiredFilled = false;
+                            return false;
+                        }
+                    });
+
+                    if (requiredFilled) {
+                        console.log('Keyboard shortcut: Ctrl+S - Submitting form');
+                        $('form').submit();
+                    } else {
+                        toastr.warning('Please complete all required fields first', 'Cannot Save');
+                    }
+                }
+
+                // Escape to cancel and return to list
+                if (e.key === 'Escape' && !$('.modal').hasClass('show') && !$('.swal2-container').length) {
+                    e.preventDefault();
+                    console.log('Keyboard shortcut: Esc - Canceling form');
+                    window.location.href = '{{ route('invoices.index') }}';
+                }
+            });
+
+            // Ctrl+Enter in PO field to trigger search
+            $('#po_no').on('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    e.preventDefault();
+                    console.log('Keyboard shortcut: Ctrl+Enter - Searching documents');
+                    $('#search-docs-btn').click();
+                }
+            });
+
+            // ENHANCEMENT: Form Progress Indicator
+            function updateFormProgress() {
+                var requiredFields = $('[required]:visible').not('#receive_project'); // Exclude auto-filled
+                var filledFields = requiredFields.filter(function() {
+                    var val = $(this).val();
+                    return val !== '' && val !== null && val.toString().trim() !== '';
+                });
+
+                var total = requiredFields.length;
+                var filled = filledFields.length;
+                var percentage = total > 0 ? Math.round((filled / total) * 100) : 0;
+
+                // Update progress bar
+                $('#form-progress-bar')
+                    .css('width', percentage + '%')
+                    .attr('aria-valuenow', percentage)
+                    .text(percentage + '%')
+                    .removeClass('bg-danger bg-warning bg-success')
+                    .addClass(
+                        percentage < 40 ? 'bg-danger' :
+                        percentage < 80 ? 'bg-warning' :
+                        'bg-success'
+                    );
+
+                // Add animation when progress increases
+                if (percentage === 100) {
+                    $('#form-progress-bar').addClass('progress-bar-animated');
+                }
+
+                $('#progress-text').text(filled + '/' + total + ' required fields completed');
+            }
+
+            // Update progress on any field change
+            $('form :input').on('change input blur', updateFormProgress);
+
+            // Initial progress update
+            setTimeout(updateFormProgress, 1000);
+
+            // ENHANCEMENT: Enhanced Submit Button State Management
+            var isSubmitting = false;
+
+            $('#submit-invoice-btn').on('click', function(e) {
+                if (isSubmitting) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            });
+
+            // Update submit button and show overlay during submission
+            var originalFormSubmit = submitFormWithAjax;
+            submitFormWithAjax = function(form) {
+                if (isSubmitting) {
+                    return false;
+                }
+
+                isSubmitting = true;
+
+                // Update submit button
+                $('#submit-invoice-btn')
+                    .prop('disabled', true)
+                    .html('<i class="fas fa-spinner fa-spin"></i> Creating Invoice...')
+                    .removeClass('btn-primary')
+                    .addClass('btn-secondary');
+
+                // Disable cancel button
+                $('#cancel-btn').addClass('disabled').css('pointer-events', 'none');
+
+                // Show save status
+                $('#save-status').show();
+
+                // Call original function
+                originalFormSubmit(form);
+            };
+
+            // ENHANCEMENT: Row checkbox toggle with SweetAlert2 warning for linked documents
             $(document).on('change', '.doc-checkbox', function() {
                 var id = $(this).data('id');
                 var row = $(this).closest('tr');
+                var checkbox = this;
+
                 if (this.checked) {
                     // Check if document is already linked to other invoices
                     var linkedInvoicesCell = row.find('td').eq(7); // Linked Invoices column
                     var linkedBadge = linkedInvoicesCell.find('.badge');
-                    if (linkedBadge.length > 0 && !linkedBadge.hasClass('badge-success')) {
-                        var count = parseInt(linkedBadge.text().match(/\d+/)[0]);
-                        if (count > 0 && typeof toastr !== 'undefined') {
-                            toastr.warning('This document is already linked to ' + count + ' other invoice(s).');
+
+                    if (linkedBadge.length > 0 && !linkedBadge.hasClass('text-muted')) {
+                        var badgeText = linkedBadge.text().trim();
+                        var countMatch = badgeText.match(/\d+/);
+
+                        if (countMatch) {
+                            var count = parseInt(countMatch[0]);
+
+                            if (count > 0) {
+                                // Show SweetAlert2 confirmation for already-linked documents
+                                var docNumber = row.find('td').eq(1).text();
+                                var linkedInvoicesList = linkedBadge.attr('title') || linkedBadge.data(
+                                    'original-title') || '';
+                                linkedInvoicesList = linkedInvoicesList.replace('Linked to: ', '');
+
+                                Swal.fire({
+                                    title: 'Document Already Linked',
+                                    html: '<div class="text-left">' +
+                                        '<p>This document (<strong>' + docNumber +
+                                        '</strong>) is already linked to <strong>' + count +
+                                        '</strong> other invoice(s):</p>' +
+                                        '<div class="alert alert-warning mt-2 mb-2">' +
+                                        '<i class="fas fa-link"></i> <strong>Currently linked to:</strong><br>' +
+                                        '<span class="small">' + linkedInvoicesList + '</span>' +
+                                        '</div>' +
+                                        '<p class="mt-3">Linking this document to multiple invoices is allowed, but please confirm you want to proceed.</p>' +
+                                        '</div>',
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonText: '<i class="fas fa-link"></i> Yes, Link Anyway',
+                                    cancelButtonText: '<i class="fas fa-times"></i> Cancel',
+                                    confirmButtonColor: '#ffc107',
+                                    cancelButtonColor: '#6c757d',
+                                    reverseButtons: true,
+                                    width: '600px'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        // User confirmed, proceed with adding to selectedDocs
+                                        var data = {
+                                            id: id,
+                                            document_number: row.find('td').eq(1).text(),
+                                            type_name: row.find('td').eq(2).text(),
+                                            document_date: row.find('td').eq(3).text(),
+                                            po_no: row.find('td').eq(4).text(),
+                                            cur_loc: row.find('td').eq(5).text().trim(),
+                                            remarks: row.find('td').eq(6).text()
+                                        };
+                                        selectedDocs[id] = data;
+                                        renderSelectedTable();
+                                        toastr.success('Document linked successfully', 'Document Added');
+                                    } else {
+                                        // User cancelled, uncheck the checkbox
+                                        $(checkbox).prop('checked', false);
+                                    }
+                                });
+
+                                return; // Exit early, SweetAlert will handle the rest
+                            }
                         }
                     }
 
+                    // If not linked or no warning needed, proceed normally
                     var data = {
                         id: id,
                         document_number: row.find('td').eq(1).text(),
@@ -1286,10 +1676,11 @@
                         remarks: row.find('td').eq(6).text()
                     };
                     selectedDocs[id] = data;
+                    renderSelectedTable();
                 } else {
                     delete selectedDocs[id];
+                    renderSelectedTable();
                 }
-                renderSelectedTable();
             });
 
             // Select all
