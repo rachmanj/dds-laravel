@@ -32,6 +32,92 @@
         .linked-invoices-badge.badge-info {
             background-color: #17a2b8;
         }
+
+        /* Enhanced Validation Feedback Styles */
+        .form-group {
+            position: relative;
+        }
+
+        .validation-spinner,
+        .validation-result,
+        .sap-validation-spinner,
+        .sap-validation-result {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 0.875rem;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50%) translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(-50%) translateX(0);
+            }
+        }
+
+        .validation-spinner i,
+        .sap-validation-spinner i {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Success state for input fields */
+        .form-control.is-valid {
+            border-color: #28a745;
+            padding-right: calc(1.5em + 0.75rem);
+            background-image: none;
+        }
+
+        .form-control.is-valid:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+
+        /* Invalid state enhancement */
+        .form-control.is-invalid {
+            border-color: #dc3545;
+            padding-right: calc(1.5em + 0.75rem);
+            background-image: none;
+        }
+
+        .form-control.is-invalid:focus {
+            border-color: #dc3545;
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+        }
+
+        /* Validation icons positioning */
+        #invoice_number,
+        #sap_doc {
+            padding-right: 120px !important;
+        }
+
+        .validation-result,
+        .sap-validation-result {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .validation-spinner,
+        .sap-validation-spinner {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            z-index: 5;
+        }
     </style>
 @endsection
 
@@ -772,14 +858,24 @@
                 }
             @endif
 
-            // Real-time invoice number validation per supplier
+            // ENHANCEMENT: Real-time invoice number validation with visual feedback
             var validationTimeout;
 
             function validateInvoiceNumber() {
                 var invoiceNumber = $('#invoice_number').val().trim();
                 var supplierId = $('#supplier_id').val();
 
+                // Clear any existing validation indicators
+                $('.validation-spinner, .validation-result').remove();
+                $('#invoice_number').removeClass('is-valid is-invalid');
+
                 if (invoiceNumber && supplierId) {
+                    // Show loading spinner while validating
+                    $('#invoice_number').after(
+                        '<span class="validation-spinner text-muted small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
+                        '<i class="fas fa-spinner fa-spin"></i> Checking...</span>'
+                    );
+                    
                     clearTimeout(validationTimeout);
                     validationTimeout = setTimeout(function() {
                         $.ajax({
@@ -791,30 +887,54 @@
                                 supplier_id: supplierId
                             },
                             success: function(response) {
+                                // Remove loading spinner
+                                $('.validation-spinner').remove();
+                                
                                 var invoiceField = $('#invoice_number');
                                 var feedback = invoiceField.next('.invalid-feedback');
 
                                 if (response.is_duplicate) {
-                                    invoiceField.addClass('is-invalid');
+                                    // Show error state
+                                    invoiceField.removeClass('is-valid').addClass('is-invalid');
+                                    
+                                    // Add error icon indicator
+                                    invoiceField.after(
+                                        '<span class="validation-result text-danger small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
+                                        '<i class="fas fa-times-circle"></i> Duplicate</span>'
+                                    );
+                                    
+                                    // Update or create error message
                                     if (feedback.length === 0) {
                                         invoiceField.after(
-                                            '<span class="invalid-feedback">This invoice number is already used for this supplier.</span>'
+                                            '<span class="invalid-feedback d-block">This invoice number is already used for this supplier.</span>'
                                         );
                                     } else {
-                                        feedback.text(
-                                            'This invoice number is already used for this supplier.'
-                                        );
+                                        feedback.text('This invoice number is already used for this supplier.');
                                     }
                                 } else {
-                                    invoiceField.removeClass('is-invalid');
+                                    // Show success state
+                                    invoiceField.removeClass('is-invalid').addClass('is-valid');
                                     feedback.remove();
+                                    
+                                    // Add success icon indicator
+                                    invoiceField.after(
+                                        '<span class="validation-result text-success small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
+                                        '<i class="fas fa-check-circle"></i> Available</span>'
+                                    );
                                 }
                             },
                             error: function() {
+                                $('.validation-spinner').remove();
                                 console.log('Validation request failed');
                             }
                         });
                     }, 500); // Debounce validation
+                } else if (invoiceNumber && !supplierId) {
+                    // Show warning if invoice number entered but no supplier selected
+                    $('#invoice_number').after(
+                        '<span class="validation-result text-warning small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
+                        '<i class="fas fa-exclamation-circle"></i> Select supplier first</span>'
+                    );
                 }
             }
 
@@ -822,13 +942,23 @@
             $('#invoice_number').on('input', validateInvoiceNumber);
             $('#supplier_id').on('change', validateInvoiceNumber);
 
-            // Real-time SAP document validation
+            // ENHANCEMENT: Real-time SAP document validation with visual feedback
             var sapValidationTimeout;
 
             function validateSapDoc() {
                 var sapDoc = $('#sap_doc').val().trim();
 
+                // Clear any existing validation indicators
+                $('.sap-validation-spinner, .sap-validation-result').remove();
+                $('#sap_doc').removeClass('is-valid is-invalid');
+
                 if (sapDoc.length > 0) {
+                    // Show loading spinner while validating
+                    $('#sap_doc').after(
+                        '<span class="sap-validation-spinner text-muted small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
+                        '<i class="fas fa-spinner fa-spin"></i> Checking...</span>'
+                    );
+                    
                     clearTimeout(sapValidationTimeout);
                     sapValidationTimeout = setTimeout(function() {
                         $.ajax({
@@ -840,32 +970,52 @@
                                 invoice_id: null // Create form has no current invoice
                             },
                             success: function(response) {
+                                // Remove loading spinner
+                                $('.sap-validation-spinner').remove();
+                                
                                 var sapField = $('#sap_doc');
                                 var feedback = sapField.next('.invalid-feedback');
 
                                 if (!response.valid) {
-                                    sapField.addClass('is-invalid');
+                                    // Show error state
+                                    sapField.removeClass('is-valid').addClass('is-invalid');
+                                    
+                                    // Add error icon indicator
+                                    sapField.after(
+                                        '<span class="sap-validation-result text-danger small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
+                                        '<i class="fas fa-times-circle"></i> Duplicate</span>'
+                                    );
+                                    
+                                    // Update or create error message
                                     if (feedback.length === 0) {
                                         sapField.after(
-                                            '<span class="invalid-feedback">' + response.message +
-                                            '</span>'
+                                            '<span class="invalid-feedback d-block">' + response.message + '</span>'
                                         );
                                     } else {
                                         feedback.text(response.message);
                                     }
                                 } else {
-                                    sapField.removeClass('is-invalid');
+                                    // Show success state
+                                    sapField.removeClass('is-invalid').addClass('is-valid');
                                     feedback.remove();
+                                    
+                                    // Add success icon indicator
+                                    sapField.after(
+                                        '<span class="sap-validation-result text-success small ml-2" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">' +
+                                        '<i class="fas fa-check-circle"></i> Available</span>'
+                                    );
                                 }
                             },
                             error: function() {
+                                $('.sap-validation-spinner').remove();
                                 console.log('SAP validation request failed');
                             }
                         });
                     }, 500); // Debounce validation
                 } else {
                     // Clear validation if field is empty
-                    $('#sap_doc').removeClass('is-invalid').next('.invalid-feedback').remove();
+                    $('#sap_doc').removeClass('is-invalid is-valid');
+                    $('#sap_doc').next('.invalid-feedback').remove();
                 }
             }
 

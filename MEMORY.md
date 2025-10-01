@@ -1,9 +1,20 @@
 ### 2025-10-01 — Invoice Create Page UX Enhancements
 
--   **Feature**: Comprehensive UX improvements to invoice creation workflow with smart field dependencies, visual enhancements, and data preservation features.
--   **Scope**: Four major improvements: PO search button, dynamic currency prefix, smart field auto-population, and auto-save draft functionality.
+-   **Feature**: Comprehensive UX improvements to invoice creation workflow with smart field dependencies, visual enhancements, data preservation, and enhanced validation feedback.
+-   **Scope**: Five major improvements: PO search button, dynamic currency prefix, smart field auto-population, auto-save draft functionality, and enhanced validation feedback with visual indicators.
 -   **Implementation Date**: 2025-10-01
 -   **Files Modified**: `resources/views/invoices/create.blade.php`
+
+#### **5. Enhanced Validation Feedback with Visual Indicators** (NEW)
+
+-   **Feature**: Real-time visual validation feedback for Invoice Number and SAP Document fields with loading states and success/error indicators
+-   **Visual States**: Loading spinner during validation, green checkmark for success, red X for duplicates, yellow warning for missing dependencies
+-   **UX Benefits**: Immediate visual confirmation, reduces form submission errors, professional appearance, clear status indication
+-   **Implementation**: Absolute-positioned icons with fade-in animations, color-coded borders, comprehensive error messages
+-   **Fields Enhanced**: Invoice Number (duplicate check per supplier), SAP Document (uniqueness validation)
+-   **Animation**: 0.3s smooth fade-in transitions, spinning loader animation, professional CSS styling
+-   **Testing**: Verified all states (loading, success, error, warning) with real database data
+-   **Business Impact**: Prevents duplicate submissions, improves data quality, enhances user confidence
 
 #### **1. PO Search Button Enhancement**
 
