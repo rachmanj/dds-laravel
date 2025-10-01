@@ -1,3 +1,16 @@
+### 2025-10-01 — Username Uniqueness Validation Implementation
+
+-   **Feature**: Comprehensive username uniqueness validation system to prevent duplicate usernames while allowing multiple NULL values.
+-   **Scope**: Database constraint, application-level validation, and user experience enhancements for secure user management.
+-   **Security**: Prevents username conflicts, impersonation risks, and login ambiguity while maintaining flexibility for email-only users.
+-   **Database**: Added unique constraint to `username` column with nullable support, allowing multiple NULL values but enforcing unique non-NULL values.
+-   **Validation**: Implemented Laravel validation rules for both user creation and updates with proper exception handling for current user.
+-   **Testing**: Comprehensive testing verified all scenarios: duplicate prevention, unique creation, update with same username, and multiple NULL username handling.
+-   **Files**: Migration `2025_10_01_060319_add_unique_constraint_to_username_in_users_table.php`, `app/Http/Controllers/Admin/UserController.php` (store and update methods).
+-   **Key Features**: Database-level unique constraint, application-level validation with user-friendly error messages, NULL value support for email-only login, update logic allowing users to keep their own username.
+-   **Business Impact**: Enhanced security preventing username impersonation, improved data integrity with database constraints, better user experience with clear validation messages.
+-   **Learning**: Nullable unique constraints in MySQL allow multiple NULL values while enforcing uniqueness on non-NULL values - perfect for optional username fields.
+
 ### 2025-09-26 — User Messaging System Implementation
 
 -   **Feature**: Complete internal messaging system for user-to-user communication within the DDS application.

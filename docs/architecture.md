@@ -813,6 +813,48 @@ Implementation references:
 -   Tests: `tests/Feature/LoginTest.php`
 -   Decision: `docs/decisions.md` (2025-09-06)
 
+#### **Username Uniqueness Validation Pattern** (2025-10-01)
+
+The system enforces username uniqueness while supporting NULL values for email-only users.
+
+**Database Schema**:
+
+```php
+// users table
+Schema::table('users', function (Blueprint $table) {
+    $table->string('username')->nullable()->unique()->change();
+});
+```
+
+**Key Characteristics**:
+
+-   **Nullable Unique Constraint**: MySQL allows multiple NULL values while enforcing uniqueness on non-NULL values
+-   **Database-Level Integrity**: Constraint prevents duplicates even with direct database access
+-   **Application-Level Validation**: User-friendly error messages for duplicate username attempts
+
+**Validation Rules**:
+
+```php
+// User Creation (UserController::store)
+'username' => ['nullable', 'string', 'max:255', 'unique:users']
+
+// User Update (UserController::update)
+'username' => ['nullable', 'string', 'max:255', 'unique:users,username,' . $user->id]
+```
+
+**Security Pattern**:
+
+-   ✅ Prevents username impersonation
+-   ✅ Eliminates login ambiguity
+-   ✅ Multi-layer validation (database + application)
+-   ✅ Maintains email-only login flexibility
+
+**Implementation References**:
+
+-   Migration: `database/migrations/2025_10_01_060319_add_unique_constraint_to_username_in_users_table.php`
+-   Controller: `app/Http/Controllers/Admin/UserController.php`
+-   Decision: `docs/decisions.md` (2025-10-01)
+
 ### **External API System**
 
 The system provides secure external API access for invoice data with comprehensive security and user accountability:

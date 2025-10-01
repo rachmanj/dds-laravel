@@ -1616,6 +1616,34 @@ DistributionHistory::create([
 
 ## **Recently Completed**
 
+### **2025-10-01: Username Uniqueness Validation Implementation** ✅
+
+-   **Date**: 2025-10-01
+-   **Description**: Implemented comprehensive username uniqueness validation system to prevent duplicate usernames while allowing multiple NULL values for email-only users
+-   **Implementation**:
+    -   ✅ Created database migration adding unique constraint to `username` column with nullable support
+    -   ✅ Updated `UserController::store()` validation with `unique:users` rule
+    -   ✅ Updated `UserController::update()` validation with `unique:users,username,{user_id}` rule
+    -   ✅ Comprehensive testing verified all scenarios (duplicate prevention, unique creation, NULL handling)
+-   **Testing Results**:
+    -   ✅ Duplicate username creation prevented with clear error message
+    -   ✅ Unique username creation successful
+    -   ✅ Update validation prevents duplicate usernames while allowing users to keep their own
+    -   ✅ Multiple NULL usernames allowed for email-only login users
+-   **Security Benefits**:
+    -   Prevents username impersonation and login confusion
+    -   Database-level integrity enforcement
+    -   Multi-layer validation (database + application)
+    -   Maintains backward compatibility with existing users
+-   **Files Modified**:
+    -   `database/migrations/2025_10_01_060319_add_unique_constraint_to_username_in_users_table.php` (created)
+    -   `app/Http/Controllers/Admin/UserController.php` (updated)
+-   **Documentation Updated**:
+    -   `MEMORY.md` - Implementation details and learnings
+    -   `docs/authentication.md` - Username validation section with testing scenarios
+    -   `docs/decisions.md` - Decision rationale and alternatives analysis
+    -   `docs/architecture.md` - Security pattern documentation
+
 ### **2025-01-27: API Documentation Organization** ✅
 
 -   **Date**: 2025-01-27

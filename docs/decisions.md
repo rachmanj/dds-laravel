@@ -1,3 +1,52 @@
+## 2025-10-01 — Username Uniqueness Validation System
+
+-   **Context**: System allowed duplicate usernames, creating security risks, login ambiguity, and potential user impersonation issues. Username field was optional but lacked uniqueness enforcement.
+-   **Decision**: Implement comprehensive username uniqueness validation with database-level unique constraint and application-level validation while maintaining NULL value support for email-only users.
+-   **Implementation**:
+    -   **Database Migration**: Added unique constraint to `username` column with nullable support (`->nullable()->unique()->change()`)
+    -   **Store Validation**: Added `'unique:users'` rule to prevent duplicate username creation
+    -   **Update Validation**: Added `'unique:users,username,{user_id}'` rule to allow users to keep their own username
+    -   **NULL Handling**: MySQL unique constraint allows multiple NULL values while enforcing uniqueness on non-NULL values
+    -   **Testing**: Comprehensive browser testing verified all scenarios (duplicate prevention, unique creation, NULL handling)
+-   **Alternatives Considered**:
+    -   **Case-insensitive unique constraint**: Rejected - adds complexity without clear benefit for current use case
+    -   **Required username field**: Rejected - breaks email-only login flexibility
+    -   **Application-level only validation**: Rejected - lacks database-level integrity enforcement
+    -   **Soft uniqueness check**: Rejected - security requires hard constraints
+-   **Implications**:
+    -   **Security Enhancement**: Prevents username impersonation and login confusion
+    -   **Data Integrity**: Database constraint ensures no duplicates even with direct DB access
+    -   **User Experience**: Clear validation messages guide users to choose unique usernames
+    -   **Flexibility Maintained**: Users can still use email-only login (NULL username)
+    -   **Migration Safety**: Non-destructive change, existing NULL usernames preserved
+    -   **Login System**: Works seamlessly with existing email/username dual login system
+-   **Review Date**: 2025-12-01
+
+## 2025-10-01 — Username Uniqueness Validation System
+
+-   **Context**: System allowed duplicate usernames, creating security risks, login ambiguity, and potential user impersonation issues. Username field was optional but lacked uniqueness enforcement.
+-   **Decision**: Implement comprehensive username uniqueness validation with database-level unique constraint and application-level validation while maintaining NULL value support for email-only users.
+-   **Implementation**:
+    -   **Database Migration**: Created migration `2025_10_01_060319_add_unique_constraint_to_username_in_users_table.php`
+    -   **Unique Constraint**: `$table->string('username')->nullable()->unique()->change()`
+    -   **Store Validation**: Added `'unique:users'` rule in `UserController::store()`
+    -   **Update Validation**: Added `'unique:users,username,{user_id}'` rule in `UserController::update()`
+    -   **NULL Support**: MySQL unique constraint allows multiple NULL values
+-   **Alternatives Considered**:
+    -   **Case-insensitive unique constraint**: Rejected - adds complexity without clear benefit for current use case
+    -   **Required username field**: Rejected - breaks email-only login flexibility and existing user workflows
+    -   **Application-level only validation**: Rejected - lacks database-level integrity enforcement against direct DB manipulation
+    -   **Soft uniqueness check**: Rejected - security requires hard constraints with proper error handling
+    -   **Custom validation rule**: Rejected - Laravel's built-in unique rule sufficient for requirements
+-   **Implications**:
+    -   **Security Enhancement**: Prevents username impersonation and login confusion
+    -   **Data Integrity**: Database constraint ensures no duplicates even with direct database access
+    -   **User Experience**: Clear validation messages ("The username has already been taken.") guide users
+    -   **Backward Compatibility**: Non-destructive migration preserves existing NULL usernames
+    -   **Login System**: Works seamlessly with existing email/username dual login authentication
+    -   **Future-Proof**: Foundation for potential username-based features and improvements
+-   **Review Date**: 2025-12-01
+
 ## 2025-09-26 — User Messaging System Architecture
 
 -   **Context**: Need to implement internal messaging system for user-to-user communication within the DDS application.

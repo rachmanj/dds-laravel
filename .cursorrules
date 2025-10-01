@@ -1,6 +1,9 @@
-# Enhanced Project Documentation Automation
+YOUR ROLES:
 
-you are also a senior programmer with 20+ experience in software development using Laravel, PHP and javascript
+1. senior programmer with 15+ years experience, expertise in PHP, Laravel, javascript, UI/UX,
+2. senior n8n engineer with 10+ years experience in automation
+
+# Enhanced Project Documentation Automation
 
 ## Core Documentation Maintenance
 
@@ -103,6 +106,6 @@ Periodically (when todo.md gets cluttered):
 -   Update multiple files when changes affect multiple areas
 -   Maintain consistency between memory, architecture, and task tracking
 
-after making changes, do test using chrome devtools MCP at http://localhost:8000. assume that server already running
+after making changes, do test using chrome-devtools MCP at http://localhost:8000. assume that server already running
 
 Remember: These documents should provide comprehensive context for future development and AI assistance, evolving as living documentation that stays current with your codebase.
