@@ -82,7 +82,7 @@ Edit Form Submission
 
 ### **Additional Documents System Architecture**
 
-**Pattern**: Enhanced document management with advanced search, filtering, and permission controls
+**Pattern**: Enhanced document management with advanced search, filtering, permission controls, and standardized UI/UX
 
 **Implementation**:
 
@@ -92,6 +92,7 @@ Edit Form Submission
 -   **Import Permission Control**: Role-based access to document import functionality
 -   **Search Presets**: User-specific saved search configurations
 -   **Professional Export**: Excel export with proper formatting and column widths
+-   **Standardized UI/UX**: Consistent styling across create and edit pages matching invoice create page
 
 **Technical Architecture**:
 
@@ -158,6 +159,75 @@ Role Assignments
 ├── accounting → All permissions including import
 ├── finance → All permissions including import
 └── other roles → Limited permissions
+```
+
+**UI/UX Standardization Architecture**:
+
+```css
+/* Standardized Card Header (matches invoice create page) */
+.card-header {
+    /* No specific background/gradient, relies on AdminLTE default */
+}
+
+.card-header .card-title {
+    /* No specific color/font-weight/text-shadow, relies on AdminLTE default */
+}
+
+/* Standardized Progress Bar */
+.progress {
+    width: 300px;
+    height: 25px;
+}
+
+.progress-bar {
+    /* Standard Bootstrap progress bar styling */
+}
+```
+
+**Form Progress System**:
+
+```javascript
+// Standardized progress tracking (matches invoice create page)
+function updateFormProgress() {
+    const requiredFields = [
+        "#type_id",
+        "#document_number",
+        "#document_date",
+        "#receive_date",
+        "#cur_loc",
+        "#remarks",
+        "#attachment",
+        "#vendor_code",
+    ];
+
+    let filled = 0;
+    let total = requiredFields.length;
+
+    requiredFields.forEach(function (field) {
+        const element = $(field);
+        if (element.length && element.val() && element.val().trim() !== "") {
+            filled++;
+        }
+    });
+
+    var percentage = total > 0 ? Math.round((filled / total) * 100) : 0;
+
+    // Update progress bar with standard Bootstrap classes
+    $("#form-progress-bar")
+        .css("width", percentage + "%")
+        .attr("aria-valuenow", percentage)
+        .text(percentage + "%")
+        .removeClass("bg-danger bg-warning bg-success")
+        .addClass(
+            percentage >= 100
+                ? "bg-success"
+                : percentage >= 75
+                ? "bg-info"
+                : percentage >= 50
+                ? "bg-warning"
+                : "bg-danger"
+        );
+}
 ```
 
 **Database Schema Enhancements**:
