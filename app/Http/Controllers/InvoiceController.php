@@ -186,6 +186,21 @@ class InvoiceController extends Controller
             $receiveProject = $authUser->project;
         }
 
+        // Ensure we have a valid user ID
+        $userId = Auth::id();
+        if (!$userId) {
+            // Log the error for debugging
+            Log::error('Auth::id() returned null when creating invoice', [
+                'invoice_number' => $request->invoice_number,
+                'supplier_id' => $request->supplier_id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication error. Please refresh the page and try again.',
+            ], 401);
+        }
+
         $invoice = Invoice::create([
             'invoice_number' => $request->invoice_number,
             'faktur_no' => $request->faktur_no,
@@ -204,7 +219,7 @@ class InvoiceController extends Controller
             'cur_loc' => $request->cur_loc,
             'sap_doc' => $request->sap_doc,
             'status' => 'open', // Always set to 'open' for new invoices
-            'created_by' => Auth::id(),
+            'created_by' => $userId,
         ]);
 
         // Link additional documents if provided

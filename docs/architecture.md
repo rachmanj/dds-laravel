@@ -6,6 +6,80 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Invoice Edit and Update System Architecture**
+
+**Pattern**: Comprehensive invoice editing with dual-field amount system and proper field synchronization
+
+**Implementation**:
+
+-   **Edit Page Access**: Route-based access to `/invoices/{id}/edit` with proper authorization
+-   **Form Pre-population**: Automatic form loading with existing invoice data
+-   **Dual-Field Amount System**: `amount_display` (user input) and hidden `amount` (submission)
+-   **Field Synchronization**: `formatNumber()` function ensures proper field sync
+-   **Validation**: `UniqueInvoicePerSupplier` rule with proper exclusion logic
+-   **AJAX Submission**: Form submission with loading states and notifications
+-   **Database Updates**: Proper field persistence with timestamp tracking
+
+**Technical Architecture**:
+
+```php
+// Invoice Edit Controller Structure
+InvoiceController
+├── edit(Invoice $invoice) → Edit form with pre-populated data
+├── update(Request $request, Invoice $invoice) → Process form updates
+└── validation rules → UniqueInvoicePerSupplier, required fields, etc.
+```
+
+**Form Field Architecture**:
+
+```javascript
+// Dual-Field Amount System
+Amount Field Structure
+├── amount_display (visible input) → User interaction
+├── amount (hidden input) → Form submission
+└── formatNumber() → Synchronization function
+```
+
+**Validation Architecture**:
+
+```php
+// Custom Validation Rule
+UniqueInvoicePerSupplier
+├── validate() → Check for duplicate invoice numbers per supplier
+├── excludeId → Exclude current invoice from duplicate check
+└── setData() → Access form data for validation
+```
+
+**AJAX Submission Flow**:
+
+```javascript
+// Form Submission Architecture
+Edit Form Submission
+├── Form Validation → Client-side validation
+├── AJAX Request → Submit form data
+├── Loading States → Show progress indicators
+├── Success Handling → Display notifications
+├── Database Update → Persist changes
+└── Redirect → Return to invoices list
+```
+
+**Key Technical Patterns**:
+
+-   **Field Synchronization**: Explicit `formatNumber()` calls ensure data integrity
+-   **Validation Exclusion**: Current invoice excluded from duplicate checks
+-   **Loading States**: Proper user feedback during form submission
+-   **Error Handling**: Comprehensive validation and error display
+-   **Database Persistence**: All field updates properly tracked with timestamps
+
+**Files Involved**:
+
+-   `resources/views/invoices/edit.blade.php` - Edit form and JavaScript functionality
+-   `app/Http/Controllers/InvoiceController.php` - Update method and validation
+-   `app/Rules/UniqueInvoicePerSupplier.php` - Custom validation rule
+-   `routes/invoice.php` - Resource routes for edit/update
+
+---
+
 ### **Additional Documents System Architecture**
 
 **Pattern**: Enhanced document management with advanced search, filtering, and permission controls

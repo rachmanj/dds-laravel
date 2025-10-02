@@ -2,6 +2,32 @@
 
 ## 🎯 **Planned Features**
 
+### **Invoice System Enhancements**
+
+-   [ ] **Invoice Field Synchronization Improvements**
+
+    -   **Priority**: Medium
+    -   **Description**: Enhance amount field synchronization to prevent manual `formatNumber()` calls
+    -   **Components**: Auto-sync on field changes, improved validation, better error handling
+    -   **Estimated Effort**: 2-3 hours
+    -   **Dependencies**: JavaScript event handling, form validation system
+
+-   [ ] **Invoice Edit Form Validation Enhancement**
+
+    -   **Priority**: Low
+    -   **Description**: Add real-time validation feedback and improved error messages
+    -   **Components**: Client-side validation, real-time feedback, enhanced error display
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: JavaScript validation, form structure
+
+-   [ ] **Invoice Edit History Tracking**
+
+    -   **Priority**: Low
+    -   **Description**: Track and display invoice edit history with user and timestamp information
+    -   **Components**: Audit trail table, history display, user tracking
+    -   **Estimated Effort**: 2-3 days
+    -   **Dependencies**: Database schema, user authentication system
+
 ### **Database & Query System Enhancements**
 
 -   [ ] **MCP MySQL Configuration Fix**

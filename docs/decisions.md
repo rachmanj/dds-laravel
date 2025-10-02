@@ -1,3 +1,74 @@
+## 2025-10-02 — Invoice Edit and Update Functionality Testing
+
+-   **Context**: Invoice edit and update functionality needed comprehensive testing to ensure proper form handling, field synchronization, validation, and database updates. The system had existing edit functionality but required validation of the complete workflow.
+
+-   **Decision**: Conduct comprehensive testing of invoice edit and update functionality to validate form pre-population, field updates, validation rules, AJAX submission, and database persistence.
+
+-   **Implementation**:
+
+    -   **Edit Page Access**: Tested route access and form loading with pre-populated data
+    -   **Form Field Updates**: Validated field updates including amount, status, and remarks
+    -   **Field Synchronization**: Identified and resolved amount field synchronization issue
+    -   **Validation Testing**: Verified `UniqueInvoicePerSupplier` rule and form validation
+    -   **AJAX Submission**: Tested form submission with proper loading states and notifications
+    -   **Database Verification**: Confirmed all updates properly persisted to database
+
+-   **Alternatives Considered**:
+
+    -   **Manual Testing Only**: Rejected - automated browser testing provides more comprehensive validation
+    -   **Skip Field Sync Testing**: Rejected - field synchronization is critical for data integrity
+    -   **Basic Validation Only**: Rejected - comprehensive testing ensures production readiness
+
+-   **Technical Decisions**:
+
+    -   **Dual-Field Amount System**: Maintained existing `amount_display` (user input) and hidden `amount` (submission) architecture
+    -   **Explicit Field Sync**: Implemented explicit `formatNumber()` calls to ensure proper field synchronization
+    -   **AJAX Submission**: Maintained existing AJAX submission with proper loading states and notifications
+    -   **Validation Rule**: Confirmed `UniqueInvoicePerSupplier` rule correctly excludes current invoice from duplicate checks
+    -   **Database Updates**: Verified all field updates properly persisted with correct timestamps
+
+-   **Implications**:
+
+    -   **Data Integrity**: Proper field synchronization ensures form data integrity
+    -   **User Experience**: Smooth edit workflow with proper loading states and notifications
+    -   **Production Readiness**: Comprehensive testing validates system reliability
+    -   **Maintainability**: Clear understanding of form structure and field relationships
+    -   **Quality Assurance**: Thorough testing prevents data corruption and validation errors
+
+-   **Implementation Details**:
+
+    -   **Form Structure**: Dual-field amount system with proper synchronization
+    -   **JavaScript**: `formatNumber()` function for field synchronization
+    -   **Validation**: `UniqueInvoicePerSupplier` rule with proper exclusion logic
+    -   **AJAX**: Form submission with loading states and success handling
+    -   **Database**: Proper field updates with timestamp tracking
+
+-   **Testing Results**:
+
+    -   ✅ Edit page loads correctly with pre-populated data
+    -   ✅ All form fields update properly
+    -   ✅ Amount field synchronization working correctly
+    -   ✅ Form validation passes with updated data
+    -   ✅ AJAX submission successful
+    -   ✅ Database updates verified
+    -   ✅ User experience smooth with proper loading states and notifications
+
+-   **Key Technical Discovery**:
+
+    -   **Issue**: Amount field synchronization between display and hidden fields
+    -   **Root Cause**: `formatNumber()` function not automatically called when field value changed programmatically
+    -   **Solution**: Explicitly call `formatNumber()` after setting field values
+    -   **Prevention**: Ensure proper field synchronization in all form update scenarios
+
+-   **Files Involved**:
+
+    -   `resources/views/invoices/edit.blade.php` - Edit form and JavaScript functionality
+    -   `app/Http/Controllers/InvoiceController.php` - Update method and validation
+    -   `app/Rules/UniqueInvoicePerSupplier.php` - Custom validation rule
+    -   `routes/invoice.php` - Resource routes for edit/update
+
+---
+
 ## 2025-10-02 — Medium Priority Improvements for Additional Documents System
 
 -   **Context**: Additional Documents system needed enhanced functionality for better user experience and enterprise-level capabilities. Three medium priority improvements were identified: Enhanced Date Validation, Advanced Search & Filtering, and Current Location Selection Enhancement, plus Import Permission Control.

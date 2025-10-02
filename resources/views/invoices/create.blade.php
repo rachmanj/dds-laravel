@@ -622,8 +622,12 @@
                                             id="preview-invoice-btn">
                                             <i class="fas fa-eye"></i> Preview
                                         </button>
-                                        <button type="submit" class="btn btn-primary btn-lg" id="submit-invoice-btn">
-                                            <i class="fas fa-save"></i> Create Invoice
+                                        <button type="submit" class="btn btn-success btn-lg mr-2"
+                                            id="save-and-close-btn">
+                                            <i class="fas fa-save"></i> Save and Close
+                                        </button>
+                                        <button type="submit" class="btn btn-primary btn-lg mr-2" id="save-and-new-btn">
+                                            <i class="fas fa-plus"></i> Save and New
                                         </button>
                                         <a href="{{ route('invoices.index') }}"
                                             class="btn btn-outline-secondary btn-lg ml-2" id="cancel-btn">
@@ -793,7 +797,6 @@
                 return;
             }
 
-            console.log('Invoice create form loaded, jQuery version:', $.fn.jquery);
 
             // Global AJAX error handler for session timeouts
             $(document).ajaxError(function(event, xhr, settings) {
@@ -870,7 +873,6 @@
             }
 
             // ENHANCEMENT: Initialize Select2 for all select fields
-            console.log('Initializing Select2 for all select fields');
             try {
                 if (typeof $.fn.select2 !== 'undefined') {
                     // Supplier dropdown with search
@@ -915,7 +917,6 @@
                         });
                     }
 
-                    console.log('Select2 initialized successfully for all fields');
                 } else {
                     console.error('Select2 plugin not loaded');
                 }
@@ -924,14 +925,14 @@
             }
 
             // Check if session is still valid before form submission
-            function checkSessionAndSubmitForm(form) {
+            window.checkSessionAndSubmitForm = function(form) {
                 // First check if session is still valid
                 $.ajax({
                     url: '{{ route('invoices.check-session') }}',
                     type: 'GET',
                     success: function(response) {
                         // Session is valid, proceed with form submission
-                        submitFormWithAjax(form);
+                        window.submitFormWithAjax(form);
                     },
                     error: function(xhr) {
                         if (xhr.status === 401 || xhr.status === 419) {
@@ -946,10 +947,11 @@
                         }
                     }
                 });
-            }
+            };
 
-            // Function to submit form with AJAX
-            function submitFormWithAjax(form) {
+            // Simplified form submission function - NO DUPLICATE GUARD
+            window.submitFormWithAjax = function(form) {
+
                 // Validate required fields
                 var isValid = true;
                 $(form).find('[required]').each(function() {
@@ -962,52 +964,98 @@
                 });
 
                 if (!isValid) {
-                    console.log('Validation failed, showing error');
                     if (typeof toastr !== 'undefined') {
                         toastr.error('Please fill in all required fields.');
                     }
                     return false;
                 }
 
+                // Format amount if needed
+                if (typeof formatNumber === 'function' && $('#amount_display').length > 0) {
+                    formatNumber(document.getElementById('amount_display'));
+                }
+
+                // Update submit buttons and show loading animation
+                var buttonText = window.saveAction === 'close' ? 'Saving and Closing...' : 'Saving and Creating New...';
+                $('#save-and-close-btn, #save-and-new-btn')
+                    .prop('disabled', true)
+                    .html('<i class="fas fa-spinner fa-spin"></i> ' + buttonText);
+
+                // Show save status
+                $('#save-status').show();
+
                 // Show loading message
-                console.log('Validation passed, showing info');
                 if (typeof toastr !== 'undefined') {
                     toastr.info('Creating invoice...', 'Please wait');
                 }
 
-                // Submit form via AJAX
+                // Prepare form data
                 var formData = new FormData(form);
                 var url = $(form).attr('action');
                 var method = $(form).attr('method');
 
+                // Submit via AJAX
                 $.ajax({
                     url: url,
                     type: method,
                     data: formData,
                     processData: false,
                     contentType: false,
+                    timeout: 30000,
                     success: function(response) {
-                        if (response.success) {
-                            // Clear draft after successful submission
-                            localStorage.removeItem('invoice_create_draft');
-                            $(document).trigger('invoice-created-success');
 
-                            toastr.success(response.message || 'Invoice created successfully.');
-                            // Redirect to index page after short delay
-                            setTimeout(function() {
-                                window.location.href = '{{ route('invoices.index') }}';
-                            }, 1500);
+                        if (response.success) {
+                            // Clear draft
+                            localStorage.removeItem('invoice_create_draft');
+
+                            if (window.saveAction === 'close') {
+                                // Save and Close: Redirect to index
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.success('Invoice created successfully. Redirecting...');
+                                }
+                                setTimeout(function() {
+                                    window.location.href = '{{ route('invoices.index') }}';
+                                }, 1500);
+                            } else {
+                                // Save and New: Reset form
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.success('Invoice created successfully. Preparing new form...');
+                                }
+                                setTimeout(function() {
+                                    resetFormForNewInvoice();
+                                }, 1000);
+                            }
                         } else {
-                            toastr.error(response.message || 'Failed to create invoice.');
+                            if (typeof toastr !== 'undefined') {
+                                toastr.error(response.message || 'Failed to create invoice.');
+                            }
                         }
                     },
+                    complete: function() {
+                        // Reset button states and hide save status
+                        $('#save-and-close-btn, #save-and-new-btn')
+                            .prop('disabled', false)
+                            .html('<i class="fas fa-save"></i> Save and Close')
+                            .eq(1).html('<i class="fas fa-plus"></i> Save and New');
+                        $('#save-status').hide();
+                    },
                     error: function(xhr) {
-                        // Clear the "Creating invoice..." message
-                        toastr.clear();
+
+                        // Reset button states and hide save status on error
+                        $('#save-and-close-btn, #save-and-new-btn')
+                            .prop('disabled', false)
+                            .html('<i class="fas fa-save"></i> Save and Close')
+                            .eq(1).html('<i class="fas fa-plus"></i> Save and New');
+                        $('#save-status').hide();
+
+                        if (typeof toastr !== 'undefined') {
+                            toastr.clear();
+                        }
 
                         if (xhr.status === 401 || xhr.status === 419) {
-                            // Unauthorized or CSRF token mismatch (session expired)
-                            toastr.error('Your session has expired. Redirecting to login page...');
+                            if (typeof toastr !== 'undefined') {
+                                toastr.error('Session expired. Redirecting to login...');
+                            }
                             setTimeout(function() {
                                 window.location.href = '{{ route('login') }}';
                             }, 1500);
@@ -1017,20 +1065,46 @@
                                 $('#' + field).addClass('is-invalid');
                                 $('#' + field + '-error').text(messages[0]);
                             });
-                            toastr.error('Please correct the validation errors.');
+                            if (typeof toastr !== 'undefined') {
+                                toastr.error('Please correct the validation errors.');
+                            }
                         } else {
-                            toastr.error('An error occurred while creating the invoice.');
-                            console.error('Error details:', xhr);
+                            if (typeof toastr !== 'undefined') {
+                                toastr.error('An error occurred while creating the invoice.');
+                            }
                         }
                     }
                 });
             }
 
-            // Handle form submission
-            $('form').on('submit', function(e) {
+            // Simplified form submission handler - NO DUPLICATE GUARD
+            $('form[action="{{ route('invoices.store') }}"]').on('submit', function(e) {
                 e.preventDefault();
-                console.log('Form submission started');
-                checkSessionAndSubmitForm(this);
+
+                // Simple validation
+                var isValid = updateValidationSummary();
+                if (!isValid) {
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error('Please fix the errors highlighted below', 'Validation Error');
+                    }
+                    $('html, body').animate({
+                        scrollTop: $('.validation-summary').offset().top - 100
+                    }, 300);
+                    return false;
+                }
+
+                // Ensure receive_project has a value
+                if (!$('#receive_project').val()) {
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error(
+                            'Receive Project is required and should be automatically set to your department project.'
+                        );
+                    }
+                    return false;
+                }
+
+                // Direct submission - no session check
+                window.submitFormWithAjax(this);
             });
 
             // Set default dates
@@ -1117,7 +1191,6 @@
                             },
                             error: function() {
                                 $('.validation-spinner').remove();
-                                console.log('Validation request failed');
                             }
                         });
                     }, 500); // Debounce validation
@@ -1201,7 +1274,6 @@
                             },
                             error: function() {
                                 $('.sap-validation-spinner').remove();
-                                console.log('SAP validation request failed');
                             }
                         });
                     }, 500); // Debounce validation
@@ -1541,7 +1613,6 @@
                     url: '/invoices/supplier-defaults/' + supplierId,
                     type: 'GET',
                     success: function(data) {
-                        console.log('Supplier defaults loaded:', data);
 
                         // Auto-suggest currency if not already set
                         if (data.common_currency && !$('#currency').val()) {
@@ -1576,9 +1647,7 @@
                                 'Auto-filled');
                         }
                     },
-                    error: function() {
-                        console.log('Could not load supplier defaults');
-                    }
+                    error: function() {}
                 });
             });
 
@@ -1652,9 +1721,7 @@
                                 });
                             }
                         },
-                        error: function() {
-                            console.log('Could not check for duplicates');
-                        }
+                        error: function() {}
                     });
                 }, 800); // Debounce 800ms
             }
@@ -1745,18 +1812,8 @@
                 }
             });
 
-            // Validate before form submission
-            $('form').on('submit', function(e) {
-                var isValid = updateValidationSummary();
-                if (!isValid) {
-                    e.preventDefault();
-                    toastr.error('Please fix the errors highlighted below', 'Validation Error');
-                    $('html, body').animate({
-                        scrollTop: $('.validation-summary').offset().top - 100
-                    }, 300);
-                    return false;
-                }
-            });
+            // Validate before form submission - REMOVED DUPLICATE HANDLER
+            // This validation is now handled in the main form submission handler
 
             // ========== END PHASE 1 UX IMPROVEMENTS ==========
 
@@ -1772,7 +1829,6 @@
                 success: function(data) {
                     if (data.success && data.invoices.length > 0) {
                         recentInvoicesData = data.invoices;
-                        console.log('Recent invoices loaded:', data.invoices.length);
 
                         data.invoices.forEach(function(inv) {
                             $('#recent-invoices').append(
@@ -1798,7 +1854,6 @@
                     }
                 },
                 error: function() {
-                    console.log('Could not load recent invoices');
                     $('#recent-invoices').parent().parent().parent().parent().hide();
                 }
             });
@@ -2036,8 +2091,7 @@
                 }).then((result) => {
                     if (result.isConfirmed) {
                         // Submit the form
-                        console.log('User confirmed preview - submitting form');
-                        $('form').submit();
+                        $('form[action="{{ route('invoices.store') }}"]').submit();
                     } else if (result.isDismissed) {
                         // User wants to edit
                         toastr.info('Review and update your invoice as needed', 'Edit Mode');
@@ -2063,8 +2117,7 @@
                     });
 
                     if (requiredFilled) {
-                        console.log('Keyboard shortcut: Ctrl+S - Submitting form');
-                        $('form').submit();
+                        $('form[action="{{ route('invoices.store') }}"]').submit();
                     } else {
                         toastr.warning('Please complete all required fields first', 'Cannot Save');
                     }
@@ -2073,7 +2126,6 @@
                 // Escape to cancel and return to list
                 if (e.key === 'Escape' && !$('.modal').hasClass('show') && !$('.swal2-container').length) {
                     e.preventDefault();
-                    console.log('Keyboard shortcut: Esc - Canceling form');
                     window.location.href = '{{ route('invoices.index') }}';
                 }
             });
@@ -2082,7 +2134,6 @@
             $('#po_no').on('keydown', function(e) {
                 if (e.ctrlKey && e.key === 'Enter') {
                     e.preventDefault();
-                    console.log('Keyboard shortcut: Ctrl+Enter - Searching documents');
                     $('#search-docs-btn').click();
                 }
             });
@@ -2125,42 +2176,102 @@
             // Initial progress update
             setTimeout(updateFormProgress, 1000);
 
-            // ENHANCEMENT: Enhanced Submit Button State Management
-            var isSubmitting = false;
+            // SIMPLIFIED: Basic state management
+            window.saveAction = 'close'; // Default action
 
-            $('#submit-invoice-btn').on('click', function(e) {
-                if (isSubmitting) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return false;
+            // Function to clear all validation states and cached errors
+            function clearAllValidationStates() {
+                // Clear validation classes
+                $('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+
+                // Remove all validation result elements
+                $('.validation-result, .validation-spinner, .sap-validation-result, .sap-validation-spinner').remove();
+
+                // Remove any error messages
+                $('.invalid-feedback, .validation-error').remove();
+
+                // Clear any cached validation data
+                if (window.validationCache) {
+                    window.validationCache = {};
                 }
+
+            }
+
+            // Call clearAllValidationStates on page load
+            clearAllValidationStates();
+
+            // REMOVED: isSubmitting flag management - no longer needed
+
+            // Function to reset form for new invoice
+            function resetFormForNewInvoice() {
+
+                // 1. Clear all validation states first
+                clearAllValidationStates();
+
+                // 2. Reset form fields using native reset
+                $('form')[0].reset();
+
+                // 3. Clear Select2 dropdowns properly
+                $('#supplier_id').val(null).trigger('change');
+                $('#invoice_type').val(null).trigger('change');
+                $('#invoice_project').val(null).trigger('change');
+                $('#payment_project').val(null).trigger('change');
+                $('#cur_loc').val(null).trigger('change');
+
+                // 4. Reset custom fields
+                $('#amount_display').val('0.00');
+                $('#amount').val('');
+                $('#invoice_number').val('');
+                $('#po_no').val('');
+                $('#faktur_no').val('');
+                $('#sap_doc').val('');
+                $('#remarks').val('');
+
+                // 5. Set default dates
+                var today = new Date().toISOString().split('T')[0];
+                $('#invoice_date').val(today);
+                $('#receive_date').val(today);
+
+                // 6. Set current location from user's department if available
+                @if (auth()->user()->department_location_code)
+                    $('#cur_loc').val('{{ auth()->user()->department_location_code }}').trigger('change');
+                @endif
+
+                // 7. Reset currency to IDR
+                $('#currency').val('IDR');
+
+                // 8. Clear any selected additional documents
+                selectedDocs = {};
+                $('#selected-count').text('Selected: 0');
+
+                // 9. Reset save action to default
+                window.saveAction = 'close';
+
+                // 10. Update form progress indicator
+                updateFormProgress();
+
+                // 11. Focus on invoice number field
+                $('#invoice_number').focus();
+
+                // 12. Show success message
+                if (typeof toastr !== 'undefined') {
+                    toastr.info('Form reset. You can now create a new invoice.');
+                }
+
+            }
+
+            // Handle Save and Close button - SIMPLIFIED
+            $('#save-and-close-btn').on('click', function(e) {
+                window.saveAction = 'close';
             });
 
-            // Update submit button and show overlay during submission
-            var originalFormSubmit = submitFormWithAjax;
-            submitFormWithAjax = function(form) {
-                if (isSubmitting) {
-                    return false;
-                }
+            // Handle Save and New button - SIMPLIFIED
+            $('#save-and-new-btn').on('click', function(e) {
+                window.saveAction = 'new';
+            });
 
-                isSubmitting = true;
-
-                // Update submit button
-                $('#submit-invoice-btn')
-                    .prop('disabled', true)
-                    .html('<i class="fas fa-spinner fa-spin"></i> Creating Invoice...')
-                    .removeClass('btn-primary')
-                    .addClass('btn-secondary');
-
-                // Disable cancel button
-                $('#cancel-btn').addClass('disabled').css('pointer-events', 'none');
-
-                // Show save status
-                $('#save-status').show();
-
-                // Call original function
-                originalFormSubmit(form);
-            };
+            // REMOVED: Complex function override with duplicate guard
+            // Now using direct submission without guards
 
             // ENHANCEMENT: Row checkbox toggle with SweetAlert2 warning for linked documents
             $(document).on('change', '.doc-checkbox', function() {
@@ -2403,17 +2514,8 @@
                 $('#receive_project').val(userProject);
             }
 
-            // Add form submission validation
-            $('form').on('submit', function(e) {
-                // Ensure receive_project has a value
-                if (!$('#receive_project').val()) {
-                    e.preventDefault();
-                    toastr.error(
-                        'Receive Project is required and should be automatically set to your department project.'
-                    );
-                    return false;
-                }
-            });
+            // Add form submission validation - REMOVED DUPLICATE HANDLER
+            // This validation is now handled in the main form submission handler
 
             // ENHANCEMENT: PO Suggestions Function
             function loadPoSuggestions(supplierId) {
@@ -2540,39 +2642,14 @@
                 });
             }
 
-            // ENHANCEMENT: Auto-save Draft Feature
-            var DRAFT_KEY = 'invoice_create_draft';
-            var AUTO_SAVE_INTERVAL = 30000; // 30 seconds
+            // ENHANCEMENT: Auto-save Draft Feature - DISABLED
+            // var DRAFT_KEY = 'invoice_create_draft';
+            // var AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
-            // Function to save current form data to localStorage
+            // Function to save current form data to localStorage - DISABLED
             function saveDraft() {
-                var formData = {
-                    supplier_id: $('#supplier_id').val(),
-                    invoice_number: $('#invoice_number').val(),
-                    invoice_date: $('#invoice_date').val(),
-                    receive_date: $('#receive_date').val(),
-                    po_no: $('#po_no').val(),
-                    type_id: $('#type_id').val(),
-                    currency: $('#currency').val(),
-                    amount: $('#amount').val(),
-                    invoice_project: $('#invoice_project').val(),
-                    payment_project: $('#payment_project').val(),
-                    faktur_no: $('#faktur_no').val(),
-                    sap_doc: $('#sap_doc').val(),
-                    remarks: $('#remarks').val(),
-                    additional_document_ids: Object.keys(selectedDocs),
-                    timestamp: new Date().toISOString()
-                };
-
-                // Only save if at least one field has data
-                var hasData = Object.values(formData).some(function(val) {
-                    return val && val.length > 0;
-                });
-
-                if (hasData) {
-                    localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
-                    console.log('Draft auto-saved at ' + new Date().toLocaleTimeString());
-                }
+                // Auto-save feature disabled
+                return;
             }
 
             // Function to restore draft from localStorage
@@ -2639,32 +2716,29 @@
                 }
             }
 
-            // Auto-save every 30 seconds
-            var autoSaveTimer = setInterval(saveDraft, AUTO_SAVE_INTERVAL);
+            // Auto-save every 30 seconds - DISABLED
+            // var autoSaveTimer = setInterval(saveDraft, AUTO_SAVE_INTERVAL);
 
-            // Save draft when user makes changes (debounced)
-            var saveTimeout;
-            $('form :input').on('change input', function() {
-                clearTimeout(saveTimeout);
-                saveTimeout = setTimeout(saveDraft, 2000); // Save 2 seconds after last change
-            });
+            // Save draft when user makes changes (debounced) - DISABLED
+            // var saveTimeout;
+            // $('form :input').on('change input', function() {
+            //     clearTimeout(saveTimeout);
+            //     saveTimeout = setTimeout(saveDraft, 2000); // Save 2 seconds after last change
+            // });
 
-            // Clear draft on successful submission
-            var originalAjaxSuccess = submitFormWithAjax;
+            // Clear draft on successful submission - DISABLED
+            // var originalAjaxSuccess = submitFormWithAjax;
 
-            // Restore draft on page load (after a short delay to let everything initialize)
-            setTimeout(restoreDraft, 1000);
+            // Restore draft on page load - DISABLED
+            // setTimeout(restoreDraft, 1000);
 
-            // Clear draft when form is successfully submitted
-            $(document).on('invoice-created-success', function() {
-                localStorage.removeItem(DRAFT_KEY);
-                clearInterval(autoSaveTimer);
-                console.log('Draft cleared after successful submission');
-            });
+            // Clear draft when form is successfully submitted - DISABLED
+            // $(document).on('invoice-created-success', function() {
+            //     localStorage.removeItem(DRAFT_KEY);
+            //     clearInterval(autoSaveTimer);
+            // });
 
-            // ENHANCEMENT: Manual save draft button (optional - shown in console for now)
-            console.log('💾 Auto-save is enabled. Your work is automatically saved every 30 seconds.');
-            console.log('💡 To manually clear draft: localStorage.removeItem("' + DRAFT_KEY + '")');
+            // ENHANCEMENT: Manual save draft button - DISABLED
         }
 
         // Start initialization when DOM is ready
