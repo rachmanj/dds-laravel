@@ -286,6 +286,10 @@
                                                     id="po_no" name="po_no" value="{{ old('po_no') }}"
                                                     maxlength="30" placeholder="Enter PO number">
                                                 <div class="input-group-append">
+                                                    <button type="button" class="btn btn-outline-info"
+                                                        id="po-suggestions-btn" title="Get PO Suggestions">
+                                                        <i class="fas fa-lightbulb"></i>
+                                                    </button>
                                                     <button type="button" class="btn btn-outline-secondary"
                                                         id="search-docs-btn" title="Search Additional Documents">
                                                         <i class="fas fa-search"></i>
@@ -369,12 +373,12 @@
                                                 <div class="input-group-prepend">
                                                     <span class="input-group-text" id="currency-prefix">IDR</span>
                                                 </div>
-                                            <input type="text" name="amount_display" id="amount_display"
-                                                class="form-control @error('amount') is-invalid @enderror"
+                                                <input type="text" name="amount_display" id="amount_display"
+                                                    class="form-control @error('amount') is-invalid @enderror"
                                                     value="{{ old('amount') }}" onkeyup="formatNumber(this)"
                                                     placeholder="0.00" required>
-                                            <input type="hidden" name="amount" id="amount"
-                                                value="{{ old('amount') }}">
+                                                <input type="hidden" name="amount" id="amount"
+                                                    value="{{ old('amount') }}">
                                                 <div class="input-group-append">
                                                     <button type="button" class="btn btn-outline-info"
                                                         id="calculator-btn" data-toggle="tooltip"
@@ -619,8 +623,8 @@
                                             <i class="fas fa-eye"></i> Preview
                                         </button>
                                         <button type="submit" class="btn btn-primary btn-lg" id="submit-invoice-btn">
-                                    <i class="fas fa-save"></i> Create Invoice
-                                </button>
+                                            <i class="fas fa-save"></i> Create Invoice
+                                        </button>
                                         <a href="{{ route('invoices.index') }}"
                                             class="btn btn-outline-secondary btn-lg ml-2" id="cancel-btn">
                                             <i class="fas fa-times"></i> Cancel
@@ -1269,7 +1273,7 @@
                 if (receiveDate && $('#payment_date').val()) {
                     if ($('#payment_date').val() < receiveDate) {
                         $('#payment_date').val('');
-                            toastr.warning('Payment date cannot be earlier than receive date.');
+                        toastr.warning('Payment date cannot be earlier than receive date.');
                     }
                 }
             });
@@ -1464,6 +1468,17 @@
                 }
                 searchAdditionalDocuments();
                 toastr.info('Searching for documents with PO: ' + po);
+            });
+
+            // ENHANCEMENT: PO Suggestions Button - Get PO suggestions based on supplier
+            $('#po-suggestions-btn').on('click', function() {
+                var supplierId = $('#supplier_id').val();
+                if (!supplierId) {
+                    toastr.warning('Please select a supplier first to get PO suggestions.');
+                    $('#supplier_id').focus();
+                    return;
+                }
+                loadPoSuggestions(supplierId);
             });
 
             // Allow Enter key to trigger search without leaving field
@@ -1979,7 +1994,7 @@
                 // Add optional fields if filled
                 if ($('#po_no').val()) {
                     previewHTML += '<tr><th><i class="fas fa-file-alt"></i> PO Number:</th><td>' + $('#po_no')
-                    .val() + '</td></tr>';
+                        .val() + '</td></tr>';
                 }
                 if ($('#faktur_no').val()) {
                     previewHTML += '<tr><th><i class="fas fa-receipt"></i> Faktur No:</th><td>' + $('#faktur_no')
@@ -1991,7 +2006,7 @@
                 }
                 if ($('#remarks').val()) {
                     previewHTML += '<tr><th><i class="fas fa-comment"></i> Remarks:</th><td>' + $('#remarks')
-                    .val() + '</td></tr>';
+                        .val() + '</td></tr>';
                 }
 
                 // Add selected documents count
@@ -2232,7 +2247,7 @@
                     renderSelectedTable();
                 } else {
                     delete selectedDocs[id];
-                renderSelectedTable();
+                    renderSelectedTable();
                 }
             });
 
@@ -2399,6 +2414,131 @@
                     return false;
                 }
             });
+
+            // ENHANCEMENT: PO Suggestions Function
+            function loadPoSuggestions(supplierId) {
+                // First get the supplier's SAP code
+                $.ajax({
+                    url: '/suppliers/' + supplierId,
+                    method: 'GET',
+                    success: function(supplierResponse) {
+                        if (supplierResponse.success && supplierResponse.data.sap_code) {
+                            var sapCode = supplierResponse.data.sap_code;
+
+                            // Now get PO suggestions based on SAP code
+                            $.ajax({
+                                url: '/suppliers/po-suggestions',
+                                method: 'POST',
+                                data: {
+                                    vendor_code: sapCode,
+                                    _token: '{{ csrf_token() }}'
+                                },
+                                success: function(response) {
+                                    if (response.success && response.data.suggestions.length > 0) {
+                                        showPoSuggestionsModal(response.data.suggestions, sapCode);
+                                    } else {
+                                        toastr.info(
+                                            'No PO suggestions found for supplier SAP code: ' +
+                                            sapCode);
+                                    }
+                                },
+                                error: function() {
+                                    toastr.error('Failed to load PO suggestions');
+                                }
+                            });
+                        } else {
+                            toastr.warning('Selected supplier has no SAP code. Cannot provide PO suggestions.');
+                        }
+                    },
+                    error: function() {
+                        toastr.error('Failed to get supplier information');
+                    }
+                });
+            }
+
+            function showPoSuggestionsModal(suggestions, sapCode) {
+                let modalHtml = `
+                    <div class="modal fade" id="po-suggestions-modal" tabindex="-1" role="dialog">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">
+                                        <i class="fas fa-lightbulb mr-2"></i>
+                                        PO Suggestions for SAP Code: ${sapCode}
+                                    </h5>
+                                    <button type="button" class="close" data-dismiss="modal">
+                                        <span>&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="text-muted mb-3">
+                                        <i class="fas fa-info-circle"></i>
+                                        Select a PO number to auto-fill the PO field
+                                    </p>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>PO Number</th>
+                                                    <th>Document Number</th>
+                                                    <th>Document Date</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                `;
+
+                suggestions.forEach(function(suggestion) {
+                    modalHtml += `
+                        <tr>
+                            <td><code>${suggestion.po_no}</code></td>
+                            <td>${suggestion.document_number}</td>
+                            <td>${suggestion.document_date}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary select-po-suggestion" 
+                                    data-po-no="${suggestion.po_no}">
+                                    <i class="fas fa-check"></i> Select
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                modalHtml += `
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Remove existing modal if any
+                $('#po-suggestions-modal').remove();
+
+                // Add modal to body
+                $('body').append(modalHtml);
+
+                // Show modal
+                $('#po-suggestions-modal').modal('show');
+
+                // Handle PO selection
+                $('.select-po-suggestion').click(function() {
+                    const poNo = $(this).data('po-no');
+                    $('#po_no').val(poNo);
+                    $('#po-suggestions-modal').modal('hide');
+                    toastr.success('PO number set to: ' + poNo);
+
+                    // Auto-trigger search for additional documents
+                    setTimeout(function() {
+                        searchAdditionalDocuments();
+                    }, 500);
+                });
+            }
 
             // ENHANCEMENT: Auto-save Draft Feature
             var DRAFT_KEY = 'invoice_create_draft';

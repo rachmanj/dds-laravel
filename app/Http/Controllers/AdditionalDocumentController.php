@@ -26,8 +26,9 @@ class AdditionalDocumentController extends Controller
     {
         $documentTypes = AdditionalDocumentType::orderByName()->get();
         $projects = \App\Models\Project::active()->orderBy('code')->get();
+        $departments = \App\Models\Department::active()->orderBy('location_code')->get();
 
-        return view('additional_documents.index', compact('documentTypes', 'projects'));
+        return view('additional_documents.index', compact('documentTypes', 'projects', 'departments'));
     }
 
     public function data(Request $request)
@@ -46,6 +47,17 @@ class AdditionalDocumentController extends Controller
             $query->where('po_no', 'like', '%' . $request->search_po_no . '%');
         }
 
+        if ($request->filled('search_vendor_code')) {
+            $query->where('vendor_code', 'like', '%' . $request->search_vendor_code . '%');
+        }
+
+        if ($request->filled('search_content')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('remarks', 'like', '%' . $request->search_content . '%')
+                    ->orWhere('attachment', 'like', '%' . $request->search_content . '%');
+            });
+        }
+
         if ($request->filled('filter_type')) {
             $query->where('type_id', $request->filter_type);
         }
@@ -58,12 +70,46 @@ class AdditionalDocumentController extends Controller
             $query->where('project', $request->filter_project);
         }
 
+        if ($request->filled('filter_location')) {
+            $query->where('cur_loc', $request->filter_location);
+        }
+
+        // Enhanced date range filtering
         if ($request->filled('date_range')) {
             $dates = explode(' - ', $request->date_range);
             if (count($dates) == 2) {
                 $startDate = \Carbon\Carbon::createFromFormat('d/m/Y', $dates[0])->startOfDay();
                 $endDate = \Carbon\Carbon::createFromFormat('d/m/Y', $dates[1])->endOfDay();
-                $query->whereBetween('created_at', [$startDate, $endDate]);
+
+                $dateType = $request->get('date_type', 'created_at');
+                $query->whereBetween($dateType, [$startDate, $endDate]);
+            }
+        }
+
+        // Handle search presets
+        if ($request->filled('search_preset')) {
+            $preset = $request->search_preset;
+            switch ($preset) {
+                case 'recent':
+                    $query->where('created_at', '>=', now()->subDays(30));
+                    break;
+                case 'open':
+                    $query->where('status', 'open');
+                    break;
+                case 'my_department':
+                    $locationCode = $user->department_location_code;
+                    if ($locationCode) {
+                        $query->where('cur_loc', $locationCode);
+                    }
+                    break;
+                case 'this_month':
+                    $query->whereMonth('created_at', now()->month)
+                        ->whereYear('created_at', now()->year);
+                    break;
+                case 'last_month':
+                    $query->whereMonth('created_at', now()->subMonth()->month)
+                        ->whereYear('created_at', now()->subMonth()->year);
+                    break;
             }
         }
 
@@ -133,9 +179,10 @@ class AdditionalDocumentController extends Controller
     {
         $documentTypes = AdditionalDocumentType::orderByName()->get();
         $projects = \App\Models\Project::active()->orderBy('code')->get();
+        $departments = \App\Models\Department::active()->orderBy('location_code')->get();
         $user = Auth::user();
 
-        return view('additional_documents.create', compact('documentTypes', 'projects', 'user'));
+        return view('additional_documents.create', compact('documentTypes', 'projects', 'departments', 'user'));
     }
 
     public function store(Request $request)
@@ -145,10 +192,12 @@ class AdditionalDocumentController extends Controller
             'document_number' => 'required|string|max:255',
             'document_date' => 'required|date',
             'po_no' => 'nullable|string|max:50',
+            'vendor_code' => 'nullable|string|max:50',
             'project' => 'nullable|string|max:50',
             'receive_date' => 'required|date',
             'remarks' => 'nullable|string',
             'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:51200',
+            'cur_loc' => 'nullable|string|max:50',
         ]);
 
         $user = Auth::user();
@@ -157,14 +206,23 @@ class AdditionalDocumentController extends Controller
             'document_number',
             'document_date',
             'po_no',
+            'vendor_code',
             'project',
             'receive_date',
             'remarks'
         ]);
 
         $data['created_by'] = $user->id;
-        // Get user's department location code, fallback to 'DEFAULT' if not assigned
-        $data['cur_loc'] = $user->department_location_code ?: 'DEFAULT';
+
+        // Handle location based on user role
+        if ($user->hasAnyRole(['superadmin', 'admin', 'accounting']) && $request->filled('cur_loc')) {
+            // Privileged users can select any location
+            $data['cur_loc'] = $request->cur_loc;
+        } else {
+            // Regular users get their department location
+            $data['cur_loc'] = $user->department_location_code ?: 'DEFAULT';
+        }
+
         // Set default project to user's department project if not provided
         if (empty($data['project']) && $user->project) {
             $data['project'] = $user->project;
@@ -240,6 +298,7 @@ class AdditionalDocumentController extends Controller
             'document_number' => 'required|string|max:255',
             'document_date' => 'required|date',
             'po_no' => 'nullable|string|max:50',
+            'vendor_code' => 'nullable|string|max:50',
             'project' => 'nullable|string|max:50',
             'receive_date' => 'required|date',
             'remarks' => 'nullable|string',
@@ -251,6 +310,7 @@ class AdditionalDocumentController extends Controller
             'document_number',
             'document_date',
             'po_no',
+            'vendor_code',
             'project',
             'receive_date',
             'remarks'
@@ -335,6 +395,8 @@ class AdditionalDocumentController extends Controller
 
     public function import()
     {
+        $this->authorize('import-additional-documents');
+
         $documentTypes = AdditionalDocumentType::orderByName()->get();
         $user = Auth::user();
 
@@ -343,6 +405,8 @@ class AdditionalDocumentController extends Controller
 
     public function processImport(Request $request)
     {
+        $this->authorize('import-additional-documents');
+
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls|max:51200', // 50MB max
             'document_type_id' => 'nullable|exists:additional_document_types,id',
@@ -536,6 +600,234 @@ class AdditionalDocumentController extends Controller
                 'success' => false,
                 'message' => 'Failed to create additional document: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    // ENHANCED SEARCH & FILTERING METHODS
+
+    /**
+     * Export additional documents with current search filters
+     */
+    public function export(Request $request)
+    {
+        try {
+            $query = AdditionalDocument::with(['type', 'creator', 'distributions.originDepartment', 'distributions.destinationDepartment']);
+
+            // Apply the same filters as the data method
+            $this->applySearchFilters($query, $request);
+
+            $documents = $query->orderBy('created_at', 'desc')->get();
+
+            // Transform data for export
+            $exportData = $documents->map(function ($document) {
+                return [
+                    'Document Number' => $document->document_number,
+                    'Document Type' => $document->type->type_name ?? '',
+                    'Document Date' => $document->document_date ? \Carbon\Carbon::parse($document->document_date)->format('d/m/Y') : '',
+                    'PO Number' => $document->po_no ?? '',
+                    'Vendor Code' => $document->vendor_code ?? '',
+                    'Project' => $document->project ?? '',
+                    'Receive Date' => $document->receive_date ? \Carbon\Carbon::parse($document->receive_date)->format('d/m/Y') : '',
+                    'Current Location' => $document->cur_loc ?? '',
+                    'Status' => $document->status ?? '',
+                    'Distribution Status' => $document->distribution_status ?? '',
+                    'Remarks' => $document->remarks ?? '',
+                    'Created By' => $document->creator->name ?? '',
+                    'Created At' => $document->created_at ? $document->created_at->format('d/m/Y H:i') : '',
+                ];
+            });
+
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new \App\Exports\AdditionalDocumentExport($exportData),
+                'additional_documents_' . now()->format('Y-m-d_H-i-s') . '.xlsx'
+            );
+        } catch (\Exception $e) {
+            Log::error('Additional documents export failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Export failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get search presets for current user
+     */
+    public function searchPresetsIndex()
+    {
+        try {
+            $user = Auth::user();
+            $presets = \App\Models\SearchPreset::where('user_id', $user->id)
+                ->where('model_type', 'additional_documents')
+                ->orderBy('name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $presets
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load search presets'
+            ], 500);
+        }
+    }
+
+    /**
+     * Store a new search preset
+     */
+    public function searchPresetsStore(Request $request)
+    {
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'filters' => 'required|string'
+            ]);
+
+            $user = Auth::user();
+
+            $preset = \App\Models\SearchPreset::create([
+                'user_id' => $user->id,
+                'model_type' => 'additional_documents',
+                'name' => $request->name,
+                'filters' => $request->filters,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $preset,
+                'message' => 'Search preset saved successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save search preset'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get a specific search preset
+     */
+    public function searchPresetsShow($id)
+    {
+        try {
+            $user = Auth::user();
+            $preset = \App\Models\SearchPreset::where('id', $id)
+                ->where('user_id', $user->id)
+                ->where('model_type', 'additional_documents')
+                ->first();
+
+            if (!$preset) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Search preset not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $preset
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load search preset'
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a search preset
+     */
+    public function searchPresetsDestroy($id)
+    {
+        try {
+            $user = Auth::user();
+            $preset = \App\Models\SearchPreset::where('id', $id)
+                ->where('user_id', $user->id)
+                ->where('model_type', 'additional_documents')
+                ->first();
+
+            if (!$preset) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Search preset not found'
+                ], 404);
+            }
+
+            $preset->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Search preset deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete search preset'
+            ], 500);
+        }
+    }
+
+    /**
+     * Apply search filters to query (extracted from data method for reuse)
+     */
+    private function applySearchFilters($query, $request)
+    {
+        // Apply search filters
+        if ($request->filled('search_number')) {
+            $query->where('document_number', 'like', '%' . $request->search_number . '%');
+        }
+
+        if ($request->filled('search_po_no')) {
+            $query->where('po_no', 'like', '%' . $request->search_po_no . '%');
+        }
+
+        if ($request->filled('search_vendor_code')) {
+            $query->where('vendor_code', 'like', '%' . $request->search_vendor_code . '%');
+        }
+
+        if ($request->filled('search_project')) {
+            $query->where('project', 'like', '%' . $request->search_project . '%');
+        }
+
+        if ($request->filled('search_remarks')) {
+            $query->where('remarks', 'like', '%' . $request->search_remarks . '%');
+        }
+
+        if ($request->filled('filter_type')) {
+            $query->where('type_id', $request->filter_type);
+        }
+
+        if ($request->filled('filter_status')) {
+            $query->where('status', $request->filter_status);
+        }
+
+        if ($request->filled('filter_project')) {
+            $query->where('project', $request->filter_project);
+        }
+
+        if ($request->filled('filter_location')) {
+            $query->where('cur_loc', $request->filter_location);
+        }
+
+        if ($request->filled('date_range')) {
+            $dates = explode(' - ', $request->date_range);
+            if (count($dates) == 2) {
+                $startDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[0]))->startOfDay();
+                $endDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[1]))->endOfDay();
+                $query->whereBetween('document_date', [$startDate, $endDate]);
+            }
+        }
+
+        // Show all records permission check
+        if ($request->filled('show_all_records') && $request->show_all_records === 'on') {
+            if (!auth()->user()->can('see-all-record-switch')) {
+                // Fallback to user's department only
+                $query->where('cur_loc', auth()->user()->department_location_code);
+            }
+        } else {
+            // Default: show only user's department records
+            $query->where('cur_loc', auth()->user()->department_location_code);
         }
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\InvoiceApiController;
+use App\Http\Controllers\Api\SupplierApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -42,4 +43,10 @@ Route::prefix('v1')->middleware(['api.key', 'api.rate.limit'])->group(function (
 
     // Get available departments for reference
     Route::get('/departments', [InvoiceApiController::class, 'getDepartments']);
+
+    // Supplier API endpoints for vendor code and PO suggestions
+    Route::get('/suppliers/sap-codes', [SupplierApiController::class, 'getSapCodes']);
+    Route::get('/suppliers/{id}', [SupplierApiController::class, 'getSupplier']);
+    Route::post('/suppliers/validate-vendor-code', [SupplierApiController::class, 'validateVendorCode']);
+    Route::post('/suppliers/po-suggestions', [SupplierApiController::class, 'getPoSuggestions']);
 });

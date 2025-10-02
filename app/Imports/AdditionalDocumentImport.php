@@ -173,6 +173,7 @@ class AdditionalDocumentImport implements ToModel, WithHeadingRow, WithChunkRead
             'document_number',
             'document_date',
             'po_no',
+            'vendor_code',
             'project',
             'receive_date',
             'created_by',
@@ -270,6 +271,7 @@ class AdditionalDocumentImport implements ToModel, WithHeadingRow, WithChunkRead
             'document_number' => $row['ito_no'] ?? null,
             'document_date' => $this->convertDate($row['ito_date'] ?? null),
             'po_no' => $row['po_no'] ?? null,
+            'vendor_code' => $row['vendor_code'] ?? null,
             'receive_date' => $this->convertDate($row['ito_date'] ?? null), // Use ito_date as receive_date
             'remarks' => $row['ito_remar'] ?? null, // Map to ito_remar from Excel
             'grpo_no' => $row['grpo_no'] ?? null,

@@ -108,6 +108,22 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="form-group">
+                                    <label for="search_vendor_code">Vendor Code</label>
+                                    <input type="text" class="form-control" id="search_vendor_code"
+                                        name="search_vendor_code" placeholder="Search by vendor code">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="search_content">Content Search</label>
+                                    <input type="text" class="form-control" id="search_content" name="search_content"
+                                        placeholder="Search in remarks and attachments">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
                                     <label for="filter_type">Document Type</label>
                                     <select class="form-control" id="filter_type" name="filter_type">
                                         <option value="">All Types</option>
@@ -140,6 +156,18 @@
                                     </select>
                                 </div>
                             </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="filter_location">Location</label>
+                                    <select class="form-control" id="filter_location" name="filter_location">
+                                        <option value="">All Locations</option>
+                                        @foreach ($departments ?? [] as $dept)
+                                            <option value="{{ $dept->location_code }}">{{ $dept->location_code }} -
+                                                {{ $dept->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                         <div class="row">
                             <div class="col-md-3">
@@ -147,6 +175,37 @@
                                     <label for="date_range">Date Range</label>
                                     <input type="text" class="form-control" id="date_range" name="date_range"
                                         placeholder="Select date range">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="date_type">Date Type</label>
+                                    <select class="form-control" id="date_type" name="date_type">
+                                        <option value="created_at">Created Date</option>
+                                        <option value="document_date">Document Date</option>
+                                        <option value="receive_date">Receive Date</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="search_preset">Search Presets</label>
+                                    <div class="input-group">
+                                        <select class="form-control" id="search_preset" name="search_preset">
+                                            <option value="">Select Preset</option>
+                                            <option value="recent">Recent Documents (Last 30 days)</option>
+                                            <option value="open">Open Documents</option>
+                                            <option value="my_department">My Department Only</option>
+                                            <option value="this_month">This Month</option>
+                                            <option value="last_month">Last Month</option>
+                                        </select>
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-outline-success" id="save-preset"
+                                                title="Save Current Search">
+                                                <i class="fas fa-save"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             @can('see-all-record-switch')
@@ -162,16 +221,28 @@
                                     </div>
                                 </div>
                             @endcan
-                            <div class="col-md-3">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
                                 <div class="form-group">
-                                    <label>&nbsp;</label>
-                                    <div class="d-flex">
-                                        <button type="submit" class="btn btn-primary mr-2">
-                                            <i class="fas fa-search"></i> Search
-                                        </button>
-                                        <button type="button" class="btn btn-secondary" id="reset-search">
-                                            <i class="fas fa-undo"></i> Reset
-                                        </button>
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <button type="submit" class="btn btn-primary mr-2">
+                                                <i class="fas fa-search"></i> Search
+                                            </button>
+                                            <button type="button" class="btn btn-secondary mr-2" id="reset-search">
+                                                <i class="fas fa-undo"></i> Reset
+                                            </button>
+                                            <button type="button" class="btn btn-info mr-2" id="export-results">
+                                                <i class="fas fa-download"></i> Export Results
+                                            </button>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle"></i>
+                                                Use multiple criteria for advanced filtering. Search presets help save time.
+                                            </small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -190,9 +261,11 @@
                         <a href="{{ route('additional-documents.create') }}" class="btn btn-primary btn-sm">
                             <i class="fas fa-plus"></i> Add New Document
                         </a>
-                        <a href="{{ route('additional-documents.import') }}" class="btn btn-success btn-sm">
-                            <i class="fas fa-upload"></i> Import Documents
-                        </a>
+                        @can('import-additional-documents')
+                            <a href="{{ route('additional-documents.import') }}" class="btn btn-success btn-sm">
+                                <i class="fas fa-upload"></i> Import Documents
+                            </a>
+                        @endcan
                         {{-- <a href="{{ route('additional-documents.download-template') }}" class="btn btn-info btn-sm">
                             <i class="fas fa-download"></i> Download Template
                         </a> --}}
@@ -477,6 +550,166 @@
                 // Redirect to the show page instead of opening modal
                 window.location.href = '{{ url('additional-documents') }}/' + documentId;
             });
+
+            // ENHANCED SEARCH FEATURES
+
+            // Initialize date range picker with enhanced options
+            $('#date_range').daterangepicker({
+                autoUpdateInput: false,
+                locale: {
+                    cancelLabel: 'Clear',
+                    applyLabel: 'Apply',
+                    format: 'DD/MM/YYYY',
+                    separator: ' - ',
+                    customRangeLabel: 'Custom Range'
+                },
+                ranges: {
+                    'Today': [moment(), moment()],
+                    'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+                    'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+                    'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                    'This Month': [moment().startOf('month'), moment().endOf('month')],
+                    'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1,
+                        'month').endOf('month')],
+                    'This Quarter': [moment().startOf('quarter'), moment().endOf('quarter')],
+                    'This Year': [moment().startOf('year'), moment().endOf('year')]
+                },
+                opens: 'left',
+                drops: 'down'
+            });
+
+            // Handle date range selection
+            $('#date_range').on('apply.daterangepicker', function(ev, picker) {
+                $(this).val(picker.startDate.format('DD/MM/YYYY') + ' - ' + picker.endDate.format(
+                    'DD/MM/YYYY'));
+                table.ajax.reload();
+            });
+
+            $('#date_range').on('cancel.daterangepicker', function(ev, picker) {
+                $(this).val('');
+                table.ajax.reload();
+            });
+
+            // Search presets functionality
+            $('#save-preset').on('click', function() {
+                var presetName = prompt('Enter a name for this search preset:');
+                if (presetName && presetName.trim() !== '') {
+                    saveSearchPreset(presetName.trim());
+                }
+            });
+
+            $('#load-preset').on('change', function() {
+                var presetId = $(this).val();
+                if (presetId) {
+                    loadSearchPreset(presetId);
+                }
+            });
+
+            // Export results functionality
+            $('#export-results').on('click', function() {
+                exportSearchResults();
+            });
+
+            // Real-time search with debouncing
+            var searchTimeout;
+            $('#search-form input, #search-form select').on('input change', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function() {
+                    table.ajax.reload();
+                }, 500); // 500ms delay
+            });
+
+            // Advanced search functions
+            function saveSearchPreset(name) {
+                var formData = $('#search-form').serialize();
+
+                $.ajax({
+                    url: '{{ route('additional-documents.search-presets.store') }}',
+                    method: 'POST',
+                    data: {
+                        name: name,
+                        filters: formData,
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        toastr.success('Search preset saved successfully!');
+                        // Reload presets dropdown
+                        loadSearchPresets();
+                    },
+                    error: function(xhr) {
+                        toastr.error('Failed to save search preset');
+                    }
+                });
+            }
+
+            function loadSearchPreset(presetId) {
+                $.ajax({
+                    url: '{{ route('additional-documents.search-presets.show', ':id') }}'.replace(':id',
+                        presetId),
+                    method: 'GET',
+                    success: function(response) {
+                        if (response.success) {
+                            // Populate form with preset data
+                            var filters = response.data.filters;
+                            Object.keys(filters).forEach(function(key) {
+                                var element = $('[name="' + key + '"]');
+                                if (element.length) {
+                                    if (element.is('input[type="checkbox"]')) {
+                                        element.prop('checked', filters[key] === 'on');
+                                    } else {
+                                        element.val(filters[key]);
+                                    }
+                                }
+                            });
+
+                            // Trigger search
+                            table.ajax.reload();
+                            toastr.success('Search preset loaded successfully!');
+                        }
+                    },
+                    error: function(xhr) {
+                        toastr.error('Failed to load search preset');
+                    }
+                });
+            }
+
+            function loadSearchPresets() {
+                $.ajax({
+                    url: '{{ route('additional-documents.search-presets.index') }}',
+                    method: 'GET',
+                    success: function(response) {
+                        if (response.success) {
+                            var options = '<option value="">Select a preset...</option>';
+                            response.data.forEach(function(preset) {
+                                options += '<option value="' + preset.id + '">' + preset.name +
+                                    '</option>';
+                            });
+                            $('#load-preset').html(options);
+                        }
+                    }
+                });
+            }
+
+            function exportSearchResults() {
+                var formData = $('#search-form').serialize();
+                var exportUrl = '{{ route('additional-documents.export') }}?' + formData;
+
+                // Show loading state
+                toastr.info('Preparing export...');
+
+                // Create temporary link for download
+                var link = document.createElement('a');
+                link.href = exportUrl;
+                link.download = 'additional_documents_' + moment().format('YYYY-MM-DD_HH-mm-ss') + '.xlsx';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                toastr.success('Export completed!');
+            }
+
+            // Initialize search presets on page load
+            loadSearchPresets();
 
             // Success message display
             @if (session('success'))

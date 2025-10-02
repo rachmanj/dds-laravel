@@ -11,6 +11,15 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     Route::get('import', [\App\Http\Controllers\AdditionalDocumentController::class, 'import'])->name('import');
     Route::post('import', [\App\Http\Controllers\AdditionalDocumentController::class, 'processImport'])->name('process-import');
     Route::get('download-template', [\App\Http\Controllers\AdditionalDocumentController::class, 'downloadTemplate'])->name('download-template');
+    Route::get('export', [\App\Http\Controllers\AdditionalDocumentController::class, 'export'])->name('export');
+
+    // Search presets routes
+    Route::prefix('search-presets')->name('search-presets.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\AdditionalDocumentController::class, 'searchPresetsIndex'])->name('index');
+        Route::post('/', [\App\Http\Controllers\AdditionalDocumentController::class, 'searchPresetsStore'])->name('store');
+        Route::get('/{id}', [\App\Http\Controllers\AdditionalDocumentController::class, 'searchPresetsShow'])->name('show');
+        Route::delete('/{id}', [\App\Http\Controllers\AdditionalDocumentController::class, 'searchPresetsDestroy'])->name('destroy');
+    });
 
     // Resource routes with explicit parameter name
     Route::get('/', [\App\Http\Controllers\AdditionalDocumentController::class, 'index'])->name('index');

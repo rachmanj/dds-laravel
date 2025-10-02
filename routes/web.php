@@ -63,4 +63,12 @@ Route::middleware(['auth', 'active.user'])->group(function () {
         Route::post('/{message}/mark-read', [\App\Http\Controllers\MessageController::class, 'markAsRead'])->name('mark-read');
         Route::get('/search-users', [\App\Http\Controllers\MessageController::class, 'searchUsers'])->name('search-users');
     });
+
+    // Supplier API routes for internal use (no API key required)
+    Route::prefix('suppliers')->name('suppliers.')->group(function () {
+        Route::get('/sap-codes', [\App\Http\Controllers\Api\SupplierApiController::class, 'getSapCodes'])->name('sap-codes');
+        Route::get('/{id}', [\App\Http\Controllers\Api\SupplierApiController::class, 'getSupplier'])->name('show');
+        Route::post('/validate-vendor-code', [\App\Http\Controllers\Api\SupplierApiController::class, 'validateVendorCode'])->name('validate-vendor-code');
+        Route::post('/po-suggestions', [\App\Http\Controllers\Api\SupplierApiController::class, 'getPoSuggestions'])->name('po-suggestions');
+    });
 });

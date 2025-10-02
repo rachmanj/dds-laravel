@@ -6,6 +6,106 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Additional Documents System Architecture**
+
+**Pattern**: Enhanced document management with advanced search, filtering, and permission controls
+
+**Implementation**:
+
+-   **Enhanced Date Validation**: Smart business day validation with warnings (not errors)
+-   **Advanced Search & Filtering**: Multi-criteria search with presets and export functionality
+-   **Role-Based Location Selection**: Privileged users can select locations, others auto-assigned
+-   **Import Permission Control**: Role-based access to document import functionality
+-   **Search Presets**: User-specific saved search configurations
+-   **Professional Export**: Excel export with proper formatting and column widths
+
+**Technical Architecture**:
+
+```php
+// Enhanced Controller Structure
+AdditionalDocumentController
+├── index() → List view with enhanced search form
+├── create() → Create form with role-based location selection
+├── store() → Save with location handling for privileged users
+├── import() → Import view (permission protected)
+├── processImport() → Process import (permission protected)
+├── export() → Export filtered results to Excel
+├── searchPresetsIndex() → Get user's search presets
+├── searchPresetsStore() → Save new search preset
+├── searchPresetsShow() → Get specific preset
+├── searchPresetsDestroy() → Delete preset
+└── applySearchFilters() → Reusable search filter logic
+```
+
+**Enhanced Search Features**:
+
+```javascript
+// Frontend Search Architecture
+Enhanced Search Form
+├── Document Number (real-time search)
+├── PO Number (real-time search)
+├── Vendor Code (real-time search)
+├── Project (real-time search)
+├── Content Search (remarks/attachments)
+├── Document Type Filter
+├── Status Filter
+├── Project Filter
+├── Location Filter
+├── Enhanced Date Range Picker
+│   ├── Predefined ranges (Today, Yesterday, etc.)
+│   └── Custom range selection
+├── Date Type Selection
+│   ├── Created Date
+│   ├── Document Date
+│   └── Receive Date
+├── Search Presets
+│   ├── Save current search
+│   ├── Load saved preset
+│   └── Delete preset
+└── Export Results
+    └── Excel download with current filters
+```
+
+**Permission Architecture**:
+
+```php
+// Role-Based Access Control
+Permissions
+├── view-additional-documents
+├── create-additional-documents
+├── edit-additional-documents
+├── delete-additional-documents
+├── import-additional-documents (NEW)
+└── on-the-fly-addoc-feature
+
+Role Assignments
+├── superadmin → All permissions
+├── admin → All permissions including import
+├── accounting → All permissions including import
+├── finance → All permissions including import
+└── other roles → Limited permissions
+```
+
+**Database Schema Enhancements**:
+
+```sql
+-- Search Presets Table
+CREATE TABLE search_presets (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT FOREIGN KEY,
+    model_type VARCHAR(255),
+    name VARCHAR(255),
+    filters TEXT, -- JSON string
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    INDEX(user_id, model_type)
+);
+
+-- Additional Documents Table (Enhanced)
+ALTER TABLE additional_documents
+ADD COLUMN vendor_code VARCHAR(50) NULL; -- For SAP code matching
+```
+
 ### **User Messaging System Architecture**
 
 **Pattern**: Internal messaging system with real-time notifications, file attachments, and enhanced user experience

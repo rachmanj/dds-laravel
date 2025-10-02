@@ -13,6 +13,7 @@ class AdditionalDocument extends Model
         'document_number',
         'document_date',
         'po_no',
+        'vendor_code',
         'project',
         'receive_date',
         'created_by',

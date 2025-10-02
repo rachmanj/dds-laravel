@@ -236,6 +236,7 @@
                             <h6>Optional Fields:</h6>
                             <ul class="list-unstyled">
                                 <li><strong>po_no</strong> - Purchase order number</li>
+                                <li><strong>vendor_code</strong> - Vendor code (should match supplier's SAP code)</li>
                                 <li><strong>grpo_no</strong> - GRPO number</li>
                                 <li><strong>origin_wh</strong> - Origin warehouse code</li>
                                 <li><strong>destinatic</strong> - Destination warehouse code</li>

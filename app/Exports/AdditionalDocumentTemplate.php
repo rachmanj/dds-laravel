@@ -244,6 +244,7 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
             'Printed',
             'grpo_no',
             'po_no',
+            'vendor_code',
             'origin_wh',
             'destinatic',
             'ito_remar',
@@ -318,19 +319,20 @@ class AdditionalDocumentTemplate implements FromArray, WithHeadings, WithStyles,
             'F' => 10, // Printed
             'G' => 15, // grpo_no
             'H' => 15, // po_no
-            'I' => 12, // origin_wh
-            'J' => 12, // destinatic
-            'K' => 40, // ito_remar
-            'L' => 15, // iti_no
-            'M' => 12, // iti_date
-            'N' => 12, // iti_create
-            'O' => 15, // delivery_s
-            'P' => 12, // delivery_1
-            'Q' => 12, // Send To Si
-            'R' => 12, // Send To B
-            'S' => 12, // Send To A
-            'T' => 12, // TA Numbe
-            'U' => 30, // Journal Remarks
+            'I' => 15, // vendor_code
+            'J' => 12, // origin_wh
+            'K' => 12, // destinatic
+            'L' => 40, // ito_remar
+            'M' => 15, // iti_no
+            'N' => 12, // iti_date
+            'O' => 12, // iti_create
+            'P' => 15, // delivery_s
+            'Q' => 12, // delivery_1
+            'R' => 12, // Send To Si
+            'S' => 12, // Send To B
+            'T' => 12, // Send To A
+            'U' => 12, // TA Numbe
+            'V' => 30, // Journal Remarks
         ];
     }
 }
