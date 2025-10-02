@@ -16,8 +16,352 @@
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
 
-    <!-- Enhanced Validation Styles -->
+    <!-- Enhanced User Interface Styles -->
     <style>
+        /* ===== ENHANCED VISUAL HIERARCHY ===== */
+
+        /* Card Header Enhancement */
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-bottom: none;
+            padding: 1.5rem 1.25rem;
+        }
+
+        .card-header .card-title {
+            color: white;
+            font-weight: 600;
+            font-size: 1.4rem;
+            margin: 0;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header .card-title i {
+            margin-right: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        /* Form Section Headers */
+        .form-section-header {
+            background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
+            border-left: 4px solid #007bff;
+            padding: 0.75rem 1rem;
+            margin: 1.5rem 0 1rem 0;
+            border-radius: 0 0.375rem 0.375rem 0;
+            font-weight: 600;
+            color: #495057;
+            font-size: 1.1rem;
+        }
+
+        .form-section-header i {
+            margin-right: 0.5rem;
+            color: #007bff;
+        }
+
+        /* Enhanced Form Groups */
+        .form-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .form-group label .text-danger {
+            font-weight: 700;
+        }
+
+        /* ===== IMPROVED FORM LAYOUT AND SPACING ===== */
+
+        /* Better Row Spacing */
+        .row {
+            margin-bottom: 0.5rem;
+        }
+
+        .row:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Enhanced Form Controls */
+        .form-control {
+            border-radius: 0.5rem;
+            border: 2px solid #e9ecef;
+            padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .form-control:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25), 0 4px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .form-control:hover {
+            border-color: #ced4da;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Enhanced Input Groups */
+        .input-group {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .input-group .form-control {
+            border-radius: 0;
+            border-right: none;
+            box-shadow: none;
+        }
+
+        .input-group .form-control:focus {
+            box-shadow: none;
+            transform: none;
+        }
+
+        .input-group-append .btn {
+            border-radius: 0 0.5rem 0.5rem 0;
+            border-left: none;
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .input-group-append .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Enhanced Select2 Styling */
+        .select2-container--bootstrap4 .select2-selection {
+            border: 2px solid #e9ecef;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            min-height: 48px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .select2-container--bootstrap4 .select2-selection:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25), 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ===== ENHANCED TOOLTIPS AND HELP TEXT ===== */
+
+        /* Enhanced Help Text */
+        .form-text {
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: #f8f9fa;
+            border-radius: 0.375rem;
+            border-left: 3px solid #17a2b8;
+            color: #495057;
+        }
+
+        .form-text i {
+            color: #17a2b8;
+            margin-right: 0.25rem;
+        }
+
+        /* Enhanced Tooltips */
+        .tooltip-enhanced {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip-enhanced::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .tooltip-enhanced::before {
+            content: '';
+            position: absolute;
+            bottom: 115%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #333;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .tooltip-enhanced:hover::after,
+        .tooltip-enhanced:hover::before {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* ===== PROGRESS INDICATORS ===== */
+
+        /* Form Progress Indicator */
+        .form-progress-container {
+            background: #f8f9fa;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e9ecef;
+        }
+
+        .form-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .form-progress-title {
+            font-weight: 600;
+            color: #495057;
+            margin: 0;
+        }
+
+        .form-progress-percentage {
+            font-weight: 700;
+            color: #007bff;
+            font-size: 1.1rem;
+        }
+
+        .form-progress-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .form-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .form-progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
+            animation: progress-shine 2s infinite;
+        }
+
+        @keyframes progress-shine {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        /* Step Indicators */
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 0.5rem;
+            border: 1px solid #e9ecef;
+        }
+
+        .step-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            position: relative;
+        }
+
+        .step-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            right: -50%;
+            width: 100%;
+            height: 2px;
+            background: #e9ecef;
+            z-index: 1;
+        }
+
+        .step-item.completed:not(:last-child)::after {
+            background: #28a745;
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e9ecef;
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .step-item.active .step-circle {
+            background: #007bff;
+            color: white;
+            box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25);
+        }
+
+        .step-item.completed .step-circle {
+            background: #28a745;
+            color: white;
+        }
+
+        .step-label {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #6c757d;
+            text-align: center;
+        }
+
+        .step-item.active .step-label {
+            color: #007bff;
+            font-weight: 600;
+        }
+
+        .step-item.completed .step-label {
+            color: #28a745;
+        }
+
+        /* ===== ENHANCED VALIDATION STYLES ===== */
+
         .is-warning {
             border-color: #ffc107 !important;
             box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25) !important;
@@ -67,10 +411,6 @@
         }
 
         /* Modal enhancements */
-        .modal-xl {
-            max-width: 90%;
-        }
-
         .supplier-row:hover {
             background-color: #f8f9fa;
         }
@@ -141,21 +481,69 @@
                 <div class="col-md-12">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">Document Information</h3>
+                            <h3 class="card-title">
+                                <i class="fas fa-file-plus"></i>
+                                Create Additional Document
+                            </h3>
                             <div class="card-tools">
                                 <a href="{{ route('additional-documents.index') }}" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-arrow-left"></i> Back to List
                                 </a>
                             </div>
                         </div>
+
+                        <!-- Form Progress Indicator -->
+                        <div class="form-progress-container">
+                            <div class="form-progress-header">
+                                <h5 class="form-progress-title">
+                                    <i class="fas fa-tasks"></i>
+                                    Form Completion Progress
+                                </h5>
+                                <span class="form-progress-percentage" id="progress-percentage">0%</span>
+                            </div>
+                            <div class="form-progress-bar">
+                                <div class="form-progress-fill" id="progress-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Step Indicator -->
+                        <div class="step-indicator">
+                            <div class="step-item active" data-step="1">
+                                <div class="step-circle">1</div>
+                                <div class="step-label">Basic Info</div>
+                            </div>
+                            <div class="step-item" data-step="2">
+                                <div class="step-circle">2</div>
+                                <div class="step-label">Document Details</div>
+                            </div>
+                            <div class="step-item" data-step="3">
+                                <div class="step-circle">3</div>
+                                <div class="step-label">Location & File</div>
+                            </div>
+                            <div class="step-item" data-step="4">
+                                <div class="step-circle">4</div>
+                                <div class="step-label">Review & Submit</div>
+                            </div>
+                        </div>
+
                         <form action="{{ route('additional-documents.store') }}" method="POST"
                             enctype="multipart/form-data">
                             @csrf
                             <div class="card-body">
+                                <!-- Basic Information Section -->
+                                <div class="form-section-header">
+                                    <i class="fas fa-info-circle"></i>
+                                    Basic Information
+                                </div>
+
                                 <div class="row">
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="type_id">Document Type <span class="text-danger">*</span></label>
+                                            <label for="type_id" class="tooltip-enhanced"
+                                                data-tooltip="Select the type of document you are creating. This helps categorize and organize your documents.">
+                                                Document Type <span class="text-danger">*</span>
+                                                <i class="fas fa-question-circle text-info ml-1"></i>
+                                            </label>
                                             <select class="form-control select2bs4 @error('type_id') is-invalid @enderror"
                                                 id="type_id" name="type_id" required>
                                                 <option value="">Select Document Type</option>
@@ -166,6 +554,11 @@
                                                     </option>
                                                 @endforeach
                                             </select>
+                                            <small class="form-text text-muted">
+                                                <i class="fas fa-lightbulb"></i>
+                                                Choose the appropriate document category for better organization and
+                                                tracking.
+                                            </small>
                                             @error('type_id')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
@@ -173,12 +566,20 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="document_number">Document Number <span
-                                                    class="text-danger">*</span></label>
+                                            <label for="document_number" class="tooltip-enhanced"
+                                                data-tooltip="Enter a unique document number. This will be used to identify and track the document throughout the system.">
+                                                Document Number <span class="text-danger">*</span>
+                                                <i class="fas fa-question-circle text-info ml-1"></i>
+                                            </label>
                                             <input type="text"
                                                 class="form-control @error('document_number') is-invalid @enderror"
                                                 id="document_number" name="document_number"
-                                                value="{{ old('document_number') }}" required>
+                                                value="{{ old('document_number') }}" required
+                                                placeholder="e.g., DOC-2024-001">
+                                            <small class="form-text text-muted">
+                                                <i class="fas fa-key"></i>
+                                                Use a clear, unique identifier for easy reference and tracking.
+                                            </small>
                                             @error('document_number')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
@@ -187,8 +588,9 @@
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label for="po_no">PO Number</label>
-                                            <input type="text" class="form-control @error('po_no') is-invalid @enderror"
-                                                id="po_no" name="po_no" value="{{ old('po_no') }}" maxlength="50">
+                                            <input type="text"
+                                                class="form-control @error('po_no') is-invalid @enderror" id="po_no"
+                                                name="po_no" value="{{ old('po_no') }}" maxlength="50">
                                             @error('po_no')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
@@ -238,15 +640,28 @@
                                     </div>
                                 </div>
 
+                                <!-- Document Details Section -->
+                                <div class="form-section-header">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    Document Details
+                                </div>
+
                                 <div class="row">
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="document_date">Document Date <span
-                                                    class="text-danger">*</span></label>
+                                            <label for="document_date" class="tooltip-enhanced"
+                                                data-tooltip="Select the date when the document was originally created or issued.">
+                                                Document Date <span class="text-danger">*</span>
+                                                <i class="fas fa-question-circle text-info ml-1"></i>
+                                            </label>
                                             <input type="date"
                                                 class="form-control @error('document_date') is-invalid @enderror"
                                                 id="document_date" name="document_date"
                                                 value="{{ old('document_date') }}" required>
+                                            <small class="form-text text-muted">
+                                                <i class="fas fa-calendar"></i>
+                                                The original date when the document was created or issued.
+                                            </small>
                                             @error('document_date')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
@@ -254,12 +669,19 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="receive_date">Receive Date <span
-                                                    class="text-danger">*</span></label>
+                                            <label for="receive_date" class="tooltip-enhanced"
+                                                data-tooltip="Select the date when the document was received or processed in your department.">
+                                                Receive Date <span class="text-danger">*</span>
+                                                <i class="fas fa-question-circle text-info ml-1"></i>
+                                            </label>
                                             <input type="date"
                                                 class="form-control @error('receive_date') is-invalid @enderror"
                                                 id="receive_date" name="receive_date"
                                                 value="{{ old('receive_date', date('Y-m-d')) }}" required>
+                                            <small class="form-text text-muted">
+                                                <i class="fas fa-inbox"></i>
+                                                The date when this document was received or processed.
+                                            </small>
                                             @error('receive_date')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
@@ -267,20 +689,25 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label for="cur_loc">Current Location</label>
-                                            @if(auth()->user()->hasAnyRole(['superadmin', 'admin', 'accounting']))
-                                                <select class="form-control @error('cur_loc') is-invalid @enderror" 
-                                                        id="cur_loc" name="cur_loc" required>
+                                            <label for="cur_loc" class="tooltip-enhanced"
+                                                data-tooltip="Select the current location where this document is stored or processed.">
+                                                Current Location
+                                                <i class="fas fa-question-circle text-info ml-1"></i>
+                                            </label>
+                                            @if (auth()->user()->hasAnyRole(['superadmin', 'admin', 'accounting']))
+                                                <select class="form-control @error('cur_loc') is-invalid @enderror"
+                                                    id="cur_loc" name="cur_loc" required>
                                                     <option value="">Select Location</option>
-                                                    @foreach($departments as $dept)
-                                                        <option value="{{ $dept->location_code }}" 
-                                                                {{ old('cur_loc', $user->department_location_code) == $dept->location_code ? 'selected' : '' }}>
+                                                    @foreach ($departments as $dept)
+                                                        <option value="{{ $dept->location_code }}"
+                                                            {{ old('cur_loc', $user->department_location_code) == $dept->location_code ? 'selected' : '' }}>
                                                             {{ $dept->location_code }} - {{ $dept->name }}
                                                         </option>
                                                     @endforeach
                                                 </select>
                                                 <small class="form-text text-muted">
-                                                    <i class="fas fa-info-circle"></i> You can select any location as you have administrative privileges
+                                                    <i class="fas fa-info-circle"></i> You can select any location as you
+                                                    have administrative privileges
                                                 </small>
                                             @else
                                                 <input type="text" class="form-control" id="cur_loc"
@@ -292,7 +719,8 @@
                                                         This will be automatically set to your department's location:
                                                         {{ $user->department_location_code }}
                                                     @else
-                                                        Please contact administrator to assign you to a department for proper
+                                                        Please contact administrator to assign you to a department for
+                                                        proper
                                                         location tracking
                                                     @endif
                                                 </small>
@@ -304,11 +732,26 @@
                                     </div>
                                 </div>
 
+                                <!-- Location & File Section -->
+                                <div class="form-section-header">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    Location & File Upload
+                                </div>
+
                                 <div class="row">
                                     <div class="col-md-12">
                                         <div class="form-group">
-                                            <label for="remarks">Remarks</label>
-                                            <textarea class="form-control @error('remarks') is-invalid @enderror" id="remarks" name="remarks" rows="3">{{ old('remarks') }}</textarea>
+                                            <label for="remarks" class="tooltip-enhanced"
+                                                data-tooltip="Add any additional notes or comments about this document.">
+                                                Remarks
+                                                <i class="fas fa-question-circle text-info ml-1"></i>
+                                            </label>
+                                            <textarea class="form-control @error('remarks') is-invalid @enderror" id="remarks" name="remarks" rows="3"
+                                                placeholder="Enter any additional notes or comments about this document...">{{ old('remarks') }}</textarea>
+                                            <small class="form-text text-muted">
+                                                <i class="fas fa-sticky-note"></i>
+                                                Optional field for additional context or notes about the document.
+                                            </small>
                                             @error('remarks')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
@@ -399,6 +842,9 @@
 
             // Enhanced validation feedback
             initializeEnhancedValidation();
+
+            // Initialize progress tracking
+            initializeProgressTracking();
         });
 
         function loadSapCodeSuggestions() {
@@ -424,7 +870,7 @@
 
             let modalHtml = `
                 <div class="modal fade" id="sap-codes-modal" tabindex="-1" role="dialog">
-                    <div class="modal-dialog modal-xl" role="document">
+                    <div class="modal-dialog modal-lg" role="document">
                         <div class="modal-content">
                             <div class="modal-header bg-primary text-white">
                                 <h5 class="modal-title">
@@ -961,6 +1407,112 @@
                 }, 500);
                 firstError.focus();
             }
+        }
+
+        // ===== PROGRESS TRACKING FUNCTIONS =====
+
+        function initializeProgressTracking() {
+            // Track form field changes
+            $('input, select, textarea').on('input change', function() {
+                updateProgress();
+                updateStepIndicator();
+            });
+
+            // Initial progress calculation
+            updateProgress();
+            updateStepIndicator();
+        }
+
+        function updateProgress() {
+            const totalFields = 8; // Total number of important fields
+            let completedFields = 0;
+
+            // Check each important field
+            const fields = [
+                '#type_id',
+                '#document_number',
+                '#document_date',
+                '#receive_date',
+                '#cur_loc',
+                '#remarks',
+                '#attachment',
+                '#vendor_code'
+            ];
+
+            fields.forEach(function(field) {
+                const element = $(field);
+                if (element.length && element.val() && element.val().trim() !== '') {
+                    completedFields++;
+                }
+            });
+
+            const percentage = Math.round((completedFields / totalFields) * 100);
+
+            // Update progress bar
+            $('#progress-fill').css('width', percentage + '%');
+            $('#progress-percentage').text(percentage + '%');
+
+            // Update progress bar color based on completion
+            if (percentage >= 100) {
+                $('#progress-fill').css('background', 'linear-gradient(90deg, #28a745 0%, #20c997 100%)');
+            } else if (percentage >= 75) {
+                $('#progress-fill').css('background', 'linear-gradient(90deg, #007bff 0%, #0056b3 100%)');
+            } else if (percentage >= 50) {
+                $('#progress-fill').css('background', 'linear-gradient(90deg, #ffc107 0%, #fd7e14 100%)');
+            } else {
+                $('#progress-fill').css('background', 'linear-gradient(90deg, #dc3545 0%, #e83e8c 100%)');
+            }
+        }
+
+        function updateStepIndicator() {
+            // Step 1: Basic Info (type_id, document_number)
+            const step1Complete = $('#type_id').val() && $('#document_number').val();
+            updateStepStatus(1, step1Complete);
+
+            // Step 2: Document Details (document_date, receive_date)
+            const step2Complete = $('#document_date').val() && $('#receive_date').val();
+            updateStepStatus(2, step2Complete);
+
+            // Step 3: Location & File (cur_loc, remarks, attachment)
+            const step3Complete = $('#cur_loc').val() && ($('#remarks').val() || $('#attachment').val());
+            updateStepStatus(3, step3Complete);
+
+            // Step 4: Review & Submit (vendor_code, po_no, project)
+            const step4Complete = $('#vendor_code').val() || $('#po_no').val() || $('#project').val();
+            updateStepStatus(4, step4Complete);
+        }
+
+        function updateStepStatus(stepNumber, isComplete) {
+            const stepItem = $(`.step-item[data-step="${stepNumber}"]`);
+            const stepCircle = stepItem.find('.step-circle');
+
+            if (isComplete) {
+                stepItem.addClass('completed').removeClass('active');
+                stepCircle.html('<i class="fas fa-check"></i>');
+            } else {
+                // Check if this is the current active step
+                const isCurrentStep = stepItem.hasClass('active');
+                if (!isCurrentStep) {
+                    stepItem.removeClass('completed active');
+                    stepCircle.text(stepNumber);
+                }
+            }
+
+            // Set active step based on completion
+            if (stepNumber === 1 && !isComplete) {
+                setActiveStep(1);
+            } else if (stepNumber === 1 && isComplete && !$('.step-item[data-step="2"]').hasClass('completed')) {
+                setActiveStep(2);
+            } else if (stepNumber === 2 && isComplete && !$('.step-item[data-step="3"]').hasClass('completed')) {
+                setActiveStep(3);
+            } else if (stepNumber === 3 && isComplete && !$('.step-item[data-step="4"]').hasClass('completed')) {
+                setActiveStep(4);
+            }
+        }
+
+        function setActiveStep(stepNumber) {
+            $('.step-item').removeClass('active');
+            $(`.step-item[data-step="${stepNumber}"]`).addClass('active');
         }
     </script>
 @endsection

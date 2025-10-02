@@ -146,12 +146,11 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="form-group">
-                                    <label for="filter_project">Project</label>
-                                    <select class="form-control" id="filter_project" name="filter_project">
-                                        <option value="">All Projects</option>
-                                        @foreach ($projects ?? [] as $project)
-                                            <option value="{{ $project->code }}">{{ $project->code }} -
-                                                {{ $project->owner }}</option>
+                                    <label for="filter_vendor_code">Vendor Code</label>
+                                    <select class="form-control" id="filter_vendor_code" name="filter_vendor_code">
+                                        <option value="">All Vendor Codes</option>
+                                        @foreach ($vendorCodes ?? [] as $vendorCode)
+                                            <option value="{{ $vendorCode }}">{{ $vendorCode }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -279,7 +278,7 @@
                                     <th>No</th>
                                     <th>Document Number</th>
                                     <th>PO Number</th>
-                                    <th>Project</th>
+                                    <th>Vendor Code</th>
                                     <th>Type</th>
                                     <th>Document Date</th>
                                     <th>Receive Date</th>
@@ -343,7 +342,7 @@
                         d.search_po_no = $('#search_po_no').val();
                         d.filter_type = $('#filter_type').val();
                         d.filter_status = $('#filter_status').val();
-                        d.filter_project = $('#filter_project').val();
+                        d.filter_vendor_code = $('#filter_vendor_code').val();
                         d.date_range = $('#date_range').val();
                         d.show_all = $('#show_all_records').length > 0 && $('#show_all_records').is(
                             ':checked') ? 1 : 0;
@@ -364,11 +363,11 @@
                         name: 'po_no'
                     },
                     {
-                        data: 'project',
-                        name: 'project',
+                        data: 'vendor_code',
+                        name: 'vendor_code',
                         render: function(data, type, row) {
                             if (data) {
-                                return '<span class="badge badge-info">' + data + '</span>';
+                                return '<span class="badge badge-secondary">' + data + '</span>';
                             }
                             return '<span class="text-muted">-</span>';
                         }

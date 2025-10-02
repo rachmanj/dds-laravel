@@ -25,10 +25,14 @@ class AdditionalDocumentController extends Controller
     public function index()
     {
         $documentTypes = AdditionalDocumentType::orderByName()->get();
-        $projects = \App\Models\Project::active()->orderBy('code')->get();
+        $vendorCodes = AdditionalDocument::whereNotNull('vendor_code')
+            ->distinct()
+            ->pluck('vendor_code')
+            ->sort()
+            ->values();
         $departments = \App\Models\Department::active()->orderBy('location_code')->get();
 
-        return view('additional_documents.index', compact('documentTypes', 'projects', 'departments'));
+        return view('additional_documents.index', compact('documentTypes', 'vendorCodes', 'departments'));
     }
 
     public function data(Request $request)
@@ -66,8 +70,8 @@ class AdditionalDocumentController extends Controller
             $query->where('status', $request->filter_status);
         }
 
-        if ($request->filled('filter_project')) {
-            $query->where('project', $request->filter_project);
+        if ($request->filled('filter_vendor_code')) {
+            $query->where('vendor_code', $request->filter_vendor_code);
         }
 
         if ($request->filled('filter_location')) {
@@ -279,9 +283,10 @@ class AdditionalDocumentController extends Controller
 
         $documentTypes = AdditionalDocumentType::orderByName()->get();
         $projects = \App\Models\Project::active()->orderBy('code')->get();
+        $departments = \App\Models\Department::active()->orderBy('location_code')->get();
         $additionalDocument->load(['type', 'creator.department']);
 
-        return view('additional_documents.edit', compact('additionalDocument', 'documentTypes', 'projects'));
+        return view('additional_documents.edit', compact('additionalDocument', 'documentTypes', 'projects', 'departments'));
     }
 
     public function update(Request $request, AdditionalDocument $additionalDocument)
@@ -626,7 +631,6 @@ class AdditionalDocumentController extends Controller
                     'Document Date' => $document->document_date ? \Carbon\Carbon::parse($document->document_date)->format('d/m/Y') : '',
                     'PO Number' => $document->po_no ?? '',
                     'Vendor Code' => $document->vendor_code ?? '',
-                    'Project' => $document->project ?? '',
                     'Receive Date' => $document->receive_date ? \Carbon\Carbon::parse($document->receive_date)->format('d/m/Y') : '',
                     'Current Location' => $document->cur_loc ?? '',
                     'Status' => $document->status ?? '',
@@ -802,8 +806,8 @@ class AdditionalDocumentController extends Controller
             $query->where('status', $request->filter_status);
         }
 
-        if ($request->filled('filter_project')) {
-            $query->where('project', $request->filter_project);
+        if ($request->filled('filter_vendor_code')) {
+            $query->where('vendor_code', $request->filter_vendor_code);
         }
 
         if ($request->filled('filter_location')) {

@@ -30,7 +30,6 @@ class AdditionalDocumentExport implements FromCollection, WithHeadings, WithStyl
             'Document Date',
             'PO Number',
             'Vendor Code',
-            'Project',
             'Receive Date',
             'Current Location',
             'Status',
@@ -57,14 +56,13 @@ class AdditionalDocumentExport implements FromCollection, WithHeadings, WithStyl
             'C' => 15, // Document Date
             'D' => 15, // PO Number
             'E' => 15, // Vendor Code
-            'F' => 15, // Project
-            'G' => 15, // Receive Date
-            'H' => 15, // Current Location
-            'I' => 15, // Status
-            'J' => 20, // Distribution Status
-            'K' => 30, // Remarks
-            'L' => 20, // Created By
-            'M' => 20, // Created At
+            'F' => 15, // Receive Date
+            'G' => 15, // Current Location
+            'H' => 15, // Status
+            'I' => 20, // Distribution Status
+            'J' => 30, // Remarks
+            'K' => 20, // Created By
+            'L' => 20, // Created At
         ];
     }
 }
