@@ -2736,3 +2736,74 @@ DistributionHistory::create([
 **Last Updated**: 2025-08-21  
 **Version**: 3.0  
 **Status**: ✅ Dashboard Enhancement Project Completed & All Phases Implemented Successfully
+
+### Distribution Create Page Improvements
+
+-   [ ] **Implement Dynamic Document Selection based on Document Type**
+
+    -   **Status**: 🚧 IN PROGRESS
+    -   **Description**: Dynamically update the document selection area based on the chosen "Document Type" (Invoice or Additional Document). Display searchable dropdown/list of available documents accordingly.
+    -   **Estimated Effort**: 2-3 days
+    -   **Dependencies**: Frontend JavaScript, Backend API for document filtering.
+
+-   [ ] **Implement Real-time Search and Filtering for Documents**
+
+    -   **Status**: 📝 PENDING
+    -   **Description**: Add a search bar within the "Document Selection" area to quickly find documents by invoice number, document number, or other relevant identifiers. Add filters for date range, status, or document type.
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: Frontend JavaScript, potentially new API endpoints for filtered document lists.
+
+-   [ ] **Provide Clearer Indication of "Documents currently in your department location"**
+
+    -   **Status**: 📝 PENDING
+    -   **Description**: Visually grey out or disable documents in the selection list that are not in the user's department, or only display documents available for distribution.
+    -   **Estimated Effort**: 0.5-1 day
+    -   **Dependencies**: Frontend JavaScript, accurate `cur_loc` data for documents.
+
+-   [ ] **Provide Visual Feedback on Selected Documents**
+
+    -   **Status**: 📝 PENDING
+    -   **Description**: As documents are selected, display them in a "Selected Documents" section with an option to remove them, providing a clear overview before distribution creation.
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: Frontend JavaScript for managing selected documents.
+
+-   [ ] **Enhance Input Validation and Error Handling**
+
+    -   **Status**: 📝 PENDING
+    -   **Description**: Implement clear client-side and server-side validation with real-time feedback for missing required fields or invalid selections.
+    -   **Estimated Effort**: 1 day
+    -   **Dependencies**: Frontend JavaScript validation, Laravel validation rules.
+
+-   [ ] **Implement User Confirmation Before Distribution Creation**
+
+    -   **Status**: 📝 PENDING
+    -   **Description**: After the user clicks "Create Distribution", display a confirmation dialog summarizing distribution details and asking for final confirmation.
+    -   **Estimated Effort**: 0.5 day
+    -   **Dependencies**: Frontend JavaScript for modal/dialog.
+
+-   [ ] **Pre-populate Current User's Department as Origin Department**
+
+    -   **Status**: 📝 PENDING
+    -   **Description**: Automatically pre-populate the "Origin Department" field (or implicitly use the current user's department) and disable it.
+    -   **Estimated Effort**: 0.5 day
+    -   **Dependencies**: Frontend JavaScript, User department data.
+
+-   [ ] **Allow Multi-document Selection**
+
+    -   **Status**: 📝 PENDING
+    -   **Description**: Enable multi-selection of documents through checkboxes in a list or a "select all" option for filtered results.
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: Frontend JavaScript for handling multiple selections.
+
+-   [ ] **Implement Toastr Notifications for Success/Error Messages**
+
+    -   **Status**: 📝 PENDING
+    -   **Description**: Use Toastr notifications to display a success message after a distribution is created and error messages if the creation fails.
+    -   **Estimated Effort**: 0.5 day
+    -   **Dependencies**: Frontend JavaScript (Toastr library).
+
+-   [ ] **Ability to Unlink/Manage Automatically Included Additional Documents**
+    -   **Status**: 📝 PENDING
+    -   **Description**: Provide an interface on the "Create Distribution" or "Distribution Details" page to view and optionally remove automatically included additional documents.
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: Frontend JavaScript, Backend logic for managing linked documents.

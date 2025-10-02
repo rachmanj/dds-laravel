@@ -124,8 +124,43 @@
                                             </div>
                                         </div>
                                         <div class="card-body">
+                                            <!-- Search and Filter Controls -->
+                                            <div class="row mb-3">
+                                                <div class="col-md-4">
+                                                    <div class="input-group">
+                                                        <div class="input-group-prepend">
+                                                            <span class="input-group-text"><i
+                                                                    class="fas fa-search"></i></span>
+                                                        </div>
+                                                        <input type="text" class="form-control" id="invoice-search"
+                                                            placeholder="Search invoices...">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <select class="form-control" id="invoice-status-filter">
+                                                        <option value="">All Status</option>
+                                                        <option value="open">Open</option>
+                                                        <option value="verify">Verify</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <select class="form-control" id="invoice-supplier-filter">
+                                                        <option value="">All Suppliers</option>
+                                                        @foreach ($invoices->pluck('supplier')->unique()->sort() as $supplier)
+                                                            <option value="{{ $supplier }}">{{ $supplier }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <button type="button" class="btn btn-outline-secondary btn-block"
+                                                        id="clear-invoice-filters">
+                                                        <i class="fas fa-times"></i> Clear
+                                                    </button>
+                                                </div>
+                                            </div>
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-hover">
+                                                <table class="table table-bordered table-hover" id="invoice-table">
                                                     <thead>
                                                         <tr>
                                                             <th width="50">
@@ -151,7 +186,8 @@
                                                                 <td>{{ $invoice->po_no ?? 'N/A' }}</td>
                                                                 <td>{{ $invoice->formatted_amount }}</td>
                                                                 <td>
-                                                                    <span class="badge {{ $invoice->status_badge_class }}">
+                                                                    <span
+                                                                        class="badge {{ $invoice->status_badge_class }}">
                                                                         {{ ucfirst($invoice->status) }}
                                                                     </span>
                                                                 </td>
@@ -181,8 +217,43 @@
                                             </div>
                                         </div>
                                         <div class="card-body">
+                                            <!-- Search and Filter Controls -->
+                                            <div class="row mb-3">
+                                                <div class="col-md-4">
+                                                    <div class="input-group">
+                                                        <div class="input-group-prepend">
+                                                            <span class="input-group-text"><i
+                                                                    class="fas fa-search"></i></span>
+                                                        </div>
+                                                        <input type="text" class="form-control"
+                                                            id="additional-doc-search" placeholder="Search documents...">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <select class="form-control" id="additional-doc-status-filter">
+                                                        <option value="">All Status</option>
+                                                        <option value="open">Open</option>
+                                                        <option value="verify">Verify</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <select class="form-control" id="additional-doc-type-filter">
+                                                        <option value="">All Types</option>
+                                                        @foreach ($additionalDocuments->pluck('type.type_name')->unique()->filter()->sort() as $type)
+                                                            <option value="{{ $type }}">{{ $type }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <button type="button" class="btn btn-outline-secondary btn-block"
+                                                        id="clear-additional-doc-filters">
+                                                        <i class="fas fa-times"></i> Clear
+                                                    </button>
+                                                </div>
+                                            </div>
                                             <div class="table-responsive">
-                                                <table class="table table-bordered table-hover">
+                                                <table class="table table-bordered table-hover" id="additional-doc-table">
                                                     <thead>
                                                         <tr>
                                                             <th width="50">
@@ -218,6 +289,31 @@
                                                         @endforeach
                                                     </tbody>
                                                 </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Selected Documents Summary -->
+                                <div class="row mt-4">
+                                    <div class="col-12">
+                                        <div class="card" id="selected-documents-card" style="display: none;">
+                                            <div class="card-header">
+                                                <h6 class="card-title">
+                                                    <i class="fas fa-list-check"></i> Selected Documents
+                                                    <span class="badge badge-primary ml-2" id="selected-count">0</span>
+                                                </h6>
+                                                <div class="card-tools">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        id="clear-all-selected">
+                                                        <i class="fas fa-times"></i> Clear All
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <div id="selected-documents-list">
+                                                    <!-- Selected documents will be populated here -->
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -304,32 +400,209 @@
                 $('#distribution-preview').hide();
             });
 
+            // Search and Filter Functions
+            function filterTable(tableId, searchTerm, statusFilter, typeFilter) {
+                var table = $('#' + tableId + ' tbody tr');
+                var visibleCount = 0;
+
+                table.each(function() {
+                    var row = $(this);
+                    var invoiceNumber = row.find('td:nth-child(2)').text().toLowerCase();
+                    var supplier = row.find('td:nth-child(3)').text().toLowerCase();
+                    var status = row.find('td:nth-child(6)').text().toLowerCase();
+                    var documentNumber = row.find('td:nth-child(2)').text().toLowerCase();
+                    var docType = row.find('td:nth-child(3)').text().toLowerCase();
+
+                    var matchesSearch = true;
+                    var matchesStatus = true;
+                    var matchesType = true;
+
+                    // Search filter
+                    if (searchTerm) {
+                        if (tableId === 'invoice-table') {
+                            matchesSearch = invoiceNumber.includes(searchTerm) || supplier.includes(
+                                searchTerm);
+                        } else {
+                            matchesSearch = documentNumber.includes(searchTerm) || docType.includes(
+                                searchTerm);
+                        }
+                    }
+
+                    // Status filter
+                    if (statusFilter) {
+                        matchesStatus = status.includes(statusFilter);
+                    }
+
+                    // Type filter (for additional documents)
+                    if (typeFilter && tableId === 'additional-doc-table') {
+                        matchesType = docType.includes(typeFilter);
+                    }
+
+                    if (matchesSearch && matchesStatus && matchesType) {
+                        row.show();
+                        visibleCount++;
+                    } else {
+                        row.hide();
+                    }
+                });
+
+                // Update visible count
+                var container = tableId === 'invoice-table' ? '#invoice-selection' :
+                    '#additional-document-selection';
+                var countElement = $(container + ' .card-header h6');
+                var originalText = countElement.text();
+                var baseText = originalText.replace(/\(\d+\)/, '');
+                countElement.text(baseText + ' (' + visibleCount + ')');
+            }
+
+            // Invoice search and filters
+            $('#invoice-search').on('input', function() {
+                var searchTerm = $(this).val().toLowerCase();
+                var statusFilter = $('#invoice-status-filter').val().toLowerCase();
+                var supplierFilter = $('#invoice-supplier-filter').val().toLowerCase();
+                filterTable('invoice-table', searchTerm, statusFilter, supplierFilter);
+            });
+
+            $('#invoice-status-filter, #invoice-supplier-filter').on('change', function() {
+                var searchTerm = $('#invoice-search').val().toLowerCase();
+                var statusFilter = $('#invoice-status-filter').val().toLowerCase();
+                var supplierFilter = $('#invoice-supplier-filter').val().toLowerCase();
+                filterTable('invoice-table', searchTerm, statusFilter, supplierFilter);
+            });
+
+            $('#clear-invoice-filters').on('click', function() {
+                $('#invoice-search').val('');
+                $('#invoice-status-filter').val('');
+                $('#invoice-supplier-filter').val('');
+                filterTable('invoice-table', '', '', '');
+            });
+
+            // Additional document search and filters
+            $('#additional-doc-search').on('input', function() {
+                var searchTerm = $(this).val().toLowerCase();
+                var statusFilter = $('#additional-doc-status-filter').val().toLowerCase();
+                var typeFilter = $('#additional-doc-type-filter').val().toLowerCase();
+                filterTable('additional-doc-table', searchTerm, statusFilter, typeFilter);
+            });
+
+            $('#additional-doc-status-filter, #additional-doc-type-filter').on('change', function() {
+                var searchTerm = $('#additional-doc-search').val().toLowerCase();
+                var statusFilter = $('#additional-doc-status-filter').val().toLowerCase();
+                var typeFilter = $('#additional-doc-type-filter').val().toLowerCase();
+                filterTable('additional-doc-table', searchTerm, statusFilter, typeFilter);
+            });
+
+            $('#clear-additional-doc-filters').on('click', function() {
+                $('#additional-doc-search').val('');
+                $('#additional-doc-status-filter').val('');
+                $('#additional-doc-type-filter').val('');
+                filterTable('additional-doc-table', '', '', '');
+            });
+
             // Select all handlers
             $('#selectAllInvoices').click(function() {
                 $('.invoice-checkbox').prop('checked', true);
+                updateSelectedDocuments();
                 updatePreview();
             });
 
             $('#deselectAllInvoices').click(function() {
                 $('.invoice-checkbox').prop('checked', false);
+                updateSelectedDocuments();
                 updatePreview();
             });
 
             $('#selectAllAdditionalDocs').click(function() {
                 $('.additional-doc-checkbox').prop('checked', true);
+                updateSelectedDocuments();
                 updatePreview();
             });
 
             $('#deselectAllAdditionalDocs').click(function() {
                 $('.additional-doc-checkbox').prop('checked', false);
+                updateSelectedDocuments();
                 updatePreview();
             });
 
             // Checkbox change handlers
             $('.invoice-checkbox, .additional-doc-checkbox').change(function() {
                 console.log('Checkbox changed:', this.name, this.value, this.checked);
+                updateSelectedDocuments();
                 updatePreview();
             });
+
+            // Clear all selected documents
+            $('#clear-all-selected').click(function() {
+                $('input[name="document_ids[]"]:checked').prop('checked', false);
+                updateSelectedDocuments();
+                updatePreview();
+            });
+
+            // Update selected documents list
+            function updateSelectedDocuments() {
+                var selectedDocs = $('input[name="document_ids[]"]:checked');
+                var documentType = $('#document_type').val();
+
+                if (selectedDocs.length > 0 && documentType) {
+                    var listHtml = '';
+                    var selectedData = [];
+
+                    selectedDocs.each(function() {
+                        var checkbox = $(this);
+                        var row = checkbox.closest('tr');
+                        var documentNumber = row.find('td:nth-child(2)').text().trim();
+                        var additionalInfo = '';
+
+                        if (documentType === 'invoice') {
+                            var supplier = row.find('td:nth-child(3)').text().trim();
+                            var amount = row.find('td:nth-child(5)').text().trim();
+                            additionalInfo = supplier + ' - ' + amount;
+                        } else {
+                            var type = row.find('td:nth-child(3)').text().trim();
+                            additionalInfo = type;
+                        }
+
+                        selectedData.push({
+                            id: checkbox.val(),
+                            number: documentNumber,
+                            info: additionalInfo,
+                            type: documentType
+                        });
+
+                        listHtml +=
+                            '<div class="selected-document-item mb-2 p-2 border rounded" data-id="' +
+                            checkbox.val() + '">';
+                        listHtml += '<div class="d-flex justify-content-between align-items-center">';
+                        listHtml += '<div>';
+                        listHtml += '<strong>' + documentNumber + '</strong><br>';
+                        listHtml += '<small class="text-muted">' + additionalInfo + '</small>';
+                        listHtml += '</div>';
+                        listHtml +=
+                            '<button type="button" class="btn btn-sm btn-outline-danger remove-document" data-id="' +
+                            checkbox.val() + '">';
+                        listHtml += '<i class="fas fa-times"></i>';
+                        listHtml += '</button>';
+                        listHtml += '</div>';
+                        listHtml += '</div>';
+                    });
+
+                    $('#selected-documents-list').html(listHtml);
+                    $('#selected-count').text(selectedDocs.length);
+                    $('#selected-documents-card').show();
+
+                    // Handle individual document removal
+                    $('.remove-document').click(function() {
+                        var documentId = $(this).data('id');
+                        $('input[name="document_ids[]"][value="' + documentId + '"]').prop('checked',
+                        false);
+                        updateSelectedDocuments();
+                        updatePreview();
+                    });
+
+                } else {
+                    $('#selected-documents-card').hide();
+                }
+            }
 
             // Update preview
             function updatePreview() {
@@ -358,7 +631,7 @@
 
             // Form submission
             var isSubmitting = false; // Submission guard
-            
+
             $('#distributionForm').submit(function(e) {
                 e.preventDefault();
 
