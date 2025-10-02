@@ -33,6 +33,161 @@
         .linked-invoices-badge.badge-info {
             background-color: #17a2b8;
         }
+
+        /* Validation Summary Panel */
+        .validation-summary-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #dc3545;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1050;
+            max-width: 90%;
+            min-width: 300px;
+            display: none;
+        }
+
+        .validation-summary-panel.show {
+            display: block;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .validation-summary-panel h6 {
+            margin: 0 0 10px 0;
+            font-weight: bold;
+        }
+
+        .validation-summary-panel ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .validation-summary-panel li {
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .validation-summary-panel li:hover {
+            color: #ffc107;
+        }
+
+        /* Form Progress Indicator */
+        .form-progress-container {
+            margin-bottom: 20px;
+        }
+
+        .form-progress-bar {
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .form-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .form-progress-text {
+            text-align: center;
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        /* Amount Calculator Widget */
+        .amount-calculator {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            display: none;
+        }
+
+        .amount-calculator.show {
+            display: block;
+        }
+
+        .calculator-input-group {
+            margin-bottom: 15px;
+        }
+
+        .calculator-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .calculator-result {
+            background: #f8f9fa;
+            border: 2px solid #28a745;
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+
+        .calculator-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        /* Enhanced submit button */
+        .btn-update-enhanced {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-update-enhanced .btn-text {
+            transition: opacity 0.3s;
+        }
+
+        .btn-update-enhanced .btn-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn-update-enhanced.loading .btn-text {
+            opacity: 0;
+        }
+
+        .btn-update-enhanced.loading .btn-spinner {
+            opacity: 1;
+        }
     </style>
 @endsection
 
@@ -48,10 +203,17 @@
                                 <i class="fas fa-arrow-left"></i> Back to List
                             </a>
                         </div>
-                        <form action="{{ route('invoices.update', $invoice) }}" method="POST">
+                        <form action="{{ route('invoices.update', $invoice) }}" method="POST" id="invoice-edit-form">
                             @csrf
                             @method('PUT')
                             <div class="card-body">
+                                <!-- Form Progress Indicator -->
+                                <div class="form-progress-container">
+                                    <div class="form-progress-bar">
+                                        <div class="form-progress-fill" id="form-progress-fill" style="width: 0%"></div>
+                                    </div>
+                                    <div class="form-progress-text" id="form-progress-text">Form Progress: 0% Complete</div>
+                                </div>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group">
@@ -155,8 +317,8 @@
                                         <div class="form-group">
                                             <label for="po_no">PO Number</label>
                                             <input type="text" class="form-control @error('po_no') is-invalid @enderror"
-                                                id="po_no" name="po_no" value="{{ old('po_no', $invoice->po_no) }}"
-                                                maxlength="30">
+                                                id="po_no" name="po_no"
+                                                value="{{ old('po_no', $invoice->po_no) }}" maxlength="30">
                                             @error('po_no')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
@@ -191,15 +353,57 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label for="amount">Amount <span class="text-danger">*</span></label>
-                                            <input type="text" name="amount_display" id="amount_display"
-                                                class="form-control @error('amount') is-invalid @enderror"
-                                                value="{{ old('amount', $invoice->amount) }}"
-                                                onkeyup="formatNumber(this)" required>
+                                            <div class="input-group">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text" id="currency-prefix">IDR</span>
+                                                </div>
+                                                <input type="text" name="amount_display" id="amount_display"
+                                                    class="form-control @error('amount') is-invalid @enderror"
+                                                    value="{{ old('amount', $invoice->amount) }}"
+                                                    onkeyup="formatNumber(this)" required>
+                                                <div class="input-group-append">
+                                                    <button type="button" class="btn btn-outline-secondary"
+                                                        id="calculator-btn">
+                                                        <i class="fas fa-calculator"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                             <input type="hidden" name="amount" id="amount"
                                                 value="{{ old('amount', $invoice->amount) }}">
                                             @error('amount')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
+
+                                            <!-- Amount Calculator Widget -->
+                                            <div class="amount-calculator" id="amount-calculator">
+                                                <div class="calculator-input-group">
+                                                    <label for="calc-base-amount">Base Amount:</label>
+                                                    <input type="text" id="calc-base-amount" class="form-control"
+                                                        placeholder="Enter amount">
+                                                </div>
+                                                <div class="calculator-buttons">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary calc-btn"
+                                                        data-action="+10">+10%</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary calc-btn"
+                                                        data-action="-10">-10%</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary calc-btn"
+                                                        data-action="+11">+11%</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary calc-btn"
+                                                        data-action="x2">×2</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary calc-btn"
+                                                        data-action="/2">÷2</button>
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary calc-btn"
+                                                        data-action="clear">Clear</button>
+                                                </div>
+                                                <div class="calculator-result" id="calc-result">0</div>
+                                                <div class="calculator-actions">
+                                                    <button type="button" class="btn btn-success"
+                                                        id="apply-calc-result">Apply</button>
+                                                    <button type="button" class="btn btn-secondary"
+                                                        id="close-calculator">Cancel</button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -431,13 +635,20 @@
                             </div>
 
                             <div class="card-footer">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Update Invoice
+                                <button type="button" class="btn btn-info mr-2" id="preview-btn">
+                                    <i class="fas fa-eye"></i> Preview Changes
+                                </button>
+                                <button type="submit" class="btn btn-primary btn-update-enhanced" id="update-btn">
+                                    <span class="btn-text">
+                                        <i class="fas fa-save"></i> Update Invoice
+                                    </span>
+                                    <span class="btn-spinner">
+                                        <i class="fas fa-spinner fa-spin"></i> Updating...
+                                    </span>
                                 </button>
                                 <a href="{{ route('invoices.show', $invoice) }}" class="btn btn-secondary">
                                     <i class="fas fa-eye"></i> View Invoice
                                 </a>
-
                             </div>
                         </form>
                     </div>
@@ -445,6 +656,12 @@
             </div>
         </div>
     </section>
+
+    <!-- Validation Summary Panel -->
+    <div class="validation-summary-panel" id="validation-summary-panel">
+        <h6><i class="fas fa-exclamation-triangle"></i> Please fix the following errors:</h6>
+        <ul id="validation-errors-list"></ul>
+    </div>
 
     <!-- Create Additional Document Modal -->
     <div class="modal fade" id="create-doc-modal" tabindex="-1" role="dialog"
@@ -556,6 +773,8 @@
     <script src="{{ asset('adminlte/plugins/select2/js/select2.full.min.js') }}"></script>
     <!-- Toastr -->
     <script src="{{ asset('adminlte/plugins/toastr/toastr.min.js') }}"></script>
+    <!-- SweetAlert2 -->
+    <script src="{{ asset('adminlte/plugins/sweetalert2/sweetalert2.min.js') }}"></script>
 
     <script>
         // Define formatNumber function globally
@@ -1361,6 +1580,471 @@
 
             // ---------- End On-the-fly Additional Document Creation ----------
             // ---------- End Additional Documents Linking ----------
+
+            // ---------- Phase 1: High Priority Improvements ----------
+
+            // 1. Validation Summary Panel
+            function updateValidationSummary() {
+                var errors = [];
+                var requiredFields = [{
+                        id: 'invoice_number',
+                        label: 'Invoice Number'
+                    },
+                    {
+                        id: 'invoice_date',
+                        label: 'Invoice Date'
+                    },
+                    {
+                        id: 'receive_date',
+                        label: 'Receive Date'
+                    },
+                    {
+                        id: 'supplier_id',
+                        label: 'Supplier'
+                    },
+                    {
+                        id: 'type_id',
+                        label: 'Invoice Type'
+                    },
+                    {
+                        id: 'currency',
+                        label: 'Currency'
+                    },
+                    {
+                        id: 'amount_display',
+                        label: 'Amount'
+                    },
+                    {
+                        id: 'status',
+                        label: 'Status'
+                    },
+                    {
+                        id: 'cur_loc',
+                        label: 'Current Location'
+                    }
+                ];
+
+                requiredFields.forEach(function(field) {
+                    var element = $('#' + field.id);
+                    if (!element.val() || element.val().trim() === '') {
+                        errors.push({
+                            field: field.id,
+                            label: field.label,
+                            message: field.label + ' is required'
+                        });
+                    }
+                });
+
+                // Check for validation errors
+                $('.is-invalid').each(function() {
+                    var fieldId = $(this).attr('id');
+                    var label = $(this).closest('.form-group').find('label').text().replace('*', '').trim();
+                    var errorMessage = $(this).next('.invalid-feedback').text();
+                    if (errorMessage) {
+                        errors.push({
+                            field: fieldId,
+                            label: label,
+                            message: errorMessage
+                        });
+                    }
+                });
+
+                var panel = $('#validation-summary-panel');
+                var errorsList = $('#validation-errors-list');
+
+                if (errors.length > 0) {
+                    errorsList.empty();
+                    errors.forEach(function(error) {
+                        errorsList.append('<li data-field="' + error.field + '">' + error.message + '</li>');
+                    });
+                    panel.addClass('show');
+                } else {
+                    panel.removeClass('show');
+                }
+
+                return errors.length;
+            }
+
+            // Click-to-scroll functionality
+            $(document).on('click', '#validation-errors-list li', function() {
+                var fieldId = $(this).data('field');
+                var field = $('#' + fieldId);
+                if (field.length) {
+                    $('html, body').animate({
+                        scrollTop: field.offset().top - 100
+                    }, 500);
+                    field.focus();
+                }
+            });
+
+            // 2. Supplier-Specific Defaults Loading
+            function loadSupplierDefaults(supplierId) {
+                if (!supplierId) return;
+
+                $.ajax({
+                    url: '/invoices/supplier-defaults/' + supplierId,
+                    type: 'GET',
+                    success: function(response) {
+                        if (response.success && response.data) {
+                            var data = response.data;
+
+                            // Auto-fill currency if user has history with this supplier
+                            if (data.preferred_currency && !$('#currency').val()) {
+                                $('#currency').val(data.preferred_currency).trigger('change');
+                                updateCurrencyPrefix();
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.info('Currency set to ' + data.preferred_currency +
+                                        ' based on your history with this supplier.');
+                                }
+                            }
+
+                            // Show hint for last invoice type used
+                            if (data.last_invoice_type && !$('#type_id').val()) {
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.info('Last invoice type used: ' + data.last_invoice_type);
+                                }
+                            }
+
+                            // Auto-fill payment project if consistently used
+                            if (data.preferred_payment_project && !$('#payment_project').val()) {
+                                $('#payment_project').val(data.preferred_payment_project).trigger('change');
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.info('Payment project set to ' + data.preferred_payment_project +
+                                        ' (used in ' + data.payment_project_count + ' previous invoices).');
+                                }
+                            }
+                        }
+                    },
+                    error: function() {
+                        console.log('Could not load supplier defaults');
+                    }
+                });
+            }
+
+            // 3. Enhanced Duplicate Warning
+            var duplicateCheckTimeout;
+
+            function checkForDuplicate() {
+                var fakturNo = $('#faktur_no').val().trim();
+                var supplierId = $('#supplier_id').val();
+                var currentInvoiceId = {{ $invoice->id }};
+
+                if (fakturNo && supplierId) {
+                    clearTimeout(duplicateCheckTimeout);
+                    duplicateCheckTimeout = setTimeout(function() {
+                        $.ajax({
+                            url: '{{ route('invoices.check-duplicate') }}',
+                            type: 'POST',
+                            data: {
+                                _token: '{{ csrf_token() }}',
+                                faktur_no: fakturNo,
+                                supplier_id: supplierId,
+                                exclude_id: currentInvoiceId
+                            },
+                            success: function(response) {
+                                if (response.is_duplicate && typeof Swal !== 'undefined') {
+                                    Swal.fire({
+                                        title: 'Duplicate Invoice Warning',
+                                        html: '<div class="text-left">' +
+                                            '<p><strong>This faktur number already exists for this supplier:</strong></p>' +
+                                            '<ul class="text-left">' +
+                                            '<li><strong>Invoice:</strong> ' + response
+                                            .existing_invoice.invoice_number + '</li>' +
+                                            '<li><strong>Faktur No:</strong> ' + response
+                                            .existing_invoice.faktur_no + '</li>' +
+                                            '<li><strong>Date:</strong> ' + response
+                                            .existing_invoice.invoice_date + '</li>' +
+                                            '<li><strong>Amount:</strong> ' + response
+                                            .existing_invoice.amount_formatted + '</li>' +
+                                            '<li><strong>Status:</strong> ' + response
+                                            .existing_invoice.status + '</li>' +
+                                            '</ul>' +
+                                            '<p class="text-warning mt-3"><i class="fas fa-exclamation-triangle"></i> Are you sure you want to continue?</p>' +
+                                            '</div>',
+                                        icon: 'warning',
+                                        showCancelButton: true,
+                                        confirmButtonText: 'Yes, Continue',
+                                        cancelButtonText: 'Cancel',
+                                        confirmButtonColor: '#d33',
+                                        cancelButtonColor: '#3085d6'
+                                    }).then((result) => {
+                                        if (!result.isConfirmed) {
+                                            $('#faktur_no').focus();
+                                        }
+                                    });
+                                }
+                            },
+                            error: function() {
+                                console.log('Duplicate check failed');
+                            }
+                        });
+                    }, 800); // Debounce
+                }
+            }
+
+            // 4. Form Progress Indicator
+            function updateFormProgress() {
+                var totalFields = 9; // Number of required fields
+                var filledFields = 0;
+
+                var requiredFields = [
+                    'invoice_number', 'invoice_date', 'receive_date', 'supplier_id',
+                    'type_id', 'currency', 'amount_display', 'status', 'cur_loc'
+                ];
+
+                requiredFields.forEach(function(fieldId) {
+                    var field = $('#' + fieldId);
+                    if (field.val() && field.val().trim() !== '') {
+                        filledFields++;
+                    }
+                });
+
+                var percentage = Math.round((filledFields / totalFields) * 100);
+                $('#form-progress-fill').css('width', percentage + '%');
+                $('#form-progress-text').text('Form Progress: ' + percentage + '% Complete');
+
+                // Update validation summary
+                updateValidationSummary();
+            }
+
+            // 5. Amount Calculator Widget
+            function initializeCalculator() {
+                var calculator = $('#amount-calculator');
+                var baseAmountInput = $('#calc-base-amount');
+                var resultDisplay = $('#calc-result');
+                var currentAmount = $('#amount_display').val().replace(/,/g, '');
+
+                // Pre-fill with current amount
+                if (currentAmount && !isNaN(currentAmount)) {
+                    baseAmountInput.val(currentAmount);
+                }
+
+                // Calculator button clicks
+                $('.calc-btn').on('click', function() {
+                    var action = $(this).data('action');
+                    var baseAmount = parseFloat(baseAmountInput.val().replace(/,/g, '')) || 0;
+                    var result = 0;
+
+                    switch (action) {
+                        case '+10':
+                            result = baseAmount * 1.10;
+                            break;
+                        case '-10':
+                            result = baseAmount * 0.90;
+                            break;
+                        case '+11':
+                            result = baseAmount * 1.11; // VAT
+                            break;
+                        case 'x2':
+                            result = baseAmount * 2;
+                            break;
+                        case '/2':
+                            result = baseAmount / 2;
+                            break;
+                        case 'clear':
+                            baseAmountInput.val('');
+                            result = 0;
+                            break;
+                    }
+
+                    resultDisplay.text(result.toLocaleString());
+                });
+
+                // Apply result
+                $('#apply-calc-result').on('click', function() {
+                    var result = resultDisplay.text().replace(/,/g, '');
+                    if (result && !isNaN(result)) {
+                        $('#amount_display').val(result);
+                        formatNumber(document.getElementById('amount_display'));
+                        updateFormProgress();
+                        calculator.removeClass('show');
+                        if (typeof toastr !== 'undefined') {
+                            toastr.success('Amount updated successfully!');
+                        }
+                    }
+                });
+
+                // Close calculator
+                $('#close-calculator').on('click', function() {
+                    calculator.removeClass('show');
+                });
+            }
+
+            // 6. Keyboard Shortcuts
+            function initializeKeyboardShortcuts() {
+                $(document).on('keydown', function(e) {
+                    // Ctrl+S to save
+                    if (e.ctrlKey && e.key === 's') {
+                        e.preventDefault();
+                        $('#invoice-edit-form').submit();
+                    }
+
+                    // Esc to cancel
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        window.location.href = '{{ route('invoices.show', $invoice) }}';
+                    }
+                });
+            }
+
+            // 7. Enhanced Submit Button
+            function initializeEnhancedSubmit() {
+                $('#invoice-edit-form').on('submit', function(e) {
+                    var errors = updateValidationSummary();
+                    if (errors > 0) {
+                        e.preventDefault();
+                        if (typeof toastr !== 'undefined') {
+                            toastr.error('Please fix all validation errors before submitting.');
+                        }
+                        return false;
+                    }
+
+                    var submitBtn = $('#update-btn');
+                    submitBtn.addClass('loading').prop('disabled', true);
+                });
+            }
+
+            // 8. Currency Prefix Update
+            function updateCurrencyPrefix() {
+                var currency = $('#currency').val();
+                $('#currency-prefix').text(currency || 'IDR');
+            }
+
+            // Initialize all Phase 1 features
+            function initializePhase1Features() {
+                // Load supplier defaults when supplier changes
+                $('#supplier_id').on('change', function() {
+                    loadSupplierDefaults($(this).val());
+                    updateFormProgress();
+                });
+
+                // Check for duplicates when faktur number changes
+                $('#faktur_no').on('input', checkForDuplicate);
+
+                // Update progress on any field change
+                $('input, select, textarea').on('change input', updateFormProgress);
+
+                // Initialize calculator
+                $('#calculator-btn').on('click', function() {
+                    $('#amount-calculator').toggleClass('show');
+                });
+
+                // Initialize all components
+                initializeCalculator();
+                initializeKeyboardShortcuts();
+                initializeEnhancedSubmit();
+                updateCurrencyPrefix();
+                updateFormProgress();
+
+                // Load supplier defaults on page load if supplier is already selected
+                if ($('#supplier_id').val()) {
+                    loadSupplierDefaults($('#supplier_id').val());
+                }
+            }
+
+            // 9. Invoice Preview Before Update
+            function initializePreviewFeature() {
+                $('#preview-btn').on('click', function() {
+                    var errors = updateValidationSummary();
+                    if (errors > 0) {
+                        if (typeof toastr !== 'undefined') {
+                            toastr.error('Please fix all validation errors before previewing.');
+                        }
+                        return false;
+                    }
+
+                    // Collect form data
+                    var formData = {
+                        invoice_number: $('#invoice_number').val(),
+                        faktur_no: $('#faktur_no').val(),
+                        invoice_date: $('#invoice_date').val(),
+                        receive_date: $('#receive_date').val(),
+                        supplier: $('#supplier_id option:selected').text(),
+                        type: $('#type_id option:selected').text(),
+                        po_no: $('#po_no').val(),
+                        currency: $('#currency').val(),
+                        amount: $('#amount_display').val(),
+                        status: $('#status option:selected').text(),
+                        receive_project: $('#receive_project option:selected').text(),
+                        invoice_project: $('#invoice_project option:selected').text(),
+                        payment_project: $('#payment_project option:selected').text(),
+                        cur_loc: $('#cur_loc option:selected').text(),
+                        payment_date: $('#payment_date').val(),
+                        sap_doc: $('#sap_doc').val(),
+                        remarks: $('#remarks').val()
+                    };
+
+                    // Create preview HTML
+                    var previewHtml = '<div class="table-responsive">' +
+                        '<table class="table table-bordered">' +
+                        '<thead class="thead-light">' +
+                        '<tr><th colspan="2" class="text-center"><h5><i class="fas fa-file-invoice"></i> Invoice Preview</h5></th></tr>' +
+                        '</thead>' +
+                        '<tbody>' +
+                        '<tr><td><i class="fas fa-hashtag text-primary"></i> Invoice Number</td><td><strong>' +
+                        formData.invoice_number + '</strong></td></tr>' +
+                        '<tr><td><i class="fas fa-receipt text-info"></i> Faktur No</td><td>' + (formData
+                            .faktur_no || '-') + '</td></tr>' +
+                        '<tr><td><i class="fas fa-calendar text-success"></i> Invoice Date</td><td>' + formData
+                        .invoice_date + '</td></tr>' +
+                        '<tr><td><i class="fas fa-calendar-check text-warning"></i> Receive Date</td><td>' +
+                        formData.receive_date + '</td></tr>' +
+                        '<tr><td><i class="fas fa-truck text-primary"></i> Supplier</td><td>' + formData.supplier +
+                        '</td></tr>' +
+                        '<tr><td><i class="fas fa-tag text-info"></i> Invoice Type</td><td>' + formData.type +
+                        '</td></tr>' +
+                        '<tr><td><i class="fas fa-file-alt text-secondary"></i> PO Number</td><td>' + (formData
+                            .po_no || '-') + '</td></tr>' +
+                        '<tr><td><i class="fas fa-money-bill text-success"></i> Currency</td><td>' + formData
+                        .currency + '</td></tr>' +
+                        '<tr><td><i class="fas fa-dollar-sign text-success"></i> Amount</td><td><strong class="text-success">' +
+                        formData.currency + ' ' + formData.amount + '</strong></td></tr>' +
+                        '<tr><td><i class="fas fa-info-circle text-info"></i> Status</td><td><span class="badge badge-primary">' +
+                        formData.status + '</span></td></tr>' +
+                        '<tr><td><i class="fas fa-building text-primary"></i> Current Location</td><td>' + formData
+                        .cur_loc + '</td></tr>' +
+                        '<tr><td><i class="fas fa-project-diagram text-secondary"></i> Receive Project</td><td>' + (
+                            formData.receive_project || '-') + '</td></tr>' +
+                        '<tr><td><i class="fas fa-project-diagram text-secondary"></i> Invoice Project</td><td>' + (
+                            formData.invoice_project || '-') + '</td></tr>' +
+                        '<tr><td><i class="fas fa-project-diagram text-secondary"></i> Payment Project</td><td>' + (
+                            formData.payment_project || '-') + '</td></tr>' +
+                        '<tr><td><i class="fas fa-calendar text-warning"></i> Payment Date</td><td>' + (formData
+                            .payment_date || '-') + '</td></tr>' +
+                        '<tr><td><i class="fas fa-file text-info"></i> SAP Document</td><td>' + (formData.sap_doc ||
+                            '-') + '</td></tr>' +
+                        '<tr><td><i class="fas fa-comment text-secondary"></i> Remarks</td><td>' + (formData
+                            .remarks || '-') + '</td></tr>' +
+                        '</tbody>' +
+                        '</table>' +
+                        '</div>';
+
+                    // Show preview dialog
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            title: 'Invoice Preview',
+                            html: previewHtml,
+                            width: '700px',
+                            showCancelButton: true,
+                            confirmButtonText: '<i class="fas fa-save"></i> Update Invoice',
+                            cancelButtonText: '<i class="fas fa-edit"></i> Continue Editing',
+                            confirmButtonColor: '#28a745',
+                            cancelButtonColor: '#6c757d',
+                            showCloseButton: true
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                $('#invoice-edit-form').submit();
+                            }
+                        });
+                    }
+                });
+            }
+
+            // Initialize all Phase 1 features
+            initializePhase1Features();
+            initializePreviewFeature();
+
+            // ---------- End Phase 1: High Priority Improvements ----------
         }
 
         // Start initialization when DOM is ready

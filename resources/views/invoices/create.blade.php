@@ -147,6 +147,30 @@
                 </div>
             </div>
 
+            <!-- PHASE 2 ENHANCEMENT: Quick Fill from Recent Invoices -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card card-outline card-info">
+                        <div class="card-body p-2">
+                            <div class="row align-items-center">
+                                <div class="col-md-2">
+                                    <strong><i class="fas fa-history"></i> Quick Fill:</strong>
+                                </div>
+                                <div class="col-md-10">
+                                    <select id="recent-invoices" class="form-control">
+                                        <option value="">Select from your recent invoices to auto-fill...</option>
+                                    </select>
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i> Select a recent invoice to auto-fill supplier,
+                                        type, currency, and projects. You can then adjust dates and amounts.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ENHANCEMENT: Form Progress Indicator -->
             <div class="row">
                 <div class="col-12">
@@ -345,12 +369,19 @@
                                                 <div class="input-group-prepend">
                                                     <span class="input-group-text" id="currency-prefix">IDR</span>
                                                 </div>
-                                                <input type="text" name="amount_display" id="amount_display"
-                                                    class="form-control @error('amount') is-invalid @enderror"
+                                            <input type="text" name="amount_display" id="amount_display"
+                                                class="form-control @error('amount') is-invalid @enderror"
                                                     value="{{ old('amount') }}" onkeyup="formatNumber(this)"
                                                     placeholder="0.00" required>
-                                                <input type="hidden" name="amount" id="amount"
-                                                    value="{{ old('amount') }}">
+                                            <input type="hidden" name="amount" id="amount"
+                                                value="{{ old('amount') }}">
+                                                <div class="input-group-append">
+                                                    <button type="button" class="btn btn-outline-info"
+                                                        id="calculator-btn" data-toggle="tooltip"
+                                                        title="Quick Calculator">
+                                                        <i class="fas fa-calculator"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                             @error('amount')
                                                 <span class="invalid-feedback d-block">{{ $message }}</span>
@@ -583,9 +614,13 @@
                             <div class="card-footer">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <button type="submit" class="btn btn-primary btn-lg" id="submit-invoice-btn">
-                                            <i class="fas fa-save"></i> Create Invoice
+                                        <button type="button" class="btn btn-outline-info btn-lg mr-2"
+                                            id="preview-invoice-btn">
+                                            <i class="fas fa-eye"></i> Preview
                                         </button>
+                                        <button type="submit" class="btn btn-primary btn-lg" id="submit-invoice-btn">
+                                    <i class="fas fa-save"></i> Create Invoice
+                                </button>
                                         <a href="{{ route('invoices.index') }}"
                                             class="btn btn-outline-secondary btn-lg ml-2" id="cancel-btn">
                                             <i class="fas fa-times"></i> Cancel
@@ -1234,7 +1269,7 @@
                 if (receiveDate && $('#payment_date').val()) {
                     if ($('#payment_date').val() < receiveDate) {
                         $('#payment_date').val('');
-                        toastr.warning('Payment date cannot be earlier than receive date.');
+                            toastr.warning('Payment date cannot be earlier than receive date.');
                     }
                 }
             });
@@ -1479,6 +1514,524 @@
                 boundary: 'window'
             });
 
+            // ========== PHASE 1 UX IMPROVEMENTS ==========
+
+            // IMPROVEMENT 1: Supplier-Specific Defaults
+            $('#supplier_id').on('change', function() {
+                var supplierId = $(this).val();
+
+                if (!supplierId) return;
+
+                $.ajax({
+                    url: '/invoices/supplier-defaults/' + supplierId,
+                    type: 'GET',
+                    success: function(data) {
+                        console.log('Supplier defaults loaded:', data);
+
+                        // Auto-suggest currency if not already set
+                        if (data.common_currency && !$('#currency').val()) {
+                            $('#currency').val(data.common_currency).trigger('change');
+                            toastr.info('Currency set to ' + data.common_currency +
+                                ' (commonly used with this supplier)', 'Auto-filled');
+                        }
+
+                        // Show last invoice type as hint
+                        if (data.last_type_name) {
+                            var typeHint = $('#type_id').parent().find('.supplier-type-hint');
+                            if (typeHint.length === 0) {
+                                $('#type_id').parent().append(
+                                    '<small class="form-text text-info supplier-type-hint">' +
+                                    '<i class="fas fa-info-circle"></i> Last used: <strong>' + data
+                                    .last_type_name + '</strong>' +
+                                    '</small>'
+                                );
+                            } else {
+                                typeHint.html(
+                                    '<i class="fas fa-info-circle"></i> Last used: <strong>' + data
+                                    .last_type_name + '</strong>'
+                                );
+                            }
+                        }
+
+                        // Auto-suggest payment project if consistent
+                        if (data.common_payment_project && !$('#payment_project').val() && data
+                            .total_invoices >= 3) {
+                            $('#payment_project').val(data.common_payment_project).trigger('change');
+                            toastr.info('Payment project set based on your history with this supplier',
+                                'Auto-filled');
+                        }
+                    },
+                    error: function() {
+                        console.log('Could not load supplier defaults');
+                    }
+                });
+            });
+
+            // IMPROVEMENT 2: Duplicate Invoice Warning
+            var duplicateCheckTimeout = null;
+
+            function checkForDuplicateInvoice() {
+                var supplierId = $('#supplier_id').val();
+                var fakturNo = $('#faktur_no').val().trim();
+
+                if (!supplierId || !fakturNo) {
+                    return;
+                }
+
+                // Clear previous timeout
+                if (duplicateCheckTimeout) {
+                    clearTimeout(duplicateCheckTimeout);
+                }
+
+                // Debounce the check
+                duplicateCheckTimeout = setTimeout(function() {
+                    $.ajax({
+                        url: '{{ route('invoices.check-duplicate') }}',
+                        type: 'POST',
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            supplier_id: supplierId,
+                            faktur_no: fakturNo
+                        },
+                        success: function(data) {
+                            if (data.exists) {
+                                // Show beautiful warning dialog
+                                Swal.fire({
+                                    title: 'Possible Duplicate Invoice',
+                                    html: '<div class="text-left">' +
+                                        '<p>An invoice with this Faktur Number already exists for this supplier:</p>' +
+                                        '<div class="alert alert-warning mt-2 mb-2">' +
+                                        '<table class="table table-sm mb-0">' +
+                                        '<tr><th width="40%">Invoice Number:</th><td><strong>' +
+                                        data.existing.invoice_number + '</strong></td></tr>' +
+                                        '<tr><th>Faktur Number:</th><td><strong>' + data
+                                        .existing.faktur_no + '</strong></td></tr>' +
+                                        '<tr><th>Date:</th><td>' + data.existing.invoice_date +
+                                        '</td></tr>' +
+                                        '<tr><th>Amount:</th><td>' + data.existing.currency +
+                                        ' ' + data.existing.amount_formatted + '</td></tr>' +
+                                        '<tr><th>Status:</th><td><span class="badge badge-info">' +
+                                        data.existing.status + '</span></td></tr>' +
+                                        '</table>' +
+                                        '</div>' +
+                                        '<p class="mt-2"><strong>Are you sure you want to continue?</strong></p>' +
+                                        '<p class="text-muted small">Note: This might be a duplicate entry. Please verify before proceeding.</p>' +
+                                        '</div>',
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonText: '<i class="fas fa-check"></i> Yes, Continue Anyway',
+                                    cancelButtonText: '<i class="fas fa-times"></i> Cancel & Review',
+                                    confirmButtonColor: '#ffc107',
+                                    cancelButtonColor: '#6c757d',
+                                    reverseButtons: true,
+                                    width: '600px',
+                                    customClass: {
+                                        confirmButton: 'btn btn-warning btn-lg',
+                                        cancelButton: 'btn btn-secondary btn-lg'
+                                    }
+                                }).then((result) => {
+                                    if (!result.isConfirmed) {
+                                        // User wants to review - highlight the faktur field
+                                        $('#faktur_no').focus().select();
+                                    }
+                                });
+                            }
+                        },
+                        error: function() {
+                            console.log('Could not check for duplicates');
+                        }
+                    });
+                }, 800); // Debounce 800ms
+            }
+
+            // Trigger duplicate check on blur and when both fields are filled
+            $('#faktur_no').on('blur', checkForDuplicateInvoice);
+            $('#supplier_id').on('change', function() {
+                if ($('#faktur_no').val().trim()) {
+                    checkForDuplicateInvoice();
+                }
+            });
+
+            // IMPROVEMENT 3: Validation Summary Panel
+            var validationPanel = $(
+                '<div class="validation-summary alert alert-danger" style="display:none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; min-width: 400px; max-width: 600px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">' +
+                '<button type="button" class="close" aria-label="Close" onclick="$(this).parent().fadeOut()">' +
+                '<span aria-hidden="true">&times;</span>' +
+                '</button>' +
+                '<h5><i class="fas fa-exclamation-triangle"></i> Please Fix These Errors:</h5>' +
+                '<ul id="validation-error-list" class="mb-0 pl-3"></ul>' +
+                '</div>');
+
+            $('body').append(validationPanel);
+
+            function updateValidationSummary() {
+                var errors = [];
+                var errorList = $('#validation-error-list');
+
+                // Check all required fields
+                $('[required]:visible').each(function() {
+                    var field = $(this);
+                    var value = field.val();
+                    var label = field.closest('.form-group').find('label').first().clone().children().remove().end()
+                        .text().trim();
+
+                    if (!value || value === '' || value === null) {
+                        errors.push({
+                            field: field,
+                            label: label || field.attr('name'),
+                            message: label + ' is required'
+                        });
+                    }
+                });
+
+                // Check for validation errors (is-invalid class)
+                $('.is-invalid:visible').each(function() {
+                    var field = $(this);
+                    var label = field.closest('.form-group').find('label').first().clone().children().remove().end()
+                        .text().trim();
+                    var errorMsg = field.siblings('.invalid-feedback').text();
+
+                    if (errorMsg) {
+                        errors.push({
+                            field: field,
+                            label: label || field.attr('name'),
+                            message: errorMsg
+                        });
+                    }
+                });
+
+                if (errors.length > 0) {
+                    errorList.empty();
+                    errors.forEach(function(error, index) {
+                        var li = $('<li style="cursor: pointer; margin-bottom: 5px;"></li>')
+                            .html('<i class="fas fa-arrow-right mr-1"></i> ' + error.message)
+                            .on('click', function() {
+                                error.field.focus();
+                                $('html, body').animate({
+                                    scrollTop: error.field.offset().top - 100
+                                }, 300);
+                            });
+                        errorList.append(li);
+                    });
+
+                    $('.validation-summary').fadeIn();
+                    return false;
+                } else {
+                    $('.validation-summary').fadeOut();
+                    return true;
+                }
+            }
+
+            // Update validation summary on field changes
+            $('form :input').on('blur change', function() {
+                // Only show summary if user has tried to interact with form
+                if ($(this).val() || $('.is-invalid').length > 0) {
+                    updateValidationSummary();
+                }
+            });
+
+            // Validate before form submission
+            $('form').on('submit', function(e) {
+                var isValid = updateValidationSummary();
+                if (!isValid) {
+                    e.preventDefault();
+                    toastr.error('Please fix the errors highlighted below', 'Validation Error');
+                    $('html, body').animate({
+                        scrollTop: $('.validation-summary').offset().top - 100
+                    }, 300);
+                    return false;
+                }
+            });
+
+            // ========== END PHASE 1 UX IMPROVEMENTS ==========
+
+            // ========== PHASE 2 UX IMPROVEMENTS ==========
+
+            // IMPROVEMENT 1: Quick Fill from Recent Invoices
+            var recentInvoicesData = [];
+
+            // Load recent invoices on page load
+            $.ajax({
+                url: '{{ route('invoices.recent-for-autofill') }}',
+                type: 'GET',
+                success: function(data) {
+                    if (data.success && data.invoices.length > 0) {
+                        recentInvoicesData = data.invoices;
+                        console.log('Recent invoices loaded:', data.invoices.length);
+
+                        data.invoices.forEach(function(inv) {
+                            $('#recent-invoices').append(
+                                $('<option></option>')
+                                .val(inv.id)
+                                .text(inv.faktur_no ? inv.faktur_no + ' - ' + inv.supplier_name +
+                                    ' (' + inv.created_at + ')' :
+                                    inv.invoice_number + ' - ' + inv.supplier_name + ' (' + inv
+                                    .created_at + ')')
+                                .data('invoice', inv)
+                            );
+                        });
+
+                        // Initialize Select2 for recent invoices
+                        $('#recent-invoices').select2({
+                            theme: 'bootstrap4',
+                            placeholder: 'Select from your recent invoices...',
+                            allowClear: true,
+                            width: '100%'
+                        });
+                    } else {
+                        $('#recent-invoices').parent().parent().parent().parent().hide();
+                    }
+                },
+                error: function() {
+                    console.log('Could not load recent invoices');
+                    $('#recent-invoices').parent().parent().parent().parent().hide();
+                }
+            });
+
+            // Handle recent invoice selection
+            $('#recent-invoices').on('change', function() {
+                var selectedId = $(this).val();
+                if (!selectedId) return;
+
+                var invoice = $(this).find('option:selected').data('invoice');
+                if (!invoice) return;
+
+                Swal.fire({
+                    title: 'Quick Fill from Recent Invoice',
+                    html: '<div class="text-left">' +
+                        '<p>Auto-fill form with data from:</p>' +
+                        '<div class="alert alert-info mt-2 mb-2">' +
+                        '<table class="table table-sm mb-0">' +
+                        '<tr><th width="40%">Invoice:</th><td><strong>' + invoice.invoice_number +
+                        '</strong></td></tr>' +
+                        '<tr><th>Supplier:</th><td>' + invoice.supplier_name + '</td></tr>' +
+                        '<tr><th>Type:</th><td>' + invoice.type_name + '</td></tr>' +
+                        '<tr><th>Currency:</th><td>' + invoice.currency + '</td></tr>' +
+                        '<tr><th>Amount:</th><td>' + invoice.currency + ' ' + invoice.amount_formatted +
+                        '</td></tr>' +
+                        '</table>' +
+                        '</div>' +
+                        '<p class="mt-2"><strong>Note:</strong> Dates and amounts will NOT be copied. Only supplier, type, currency, and projects will be filled.</p>' +
+                        '</div>',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fas fa-check"></i> Yes, Auto-Fill',
+                    cancelButtonText: '<i class="fas fa-times"></i> Cancel',
+                    confirmButtonColor: '#17a2b8',
+                    cancelButtonColor: '#6c757d',
+                    reverseButtons: true,
+                    width: '600px'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Auto-fill fields
+                        $('#supplier_id').val(invoice.supplier_id).trigger('change');
+                        $('#type_id').val(invoice.type_id).trigger('change');
+                        $('#currency').val(invoice.currency).trigger('change');
+                        $('#invoice_project').val(invoice.invoice_project).trigger('change');
+                        $('#payment_project').val(invoice.payment_project).trigger('change');
+
+                        // Show success message
+                        toastr.success(
+                            'Form auto-filled from recent invoice. Please update dates and amounts.',
+                            'Quick Fill Complete');
+
+                        // Focus on invoice number field
+                        setTimeout(function() {
+                            $('#faktur_no').focus();
+                        }, 500);
+                    }
+
+                    // Reset dropdown
+                    $('#recent-invoices').val('').trigger('change');
+                });
+            });
+
+            // IMPROVEMENT 2: Amount Calculator Widget
+            $('#calculator-btn').on('click', function() {
+                var currentAmount = parseFloat($('#amount').val()) || 0;
+
+                Swal.fire({
+                    title: '<i class="fas fa-calculator"></i> Quick Calculator',
+                    html: '<div class="calculator-widget">' +
+                        '<div class="form-group">' +
+                        '<label>Base Amount:</label>' +
+                        '<input type="text" id="calc-base" class="form-control form-control-lg text-right" value="' +
+                        currentAmount.toFixed(2) + '">' +
+                        '</div>' +
+                        '<div class="row mb-3">' +
+                        '<div class="col-4"><button type="button" class="btn btn-block btn-success calc-action" data-action="add" data-value="10">+10%</button></div>' +
+                        '<div class="col-4"><button type="button" class="btn btn-block btn-warning calc-action" data-action="subtract" data-value="10">-10%</button></div>' +
+                        '<div class="col-4"><button type="button" class="btn btn-block btn-info calc-action" data-action="add" data-value="11">+11% (VAT)</button></div>' +
+                        '</div>' +
+                        '<div class="row mb-3">' +
+                        '<div class="col-4"><button type="button" class="btn btn-block btn-success calc-action" data-action="multiply" data-value="2">×2</button></div>' +
+                        '<div class="col-4"><button type="button" class="btn btn-block btn-success calc-action" data-action="divide" data-value="2">÷2</button></div>' +
+                        '<div class="col-4"><button type="button" class="btn btn-block btn-secondary" id="calc-clear">Clear</button></div>' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                        '<label>Result:</label>' +
+                        '<input type="text" id="calc-result" class="form-control form-control-lg text-right font-weight-bold" readonly style="background-color: #e9ecef; font-size: 1.25rem;">' +
+                        '</div>' +
+                        '</div>',
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fas fa-check"></i> Use This Amount',
+                    cancelButtonText: '<i class="fas fa-times"></i> Cancel',
+                    confirmButtonColor: '#28a745',
+                    cancelButtonColor: '#6c757d',
+                    width: '500px',
+                    didOpen: function() {
+                        // Initialize calculator
+                        $('#calc-result').val(currentAmount.toFixed(2));
+
+                        // Calculate button actions
+                        $('.calc-action').on('click', function() {
+                            var base = parseFloat($('#calc-base').val()) || 0;
+                            var action = $(this).data('action');
+                            var value = parseFloat($(this).data('value'));
+                            var result = 0;
+
+                            switch (action) {
+                                case 'add':
+                                    result = base + (base * value / 100);
+                                    break;
+                                case 'subtract':
+                                    result = base - (base * value / 100);
+                                    break;
+                                case 'multiply':
+                                    result = base * value;
+                                    break;
+                                case 'divide':
+                                    result = base / value;
+                                    break;
+                            }
+
+                            $('#calc-result').val(result.toFixed(2));
+                        });
+
+                        // Clear button
+                        $('#calc-clear').on('click', function() {
+                            $('#calc-base').val('0.00');
+                            $('#calc-result').val('0.00');
+                        });
+
+                        // Update result when base changes
+                        $('#calc-base').on('input', function() {
+                            var base = parseFloat($(this).val()) || 0;
+                            $('#calc-result').val(base.toFixed(2));
+                        });
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        var calculatedAmount = parseFloat($('#calc-result').val()) || 0;
+                        $('#amount').val(calculatedAmount);
+                        $('#amount_display').val(calculatedAmount.toFixed(2)).trigger('input');
+                        toastr.success('Amount updated from calculator', 'Amount Set');
+                    }
+                });
+            });
+
+            // IMPROVEMENT 3: Invoice Preview Before Submit
+            $('#preview-invoice-btn').on('click', function() {
+                // Validate required fields first
+                var requiredFilled = true;
+                var missingFields = [];
+
+                $('[required]:visible').each(function() {
+                    if (!$(this).val() || $(this).val() === '') {
+                        requiredFilled = false;
+                        var label = $(this).closest('.form-group').find('label').first().clone().children()
+                            .remove().end().text().trim();
+                        missingFields.push(label);
+                    }
+                });
+
+                if (!requiredFilled) {
+                    toastr.warning('Please fill all required fields before previewing', 'Cannot Preview');
+                    return;
+                }
+
+                // Generate preview HTML
+                var previewHTML = '<div class="invoice-preview text-left">' +
+                    '<table class="table table-bordered table-sm">' +
+                    '<thead class="bg-light"><tr><th colspan="2" class="text-center"><h5 class="mb-0">Invoice Information</h5></th></tr></thead>' +
+                    '<tbody>' +
+                    '<tr><th width="35%"><i class="fas fa-building"></i> Supplier:</th><td><strong>' + $(
+                        '#supplier_id option:selected').text() + '</strong></td></tr>' +
+                    '<tr><th><i class="fas fa-file-invoice"></i> Invoice Number:</th><td><strong>' + $('#faktur_no')
+                    .val() + '</strong></td></tr>' +
+                    '<tr><th><i class="fas fa-calendar"></i> Invoice Date:</th><td>' + $('#invoice_date').val() +
+                    '</td></tr>' +
+                    '<tr><th><i class="fas fa-calendar-check"></i> Receive Date:</th><td>' + $('#receive_date')
+                    .val() + '</td></tr>' +
+                    '<tr><th><i class="fas fa-tag"></i> Type:</th><td>' + $('#type_id option:selected').text() +
+                    '</td></tr>' +
+                    '<tr><th><i class="fas fa-money-bill-wave"></i> Currency:</th><td>' + $('#currency').val() +
+                    '</td></tr>' +
+                    '<tr><th><i class="fas fa-dollar-sign"></i> Amount:</th><td class="text-right"><strong class="text-success" style="font-size: 1.1rem;">' +
+                    $('#currency').val() + ' ' + $('#amount_display').val() + '</strong></td></tr>' +
+                    '<tr><th><i class="fas fa-project-diagram"></i> Invoice Project:</th><td>' + $(
+                        '#invoice_project option:selected').text() + '</td></tr>' +
+                    '<tr><th><i class="fas fa-credit-card"></i> Payment Project:</th><td>' + $(
+                        '#payment_project option:selected').text() + '</td></tr>' +
+                    '<tr><th><i class="fas fa-map-marker-alt"></i> Current Location:</th><td>' + $(
+                        '#cur_loc option:selected').text() + '</td></tr>';
+
+                // Add optional fields if filled
+                if ($('#po_no').val()) {
+                    previewHTML += '<tr><th><i class="fas fa-file-alt"></i> PO Number:</th><td>' + $('#po_no')
+                    .val() + '</td></tr>';
+                }
+                if ($('#faktur_no').val()) {
+                    previewHTML += '<tr><th><i class="fas fa-receipt"></i> Faktur No:</th><td>' + $('#faktur_no')
+                        .val() + '</td></tr>';
+                }
+                if ($('#sap_doc').val()) {
+                    previewHTML += '<tr><th><i class="fas fa-barcode"></i> SAP Document:</th><td>' + $('#sap_doc')
+                        .val() + '</td></tr>';
+                }
+                if ($('#remarks').val()) {
+                    previewHTML += '<tr><th><i class="fas fa-comment"></i> Remarks:</th><td>' + $('#remarks')
+                    .val() + '</td></tr>';
+                }
+
+                // Add selected documents count
+                var selectedCount = Object.keys(selectedDocs).length;
+                if (selectedCount > 0) {
+                    previewHTML +=
+                        '<tr><th><i class="fas fa-link"></i> Linked Documents:</th><td><span class="badge badge-info">' +
+                        selectedCount + ' document(s)</span></td></tr>';
+                }
+
+                previewHTML += '</tbody></table></div>';
+
+                Swal.fire({
+                    title: '<i class="fas fa-eye"></i> Invoice Preview',
+                    html: previewHTML,
+                    width: '700px',
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fas fa-check-circle"></i> Looks Good, Submit!',
+                    cancelButtonText: '<i class="fas fa-edit"></i> Edit Invoice',
+                    confirmButtonColor: '#28a745',
+                    cancelButtonColor: '#6c757d',
+                    reverseButtons: true,
+                    customClass: {
+                        confirmButton: 'btn btn-success btn-lg',
+                        cancelButton: 'btn btn-secondary btn-lg'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Submit the form
+                        console.log('User confirmed preview - submitting form');
+                        $('form').submit();
+                    } else if (result.isDismissed) {
+                        // User wants to edit
+                        toastr.info('Review and update your invoice as needed', 'Edit Mode');
+                    }
+                });
+            });
+
+            // ========== END PHASE 2 UX IMPROVEMENTS ==========
+
             // ENHANCEMENT: Keyboard Shortcuts
             $(document).on('keydown', function(e) {
                 // Ctrl+S to submit form
@@ -1679,7 +2232,7 @@
                     renderSelectedTable();
                 } else {
                     delete selectedDocs[id];
-                    renderSelectedTable();
+                renderSelectedTable();
                 }
             });
 

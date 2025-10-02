@@ -44,10 +44,12 @@ class InvoiceAttachmentController extends Controller
 
         $request->validate([
             'description' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:50'],
         ]);
 
         $attachment->update([
             'description' => $request->description,
+            'category' => $request->category,
         ]);
 
         if (request()->ajax()) {
@@ -80,6 +82,7 @@ class InvoiceAttachmentController extends Controller
         $request->validate([
             'files.*' => ['required', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,gif,webp'],
             'description' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:50'],
         ]);
 
         $uploadedFiles = [];
@@ -107,6 +110,7 @@ class InvoiceAttachmentController extends Controller
                     'file_size' => $file->getSize(),
                     'mime_type' => $file->getMimeType(),
                     'description' => $request->description,
+                    'category' => $request->category,
                     'uploaded_by' => Auth::id(),
                 ]);
 

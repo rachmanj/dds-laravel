@@ -60,6 +60,15 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
     // Search additional documents by PO number (AJAX)
     Route::post('/search-additional-documents', [InvoiceController::class, 'searchAdditionalDocuments'])->name('search-additional-documents');
 
+    // Supplier defaults for auto-suggestion (AJAX)
+    Route::get('/supplier-defaults/{supplier}', [InvoiceController::class, 'getSupplierDefaults'])->name('supplier-defaults');
+
+    // Check for duplicate invoice (AJAX)
+    Route::post('/check-duplicate', [InvoiceController::class, 'checkDuplicate'])->name('check-duplicate');
+
+    // Get recent invoices for quick fill (AJAX)
+    Route::get('/recent-for-autofill', [InvoiceController::class, 'getRecentInvoices'])->name('recent-for-autofill');
+
     // Invoice attachment routes
     Route::prefix('attachments')->group(function () {
         Route::get('/{invoice}/show', [InvoiceAttachmentController::class, 'show'])->name('attachments.show');

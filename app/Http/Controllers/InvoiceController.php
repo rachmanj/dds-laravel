@@ -530,4 +530,123 @@ class InvoiceController extends Controller
             'documents' => $documents,
         ]);
     }
+
+    /**
+     * Get supplier-specific defaults for auto-suggestion.
+     * Returns common currency, last used invoice type, and common payment project.
+     */
+    public function getSupplierDefaults($supplierId)
+    {
+        $user = Auth::user();
+
+        // Get most common currency for this supplier (from user's invoices)
+        $commonCurrency = Invoice::where('supplier_id', $supplierId)
+            ->where('created_by', $user->id)
+            ->select('currency')
+            ->groupBy('currency')
+            ->orderByRaw('COUNT(*) DESC')
+            ->first();
+
+        // Get last used invoice type for this supplier (from user's invoices)
+        $lastInvoice = Invoice::with('type')
+            ->where('supplier_id', $supplierId)
+            ->where('created_by', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        // Get most common payment project for this supplier (from user's invoices)
+        $commonPaymentProject = Invoice::where('supplier_id', $supplierId)
+            ->where('created_by', $user->id)
+            ->whereNotNull('payment_project')
+            ->select('payment_project')
+            ->groupBy('payment_project')
+            ->orderByRaw('COUNT(*) DESC')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'common_currency' => $commonCurrency ? $commonCurrency->currency : null,
+            'last_type' => $lastInvoice && $lastInvoice->type ? $lastInvoice->type_id : null,
+            'last_type_name' => $lastInvoice && $lastInvoice->type ? $lastInvoice->type->type_name : null,
+            'common_payment_project' => $commonPaymentProject ? $commonPaymentProject->payment_project : null,
+            'total_invoices' => Invoice::where('supplier_id', $supplierId)
+                ->where('created_by', $user->id)
+                ->count(),
+        ]);
+    }
+
+    /**
+     * Check if invoice with same faktur number and supplier already exists.
+     * Used to warn about potential duplicates.
+     */
+    public function checkDuplicate(Request $request)
+    {
+        $request->validate([
+            'supplier_id' => 'required|exists:suppliers,id',
+            'faktur_no' => 'required|string',
+        ]);
+
+        $existingInvoice = Invoice::with('supplier')
+            ->where('supplier_id', $request->supplier_id)
+            ->where('faktur_no', $request->faktur_no)
+            ->first();
+
+        if ($existingInvoice) {
+            return response()->json([
+                'exists' => true,
+                'existing' => [
+                    'id' => $existingInvoice->id,
+                    'invoice_number' => $existingInvoice->invoice_number,
+                    'faktur_no' => $existingInvoice->faktur_no,
+                    'invoice_date' => $existingInvoice->invoice_date->format('d M Y'),
+                    'amount_formatted' => number_format($existingInvoice->amount, 2),
+                    'currency' => $existingInvoice->currency,
+                    'status' => ucfirst($existingInvoice->status),
+                    'supplier_name' => $existingInvoice->supplier->name,
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'exists' => false,
+        ]);
+    }
+
+    /**
+     * Get user's recent invoices for quick fill auto-complete.
+     * Returns last 5 invoices created by the current user.
+     */
+    public function getRecentInvoices()
+    {
+        $user = Auth::user();
+
+        $recentInvoices = Invoice::with(['supplier', 'type'])
+            ->where('created_by', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($invoice) {
+                return [
+                    'id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    'faktur_no' => $invoice->faktur_no,
+                    'supplier_id' => $invoice->supplier_id,
+                    'supplier_name' => $invoice->supplier ? $invoice->supplier->name : '',
+                    'type_id' => $invoice->type_id,
+                    'type_name' => $invoice->type ? $invoice->type->type_name : '',
+                    'currency' => $invoice->currency,
+                    'invoice_project' => $invoice->invoice_project,
+                    'payment_project' => $invoice->payment_project,
+                    'invoice_date' => $invoice->invoice_date->format('Y-m-d'),
+                    'amount' => $invoice->amount,
+                    'amount_formatted' => number_format($invoice->amount, 2),
+                    'created_at' => $invoice->created_at->format('d M Y'),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'invoices' => $recentInvoices,
+        ]);
+    }
 }

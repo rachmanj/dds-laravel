@@ -15,6 +15,7 @@ class InvoiceAttachment extends Model
         'file_size',
         'mime_type',
         'description',
+        'category',
         'uploaded_by',
     ];
 
@@ -98,11 +99,36 @@ class InvoiceAttachment extends Model
     }
 
     /**
-     * Get the file URL for download.
+     * Get the category badge HTML.
      */
-    public function getDownloadUrlAttribute()
+    public function getCategoryBadgeAttribute()
     {
-        return route('invoices.attachments.download', $this->id);
+        if (!$this->category) {
+            return '<span class="badge badge-secondary">No Category</span>';
+        }
+
+        $badgeClass = match($this->category) {
+            'Invoice Copy' => 'badge-primary',
+            'Purchase Order' => 'badge-success',
+            'Supporting Document' => 'badge-info',
+            'Other' => 'badge-warning',
+            default => 'badge-secondary'
+        };
+
+        return '<span class="badge ' . $badgeClass . '">' . e($this->category) . '</span>';
+    }
+
+    /**
+     * Get available categories.
+     */
+    public static function getAvailableCategories()
+    {
+        return [
+            'Invoice Copy',
+            'Purchase Order', 
+            'Supporting Document',
+            'Other'
+        ];
     }
 
     /**

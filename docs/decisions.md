@@ -1,3 +1,96 @@
+## 2025-10-02 — Invoice Edit Page JavaScript Debugging & Production Readiness
+
+-   **Context**: Invoice Edit page had 9 UX improvements implemented but JavaScript errors ("Unexpected end of input") were preventing interactive features from working. Comprehensive testing was needed to verify production readiness.
+
+-   **Decision**: Debug JavaScript syntax errors and conduct comprehensive browser automation testing to ensure all 9 UX improvements are fully functional and production-ready.
+
+-   **Implementation**:
+
+    -   **JavaScript Debugging**: Identified missing closing brace `}` for `initializeInvoiceForm` function causing syntax errors
+    -   **Browser Automation Testing**: Used Playwright to test all interactive features including calculator widget, preview modal, keyboard shortcuts, form validation, and database integration
+    -   **Production Verification**: Confirmed all features working correctly with real data persistence
+
+-   **Alternatives Considered**:
+
+    -   **Manual Testing Only**: Rejected - browser automation provides more comprehensive and reliable testing
+    -   **Deploy Without Testing**: Rejected - production deployment requires verified functionality
+    -   **Partial Testing**: Rejected - all features needed verification for production readiness
+    -   **Ignore JavaScript Errors**: Rejected - errors prevent features from working properly
+
+-   **Technical Decisions**:
+
+    -   **Root Cause Analysis**: Systematically identified missing closing brace as cause of "Unexpected end of input" errors
+    -   **Browser Automation**: Used Playwright for comprehensive testing of all interactive features
+    -   **Real Database Testing**: Verified actual data persistence with amount calculations (152,000 → 167,200)
+    -   **Console Logging**: Confirmed clean console logs after debugging
+    -   **Feature Verification**: Tested each of the 9 UX improvements individually
+
+-   **Implications**:
+
+    -   **Production Readiness**: All 9 UX improvements now fully functional and verified
+    -   **User Experience**: Calculator widget, preview modal, keyboard shortcuts all working perfectly
+    -   **Data Integrity**: Database integration confirmed working with persistent updates
+    -   **Performance**: All features working smoothly without JavaScript errors
+    -   **Maintainability**: Clean code structure enables future enhancements
+    -   **Documentation**: Comprehensive testing results documented for future reference
+
+-   **Testing Results**:
+
+    -   **Form Progress Indicator**: ✅ Shows "Form Progress: 100% Complete" correctly
+    -   **Amount Calculator Widget**: ✅ +10% calculation working (152,000 → 167,200)
+    -   **Invoice Preview Feature**: ✅ SweetAlert2 modal displays complete invoice summary
+    -   **Keyboard Shortcuts**: ✅ Ctrl+S successfully triggers form submission
+    -   **Enhanced Submit Button**: ✅ Loading state working with spinner animation
+    -   **Currency Prefix Display**: ✅ IDR prefix displayed correctly
+    -   **Form Validation**: ✅ All validation working properly
+    -   **Database Integration**: ✅ Invoice updates persisted successfully
+
+-   **Status**: ✅ **COMPLETED** - All features production-ready with comprehensive testing verification
+
+---
+
+## 2025-10-01 — Invoice Attachments Page UX Transformation (3 Core Improvements)
+
+-   **Context**: Invoice Attachments page had basic file upload functionality with modal-based file input, page reloads after operations, and no file organization system. Users needed modern drag-and-drop interface, file categorization, and seamless file management without page refreshes.
+
+-   **Decision**: Implement 3 core UX improvements using Dropzone.js for drag-and-drop, database schema changes for categorization, and JavaScript enhancements for dynamic table updates - transforming the page from basic upload to professional file management system.
+
+-   **Implementation**:
+
+    -   **Drag-and-Drop with Dropzone.js**: Replaced modal file input with professional dropzone interface, file preview cards, individual file management, progress bars, and file queue system
+    -   **File Categorization**: Added `category` column to database, implemented 5-category system (All Documents, Invoice Copy, Purchase Order, Supporting Document, Other), category dropdowns, badges, and filter buttons
+    -   **Dynamic Table Updates**: Real-time table updates without page reload, AJAX integration with proper headers, automatic row addition/removal, file count updates
+
+-   **Alternatives Considered**:
+
+    -   **Modal with Dropzone**: Rejected - inline dropzone provides more space, better visibility, and modern UX patterns
+    -   **Server-side File Processing**: Rejected - client-side preview and management provides better user experience
+    -   **Page Reload After Operations**: Rejected - dynamic updates provide smoother user experience
+    -   **Basic File Input**: Rejected - drag-and-drop is industry standard for modern file management
+    -   **No File Categorization**: Rejected - categorization improves organization and workflow efficiency
+
+-   **Technical Decisions**:
+
+    -   **Database Schema**: Added nullable `category` column to maintain backward compatibility
+    -   **AJAX Headers**: Added `X-Requested-With: XMLHttpRequest` for proper server recognition
+    -   **File Extension Handling**: Extract from filename instead of relying on server-provided field
+    -   **Error Handling**: Comprehensive error handling with user feedback and console logging
+    -   **DataTable Integration**: Used existing DataTable for category filtering and search functionality
+
+-   **Implications**:
+
+    -   **User Experience**: Transformed from basic upload to professional file management with modern UX patterns
+    -   **File Organization**: 5-category system improves workflow efficiency and file management
+    -   **Performance**: No page reloads provide faster perceived performance and smoother operations
+    -   **Maintainability**: Modular JavaScript functions make future enhancements easier
+    -   **Scalability**: Dropzone.js and DataTable provide robust foundation for future features
+    -   **Training**: Users need brief introduction to drag-and-drop interface and category system
+    -   **Browser Compatibility**: Dropzone.js works across modern browsers with graceful degradation
+
+-   **Review Date**: 2025-11-01 (1 month) - Evaluate user adoption and identify additional enhancement opportunities
+
+---
+
 ## 2025-10-01 — Invoice Create Page UX Enhancements (7 Major Features)
 
 -   **Context**: Invoice create form had basic functionality but lacked modern UX features that could improve data entry efficiency, reduce user errors, and provide better visual feedback. Users requested improvements for power-user workflows, progress tracking, and better field visibility.
@@ -5,6 +98,7 @@
 -   **Decision**: Implement 7 comprehensive UX enhancements focused on keyboard shortcuts, visual feedback, smart validation, and enhanced dropdown information display - all as frontend-only improvements requiring no backend changes.
 
 -   **Implementation**:
+
     -   **Keyboard Shortcuts**: Ctrl+S (save with validation), Esc (cancel), Ctrl+Enter in PO field (search documents)
     -   **Progress Indicator**: Real-time color-coded progress bar (red→yellow→green) showing "X/8 required fields completed"
     -   **Enhanced Submit Button**: Loading state with spinner, disabled state during submission, Cancel button, prevents double-submission
@@ -14,6 +108,7 @@
     -   **Invoice Project Required**: Changed from optional to required field, updated validation and progress counter
 
 -   **Alternatives Considered**:
+
     -   **Backend Progress Tracking**: Rejected - frontend real-time tracking provides instant feedback without server overhead
     -   **Multi-step Form Wizard**: Rejected - single-page form with progress indicator balances simplicity and guidance
     -   **Always-visible Additional Docs**: Rejected - collapsed by default reduces visual complexity, auto-expand provides best of both worlds
@@ -21,6 +116,7 @@
     -   **Separate SAP Code Column**: Rejected - inline display in dropdown is more efficient for data entry
 
 -   **Implications**:
+
     -   **Power User Efficiency**: Keyboard shortcuts significantly speed up repetitive data entry tasks
     -   **User Confidence**: Progress indicator and loading states reduce uncertainty during form completion
     -   **Error Prevention**: Required Invoice Project field and linked-document warnings prevent common mistakes
@@ -30,6 +126,7 @@
     -   **Browser Compatibility**: All features work cross-platform in modern browsers
 
 -   **UX Principles Applied**:
+
     -   **Progressive Disclosure**: Collapsed card reduces initial cognitive load
     -   **Immediate Feedback**: Real-time progress updates and validation states
     -   **Error Prevention**: Warnings before potentially problematic actions
@@ -39,6 +136,7 @@
 -   **Review Date**: 2025-12-01 (Review user adoption of keyboard shortcuts and form completion rates)
 
 ---
+
 ## 2025-10-01 — Username Uniqueness Validation System
 
 -   **Context**: System allowed duplicate usernames, creating security risks, login ambiguity, and potential user impersonation issues. Username field was optional but lacked uniqueness enforcement.
@@ -3948,4 +4046,3 @@ After implementing the comprehensive external invoice API system with multiple e
 -   Review Date: 2025-10-05
 
 ---
-
