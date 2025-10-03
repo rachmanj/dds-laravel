@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\InvoiceApiController;
 use App\Http\Controllers\Api\SupplierApiController;
 use App\Http\Controllers\Api\DistributionDocumentController;
 use App\Http\Controllers\Api\AnalyticsController;
+use App\Http\Controllers\ProcessingAnalyticsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -73,4 +74,14 @@ Route::prefix('v1/analytics')->group(function () {
     Route::get('/document-flow', [AnalyticsController::class, 'getDocumentFlowAnalytics']);
     Route::get('/real-time-dashboard', [AnalyticsController::class, 'getRealTimeDashboard']);
     Route::get('/predictive', [AnalyticsController::class, 'getPredictiveAnalytics']);
+});
+
+// Processing Analytics API endpoints
+Route::prefix('v1/processing-analytics')->group(function () {
+    Route::get('/monthly/{year}/{month}', [ProcessingAnalyticsController::class, 'getMonthlyProcessing']);
+    Route::get('/department/{departmentId}', [ProcessingAnalyticsController::class, 'getDepartmentProcessing']);
+    Route::get('/trends/{monthsBack?}', [ProcessingAnalyticsController::class, 'getProcessingTrends']);
+    Route::get('/overview', [ProcessingAnalyticsController::class, 'getMonthlyOverview']);
+    Route::get('/efficiency', [ProcessingAnalyticsController::class, 'getDepartmentEfficiency']);
+    Route::get('/export', [ProcessingAnalyticsController::class, 'exportMonthlyReport']);
 });

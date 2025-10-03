@@ -15,12 +15,32 @@
                 data-accordion="false">
                 <!-- Add icons to the links using the .nav-icon class with font-awesome or any other icon font library -->
 
-                <!-- Dashboard -->
-                <li class="nav-item">
-                    <a href="/dashboard" class="nav-link {{ request()->is('dashboard') ? 'active' : '' }}">
+                <!-- Dashboard Section -->
+                <li
+                    class="nav-item {{ request()->is('dashboard') || request()->is('processing-analytics') ? 'menu-open' : '' }}">
+                    <a href="#"
+                        class="nav-link {{ request()->is('dashboard') || request()->is('processing-analytics') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-tachometer-alt"></i>
-                        <p>Dashboard</p>
+                        <p>
+                            Dashboard
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
                     </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="/dashboard" class="nav-link {{ request()->is('dashboard') ? 'active' : '' }}">
+                                <i class="far fa-circle nav-icon"></i>
+                                <p>Dashboard 1</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/processing-analytics"
+                                class="nav-link {{ request()->is('processing-analytics') ? 'active' : '' }}">
+                                <i class="far fa-circle nav-icon"></i>
+                                <p>Dashboard 2</p>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
 
                 <!-- Divider -->

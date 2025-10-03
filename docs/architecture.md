@@ -6,6 +6,28 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Processing Analytics Architecture** ✅ **NEW**
+
+**Pattern**: Comprehensive document processing analytics with department efficiency tracking
+
+**Implementation**:
+
+-   **Processing Time Calculation**: Uses `DATEDIFF(NOW(), receive_date)` to calculate days documents spend in departments
+-   **Monthly Analytics**: Aggregates data by year/month for trend analysis and performance comparison
+-   **Department Efficiency Scoring**: 4-tier scoring system (Excellent/Good/Fair/Poor) based on processing times
+-   **Real-time Data Visualization**: ECharts integration with interactive charts and tables
+-   **API-first Design**: Separate service layer with RESTful endpoints for data consumption
+-   **Data Integration**: Leverages existing `invoices` and `additional_documents` tables with `receive_date` field
+
+**Service Architecture**:
+```
+ProcessingAnalyticsController
+├── ProcessingAnalyticsService
+├── API Endpoints (/api/v1/processing-analytics/*)
+├── Dashboard View (/processing-analytics)
+└── ECharts Integration
+```
+
 ### **Analytics Integration Architecture** ✅ **NEW**
 
 **Pattern**: Comprehensive analytics system with optimized call frequency and real-time dashboards

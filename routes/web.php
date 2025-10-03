@@ -5,6 +5,7 @@ use App\Models\User;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\ProcessingAnalyticsController;
 
 // Authentication Routes
 Route::middleware('guest')->group(function () {
@@ -29,6 +30,11 @@ Route::get('/', function () {
 // Protected Routes
 Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    
+    // Processing Analytics Routes
+    Route::get('/processing-analytics', function () {
+        return view('processing-analytics.index');
+    })->name('processing-analytics.index');
 
     // Profile Routes
     Route::get('/profile/change-password', [\App\Http\Controllers\ProfileController::class, 'changePassword'])->name('profile.change-password');
