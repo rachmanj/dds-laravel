@@ -5,7 +5,7 @@
 @endsection
 
 @section('breadcrumb_title')
-    <li class="breadcrumb-item"><a href="/">Home</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
     <li class="breadcrumb-item active">Processing Analytics</li>
 @endsection
 
@@ -216,12 +216,12 @@
                 try {
                     // Load overview data
                     const overviewResponse = await fetch(
-                        `/api/v1/processing-analytics/overview?year=${year}&month=${month}&document_type=${documentType}`
+                        `{{ url('api/v1/processing-analytics/overview') }}?year=${year}&month=${month}&document_type=${documentType}`
                     );
                     const overviewData = await overviewResponse.json();
 
                     // Load trend data
-                    const trendResponse = await fetch(`/api/v1/processing-analytics/trends/6`);
+                    const trendResponse = await fetch(`{{ url('api/v1/processing-analytics/trends/6') }}`);
                     const trendData = await trendResponse.json();
 
                     if (overviewData.success) {
@@ -594,7 +594,8 @@
                 const month = $('#monthSelect').val();
                 const format = $('#documentTypeSelect').val();
 
-                window.open(`/api/v1/processing-analytics/export?year=${year}&month=${month}&format=excel`);
+                window.open(
+                    `{{ url('api/v1/processing-analytics/export') }}?year=${year}&month=${month}&format=excel`);
             }
 
             function showLoading() {
