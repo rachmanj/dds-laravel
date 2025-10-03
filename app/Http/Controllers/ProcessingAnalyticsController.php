@@ -17,6 +17,11 @@ class ProcessingAnalyticsController extends Controller
         $this->analyticsService = $analyticsService;
     }
 
+    public function index()
+    {
+        return view('processing-analytics.index');
+    }
+
     public function getMonthlyProcessing($year, $month)
     {
         try {

@@ -32,9 +32,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     
     // Processing Analytics Routes
-    Route::get('/processing-analytics', function () {
-        return view('processing-analytics.index');
-    })->name('processing-analytics.index');
+    Route::get('/processing-analytics', [ProcessingAnalyticsController::class, 'index'])->name('processing-analytics.index');
 
     // Profile Routes
     Route::get('/profile/change-password', [\App\Http\Controllers\ProfileController::class, 'changePassword'])->name('profile.change-password');
