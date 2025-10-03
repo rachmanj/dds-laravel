@@ -34,7 +34,7 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="/processing-analytics"
+                            <a href="{{ route('processing-analytics.index') }}"
                                 class="nav-link {{ request()->is('processing-analytics') ? 'active' : '' }}">
                                 <i class="far fa-circle nav-icon"></i>
                                 <p>Dashboard 2</p>
