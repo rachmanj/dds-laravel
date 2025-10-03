@@ -32,17 +32,25 @@ ProcessingAnalyticsController
 │   ├── getDocumentProcessingTimeline()
 │   ├── getDepartmentProcessingEfficiency()
 │   ├── getProcessingBottlenecks()
-│   └── getSlowProcessingDocuments()
+│   ├── getSlowProcessingDocuments()
+│   └── getDepartmentMonthlyPerformance() ✅ NEW
 ├── API Endpoints (/api/v1/processing-analytics/*)
 │   ├── /accurate-processing-days
 │   ├── /document-timeline
 │   ├── /department-efficiency-accurate
 │   ├── /processing-bottlenecks
-│   └── /slow-processing-documents
+│   ├── /slow-processing-documents
+│   └── /department-monthly-performance ✅ NEW
 ├── Dashboard View (/processing-analytics)
 ├── Document Journey Integration
 │   ├── Invoice Show Page Integration
 │   └── Additional Document Show Page Integration
+├── Department Monthly Performance Chart ✅ NEW
+│   ├── Department Selection Dropdown
+│   ├── Year Selection (2022-2025)
+│   ├── Document Type Filtering
+│   ├── Monthly Line Chart (ECharts)
+│   └── Summary Cards (Total Docs, Avg Days, Best/Worst Month)
 └── ECharts Integration with Enhanced Analytics
 ```
 
@@ -52,6 +60,55 @@ ProcessingAnalyticsController
 -   **Key Relationships**: Documents → Distribution Documents → Distributions → Departments
 -   **Processing Calculation**: `DATEDIFF(distribution.sent_at, invoice.receive_date)` for accurate timing
 -   **Timeline Tracking**: Complete document journey with department steps and processing durations
+
+### **Department Monthly Performance Chart Architecture** ✅ **NEW**
+
+**Pattern**: Department-specific monthly performance analysis with comprehensive filtering and trend visualization
+
+**Implementation**:
+
+-   **Department Selection**: Dropdown with correct department IDs (Accounting=15, Logistic=9)
+-   **Year Range**: 2022-2025 selection for historical analysis
+-   **Document Type Filtering**: Both Documents, Invoices Only, Additional Documents Only
+-   **Monthly Data Aggregation**: Complete 12-month breakdown with statistics per month
+-   **Multi-Series Visualization**: Three data series (Invoices, Additional Documents, Overall Average)
+-   **Summary Metrics**: Total documents, average processing days, best/worst performing months
+-   **Interactive Tooltips**: Detailed month-by-month breakdown with document counts and averages
+
+**Technical Architecture**:
+
+```
+Department Monthly Performance API
+├── Controller: ProcessingAnalyticsController@getDepartmentMonthlyPerformance
+├── Service: ProcessingAnalyticsService@getDepartmentMonthlyPerformance
+├── Parameters: year, department_id, document_type
+├── Data Processing:
+│   ├── Monthly Loop (1-12 months)
+│   ├── Invoice Statistics (count, avg_days, min_days, max_days)
+│   ├── Additional Document Statistics (count, avg_days, min_days, max_days)
+│   ├── Total Calculations (combined counts and weighted averages)
+│   └── Summary Generation (total_docs, avg_days, best_month, worst_month)
+├── Frontend Integration:
+│   ├── Department Selection Dropdown
+│   ├── Year Selection Dropdown
+│   ├── Document Type Filter Dropdown
+│   ├── ECharts Line Chart (3 series)
+│   ├── Summary Cards (4 metrics)
+│   └── Loading States & Error Handling
+└── Database Queries:
+    ├── Invoice Monthly Stats (JOIN users for department mapping)
+    ├── Additional Document Monthly Stats (JOIN users for department mapping)
+    └── Department Information Lookup
+```
+
+**Key Features**:
+
+-   **Accurate Department Mapping**: Fixed department ID mapping issue (was using wrong IDs)
+-   **Comprehensive Filtering**: Year, department, and document type filtering
+-   **Visual Data Representation**: Line chart with distinct colors and styles for each series
+-   **Performance Metrics**: Best/worst month identification for performance optimization
+-   **Responsive Design**: Chart resizing and mobile compatibility
+-   **Error Handling**: Validation for department selection and API error management
 
 ### **Analytics Integration Architecture** ✅ **NEW**
 

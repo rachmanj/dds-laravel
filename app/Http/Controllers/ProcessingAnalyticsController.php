@@ -299,6 +299,42 @@ class ProcessingAnalyticsController extends Controller
     }
 
     /**
+     * Get monthly performance for selected department
+     */
+    public function getDepartmentMonthlyPerformance(Request $request)
+    {
+        try {
+            $year = $request->get('year', now()->year);
+            $departmentId = $request->get('department_id');
+            $documentType = $request->get('document_type', 'both');
+
+            if (!$departmentId) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Department ID is required'
+                ], 400);
+            }
+
+            $data = $this->analyticsService->getDepartmentMonthlyPerformance($year, $departmentId, $documentType);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'filters' => [
+                    'year' => $year,
+                    'department_id' => $departmentId,
+                    'document_type' => $documentType
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Document journey tracking page
      */
     public function documentJourney(Request $request)

@@ -1,3 +1,64 @@
+## 2025-10-03 — Department Monthly Performance Chart Implementation
+
+-   **Context**: User request to add a new chart showing monthly performance for selected departments for current year (or selected year) with department selection functionality. Need to provide detailed monthly analysis with comprehensive filtering options.
+
+-   **Decision**: Implement Department Monthly Performance Chart with department selection dropdown, year selection, document type filtering, and comprehensive monthly trend visualization.
+
+-   **Implementation**:
+
+    -   **Backend API Development**:
+
+        -   Created new API endpoint `/api/v1/processing-analytics/department-monthly-performance`
+        -   Implemented `getDepartmentMonthlyPerformance()` method in `ProcessingAnalyticsService`
+        -   Added controller method `getDepartmentMonthlyPerformance()` in `ProcessingAnalyticsController`
+        -   Built comprehensive monthly data aggregation for all 12 months of selected year
+        -   Implemented department-specific filtering with correct user-department mapping
+        -   Added summary calculations: total documents, average processing days, best/worst months
+
+    -   **Frontend Chart Implementation**:
+
+        -   Added Department Monthly Performance section to Processing Analytics Dashboard
+        -   Implemented department selection dropdown with correct department IDs (Accounting=15, Logistic=9)
+        -   Created year selection dropdown (2022-2025) and document type filtering
+        -   Built interactive ECharts line chart with three data series: Invoices, Additional Documents, Overall Average
+        -   Added comprehensive summary cards: Total Documents, Avg Processing Days, Best Month, Worst Month
+        -   Implemented responsive design with proper chart resizing
+
+    -   **Data Integration & Bug Fixes**:
+
+        -   Fixed department ID mapping issue (was using wrong IDs: 1,2 instead of correct 15,9)
+        -   Corrected chart title display to show proper department names
+        -   Implemented proper error handling and user validation
+        -   Added loading states and user feedback for better UX
+
+    -   **Testing & Validation**:
+        -   Successfully tested department selection functionality
+        -   Verified API responses with correct department data
+        -   Confirmed chart rendering with proper titles and data
+        -   Validated summary cards display and calculations
+
+-   **Consequences**:
+
+    -   **Positive**: Users can now analyze monthly performance trends for specific departments
+    -   **Positive**: Comprehensive filtering options provide detailed insights
+    -   **Positive**: Visual representation makes it easy to identify performance patterns
+    -   **Positive**: Summary metrics help identify best and worst performing months
+    -   **Consideration**: Fixed department ID mapping ensures accurate data display
+
+-   **Alternatives Considered**:
+
+    -   **Alternative 1**: Static department list without selection - Rejected due to lack of flexibility
+    -   **Alternative 2**: Single year view only - Rejected to provide historical analysis capability
+    -   **Alternative 3**: Basic chart without summary cards - Rejected to provide comprehensive metrics
+
+-   **Implementation Implications**:
+    -   **Files Modified**: `ProcessingAnalyticsController.php`, `ProcessingAnalyticsService.php`, `api.php`, `index.blade.php`
+    -   **Database Impact**: Uses existing tables with proper department mapping
+    -   **Performance**: Efficient monthly aggregation with proper indexing
+    -   **Maintenance**: Clear separation of concerns with dedicated service methods
+
+---
+
 ## 2025-10-03 — Enhanced Processing Analytics System Implementation
 
 -   **Context**: Business requirement to track document processing efficiency across departments with accurate processing day calculations based on actual distribution workflow. Need to provide individual document journey tracking, processing bottlenecks detection, and seamless integration into existing document show pages.
@@ -52,6 +113,7 @@
 -   **Consequences**:
 
     -   **Positive**:
+
         -   Provides accurate processing time calculations based on actual distribution workflow
         -   Enables individual document journey tracking for detailed analysis
         -   Identifies processing bottlenecks and slow departments for optimization

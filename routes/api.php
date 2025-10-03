@@ -91,4 +91,5 @@ Route::prefix('v1/processing-analytics')->group(function () {
     Route::get('/department-efficiency-accurate', [ProcessingAnalyticsController::class, 'getDepartmentEfficiencyAccurate']);
     Route::get('/processing-bottlenecks', [ProcessingAnalyticsController::class, 'getProcessingBottlenecks']);
     Route::get('/slow-processing-documents', [ProcessingAnalyticsController::class, 'getSlowProcessingDocuments']);
+    Route::get('/department-monthly-performance', [ProcessingAnalyticsController::class, 'getDepartmentMonthlyPerformance']);
 });

@@ -261,14 +261,16 @@ class ProcessingAnalyticsService
                 $query->whereExists(function ($subQuery) use ($startDate, $endDate) {
                     $subQuery->select(DB::raw(1))
                         ->from('invoices')
-                        ->where('created_by', DB::raw('departments.id'))
+                        ->join('users', 'invoices.created_by', '=', 'users.id')
+                        ->where('users.department_id', DB::raw('departments.id'))
                         ->where('receive_date', '>=', $startDate)
                         ->where('receive_date', '<=', $endDate);
                 })
                     ->orWhereExists(function ($subQuery) use ($startDate, $endDate) {
                         $subQuery->select(DB::raw(1))
                             ->from('additional_documents')
-                            ->where('created_by', DB::raw('departments.id'))
+                            ->join('users', 'additional_documents.created_by', '=', 'users.id')
+                            ->where('users.department_id', DB::raw('departments.id'))
                             ->whereNotNull('receive_date')
                             ->where('receive_date', '>=', $startDate)
                             ->where('receive_date', '<=', $endDate);
@@ -597,5 +599,138 @@ class ProcessingAnalyticsService
             'slow_additional_documents' => $slowAdditionalDocs,
             'threshold_days' => $thresholdDays
         ];
+    }
+    public function getDepartmentMonthlyPerformance($year, $departmentId, $documentType = 'both')
+    {
+        $monthlyData = [];
+
+        // Generate data for all 12 months
+        for ($month = 1; $month <= 12; $month++) {
+            $startDate = Carbon::create($year, $month, 1)->startOfMonth();
+            $endDate = $startDate->copy()->endOfMonth();
+
+            $monthData = [
+                'month' => $month,
+                'month_name' => $startDate->format('F'),
+                'year' => $year,
+                'invoices' => [],
+                'additional_documents' => [],
+                'total_documents' => 0,
+                'avg_processing_days' => 0
+            ];
+
+            // Get invoice data for this month
+            if ($documentType === 'both' || $documentType === 'invoice') {
+                $invoiceStats = Invoice::select([
+                    DB::raw('COUNT(*) as count'),
+                    DB::raw('AVG(DATEDIFF(now(), receive_date)) as avg_processing_days'),
+                    DB::raw('MIN(DATEDIFF(now(), receive_date)) as min_days'),
+                    DB::raw('MAX(DATEDIFF(now(), receive_date)) as max_days')
+                ])
+                    ->join('users as u', 'invoices.created_by', '=', 'u.id')
+                    ->where('u.department_id', $departmentId)
+                    ->where('receive_date', '>=', $startDate)
+                    ->where('receive_date', '<=', $endDate)
+                    ->first();
+
+                $monthData['invoices'] = [
+                    'count' => $invoiceStats->count ?? 0,
+                    'avg_processing_days' => round($invoiceStats->avg_processing_days ?? 0, 2),
+                    'min_days' => $invoiceStats->min_days ?? 0,
+                    'max_days' => $invoiceStats->max_days ?? 0
+                ];
+            }
+
+            // Get additional document data for this month
+            if ($documentType === 'both' || $documentType === 'additional_document') {
+                $docStats = AdditionalDocument::select([
+                    DB::raw('COUNT(*) as count'),
+                    DB::raw('AVG(DATEDIFF(now(), receive_date)) as avg_processing_days'),
+                    DB::raw('MIN(DATEDIFF(now(), receive_date)) as min_days'),
+                    DB::raw('MAX(DATEDIFF(now(), receive_date)) as max_days')
+                ])
+                    ->join('users as u', 'additional_documents.created_by', '=', 'u.id')
+                    ->where('u.department_id', $departmentId)
+                    ->whereNotNull('receive_date')
+                    ->where('receive_date', '>=', $startDate)
+                    ->where('receive_date', '<=', $endDate)
+                    ->first();
+
+                $monthData['additional_documents'] = [
+                    'count' => $docStats->count ?? 0,
+                    'avg_processing_days' => round($docStats->avg_processing_days ?? 0, 2),
+                    'min_days' => $docStats->min_days ?? 0,
+                    'max_days' => $docStats->max_days ?? 0
+                ];
+            }
+
+            // Calculate totals
+            $totalCount = ($monthData['invoices']['count'] ?? 0) + ($monthData['additional_documents']['count'] ?? 0);
+            $totalDays = (($monthData['invoices']['avg_processing_days'] ?? 0) * ($monthData['invoices']['count'] ?? 0)) +
+                (($monthData['additional_documents']['avg_processing_days'] ?? 0) * ($monthData['additional_documents']['count'] ?? 0));
+
+            $monthData['total_documents'] = $totalCount;
+            $monthData['avg_processing_days'] = $totalCount > 0 ? round($totalDays / $totalCount, 2) : 0;
+
+            $monthlyData[] = $monthData;
+        }
+
+        // Get department information
+        $department = Department::find($departmentId);
+
+        return [
+            'department' => $department,
+            'year' => $year,
+            'monthly_data' => $monthlyData,
+            'summary' => [
+                'total_documents' => array_sum(array_column($monthlyData, 'total_documents')),
+                'avg_processing_days' => $this->calculateYearlyAverage($monthlyData),
+                'best_month' => $this->getBestMonth($monthlyData),
+                'worst_month' => $this->getWorstMonth($monthlyData)
+            ]
+        ];
+    }
+
+    private function calculateYearlyAverage($monthlyData)
+    {
+        $totalDays = 0;
+        $totalCount = 0;
+
+        foreach ($monthlyData as $month) {
+            $totalDays += $month['avg_processing_days'] * $month['total_documents'];
+            $totalCount += $month['total_documents'];
+        }
+
+        return $totalCount > 0 ? round($totalDays / $totalCount, 2) : 0;
+    }
+
+    private function getBestMonth($monthlyData)
+    {
+        $bestMonth = null;
+        $bestScore = PHP_FLOAT_MAX;
+
+        foreach ($monthlyData as $month) {
+            if ($month['total_documents'] > 0 && $month['avg_processing_days'] < $bestScore) {
+                $bestScore = $month['avg_processing_days'];
+                $bestMonth = $month;
+            }
+        }
+
+        return $bestMonth;
+    }
+
+    private function getWorstMonth($monthlyData)
+    {
+        $worstMonth = null;
+        $worstScore = 0;
+
+        foreach ($monthlyData as $month) {
+            if ($month['total_documents'] > 0 && $month['avg_processing_days'] > $worstScore) {
+                $worstScore = $month['avg_processing_days'];
+                $worstMonth = $month;
+            }
+        }
+
+        return $worstMonth;
     }
 }
