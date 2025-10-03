@@ -65,6 +65,11 @@
             preventDuplicates: true,
         };
     }
+
+    // Disable Dropzone auto-discovery to prevent unwanted file choosers
+    if (typeof Dropzone !== "undefined") {
+        Dropzone.autoDiscover = false;
+    }
 </script>
 
 @yield('scripts')

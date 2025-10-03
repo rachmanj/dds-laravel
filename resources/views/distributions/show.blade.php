@@ -718,8 +718,10 @@
                                             </td>
                                             <td>
                                                 @if ($doc->skip_verification)
-                                                    <span class="badge badge-secondary">Not included in this
-                                                        distribution</span>
+                                                    <span class="badge badge-warning"
+                                                        title="Document was not physically available in origin department at distribution creation">
+                                                        <i class="fas fa-exclamation-triangle"></i> Out of Location
+                                                    </span>
                                                 @elseif ($doc->sender_verified)
                                                     <span
                                                         class="badge badge-{{ $doc->sender_verification_status === 'verified' ? 'success' : ($doc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
@@ -731,8 +733,10 @@
                                             </td>
                                             <td>
                                                 @if ($doc->skip_verification)
-                                                    <span class="badge badge-secondary">Not included in this
-                                                        distribution</span>
+                                                    <span class="badge badge-warning"
+                                                        title="Document was not physically available in origin department at distribution creation">
+                                                        <i class="fas fa-exclamation-triangle"></i> Out of Location
+                                                    </span>
                                                 @elseif ($doc->receiver_verified)
                                                     <span
                                                         class="badge badge-{{ $doc->receiver_verification_status === 'verified' ? 'success' : ($doc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
@@ -915,6 +919,21 @@
                 </div>
                 <form id="senderVerificationForm">
                     <div class="modal-body">
+                        @php
+                            $skippedDocs = $distribution->documents->where('skip_verification', true);
+                            $eligibleDocs = $distribution->documents->where('skip_verification', false);
+                        @endphp
+
+                        @if ($skippedDocs->count() > 0)
+                            <div class="alert alert-info mb-3" role="alert">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Note:</strong> {{ $skippedDocs->count() }} document(s) are not available for
+                                verification as they were not physically located in the origin department when this
+                                distribution was created. Only {{ $eligibleDocs->count() }} document(s) require
+                                verification.
+                            </div>
+                        @endif
+
                         <div class="form-group">
                             <label for="sender_verification_notes">Verification Notes</label>
                             <textarea class="form-control" id="sender_verification_notes" name="verification_notes" rows="3"
@@ -970,9 +989,13 @@
                                             <td>
                                                 @php $isSkipped = $doc->skip_verification ?? false; @endphp
                                                 @if ($isSkipped)
-                                                    <span class="badge badge-secondary"
-                                                        title="Document was not in origin department at creation">Out of
-                                                        origin dept</span>
+                                                    <div class="alert alert-info alert-sm mb-2" role="alert">
+                                                        <i class="fas fa-info-circle"></i>
+                                                        <strong>Document Not Available:</strong> This document was not
+                                                        physically located in the origin department when the distribution
+                                                        was created. It will be excluded from verification and status
+                                                        updates.
+                                                    </div>
                                                 @endif
                                                 <select class="form-control document-status"
                                                     name="document_verifications[{{ $doc->document_id }}][status]"
@@ -1066,6 +1089,21 @@
                 </div>
                 <form id="receiverVerificationForm">
                     <div class="modal-body">
+                        @php
+                            $skippedDocs = $distribution->documents->where('skip_verification', true);
+                            $eligibleDocs = $distribution->documents->where('skip_verification', false);
+                        @endphp
+
+                        @if ($skippedDocs->count() > 0)
+                            <div class="alert alert-info mb-3" role="alert">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Note:</strong> {{ $skippedDocs->count() }} document(s) are not available for
+                                verification as they were not physically located in the origin department when this
+                                distribution was created. Only {{ $eligibleDocs->count() }} document(s) require
+                                verification.
+                            </div>
+                        @endif
+
                         <div class="form-group">
                             <label for="receiver_verification_notes">Verification Notes</label>
                             <textarea class="form-control" id="receiver_verification_notes" name="verification_notes" rows="3"
@@ -1388,680 +1426,23 @@
 @endsection
 
 @section('scripts')
+    <!-- Distribution Show JavaScript -->
+    <script src="{{ asset('js/distributions/show.js') }}"></script>
+    <script src="{{ asset('js/distributions/bulk-operations.js') }}"></script>
+    <script src="{{ asset('js/distributions/analytics.js') }}"></script>
+    <script src="{{ asset('js/distributions/accessibility.js') }}"></script>
+
     <script>
-        $(document).ready(function() {
-            // Sender Verification Modal Functionality
-            let selectedDocuments = new Set();
-
-            // Select All checkbox functionality
-            $('#selectAll').change(function() {
-                const isChecked = $(this).is(':checked');
-                $('.document-checkbox').prop('checked', isChecked);
-
-                if (isChecked) {
-                    $('.document-checkbox').each(function() {
-                        selectedDocuments.add($(this).data('document-id'));
-                    });
-                } else {
-                    selectedDocuments.clear();
-                }
-                updateSelectAllButton();
-            });
-
-            // Individual document checkbox functionality
-            $(document).on('change', '.document-checkbox', function() {
-                const documentId = $(this).data('document-id');
-                if ($(this).is(':checked')) {
-                    selectedDocuments.add(documentId);
-                } else {
-                    selectedDocuments.delete(documentId);
-                }
-
-                // Update select all checkbox state
-                const totalDocuments = $('.document-checkbox').length;
-                const checkedDocuments = selectedDocuments.size;
-                $('#selectAll').prop('checked', checkedDocuments === totalDocuments);
-                $('#selectAll').prop('indeterminate', checkedDocuments > 0 && checkedDocuments <
-                    totalDocuments);
-
-                updateSelectAllButton();
-            });
-
-            // Select All as Verified button
-            $('#selectAllVerified').click(function() {
-                console.log('=== SELECT ALL AS VERIFIED CLICKED ===');
-                console.log('Total documents found:', $('.document-checkbox').length);
-
-                // Only affect non-skipped rows
-                $('.document-checkbox').each(function() {
-                    const row = $(this).closest('tr');
-                    const select = row.find('.document-status');
-                    const isDisabled = select.is(':disabled');
-                    if (!isDisabled) {
-                        $(this).prop('checked', true);
-                        select.val('verified');
-                        row.find('.document-notes').val('').prop('required', false);
-                    }
-                });
-
-                selectedDocuments.clear();
-                $('.document-checkbox').each(function() {
-                    const docId = $(this).data('document-id');
-                    const row = $(this).closest('tr');
-                    const select = row.find('.document-status');
-                    if (!select.is(':disabled')) {
-                        selectedDocuments.add(docId);
-                    }
-                    console.log('Added document ID to selection:', docId);
-                });
-
-                $('#selectAll').prop('checked', true);
-                updateSelectAllButton();
-
-                console.log('Final selected documents count:', selectedDocuments.size);
-                console.log('Selected document IDs:', Array.from(selectedDocuments));
-                console.log('=== END SELECT ALL DEBUG ===');
-            });
-
-            // Clear All button
-            $('#clearAll').click(function() {
-                $('.document-checkbox').prop('checked', false);
-                $('.document-status').val('');
-                $('.document-notes').val('').prop('required', false);
-
-                selectedDocuments.clear();
-                $('#selectAll').prop('checked', false);
-                updateSelectAllButton();
-            });
-
-            // Update Select All button text based on selection
-            function updateSelectAllButton() {
-                const selectedCount = selectedDocuments.size;
-                const totalCount = $('.document-checkbox').length;
-
-                if (selectedCount === 0) {
-                    $('#selectAllVerified').html('<i class="fas fa-check-double"></i> Select All as Verified');
-                } else if (selectedCount === totalCount) {
-                    $('#selectAllVerified').html('<i class="fas fa-check-double"></i> All Selected');
-                } else {
-                    $('#selectAllVerified').html(
-                        `<i class="fas fa-check-double"></i> ${selectedCount}/${totalCount} Selected`);
-                }
-            }
-
-            // Status change handler for notes requirement
-            $(document).on('change', '.document-status', function() {
-                const documentId = $(this).data('document-id');
-                const status = $(this).val();
-                const notesField = $(`.document-notes[data-document-id="${documentId}"]`);
-
-                if (status === 'missing' || status === 'damaged') {
-                    notesField.prop('required', true);
-                    notesField.attr('placeholder', 'Notes required for ' + status.charAt(0).toUpperCase() +
-                        status.slice(1) + ' status');
-                } else {
-                    notesField.prop('required', false);
-                    notesField.attr('placeholder', 'Optional notes');
-                }
-            });
-
-            // Sender Verification Form
-            $('#senderVerificationForm').submit(function(e) {
-                e.preventDefault();
-
-                // Validate required fields
-                let isValid = true;
-                let errorMessage = '';
-
-                // Check if at least one document is selected
-                if ($('.document-checkbox:checked').length === 0) {
-                    isValid = false;
-                    errorMessage = 'Please select at least one document to verify.';
-                }
-
-                // Check required notes for missing/damaged status - ONLY for selected documents
-                $('.document-checkbox:checked').each(function() {
-                    const documentId = $(this).data('document-id');
-                    const status = $(`.document-status[data-document-id="${documentId}"]`).val();
-                    const notesField = $(`.document-notes[data-document-id="${documentId}"]`);
-
-                    if (status === 'missing' || status === 'damaged') {
-                        if (!notesField.val().trim()) {
-                            isValid = false;
-                            errorMessage =
-                                'Notes are required for Missing or Damaged document status.';
-                            return false; // break the loop
-                        }
-                    }
-                });
-
-                if (!isValid) {
-                    toastr.error(errorMessage);
-                    return;
-                }
-
-                // Prepare form data with only selected documents
-                const formData = new FormData();
-                formData.append('verification_notes', $('#sender_verification_notes').val());
-
-                // Debug logging
-                console.log('=== SENDER VERIFICATION DEBUG ===');
-                console.log('Total documents in distribution:', $('.document-checkbox').length);
-                console.log('Selected documents:', $('.document-checkbox:checked').length);
-
-                const selectedDocumentsData = [];
-                $('.document-checkbox:checked').each(function() {
-                    const documentId = $(this).data('document-id');
-                    const status = $(`.document-status[data-document-id="${documentId}"]`).val();
-                    const notes = $(`.document-notes[data-document-id="${documentId}"]`).val();
-
-                    selectedDocumentsData.push({
-                        document_id: documentId,
-                        status: status,
-                        notes: notes
-                    });
-
-                    formData.append(`document_verifications[${documentId}][document_id]`,
-                        documentId);
-                    formData.append(`document_verifications[${documentId}][status]`, status);
-                    formData.append(`document_verifications[${documentId}][notes]`, notes);
-                });
-
-                console.log('Documents being sent to backend:', selectedDocumentsData);
-                console.log('Form data entries:', Array.from(formData.entries()));
-                console.log('=== END DEBUG ===');
-
-                $.ajax({
-                    url: '{{ route('distributions.verify-sender', $distribution) }}',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message);
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1000);
-                        } else {
-                            toastr.error(response.message || 'Failed to verify as sender');
-                        }
-                    },
-                    error: function(xhr) {
-                        if (xhr.status === 422) {
-                            const errors = xhr.responseJSON.errors;
-                            if (errors) {
-                                let errorMsg = '';
-                                Object.keys(errors).forEach(key => {
-                                    errorMsg += errors[key][0] + '\n';
-                                });
-                                toastr.error(errorMsg);
-                            } else {
-                                toastr.error('Please fill in all required fields');
-                            }
-                        } else {
-                            toastr.error('Failed to verify as sender');
-                        }
-                    }
-                });
-            });
-
-            // Send Distribution
-            $('#sendDistribution').click(function() {
-                $.ajax({
-                    url: '{{ route('distributions.send', $distribution) }}',
-                    type: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message);
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1000);
-                        } else {
-                            toastr.error(response.message || 'Failed to send distribution');
-                        }
-                    },
-                    error: function(xhr) {
-                        toastr.error('Failed to send distribution');
-                    }
-                });
-                $('#sendModal').modal('hide');
-            });
-
-            // Receive Distribution
-            $('#receiveDistribution').click(function() {
-                $.ajax({
-                    url: '{{ route('distributions.receive', $distribution) }}',
-                    type: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message);
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1000);
-                        } else {
-                            toastr.error(response.message || 'Failed to receive distribution');
-                        }
-                    },
-                    error: function(xhr) {
-                        toastr.error('Failed to receive distribution');
-                    }
-                });
-                $('#receiveModal').modal('hide');
-            });
-
-            // Receiver Verification Modal Functionality
-            let selectedDocumentsReceiver = new Set();
-
-            // Select All checkbox functionality for receiver
-            $('#selectAllReceiver').change(function() {
-                const isChecked = $(this).is(':checked');
-                $('.document-checkbox-receiver').prop('checked', isChecked);
-
-                if (isChecked) {
-                    $('.document-checkbox-receiver').each(function() {
-                        selectedDocumentsReceiver.add($(this).data('document-id'));
-                    });
-                } else {
-                    selectedDocumentsReceiver.clear();
-                }
-                updateSelectAllReceiverButton();
-            });
-
-            // Individual document checkbox functionality for receiver
-            $(document).on('change', '.document-checkbox-receiver', function() {
-                const documentId = $(this).data('document-id');
-                if ($(this).is(':checked')) {
-                    selectedDocumentsReceiver.add(documentId);
-                } else {
-                    selectedDocumentsReceiver.delete(documentId);
-                }
-
-                // Update select all checkbox state
-                const totalDocuments = $('.document-checkbox-receiver').length;
-                const checkedDocuments = selectedDocumentsReceiver.size;
-                $('#selectAllReceiver').prop('checked', checkedDocuments === totalDocuments);
-                $('#selectAllReceiver').prop('indeterminate', checkedDocuments > 0 && checkedDocuments <
-                    totalDocuments);
-
-                updateSelectAllReceiverButton();
-            });
-
-            // Select All as Verified button for receiver
-            $('#selectAllVerifiedReceiver').click(function() {
-                console.log('=== RECEIVER SELECT ALL AS VERIFIED CLICKED ===');
-                console.log('Total documents found:', $('.document-checkbox-receiver').length);
-
-                // Only affect non-skipped rows
-                $('.document-checkbox-receiver').each(function() {
-                    const row = $(this).closest('tr');
-                    const select = row.find('.document-status-receiver');
-                    const isDisabled = select.is(':disabled');
-                    if (!isDisabled) {
-                        $(this).prop('checked', true);
-                        select.val('verified');
-                        row.find('.document-notes-receiver').val('').prop('required', false);
-                    }
-                });
-
-                selectedDocumentsReceiver.clear();
-                $('.document-checkbox-receiver').each(function() {
-                    const docId = $(this).data('document-id');
-                    const row = $(this).closest('tr');
-                    const select = row.find('.document-status-receiver');
-                    if (!select.is(':disabled')) {
-                        selectedDocumentsReceiver.add(docId);
-                    }
-                    console.log('Added document ID to selection:', docId);
-                });
-
-                $('#selectAllReceiver').prop('checked', true);
-                updateSelectAllReceiverButton();
-
-                console.log('Final selected documents count:', selectedDocumentsReceiver.size);
-                console.log('Selected document IDs:', Array.from(selectedDocumentsReceiver));
-                console.log('=== END RECEIVER SELECT ALL DEBUG ===');
-            });
-
-            // Clear All button for receiver
-            $('#clearAllReceiver').click(function() {
-                $('.document-checkbox-receiver').prop('checked', false);
-                $('.document-status-receiver').val('');
-                $('.document-notes-receiver').val('').prop('required', false);
-
-                selectedDocumentsReceiver.clear();
-                $('#selectAllReceiver').prop('checked', false);
-                updateSelectAllReceiverButton();
-            });
-
-            // Update Select All button text based on selection for receiver
-            function updateSelectAllReceiverButton() {
-                const selectedCount = selectedDocumentsReceiver.size;
-                const totalCount = $('.document-checkbox-receiver').length;
-
-                if (selectedCount === 0) {
-                    $('#selectAllVerifiedReceiver').html(
-                        '<i class="fas fa-check-double"></i> Select All as Verified');
-                } else if (selectedCount === totalCount) {
-                    $('#selectAllVerifiedReceiver').html('<i class="fas fa-check-double"></i> All Selected');
-                } else {
-                    $('#selectAllVerifiedReceiver').html(
-                        `<i class="fas fa-check-double"></i> ${selectedCount}/${totalCount} Selected`);
-                }
-            }
-
-            // Status change handler for notes requirement in receiver modal
-            $(document).on('change', '.document-status-receiver', function() {
-                const documentId = $(this).data('document-id');
-                const status = $(this).val();
-                const notesField = $(`.document-notes-receiver[data-document-id="${documentId}"]`);
-
-                if (status === 'missing' || status === 'damaged') {
-                    notesField.prop('required', true);
-                    notesField.attr('placeholder', 'Notes required for ' + status.charAt(0).toUpperCase() +
-                        status.slice(1) + ' status');
-                } else {
-                    notesField.prop('required', false);
-                    notesField.attr('placeholder', 'Optional notes');
-                }
-            });
-
-            // Receiver Verification Form
-            $('#receiverVerificationForm').submit(function(e) {
-                e.preventDefault();
-
-                // Validate required fields
-                let isValid = true;
-                let errorMessage = '';
-
-                // Check if at least one document is selected
-                if ($('.document-checkbox-receiver:checked').length === 0) {
-                    isValid = false;
-                    errorMessage = 'Please select at least one document to verify.';
-                }
-
-                // Check required notes for missing/damaged status - ONLY for selected documents
-                $('.document-checkbox-receiver:checked').each(function() {
-                    const documentId = $(this).data('document-id');
-                    const status = $(`.document-status-receiver[data-document-id="${documentId}"]`)
-                        .val();
-                    const notesField = $(
-                        `.document-notes-receiver[data-document-id="${documentId}"]`);
-
-                    if (status === 'missing' || status === 'damaged') {
-                        if (!notesField.val().trim()) {
-                            isValid = false;
-                            errorMessage =
-                                'Notes are required for Missing or Damaged document status.';
-                            return false; // break the loop
-                        }
-                    }
-                });
-
-                if (!isValid) {
-                    toastr.error(errorMessage);
-                    return;
-                }
-
-                // Prepare form data with only selected documents
-                const formData = new FormData();
-                formData.append('verification_notes', $('#receiver_verification_notes').val());
-                formData.append('has_discrepancies', $('#has_discrepancies').is(':checked') ? '1' : '0');
-
-                // Debug logging
-                console.log('=== RECEIVER VERIFICATION DEBUG ===');
-                console.log('Total documents in distribution:', $('.document-checkbox-receiver').length);
-                console.log('Selected documents:', $('.document-checkbox-receiver:checked').length);
-
-                const selectedDocumentsData = [];
-                $('.document-checkbox-receiver:checked').each(function() {
-                    const documentId = $(this).data('document-id');
-                    const status = $(`.document-status-receiver[data-document-id="${documentId}"]`)
-                        .val();
-                    const notes = $(`.document-notes-receiver[data-document-id="${documentId}"]`)
-                        .val();
-
-                    selectedDocumentsData.push({
-                        document_id: documentId,
-                        status: status,
-                        notes: notes
-                    });
-
-                    formData.append(`document_verifications[${documentId}][document_id]`,
-                        documentId);
-                    formData.append(`document_verifications[${documentId}][status]`, status);
-                    formData.append(`document_verifications[${documentId}][notes]`, notes);
-                });
-
-                console.log('Documents being sent to backend:', selectedDocumentsData);
-                console.log('Form data entries:', Array.from(formData.entries()));
-                console.log('=== END DEBUG ===');
-
-                $.ajax({
-                    url: '{{ route('distributions.verify-receiver', $distribution) }}',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message);
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1000);
-                        } else {
-                            toastr.error(response.message || 'Failed to verify as receiver');
-                        }
-                    },
-                    error: function(xhr) {
-                        if (xhr.status === 422) {
-                            const errors = xhr.responseJSON.errors;
-                            if (errors) {
-                                let errorMsg = '';
-                                Object.keys(errors).forEach(key => {
-                                    errorMsg += errors[key][0] + '\n';
-                                });
-                                toastr.error(errorMsg);
-                            } else {
-                                toastr.error('Please fill in all required fields');
-                            }
-                        } else {
-                            toastr.error('Failed to verify as receiver');
-                        }
-                    }
-                });
-            });
-
-            // Complete Distribution
-            $('#completeDistribution').click(function() {
-                $.ajax({
-                    url: '{{ route('distributions.complete', $distribution) }}',
-                    type: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message);
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1000);
-                        } else {
-                            toastr.error(response.message || 'Failed to complete distribution');
-                        }
-                    },
-                    error: function(xhr) {
-                        toastr.error('Failed to complete distribution');
-                    }
-                });
-                $('#completeModal').modal('hide');
-            });
-
-            // Cancel (Sent but not Received) with SweetAlert2 confirmation
-            $('.cancel-distribution-sent').click(function() {
-                const distributionId = $(this).data('id');
-                const distributionNumber = $(this).data('number');
-
-                Swal.fire({
-                    title: 'Cancel sent distribution?',
-                    html: `<small>Distribution <strong>${distributionNumber}</strong> will be cancelled and documents reverted to <strong>available</strong>. This action cannot be undone.</small>`,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
-                    confirmButtonText: 'Yes, cancel and revert',
-                    cancelButtonText: 'No, keep it',
-                    reverseButtons: true
-                }).then((result) => {
-                    if (!result.isConfirmed) return;
-
-                    $.ajax({
-                        url: '{{ route('distributions.cancel-sent', $distribution) }}',
-                        type: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'Cancelled',
-                                    text: response.message ||
-                                        'Distribution cancelled and documents reverted',
-                                    timer: 1500,
-                                    showConfirmButton: false
-                                });
-                                setTimeout(function() {
-                                    window.location =
-                                        '{{ route('distributions.index') }}';
-                                }, 1500);
-                            } else {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Failed',
-                                    text: response.message ||
-                                        'Failed to cancel distribution'
-                                });
-                            }
-                        },
-                        error: function(xhr) {
-                            let msg = 'Failed to cancel distribution';
-                            if (xhr.status === 403) msg =
-                                'You do not have permission to cancel this distribution';
-                            if (xhr.status === 422) msg =
-                                'Only sent (not received) distributions can be cancelled';
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: msg
-                            });
-                        }
-                    });
-                });
-            });
-
-            // (Deprecated) Cancel Distribution (draft-only) remains below for legacy paths
-            $('.cancel-distribution').click(function() {
-                const distributionId = $(this).data('id');
-                const distributionNumber = $(this).data('number');
-
-                Swal.fire({
-                    title: 'Cancel this distribution?',
-                    html: `<small>Distribution <strong>${distributionNumber}</strong> will be cancelled. This action cannot be undone.</small>`,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
-                    confirmButtonText: 'Yes, cancel it',
-                    cancelButtonText: 'No, keep it',
-                    reverseButtons: true
-                }).then((result) => {
-                    if (!result.isConfirmed) return;
-
-                    $.ajax({
-                        url: '{{ url('distributions') }}/' + distributionId,
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'Cancelled',
-                                    text: response.message ||
-                                        'Distribution cancelled successfully',
-                                    timer: 1200,
-                                    showConfirmButton: false
-                                });
-                                setTimeout(function() {
-                                    location.href =
-                                        '{{ route('distributions.index') }}';
-                                }, 1200);
-                            } else {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Failed',
-                                    text: response.message ||
-                                        'Failed to cancel distribution'
-                                });
-                            }
-                        },
-                        error: function(xhr) {
-                            let msg = 'Failed to cancel distribution';
-                            if (xhr.status === 403) {
-                                msg =
-                                    'You do not have permission to cancel this distribution';
-                            } else if (xhr.status === 422) {
-                                msg = 'This distribution cannot be cancelled';
-                            }
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: msg
-                            });
-                        }
-                    });
-                });
-            });
-
-            // Sync linked documents (draft only)
-            $('#syncLinkedDocsBtn').click(function() {
-                $.ajax({
-                    url: '{{ route('distributions.sync-linked-documents', $distribution) }}',
-                    type: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message || 'Linked documents synced');
-                            setTimeout(function() {
-                                location.reload();
-                            }, 800);
-                        } else {
-                            toastr.error(response.message || 'Failed to sync linked documents');
-                        }
-                    },
-                    error: function(xhr) {
-                        toastr.error('Failed to sync linked documents');
-                    }
-                });
-            });
-        });
+        // Set up global URLs for AJAX calls
+        window.senderVerificationUrl = '{{ route('distributions.verify-sender', $distribution) }}';
+        window.receiverVerificationUrl = '{{ route('distributions.verify-receiver', $distribution) }}';
+        window.sendDistributionUrl = '{{ route('distributions.send', $distribution) }}';
+        window.receiveDistributionUrl = '{{ route('distributions.receive', $distribution) }}';
+        window.completeDistributionUrl = '{{ route('distributions.complete', $distribution) }}';
+        window.cancelSentDistributionUrl = '{{ route('distributions.cancel-sent', $distribution) }}';
+        window.distributionsUrl = '{{ url('distributions') }}';
+        window.distributionsIndexUrl = '{{ route('distributions.index') }}';
+        window.syncLinkedDocumentsUrl = '{{ route('distributions.sync-linked-documents', $distribution) }}';
+        window.currentUserId = '{{ auth()->id() }}';
     </script>
-
-
 @endsection

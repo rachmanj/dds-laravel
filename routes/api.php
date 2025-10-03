@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\InvoiceApiController;
 use App\Http\Controllers\Api\SupplierApiController;
+use App\Http\Controllers\Api\DistributionDocumentController;
+use App\Http\Controllers\Api\AnalyticsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -49,4 +51,26 @@ Route::prefix('v1')->middleware(['api.key', 'api.rate.limit'])->group(function (
     Route::get('/suppliers/{id}', [SupplierApiController::class, 'getSupplier']);
     Route::post('/suppliers/validate-vendor-code', [SupplierApiController::class, 'validateVendorCode']);
     Route::post('/suppliers/po-suggestions', [SupplierApiController::class, 'getPoSuggestions']);
+
+    // Distribution Document API endpoints
+    Route::prefix('distributions')->group(function () {
+        Route::put('/documents/{documentId}/status', [DistributionDocumentController::class, 'updateStatus']);
+        Route::post('/documents/{documentId}/verify', [DistributionDocumentController::class, 'verify']);
+        Route::put('/documents/{documentId}/notes', [DistributionDocumentController::class, 'addNotes']);
+        Route::post('/bulk-update-status', [DistributionDocumentController::class, 'bulkUpdateStatus']);
+        Route::post('/bulk-verify', [DistributionDocumentController::class, 'bulkVerify']);
+        Route::post('/bulk-add-notes', [DistributionDocumentController::class, 'bulkAddNotes']);
+        Route::post('/bulk-export', [DistributionDocumentController::class, 'bulkExport']);
+        Route::post('/bulk-print', [DistributionDocumentController::class, 'bulkPrint']);
+    });
+});
+
+// Analytics API endpoints (no authentication required for internal analytics)
+Route::prefix('v1/analytics')->group(function () {
+    Route::post('/distribution', [AnalyticsController::class, 'storeDistributionAnalytics']);
+    Route::get('/performance-metrics', [AnalyticsController::class, 'getPerformanceMetrics']);
+    Route::get('/user-behavior', [AnalyticsController::class, 'getUserBehaviorAnalytics']);
+    Route::get('/document-flow', [AnalyticsController::class, 'getDocumentFlowAnalytics']);
+    Route::get('/real-time-dashboard', [AnalyticsController::class, 'getRealTimeDashboard']);
+    Route::get('/predictive', [AnalyticsController::class, 'getPredictiveAnalytics']);
 });
