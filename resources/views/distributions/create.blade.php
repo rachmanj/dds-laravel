@@ -14,6 +14,81 @@
     <!-- Select2 -->
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+
+    <style>
+        /* Confirmation Modal Styles */
+        .max-height-200 {
+            max-height: 200px;
+        }
+
+        .overflow-auto {
+            overflow-y: auto;
+        }
+
+        /* Department Location Indicators */
+        .location-indicator {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-left: 5px;
+        }
+
+        .location-current {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .location-other {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .location-unavailable {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        /* Document row styling based on location */
+        .document-row-unavailable {
+            opacity: 0.6;
+            background-color: #f8f9fa;
+        }
+
+        .document-row-unavailable td {
+            color: #6c757d;
+        }
+
+        /* Linked documents styling */
+        .linked-document-item {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 8px;
+            background-color: #f8f9fa;
+        }
+
+        .linked-document-item.selected {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        /* Confirmation modal specific styles */
+        #confirmationModal .modal-body {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .document-summary-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .document-summary-item:last-child {
+            border-bottom: none;
+        }
+    </style>
 @endsection
 
 @section('content')
@@ -171,6 +246,7 @@
                                                             <th>PO Number</th>
                                                             <th>Amount</th>
                                                             <th>Status</th>
+                                                            <th>Location</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -190,6 +266,19 @@
                                                                         class="badge {{ $invoice->status_badge_class }}">
                                                                         {{ ucfirst($invoice->status) }}
                                                                     </span>
+                                                                </td>
+                                                                <td>
+                                                                    @if ($invoice->cur_loc === auth()->user()->department->location_code)
+                                                                        <span class="location-indicator location-current">
+                                                                            <i class="fas fa-map-marker-alt"></i>
+                                                                            {{ $invoice->cur_loc }}
+                                                                        </span>
+                                                                    @else
+                                                                        <span class="location-indicator location-other">
+                                                                            <i class="fas fa-map-marker-alt"></i>
+                                                                            {{ $invoice->cur_loc }}
+                                                                        </span>
+                                                                    @endif
                                                                 </td>
                                                             </tr>
                                                         @endforeach
@@ -264,6 +353,7 @@
                                                             <th>PO Number</th>
                                                             {{-- <th>Project</th> --}}
                                                             <th>Status</th>
+                                                            <th>Location</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -284,6 +374,19 @@
                                                                         class="badge badge-{{ $doc->status === 'open' ? 'success' : 'secondary' }}">
                                                                         {{ ucfirst($doc->status) }}
                                                                     </span>
+                                                                </td>
+                                                                <td>
+                                                                    @if ($doc->cur_loc === auth()->user()->department->location_code)
+                                                                        <span class="location-indicator location-current">
+                                                                            <i class="fas fa-map-marker-alt"></i>
+                                                                            {{ $doc->cur_loc }}
+                                                                        </span>
+                                                                    @else
+                                                                        <span class="location-indicator location-other">
+                                                                            <i class="fas fa-map-marker-alt"></i>
+                                                                            {{ $doc->cur_loc }}
+                                                                        </span>
+                                                                    @endif
                                                                 </td>
                                                             </tr>
                                                         @endforeach
@@ -347,6 +450,121 @@
                 </div>
             </div>
     </section>
+
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmationModal" tabindex="-1" role="dialog"
+        aria-labelledby="confirmationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmationModalLabel">
+                        <i class="fas fa-check-circle text-warning"></i> Confirm Distribution Creation
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Please review the distribution details below before confirming:</strong>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-tag"></i> Distribution Information</h6>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td><strong>Type:</strong></td>
+                                    <td id="confirm-type"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Destination:</strong></td>
+                                    <td id="confirm-destination"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Document Type:</strong></td>
+                                    <td id="confirm-document-type"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Notes:</strong></td>
+                                    <td id="confirm-notes"></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-list-check"></i> Selected Documents</h6>
+                            <div id="confirm-selected-documents" class="max-height-200 overflow-auto">
+                                <!-- Selected documents will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Linked Documents Section -->
+                    <div class="row mt-3" id="linked-documents-section" style="display: none;">
+                        <div class="col-12">
+                            <h6><i class="fas fa-link"></i> Automatically Linked Additional Documents</h6>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Note:</strong> The following additional documents will be automatically included
+                                with the selected invoices:
+                            </div>
+                            <div id="confirm-linked-documents" class="max-height-200 overflow-auto">
+                                <!-- Linked documents will be populated here -->
+                            </div>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="manage-linked-docs">
+                                    <i class="fas fa-cog"></i> Manage Linked Documents
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" id="confirmSubmit">
+                        <i class="fas fa-check"></i> Confirm & Create Distribution
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Linked Documents Management Modal -->
+    <div class="modal fade" id="linkedDocsModal" tabindex="-1" role="dialog" aria-labelledby="linkedDocsModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="linkedDocsModalLabel">
+                        <i class="fas fa-link"></i> Manage Linked Additional Documents
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Select which additional documents to include with your distribution:</strong>
+                    </div>
+                    <div id="linked-documents-list">
+                        <!-- Linked documents checkboxes will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" id="saveLinkedDocs">
+                        <i class="fas fa-save"></i> Save Selection
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('styles')
@@ -594,7 +812,7 @@
                     $('.remove-document').click(function() {
                         var documentId = $(this).data('id');
                         $('input[name="document_ids[]"][value="' + documentId + '"]').prop('checked',
-                        false);
+                            false);
                         updateSelectedDocuments();
                         updatePreview();
                     });
@@ -629,11 +847,223 @@
                 }
             }
 
-            // Form submission
+            // Global variables for linked documents management
+            var linkedDocuments = [];
+            var selectedLinkedDocuments = [];
+
+            // Form submission with confirmation dialog
             var isSubmitting = false; // Submission guard
 
             $('#distributionForm').submit(function(e) {
                 e.preventDefault();
+
+                // Show confirmation dialog instead of direct submission
+                showConfirmationDialog();
+            });
+
+            // Show confirmation dialog
+            function showConfirmationDialog() {
+                // Validate required fields first
+                var requiredFields = ['type_id', 'destination_department_id', 'document_type'];
+                var missingFields = [];
+
+                requiredFields.forEach(function(field) {
+                    var value = $('#' + field).val();
+                    if (!value) {
+                        missingFields.push(field);
+                    }
+                });
+
+                if (missingFields.length > 0) {
+                    toastr.error('Please fill in all required fields: ' + missingFields.join(', '));
+                    return false;
+                }
+
+                var selectedDocs = $('input[name="document_ids[]"]:checked');
+                if (selectedDocs.length === 0) {
+                    toastr.error('Please select at least one document to distribute');
+                    return false;
+                }
+
+                // Populate confirmation dialog
+                populateConfirmationDialog();
+
+                // Check for linked documents if distributing invoices
+                if ($('#document_type').val() === 'invoice') {
+                    checkLinkedDocuments();
+                } else {
+                    $('#linked-documents-section').hide();
+                }
+
+                // Show modal
+                $('#confirmationModal').modal('show');
+            }
+
+            // Populate confirmation dialog
+            function populateConfirmationDialog() {
+                // Distribution information
+                $('#confirm-type').text($('#type_id option:selected').text() || 'Not selected');
+                $('#confirm-destination').text($('#destination_department_id option:selected').text() ||
+                    'Not selected');
+                $('#confirm-document-type').text($('#document_type option:selected').text() || 'Not selected');
+                $('#confirm-notes').text($('#notes').val() || 'No notes');
+
+                // Selected documents
+                var selectedDocs = $('input[name="document_ids[]"]:checked');
+                var documentType = $('#document_type').val();
+                var documentsHtml = '';
+
+                selectedDocs.each(function() {
+                    var checkbox = $(this);
+                    var row = checkbox.closest('tr');
+                    var documentNumber = row.find('td:nth-child(2)').text().trim();
+                    var additionalInfo = '';
+
+                    if (documentType === 'invoice') {
+                        var supplier = row.find('td:nth-child(3)').text().trim();
+                        var amount = row.find('td:nth-child(5)').text().trim();
+                        additionalInfo = supplier + ' - ' + amount;
+                    } else {
+                        var type = row.find('td:nth-child(3)').text().trim();
+                        additionalInfo = type;
+                    }
+
+                    documentsHtml += '<div class="document-summary-item">';
+                    documentsHtml += '<strong>' + documentNumber + '</strong><br>';
+                    documentsHtml += '<small class="text-muted">' + additionalInfo + '</small>';
+                    documentsHtml += '</div>';
+                });
+
+                $('#confirm-selected-documents').html(documentsHtml);
+            }
+
+            // Check for linked additional documents
+            function checkLinkedDocuments() {
+                var selectedInvoiceIds = $('input[name="document_ids[]"]:checked').map(function() {
+                    return this.value;
+                }).get();
+
+                if (selectedInvoiceIds.length === 0) {
+                    $('#linked-documents-section').hide();
+                    return;
+                }
+
+                // Make AJAX call to check for linked documents
+                $.ajax({
+                    url: '{{ route('distributions.check-linked-documents') }}',
+                    type: 'POST',
+                    data: {
+                        _token: $('input[name="_token"]').val(),
+                        invoice_ids: selectedInvoiceIds
+                    },
+                    success: function(response) {
+                        if (response.success && response.linked_documents.length > 0) {
+                            linkedDocuments = response.linked_documents;
+                            selectedLinkedDocuments = [...linkedDocuments]; // Select all by default
+                            populateLinkedDocuments();
+                            $('#linked-documents-section').show();
+                        } else {
+                            $('#linked-documents-section').hide();
+                        }
+                    },
+                    error: function() {
+                        $('#linked-documents-section').hide();
+                    }
+                });
+            }
+
+            // Populate linked documents in confirmation dialog
+            function populateLinkedDocuments() {
+                var linkedDocsHtml = '';
+
+                linkedDocuments.forEach(function(doc) {
+                    var isSelected = selectedLinkedDocuments.some(function(selected) {
+                        return selected.id === doc.id;
+                    });
+
+                    linkedDocsHtml += '<div class="document-summary-item">';
+                    linkedDocsHtml += '<strong>' + doc.document_number + '</strong> ';
+                    linkedDocsHtml += '<span class="badge badge-info">' + doc.type + '</span><br>';
+                    linkedDocsHtml += '<small class="text-muted">PO: ' + (doc.po_no || 'N/A') + '</small>';
+                    linkedDocsHtml += '</div>';
+                });
+
+                $('#confirm-linked-documents').html(linkedDocsHtml);
+            }
+
+            // Handle manage linked documents button
+            $('#manage-linked-docs').click(function() {
+                showLinkedDocumentsModal();
+            });
+
+            // Show linked documents management modal
+            function showLinkedDocumentsModal() {
+                var modalHtml = '';
+
+                linkedDocuments.forEach(function(doc) {
+                    var isSelected = selectedLinkedDocuments.some(function(selected) {
+                        return selected.id === doc.id;
+                    });
+
+                    modalHtml += '<div class="linked-document-item ' + (isSelected ? 'selected' : '') +
+                        '" data-id="' + doc.id + '">';
+                    modalHtml += '<div class="form-check">';
+                    modalHtml +=
+                        '<input class="form-check-input linked-doc-checkbox" type="checkbox" id="linked-doc-' +
+                        doc.id + '" value="' + doc.id + '" ' + (isSelected ? 'checked' : '') + '>';
+                    modalHtml += '<label class="form-check-label" for="linked-doc-' + doc.id + '">';
+                    modalHtml += '<strong>' + doc.document_number + '</strong><br>';
+                    modalHtml += '<small class="text-muted">Type: ' + doc.type + ' | PO: ' + (doc.po_no ||
+                        'N/A') + '</small>';
+                    modalHtml += '</label>';
+                    modalHtml += '</div>';
+                    modalHtml += '</div>';
+                });
+
+                $('#linked-documents-list').html(modalHtml);
+                $('#linkedDocsModal').modal('show');
+            }
+
+            // Handle linked document checkbox changes
+            $(document).on('change', '.linked-doc-checkbox', function() {
+                var docId = parseInt($(this).val());
+                var isChecked = $(this).is(':checked');
+                var item = $(this).closest('.linked-document-item');
+
+                if (isChecked) {
+                    // Add to selected
+                    if (!selectedLinkedDocuments.some(function(doc) {
+                            return doc.id === docId;
+                        })) {
+                        var doc = linkedDocuments.find(function(d) {
+                            return d.id === docId;
+                        });
+                        if (doc) selectedLinkedDocuments.push(doc);
+                    }
+                    item.addClass('selected');
+                } else {
+                    // Remove from selected
+                    selectedLinkedDocuments = selectedLinkedDocuments.filter(function(doc) {
+                        return doc.id !== docId;
+                    });
+                    item.removeClass('selected');
+                }
+            });
+
+            // Save linked documents selection
+            $('#saveLinkedDocs').click(function() {
+                $('#linkedDocsModal').modal('hide');
+                populateLinkedDocuments(); // Refresh the confirmation dialog
+            });
+
+            // Handle confirmation submission
+            $('#confirmSubmit').click(function() {
+                $('#confirmationModal').modal('hide');
+                submitDistribution();
+            });
+
+            // Original form submission logic (now called from confirmation)
+            function submitDistribution() {
 
                 // Prevent multiple submissions
                 if (isSubmitting) {
@@ -643,11 +1073,11 @@
 
                 // Debug: Log form data before submission
                 console.log('=== DISTRIBUTION FORM DEBUG ===');
-                console.log('Form action:', $(this).attr('action'));
+                console.log('Form action:', $('#distributionForm').attr('action'));
                 console.log('CSRF token:', $('input[name="_token"]').val());
 
                 // Log all form fields
-                var formData = $(this).serializeArray();
+                var formData = $('#distributionForm').serializeArray();
                 console.log('Form data (serializeArray):', formData);
 
                 // Log individual field values
@@ -692,9 +1122,18 @@
                     return false;
                 }
 
-                // Log final form data being sent
-                var finalFormData = $(this).serialize();
+                // Add linked documents to form data
+                var finalFormData = $('#distributionForm').serialize();
+
+                // Add selected linked documents
+                if (selectedLinkedDocuments.length > 0) {
+                    finalFormData += '&linked_document_ids=' + selectedLinkedDocuments.map(function(doc) {
+                        return doc.id;
+                    }).join(',');
+                }
+
                 console.log('Final form data (serialize):', finalFormData);
+                console.log('Linked documents:', selectedLinkedDocuments);
                 console.log('=== END DEBUG ===');
 
                 // Set submission guard
@@ -706,7 +1145,7 @@
 
                 // Submit form
                 $.ajax({
-                    url: $(this).attr('action'),
+                    url: $('#distributionForm').attr('action'),
                     type: 'POST',
                     data: finalFormData,
                     beforeSend: function(xhr) {
@@ -753,7 +1192,7 @@
                             '<i class="fas fa-save"></i> Create Distribution');
                     }
                 });
-            });
+            }
 
             // Remove validation errors on input
             $('input, select, textarea').on('input change', function() {

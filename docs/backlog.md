@@ -2,6 +2,40 @@
 
 ## 🎯 **Planned Features**
 
+### **Distribution System Enhancements**
+
+-   [ ] **Distribution Workflow Status Management**
+
+    -   **Priority**: High
+    -   **Description**: Enhance distribution workflow with proper status transitions and user notifications
+    -   **Components**: Status management, workflow transitions, email notifications, progress tracking
+    -   **Estimated Effort**: 2-3 days
+    -   **Dependencies**: Distribution model, user notification system, email configuration
+
+-   [ ] **Distribution Bulk Operations**
+
+    -   **Priority**: Medium
+    -   **Description**: Add bulk operations for multiple distributions (approve, reject, send, etc.)
+    -   **Components**: Bulk selection interface, batch operations, progress indicators
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: Distribution list interface, AJAX operations
+
+-   [ ] **Distribution Analytics Dashboard**
+
+    -   **Priority**: Medium
+    -   **Description**: Create analytics dashboard for distribution metrics and performance tracking
+    -   **Components**: Charts, metrics calculation, filtering, export functionality
+    -   **Estimated Effort**: 2-3 days
+    -   **Dependencies**: Chart.js or similar, database aggregation queries
+
+-   [ ] **Distribution Document Preview**
+
+    -   **Priority**: Low
+    -   **Description**: Add document preview functionality for invoices and additional documents
+    -   **Components**: Document viewer, file handling, preview modal
+    -   **Estimated Effort**: 1-2 days
+    -   **Dependencies**: Document storage system, file type support
+
 ### **Invoice System Enhancements**
 
 -   [ ] **Invoice Field Synchronization Improvements**

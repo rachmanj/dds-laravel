@@ -100,7 +100,8 @@ class DistributionController extends Controller
             'document_type' => 'required|in:invoice,additional_document',
             'document_ids' => 'required|array|min:1',
             'document_ids.*' => 'required|integer',
-            'notes' => 'nullable|string|max:1000'
+            'notes' => 'nullable|string|max:1000',
+            'linked_document_ids' => 'nullable|string'
         ]);
 
         if ($validator->fails()) {
@@ -164,6 +165,12 @@ class DistributionController extends Controller
             // Attach documents
             $this->attachDocuments($distribution, $request->document_type, $request->document_ids);
 
+            // Handle linked documents if provided
+            if ($request->linked_document_ids) {
+                $linkedDocumentIds = explode(',', $request->linked_document_ids);
+                $this->attachDocuments($distribution, 'additional_document', $linkedDocumentIds);
+            }
+
             // If distributing invoices, also automatically include any attached additional documents
             if ($request->document_type === 'invoice') {
                 $this->attachInvoiceAdditionalDocuments($distribution, $request->document_ids);
@@ -201,6 +208,53 @@ class DistributionController extends Controller
             }
 
             return back()->with('error', 'Failed to create distribution: ' . $e->getMessage())->withInput();
+        }
+    }
+
+    /**
+     * Check for linked additional documents for selected invoices
+     */
+    public function checkLinkedDocuments(Request $request): JsonResponse
+    {
+        try {
+            $invoiceIds = $request->input('invoice_ids', []);
+
+            if (empty($invoiceIds)) {
+                return response()->json([
+                    'success' => true,
+                    'linked_documents' => []
+                ]);
+            }
+
+            // Get PO numbers from selected invoices
+            $poNumbers = Invoice::whereIn('id', $invoiceIds)->pluck('po_no')->filter();
+
+            // Find additional documents linked to the selected invoices via PO number
+            $linkedDocuments = AdditionalDocument::whereIn('po_no', $poNumbers)
+                ->where('cur_loc', auth()->user()->department->location_code)
+                ->with('type')
+                ->get()
+                ->map(function ($doc) {
+                    return [
+                        'id' => $doc->id,
+                        'document_number' => $doc->document_number,
+                        'type' => $doc->type->type_name ?? 'N/A',
+                        'po_no' => $doc->po_no,
+                        'status' => $doc->status
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'linked_documents' => $linkedDocuments
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error checking linked documents: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error checking linked documents'
+            ], 500);
         }
     }
 

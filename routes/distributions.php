@@ -43,4 +43,7 @@ Route::prefix('distributions')->name('distributions.')->group(function () {
     // Additional routes
     Route::get('/{distribution}/history', [DistributionController::class, 'history'])->name('history');
     Route::get('/{distribution}/discrepancy-summary', [DistributionController::class, 'discrepancySummary'])->name('discrepancy-summary');
+
+    // Check linked documents for selected invoices
+    Route::post('/check-linked-documents', [DistributionController::class, 'checkLinkedDocuments'])->name('check-linked-documents');
 });

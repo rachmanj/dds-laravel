@@ -6,6 +6,66 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Distribution Creation UX Architecture**
+
+**Pattern**: Enhanced distribution creation with confirmation dialog, linked documents management, and visual location indicators
+
+**Implementation**:
+
+-   **Confirmation Dialog**: Bootstrap modal with dynamic content population before form submission
+-   **Linked Documents Detection**: AJAX-based API for finding additional documents linked via PO number
+-   **Management Interface**: Modal-based selection/deselection of linked documents
+-   **Location Indicators**: Visual badges showing document department location
+-   **Form Submission**: AJAX-based submission with proper error handling and success feedback
+
+**Technical Architecture**:
+
+```php
+// Distribution Creation Controller Structure
+DistributionController
+├── create() → Distribution creation form
+├── store(Request $request) → Process distribution creation
+├── checkLinkedDocuments(Request $request) → AJAX endpoint for linked documents
+└── validation → Required fields, document selection, etc.
+```
+
+**Frontend Architecture**:
+
+```javascript
+// Distribution Creation Flow
+Distribution Creation Process
+├── Form Validation → Required fields check
+├── Confirmation Dialog → Review before submission
+├── Linked Documents Check → AJAX call to detect linked documents
+├── Linked Documents Management → Modal for document selection
+└── Form Submission → AJAX submission with success handling
+```
+
+**Database Relationship Architecture**:
+
+```sql
+-- Linked Documents Relationship
+Invoices (po_no) ←→ Additional Documents (po_no)
+├── PO Number Matching → Primary linking mechanism
+├── Location Filtering → cur_loc field for department filtering
+└── Status Validation → Available documents only
+```
+
+**UI Component Architecture**:
+
+```html
+<!-- Confirmation Modal Structure -->
+Confirmation Modal ├── Distribution Information → Type, destination, document
+type, notes ├── Selected Documents → List of chosen documents ├── Linked
+Documents Section → Automatically detected additional documents └── Action
+Buttons → Cancel, Confirm & Create Distribution
+
+<!-- Linked Documents Management Modal -->
+Management Modal ├── Document List → Checkbox interface for each linked document
+├── Document Details → Number, type, PO number └── Action Buttons → Cancel, Save
+Selection
+```
+
 ### **Invoice Edit and Update System Architecture**
 
 **Pattern**: Comprehensive invoice editing with dual-field amount system and proper field synchronization
