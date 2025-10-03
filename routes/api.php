@@ -84,4 +84,11 @@ Route::prefix('v1/processing-analytics')->group(function () {
     Route::get('/overview', [ProcessingAnalyticsController::class, 'getMonthlyOverview']);
     Route::get('/efficiency', [ProcessingAnalyticsController::class, 'getDepartmentEfficiency']);
     Route::get('/export', [ProcessingAnalyticsController::class, 'exportMonthlyReport']);
+
+    // Enhanced Processing Analytics endpoints
+    Route::get('/accurate-processing-days', [ProcessingAnalyticsController::class, 'getAccurateProcessingDays']);
+    Route::get('/document-timeline', [ProcessingAnalyticsController::class, 'getDocumentTimeline']);
+    Route::get('/department-efficiency-accurate', [ProcessingAnalyticsController::class, 'getDepartmentEfficiencyAccurate']);
+    Route::get('/processing-bottlenecks', [ProcessingAnalyticsController::class, 'getProcessingBottlenecks']);
+    Route::get('/slow-processing-documents', [ProcessingAnalyticsController::class, 'getSlowProcessingDocuments']);
 });

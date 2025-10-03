@@ -31,7 +31,7 @@
                         <div class="card-body">
                             <!-- Filter Controls -->
                             <div class="row mb-4">
-                                <div class="col-md-3">
+                                <div class="col-lg-2 col-md-3 col-sm-6">
                                     <div class="form-group">
                                         <label>Year</label>
                                         <select class="form-control" id="yearSelect">
@@ -42,7 +42,7 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-lg-2 col-md-3 col-sm-6">
                                     <div class="form-group">
                                         <label>Month</label>
                                         <select class="form-control" id="monthSelect">
@@ -54,7 +54,7 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-lg-2 col-md-3 col-sm-6">
                                     <div class="form-group">
                                         <label>Document Type</label>
                                         <select class="form-control" id="documentTypeSelect">
@@ -64,11 +64,28 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-lg-2 col-md-3 col-sm-6">
+                                    <div class="form-group">
+                                        <label>Analysis Type</label>
+                                        <select class="form-control" id="analysisTypeSelect">
+                                            <option value="basic">Basic Analysis</option>
+                                            <option value="accurate">Accurate Analysis</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-6 col-sm-6">
                                     <div class="form-group">
                                         <label>&nbsp;</label>
                                         <button type="button" class="btn btn-primary btn-block" id="loadDataBtn">
                                             <i class="fas fa-refresh mr-1"></i> Load Data
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-6 col-sm-6">
+                                    <div class="form-group">
+                                        <label>&nbsp;</label>
+                                        <button type="button" class="btn btn-success btn-block" id="helpBtn">
+                                            <i class="fas fa-question-circle mr-1"></i> Help
                                         </button>
                                     </div>
                                 </div>
@@ -155,6 +172,63 @@
                                 </div>
                             </div>
 
+                            <!-- Enhanced Analytics Section -->
+                            <div class="row" id="enhancedAnalytics" style="display: none;">
+                                <!-- Processing Bottlenecks -->
+                                <div class="col-lg-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h3 class="card-title">
+                                                <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+                                                Processing Bottlenecks
+                                            </h3>
+                                            <div class="card-tools">
+                                                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                                    <i class="fas fa-minus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="bottlenecksChart" style="height: 300px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Slow Processing Documents -->
+                                <div class="col-lg-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h3 class="card-title">
+                                                <i class="fas fa-clock text-danger mr-2"></i>
+                                                Slow Processing Documents
+                                            </h3>
+                                            <div class="card-tools">
+                                                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                                    <i class="fas fa-minus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-striped" id="slowDocumentsTable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Document</th>
+                                                            <th>Department</th>
+                                                            <th>Days</th>
+                                                            <th>Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="slowDocumentsTableBody">
+                                                        <!-- Slow documents will be loaded here -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Trend Analysis -->
                             <div class="row">
                                 <div class="col-12">
@@ -194,6 +268,7 @@
             // Event handlers
             $('#loadDataBtn').on('click', loadData);
             $('#exportBtn').on('click', exportData);
+            $('#helpBtn').on('click', showHelp);
 
             function initializeCharts() {
                 // Department Performance Chart
@@ -210,6 +285,7 @@
                 const year = $('#yearSelect').val();
                 const month = $('#monthSelect').val();
                 const documentType = $('#documentTypeSelect').val();
+                const analysisType = $('#analysisTypeSelect').val();
 
                 showLoading();
 
@@ -235,12 +311,143 @@
                         updateTrendChart(trendData.data);
                     }
 
+                    // Load enhanced analytics if accurate analysis is selected
+                    if (analysisType === 'accurate') {
+                        await loadEnhancedAnalytics(year, month);
+                    } else {
+                        $('#enhancedAnalytics').hide();
+                    }
+
                 } catch (error) {
                     console.error('Error loading data:', error);
                     showError('Failed to load analytics data');
                 } finally {
                     hideLoading();
                 }
+            }
+
+            async function loadEnhancedAnalytics(year, month) {
+                try {
+                    // Load processing bottlenecks
+                    const bottlenecksResponse = await fetch(
+                        `{{ url('api/v1/processing-analytics/processing-bottlenecks') }}?year=${year}&month=${month}&limit=5`
+                    );
+                    const bottlenecksData = await bottlenecksResponse.json();
+
+                    // Load slow processing documents
+                    const slowDocsResponse = await fetch(
+                        `{{ url('api/v1/processing-analytics/slow-processing-documents') }}?year=${year}&month=${month}&threshold_days=7`
+                    );
+                    const slowDocsData = await slowDocsResponse.json();
+
+                    if (bottlenecksData.success) {
+                        updateBottlenecksChart(bottlenecksData.data);
+                    }
+
+                    if (slowDocsData.success) {
+                        updateSlowDocumentsTable(slowDocsData.data);
+                    }
+
+                    $('#enhancedAnalytics').show();
+
+                } catch (error) {
+                    console.error('Error loading enhanced analytics:', error);
+                }
+            }
+
+            function updateBottlenecksChart(data) {
+                const bottlenecksChart = echarts.init(document.getElementById('bottlenecksChart'));
+
+                const chartData = data.map(item => ({
+                    name: item.department_name,
+                    value: parseFloat(item.avg_invoice_processing_days || 0)
+                }));
+
+                const option = {
+                    title: {
+                        text: 'Top Processing Bottlenecks',
+                        left: 'center'
+                    },
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: '{a} <br/>{b}: {c} days ({d}%)'
+                    },
+                    series: [{
+                        name: 'Processing Days',
+                        type: 'pie',
+                        radius: '50%',
+                        data: chartData,
+                        emphasis: {
+                            itemStyle: {
+                                shadowBlur: 10,
+                                shadowOffsetX: 0,
+                                shadowColor: 'rgba(0, 0, 0, 0.5)'
+                            }
+                        }
+                    }]
+                };
+
+                bottlenecksChart.setOption(option);
+            }
+
+            function updateSlowDocumentsTable(data) {
+                const tbody = $('#slowDocumentsTableBody');
+                tbody.empty();
+
+                // Combine slow invoices and additional documents
+                const allSlowDocs = [
+                    ...data.slow_invoices.map(doc => ({
+                        ...doc,
+                        type: 'Invoice',
+                        number: doc.invoice_number
+                    })),
+                    ...data.slow_additional_documents.map(doc => ({
+                        ...doc,
+                        type: 'Additional Document',
+                        number: doc.document_number
+                    }))
+                ].sort((a, b) => b.processing_days - a.processing_days);
+
+                allSlowDocs.slice(0, 10).forEach(doc => {
+                    const row = `
+                        <tr>
+                            <td>
+                                <strong>${doc.number}</strong><br>
+                                <small class="text-muted">${doc.type}</small>
+                            </td>
+                            <td>${doc.department_name}</td>
+                            <td>
+                                <span class="badge badge-danger">${doc.processing_days} days</span>
+                            </td>
+                            <td>
+                                <a href="${getDocumentShowUrl(doc)}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> View Document
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                });
+
+                if (allSlowDocs.length === 0) {
+                    tbody.append(
+                        '<tr><td colspan="4" class="text-center text-muted">No slow processing documents found</td></tr>'
+                    );
+                }
+            }
+
+            function getDocumentShowUrl(doc) {
+                if (doc.type === 'Invoice') {
+                    return `{{ url('invoices') }}/${doc.id}`;
+                } else if (doc.type === 'Additional Document') {
+                    return `{{ url('additional-documents') }}/${doc.id}`;
+                }
+                return '#';
+            }
+
+            function showHelp() {
+                $('#helpModal').modal('show');
             }
 
             function updateSummaryCards(data) {
@@ -636,3 +843,59 @@
         }
     </style>
 @endpush
+
+<!-- Help Modal -->
+<div class="modal fade" id="helpModal" tabindex="-1" role="dialog" aria-labelledby="helpModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="helpModalLabel">
+                    <i class="fas fa-question-circle"></i> Processing Analytics Help
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-chart-line"></i> Dashboard Features</h6>
+                        <ul>
+                            <li><strong>Basic Analysis:</strong> Shows overall processing statistics</li>
+                            <li><strong>Accurate Analysis:</strong> Shows processing times based on actual distribution
+                                workflow</li>
+                            <li><strong>Processing Bottlenecks:</strong> Identifies departments with longest processing
+                                times</li>
+                            <li><strong>Slow Processing Documents:</strong> Lists documents exceeding processing
+                                thresholds</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-route"></i> Document Journey Tracking</h6>
+                        <ul>
+                            <li>Click "View Document" in Slow Processing Documents table</li>
+                            <li>On the document detail page, click "Load Document Journey"</li>
+                            <li>View step-by-step timeline of document processing</li>
+                            <li>See processing time at each department</li>
+                        </ul>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <h6><i class="fas fa-info-circle"></i> How Processing Days Are Calculated</h6>
+                        <div class="alert alert-info">
+                            <strong>Basic Analysis:</strong> Days from receive_date to current date<br>
+                            <strong>Accurate Analysis:</strong> Days from receive_date to when document was sent to next
+                            department
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

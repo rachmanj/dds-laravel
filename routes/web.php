@@ -30,9 +30,10 @@ Route::get('/', function () {
 // Protected Routes
 Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
-    
+
     // Processing Analytics Routes
     Route::get('/processing-analytics', [ProcessingAnalyticsController::class, 'index'])->name('processing-analytics.index');
+    Route::get('/processing-analytics/document-journey', [ProcessingAnalyticsController::class, 'documentJourney'])->name('processing-analytics.document-journey');
 
     // Profile Routes
     Route::get('/profile/change-password', [\App\Http\Controllers\ProfileController::class, 'changePassword'])->name('profile.change-password');

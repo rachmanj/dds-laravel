@@ -26,7 +26,7 @@ class ProcessingAnalyticsController extends Controller
     {
         try {
             $data = $this->analyticsService->getMonthlyProcessingDays($year, $month);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $data,
@@ -45,7 +45,7 @@ class ProcessingAnalyticsController extends Controller
     {
         try {
             $data = $this->analyticsService->getDepartmentProcessingDays($departmentId, $year, $month);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $data,
@@ -63,7 +63,7 @@ class ProcessingAnalyticsController extends Controller
     {
         try {
             $data = $this->analyticsService->getProcessingTrends($monthsBack);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $data,
@@ -85,7 +85,7 @@ class ProcessingAnalyticsController extends Controller
             $documentType = $request->get('document_type', 'both'); // invoice, additional_document, both
 
             $data = $this->analyticsService->getMonthlyOverview($year, $month, $documentType);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $data,
@@ -110,7 +110,7 @@ class ProcessingAnalyticsController extends Controller
             $documentType = $request->get('document_type', 'both');
 
             $data = $this->analyticsService->getDepartmentEfficiency($year, $documentType);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $data,
@@ -135,7 +135,7 @@ class ProcessingAnalyticsController extends Controller
             $format = $request->get('format', 'excel'); // excel, pdf, csv
 
             $filePath = $this->analyticsService->exportMonthlyReport($year, $month, $format);
-            
+
             return response()->download($filePath);
         } catch (\Exception $e) {
             return response()->json([
@@ -143,5 +143,169 @@ class ProcessingAnalyticsController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get accurate processing days based on distribution workflow
+     */
+    public function getAccurateProcessingDays(Request $request)
+    {
+        try {
+            $year = $request->get('year', now()->year);
+            $month = $request->get('month', now()->month);
+            $department = $request->get('department');
+
+            $data = $this->analyticsService->getAccurateProcessingDays($year, $month, $department);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'filters' => [
+                    'year' => $year,
+                    'month' => $month,
+                    'department' => $department
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get individual document processing timeline
+     */
+    public function getDocumentTimeline(Request $request)
+    {
+        try {
+            $documentId = $request->get('document_id');
+            $documentType = $request->get('document_type', 'invoice');
+
+            if (!$documentId) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Document ID is required'
+                ], 400);
+            }
+
+            $data = $this->analyticsService->getDocumentProcessingTimeline($documentId, $documentType);
+
+            if (!$data) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Document not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get department processing efficiency with accurate calculations
+     */
+    public function getDepartmentEfficiencyAccurate(Request $request)
+    {
+        try {
+            $year = $request->get('year', now()->year);
+            $month = $request->get('month', now()->month);
+            $departmentId = $request->get('department_id');
+
+            $data = $this->analyticsService->getDepartmentProcessingEfficiency($year, $month, $departmentId);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'filters' => [
+                    'year' => $year,
+                    'month' => $month,
+                    'department_id' => $departmentId
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get processing bottlenecks
+     */
+    public function getProcessingBottlenecks(Request $request)
+    {
+        try {
+            $year = $request->get('year', now()->year);
+            $month = $request->get('month', now()->month);
+            $limit = $request->get('limit', 5);
+
+            $data = $this->analyticsService->getProcessingBottlenecks($year, $month, $limit);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'filters' => [
+                    'year' => $year,
+                    'month' => $month,
+                    'limit' => $limit
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get documents exceeding normal processing times
+     */
+    public function getSlowProcessingDocuments(Request $request)
+    {
+        try {
+            $year = $request->get('year', now()->year);
+            $month = $request->get('month', now()->month);
+            $thresholdDays = $request->get('threshold_days', 7);
+
+            $data = $this->analyticsService->getSlowProcessingDocuments($year, $month, $thresholdDays);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'filters' => [
+                    'year' => $year,
+                    'month' => $month,
+                    'threshold_days' => $thresholdDays
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Document journey tracking page
+     */
+    public function documentJourney(Request $request)
+    {
+        $documentId = $request->get('document_id');
+        $documentType = $request->get('document_type', 'invoice');
+
+        return view('processing-analytics.document-journey', compact('documentId', 'documentType'));
     }
 }
