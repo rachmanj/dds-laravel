@@ -106,31 +106,21 @@ class InvoiceController extends Controller
                 return $invoice->status_badge;
             })
             ->addColumn('days_difference', function ($invoice) {
-                if (!$invoice->receive_date) {
+                // Use department-specific aging calculation
+                $daysInCurrentLocation = $invoice->days_in_current_location;
+
+                if ($daysInCurrentLocation == 0) {
                     return '<span class="text-muted">-</span>';
                 }
 
-                // Calculate days since receive_date (positive = past, negative = future)
-                $now = \Carbon\Carbon::now()->startOfDay(); // Start of today to avoid time issues
-                $receiveDate = \Carbon\Carbon::parse($invoice->receive_date)->startOfDay(); // Start of receive date
+                // Round to 1 decimal place
+                $roundedDays = round($daysInCurrentLocation, 1);
 
-                // Use timestamp difference for more accurate calculation
-                $days = $now->timestamp - $receiveDate->timestamp;
-                $days = $days / (24 * 60 * 60); // Convert seconds to days
-                $roundedDays = round($days); // Round to nearest integer
-
-                if ($roundedDays < 0) {
-                    // Future date (negative days) - invoice not yet received
-                    $roundedDays = abs($roundedDays);
-                    return '<span class="badge badge-info">' . $roundedDays . '</span>';
-                } elseif ($roundedDays < 7) {
-                    // Less than 7 days since received (green)
+                if ($roundedDays <= 7) {
                     return '<span class="badge badge-success">' . $roundedDays . '</span>';
-                } elseif ($roundedDays == 7) {
-                    // Exactly 7 days since received (yellow)
+                } elseif ($roundedDays <= 14) {
                     return '<span class="badge badge-warning">' . $roundedDays . '</span>';
                 } else {
-                    // More than 7 days since received (red)
                     return '<span class="badge badge-danger">' . $roundedDays . '</span>';
                 }
             })

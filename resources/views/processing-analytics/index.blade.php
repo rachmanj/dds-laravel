@@ -70,6 +70,7 @@
                                         <select class="form-control" id="analysisTypeSelect">
                                             <option value="basic">Basic Analysis</option>
                                             <option value="accurate">Accurate Analysis</option>
+                                            <option value="department_specific">Department-Specific Analysis</option>
                                         </select>
                                     </div>
                                 </div>
@@ -86,6 +87,26 @@
                                         <label>&nbsp;</label>
                                         <button type="button" class="btn btn-success btn-block" id="helpBtn">
                                             <i class="fas fa-question-circle mr-1"></i> Help
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Department-Specific Aging Alerts -->
+                            <div class="row mb-4" id="departmentAgingAlerts" style="display: none;">
+                                <div class="col-12">
+                                    <div class="alert alert-danger alert-dismissible" id="criticalAgingAlert" style="display: none;">
+                                        <h4><i class="icon fas fa-exclamation-triangle"></i> Critical Aging Alert!</h4>
+                                        <span id="criticalAgingCount">0</span> documents have been in departments for over 30 days.
+                                        <button type="button" class="btn btn-danger btn-sm ml-2" id="viewCriticalDocuments">
+                                            <i class="fas fa-eye"></i> View Critical Documents
+                                        </button>
+                                    </div>
+                                    <div class="alert alert-warning alert-dismissible" id="warningAgingAlert" style="display: none;">
+                                        <h4><i class="icon fas fa-exclamation-circle"></i> Warning!</h4>
+                                        <span id="warningAgingCount">0</span> documents have been in departments for 15-30 days.
+                                        <button type="button" class="btn btn-warning btn-sm ml-2" id="viewWarningDocuments">
+                                            <i class="fas fa-eye"></i> View Warning Documents
                                         </button>
                                     </div>
                                 </div>
@@ -167,6 +188,48 @@
                                                     </tbody>
                                                 </table>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Department-Specific Analysis Section -->
+                            <div class="row" id="departmentSpecificAnalysis" style="display: none;">
+                                <!-- Department-Specific Processing Chart -->
+                                <div class="col-lg-8">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h3 class="card-title">Department-Specific Processing Analysis</h3>
+                                            <div class="card-tools">
+                                                <select class="form-control" id="agingAnalysisType">
+                                                    <option value="current_location">Days in Current Department</option>
+                                                    <option value="total_processing">Total Processing Days</option>
+                                                    <option value="comparison">Comparison View</option>
+                                                </select>
+                                                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                                    <i class="fas fa-minus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="departmentSpecificChart" style="height: 400px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Aging Categories Breakdown -->
+                                <div class="col-lg-4">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h3 class="card-title">Aging Categories Breakdown</h3>
+                                            <div class="card-tools">
+                                                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                                    <i class="fas fa-minus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="agingCategoriesChart" style="height: 400px;"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -364,6 +427,17 @@
                             $('#exportBtn').on('click', exportData);
                             $('#helpBtn').on('click', showHelp);
                             $('#loadDepartmentData').on('click', loadDepartmentMonthlyData);
+                            
+                            // NEW: Aging alert event handlers
+                            $('#viewCriticalDocuments').on('click', function() {
+                                // Navigate to invoices/additional documents with critical aging filter
+                                window.location.href = '{{ url("invoices") }}?age_filter=30_plus_days&status_filter=available,in_transit';
+                            });
+                            
+                            $('#viewWarningDocuments').on('click', function() {
+                                // Navigate to invoices/additional documents with warning aging filter
+                                window.location.href = '{{ url("invoices") }}?age_filter=15-30_days&status_filter=available,in_transit';
+                            });
 
                             function initializeCharts() {
                                 // Department Performance Chart
@@ -409,9 +483,19 @@
                                     // Load enhanced analytics if accurate analysis is selected
                                     if (analysisType === 'accurate') {
                                         await loadEnhancedAnalytics(year, month);
+                                        $('#enhancedAnalytics').show();
+                                        $('#departmentSpecificAnalysis').hide();
+                                    } else if (analysisType === 'department_specific') {
+                                        await loadDepartmentSpecificAnalytics(year, month);
+                                        $('#departmentSpecificAnalysis').show();
+                                        $('#enhancedAnalytics').hide();
                                     } else {
                                         $('#enhancedAnalytics').hide();
+                                        $('#departmentSpecificAnalysis').hide();
                                     }
+
+                                    // Load aging alerts for all analysis types
+                                    await loadAgingAlerts();
 
                                 } catch (error) {
                                     console.error('Error loading data:', error);
@@ -448,6 +532,186 @@
                                 } catch (error) {
                                     console.error('Error loading enhanced analytics:', error);
                                 }
+                            }
+
+                            // NEW: Load department-specific analytics
+                            async function loadDepartmentSpecificAnalytics(year, month) {
+                                try {
+                                    // Load department-specific metrics
+                                    const response = await fetch(
+                                        `{{ url('api/v1/processing-analytics/department-specific') }}/${year}/${month}`
+                                    );
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                        updateDepartmentSpecificChart(data.data);
+                                        updateAgingCategoriesChart(data.data);
+                                        updateDepartmentSpecificTable(data.data);
+                                    }
+
+                                } catch (error) {
+                                    console.error('Error loading department-specific analytics:', error);
+                                }
+                            }
+
+                            // NEW: Load aging alerts
+                            async function loadAgingAlerts() {
+                                try {
+                                    const response = await fetch(
+                                        `{{ url('api/v1/processing-analytics/aging-alerts') }}`
+                                    );
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                        updateAgingAlerts(data.data);
+                                    }
+
+                                } catch (error) {
+                                    console.error('Error loading aging alerts:', error);
+                                }
+                            }
+
+                            // NEW: Update aging alerts display
+                            function updateAgingAlerts(alerts) {
+                                const alertsContainer = $('#departmentAgingAlerts');
+                                const criticalAlert = $('#criticalAgingAlert');
+                                const warningAlert = $('#warningAgingAlert');
+
+                                if (alerts.overdue_critical > 0 || alerts.overdue_warning > 0) {
+                                    alertsContainer.show();
+
+                                    if (alerts.overdue_critical > 0) {
+                                        $('#criticalAgingCount').text(alerts.overdue_critical);
+                                        criticalAlert.show();
+                                    } else {
+                                        criticalAlert.hide();
+                                    }
+
+                                    if (alerts.overdue_warning > 0) {
+                                        $('#warningAgingCount').text(alerts.overdue_warning);
+                                        warningAlert.show();
+                                    } else {
+                                        warningAlert.hide();
+                                    }
+                                } else {
+                                    alertsContainer.hide();
+                                }
+                            }
+
+                            // NEW: Update department-specific chart
+                            function updateDepartmentSpecificChart(data) {
+                                const chart = echarts.init(document.getElementById('departmentSpecificChart'));
+                                
+                                const departments = [];
+                                const currentLocationDays = [];
+                                const totalProcessingDays = [];
+
+                                // Process department breakdown data
+                                Object.values(data.invoices.department_breakdown).forEach(dept => {
+                                    departments.push(dept.department_name);
+                                    currentLocationDays.push(dept.avg_days_in_current_location || 0);
+                                    totalProcessingDays.push(dept.avg_days_in_current_location || 0); // For now, same as current location
+                                });
+
+                                const option = {
+                                    title: {
+                                        text: 'Department-Specific Processing Analysis',
+                                        left: 'center'
+                                    },
+                                    tooltip: {
+                                        trigger: 'axis',
+                                        axisPointer: {
+                                            type: 'shadow'
+                                        }
+                                    },
+                                    legend: {
+                                        data: ['Days in Current Department', 'Total Processing Days'],
+                                        top: 30
+                                    },
+                                    grid: {
+                                        left: '3%',
+                                        right: '4%',
+                                        bottom: '3%',
+                                        containLabel: true
+                                    },
+                                    xAxis: {
+                                        type: 'category',
+                                        data: departments,
+                                        axisLabel: {
+                                            rotate: 45
+                                        }
+                                    },
+                                    yAxis: {
+                                        type: 'value',
+                                        name: 'Days'
+                                    },
+                                    series: [
+                                        {
+                                            name: 'Days in Current Department',
+                                            type: 'bar',
+                                            data: currentLocationDays,
+                                            itemStyle: {
+                                                color: '#3498db'
+                                            }
+                                        },
+                                        {
+                                            name: 'Total Processing Days',
+                                            type: 'bar',
+                                            data: totalProcessingDays,
+                                            itemStyle: {
+                                                color: '#e74c3c'
+                                            }
+                                        }
+                                    ]
+                                };
+
+                                chart.setOption(option);
+                            }
+
+                            // NEW: Update aging categories chart
+                            function updateAgingCategoriesChart(data) {
+                                const chart = echarts.init(document.getElementById('agingCategoriesChart'));
+                                
+                                const categories = data.summary.aging_categories;
+                                const chartData = [
+                                    { value: categories['0-7_days'], name: '0-7 Days', itemStyle: { color: '#27ae60' } },
+                                    { value: categories['8-14_days'], name: '8-14 Days', itemStyle: { color: '#f39c12' } },
+                                    { value: categories['15-30_days'], name: '15-30 Days', itemStyle: { color: '#e67e22' } },
+                                    { value: categories['30_plus_days'], name: '30+ Days', itemStyle: { color: '#e74c3c' } }
+                                ];
+
+                                const option = {
+                                    title: {
+                                        text: 'Document Aging Distribution',
+                                        left: 'center'
+                                    },
+                                    tooltip: {
+                                        trigger: 'item',
+                                        formatter: '{a} <br/>{b}: {c} documents ({d}%)'
+                                    },
+                                    series: [{
+                                        name: 'Documents',
+                                        type: 'pie',
+                                        radius: '70%',
+                                        data: chartData,
+                                        emphasis: {
+                                            itemStyle: {
+                                                shadowBlur: 10,
+                                                shadowOffsetX: 0,
+                                                shadowColor: 'rgba(0, 0, 0, 0.5)'
+                                            }
+                                        }
+                                    }]
+                                };
+
+                                chart.setOption(option);
+                            }
+
+                            // NEW: Update department-specific table
+                            function updateDepartmentSpecificTable(data) {
+                                // This would update the existing department table with department-specific data
+                                // For now, we'll use the existing table structure
+                                console.log('Department-specific table data:', data);
                             }
 
                             function updateBottlenecksChart(data) {

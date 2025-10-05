@@ -1,3 +1,106 @@
+### 2025-01-05 — UI/UX Enhancements and Data Formatting Improvements
+
+-   **Issue**: User requested improvements to document aging calculations, right-alignment of numeric values, date formatting, and attachment section simplification
+-   **Scope**: Comprehensive UI/UX improvements across invoice and additional document pages
+-   **Implementation Date**: 2025-01-05
+-   **Status**: ✅ **COMPLETED** - All enhancements successfully implemented and tested
+
+#### **1. Department-Specific Document Aging System** ✅ **COMPLETED**
+
+-   **Critical Flaw Identified**: Original aging calculation using `receive_date` was inaccurate for distributed documents
+-   **Solution Implemented**: Department-specific aging based on arrival date at current department
+-   **Files Modified**:
+    -   `app/Models/AdditionalDocument.php` - Added new accessors for department-specific aging
+    -   `app/Models/Invoice.php` - Added identical accessors for invoice aging
+    -   `app/Http/Controllers/AdditionalDocumentDashboardController.php` - Enhanced with department-specific alerts
+    -   `database/migrations/2025_10_05_001106_add_document_aging_indexes.php` - Performance indexes
+-   **New Features**:
+    -   `current_location_arrival_date` - Tracks when document arrived at current department
+    -   `days_in_current_location` - Calculates days spent in current department only
+    -   `current_location_age_category` - Categorizes aging (0-7, 8-14, 15-30, 30+ days)
+    -   Critical alerts banner for overdue documents
+    -   Action buttons for immediate attention to critical documents
+
+#### **2. Document Journey Tracking Enhancement** ✅ **COMPLETED**
+
+-   **Enhanced Timeline**: Updated `ProcessingAnalyticsService` to use department-specific processing days
+-   **Files Modified**:
+    -   `app/Services/ProcessingAnalyticsService.php` - Complete overhaul of timeline calculation
+    -   `resources/views/invoices/show.blade.php` - Enhanced JavaScript for timeline display
+    -   `resources/views/additional_documents/show.blade.php` - Enhanced JavaScript for timeline display
+-   **New Features**:
+    -   Department-specific arrival dates in timeline
+    -   Enhanced metrics (total departments, average stay, longest stay)
+    -   Journey summary with recommendations
+    -   Visual indicators for delayed departments
+    -   Real-time processing statistics
+
+#### **3. Data Formatting Improvements** ✅ **COMPLETED**
+
+-   **Right-Alignment**: Amount and days columns now properly right-aligned for better readability
+-   **Date Formatting**: All dates in Document Journey Tracking display as "DD-MMM-YYYY" format (e.g., "02-Oct-2025")
+-   **Decimal Precision**: Days values rounded to 1 decimal place for consistency
+-   **Files Modified**:
+    -   `resources/views/invoices/index.blade.php` - Added `className: 'text-right'` to amount and days columns
+    -   `resources/views/additional_documents/index.blade.php` - Added `className: 'text-right'` to days column
+    -   Both show pages - Updated JavaScript for date formatting and right-alignment
+    -   Controllers - Added `round($value, 1)` for decimal precision
+
+#### **4. Invoice Attachments Section Simplification** ✅ **COMPLETED**
+
+-   **Removed Complex UI**: Eliminated full attachment management from invoice show page
+-   **Added Simple Link**: Clean, professional link to dedicated attachments page
+-   **Files Modified**:
+    -   `resources/views/invoices/show.blade.php` - Removed attachment list, upload form, and related JavaScript
+-   **Benefits**:
+    -   Cleaner, less cluttered invoice detail page
+    -   Better separation of concerns
+    -   Improved performance (removed complex JavaScript)
+    -   Enhanced user experience with dedicated attachments page
+
+#### **5. Testing & Validation** ✅ **COMPLETED**
+
+-   **Browser Testing**: All features tested using Playwright browser automation
+-   **Data Accuracy**: Verified department-specific aging calculations work correctly
+-   **UI Consistency**: Confirmed right-alignment and date formatting across all pages
+-   **Navigation**: Tested attachment link functionality
+-   **Performance**: Verified improved page load times after JavaScript cleanup
+
+### 2025-01-05 — Processing Trends Chart Date Calculation Bug Fix
+
+-   **Issue**: Processing Trends chart showing future months (April-September 2025) instead of historical data
+-   **Root Cause**: Date calculation bug in `getProcessingTrends()` method causing incorrect month ranges
+-   **Implementation Date**: 2025-01-05
+-   **Files Modified**:
+    -   `app/Services/ProcessingAnalyticsService.php` - Fixed date calculation logic and added validation
+    -   `app/Http/Controllers/ProcessingAnalyticsController.php` - Enhanced error handling and validation
+    -   `config/app.php` - Made timezone configurable via environment
+-   **Fixes Implemented**:
+    1. **Date Calculation Bug Fix**: Corrected `getProcessingTrends()` to calculate proper historical date ranges
+    2. **Timezone Configuration**: Made timezone configurable via `APP_TIMEZONE` environment variable
+    3. **Data Validation**: Added comprehensive validation to prevent future data display
+    4. **Error Handling**: Enhanced API error responses with proper HTTP status codes
+-   **Validation Features**:
+    -   Prevents future months beyond current month from being included
+    -   Validates month/year parameters with clear error messages
+    -   Adds metadata (timezone, calculation timestamp, date ranges) to API responses
+    -   Graceful error handling for invalid date ranges
+-   **Testing Results**: All date ranges (1, 3, 6, 12 months) working correctly with proper historical data
+-   **Status**: ✅ **COMPLETED** - Chart now shows correct historical data with proper validation
+
+### 2025-01-05 — Zero Amount Invoice Analysis
+
+-   **Issue**: Invoice 13048264 (BALFILTRACS INDONESIA) recorded with zero amount (0.00 IDR)
+-   **Scope**: Analysis of zero amount invoice anomaly and system validation rules
+-   **Analysis Date**: 2025-01-05
+-   **Key Findings**:
+    -   System validation allows zero amounts (`min:0` validation rule)
+    -   Only 1 out of 20 invoices has zero amount (5% anomaly rate)
+    -   Has associated Delivery Order document 00025696
+    -   Possible causes: credit note, placeholder, free delivery, or data entry error
+-   **Recommendation**: Verify with business users (elma rahmadaniati - Accounting) whether intentional or requires correction
+-   **Status**: ✅ **ANALYSIS COMPLETED**
+
 ### 2025-10-03 — Department Monthly Performance Chart Implementation
 
 -   **Issue**: User request to add monthly performance chart for selected departments with department selection functionality

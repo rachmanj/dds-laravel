@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -6,6 +6,144 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif,
+        "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+        "Noto Color Emoji";
+}
+
+/* Enhanced Document Aging Dashboard Styles */
+.badge-clickable {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.badge-clickable:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.table-danger {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+.info-box.bg-danger {
+    background-color: #dc3545 !important;
+    color: white;
+}
+
+.alert-critical {
+    border-left: 5px solid #dc3545;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+.age-urgent {
+    position: relative;
+}
+
+.age-urgent::after {
+    content: "⚠️";
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 16px;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%,
+    50% {
+        opacity: 1;
+    }
+    51%,
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Timeline Styles for Document Journey Tracking */
+.timeline-container {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+    padding-left: 30px;
+}
+
+.timeline-item.current {
+    background: rgba(0, 123, 255, 0.1);
+    border-radius: 8px;
+    padding: 15px;
+    margin-left: -15px;
+}
+
+.timeline-item.delayed {
+    border-left: 4px solid #dc3545;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 10px;
+    width: 30px;
+    height: 30px;
+    background: #fff;
+    border: 3px solid #dee2e6;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.timeline-item.current .timeline-marker {
+    border-color: #007bff;
+    background: #007bff;
+    color: white;
+}
+
+.timeline-item.delayed .timeline-marker {
+    border-color: #dc3545;
+    background: #dc3545;
+    color: white;
+}
+
+.timeline-content {
+    background: #fff;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-item.current .timeline-content {
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
 }

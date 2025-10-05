@@ -92,4 +92,11 @@ Route::prefix('v1/processing-analytics')->group(function () {
     Route::get('/processing-bottlenecks', [ProcessingAnalyticsController::class, 'getProcessingBottlenecks']);
     Route::get('/slow-processing-documents', [ProcessingAnalyticsController::class, 'getSlowProcessingDocuments']);
     Route::get('/department-monthly-performance', [ProcessingAnalyticsController::class, 'getDepartmentMonthlyPerformance']);
+
+    // NEW: Department-Specific Aging Analytics endpoints
+    Route::get('/department-specific/{year}/{month}', [ProcessingAnalyticsController::class, 'getDepartmentSpecificMetrics']);
+    Route::get('/department-specific/{year}/{month}/{department}', [ProcessingAnalyticsController::class, 'getDepartmentSpecificMetrics']);
+    Route::get('/aging-alerts', [ProcessingAnalyticsController::class, 'getDepartmentAgingAlerts']);
+    Route::get('/aging-alerts/{department}', [ProcessingAnalyticsController::class, 'getDepartmentAgingAlerts']);
+    Route::get('/department-aging-breakdown/{departmentId}', [ProcessingAnalyticsController::class, 'getDepartmentAgingBreakdown']);
 });

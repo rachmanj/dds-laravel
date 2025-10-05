@@ -6,6 +6,96 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Department-Specific Document Aging System** ✅ **COMPLETED**
+
+**Pattern**: Accurate document aging calculation based on department-specific arrival dates for distributed documents
+
+**Implementation**:
+
+-   **Critical Problem Solved**: Original aging calculation using `receive_date` was inaccurate for documents distributed between departments
+-   **Department-Specific Aging**: New system calculates aging based on when document arrived at current department
+-   **Model Accessors**: Added `current_location_arrival_date`, `days_in_current_location`, `current_location_age_category` to both Invoice and AdditionalDocument models
+-   **Enhanced Dashboard**: Critical alerts banner with action buttons for overdue documents
+-   **Performance Optimization**: Database indexes added for aging-related queries
+-   **Timeline Integration**: Document Journey Tracking now uses department-specific processing days
+
+**Technical Architecture**:
+
+```
+Document Aging System
+├── Model Accessors (Invoice.php, AdditionalDocument.php)
+│   ├── getCurrentLocationArrivalDateAttribute()
+│   ├── getDaysInCurrentLocationAttribute()
+│   ├── getCurrentLocationAgeCategoryAttribute()
+│   └── hasBeenDistributed()
+├── Enhanced Dashboard Controller
+│   ├── getDepartmentSpecificAgingAlerts()
+│   ├── Critical alerts banner
+│   └── Action buttons for overdue documents
+├── Database Performance
+│   └── Migration: add_document_aging_indexes.php
+└── Document Journey Integration
+    └── ProcessingAnalyticsService enhancement
+```
+
+### **Data Formatting and UI Consistency** ✅ **COMPLETED**
+
+**Pattern**: Consistent data presentation with right-aligned numeric values, standardized date formatting, and decimal precision
+
+**Implementation**:
+
+-   **Right-Alignment**: Amount and days columns in DataTables now properly right-aligned for better readability
+-   **Date Formatting**: All dates in Document Journey Tracking display as "DD-MMM-YYYY" format (e.g., "02-Oct-2025")
+-   **Decimal Precision**: Days values consistently rounded to 1 decimal place across all displays
+-   **Controller Integration**: Enhanced controllers with proper rounding functions
+-   **JavaScript Enhancement**: Updated timeline display functions for consistent formatting
+
+**Technical Architecture**:
+
+```
+Data Formatting System
+├── DataTable Enhancements
+│   ├── className: 'text-right' for numeric columns
+│   └── Consistent column styling
+├── JavaScript Date Formatting
+│   ├── toLocaleDateString('en-GB') with custom separators
+│   └── Math.round(value * 10) / 10 for decimal precision
+├── Controller Rounding
+│   └── round($value, 1) for consistent decimal places
+└── CSS Styling
+    └── text-right class for right-aligned numeric displays
+```
+
+### **Simplified Attachment Management** ✅ **COMPLETED**
+
+**Pattern**: Clean separation of concerns with dedicated attachment pages and simplified invoice detail views
+
+**Implementation**:
+
+-   **Removed Complex UI**: Eliminated full attachment management from invoice show pages
+-   **Simple Navigation**: Clean, professional link to dedicated attachments page
+-   **Performance Improvement**: Removed unnecessary JavaScript and modal components
+-   **Better UX**: Users get dedicated, full-featured attachments page with better functionality
+-   **Code Cleanup**: Simplified invoice show page with cleaner, less cluttered interface
+
+**Technical Architecture**:
+
+```
+Attachment Management Simplification
+├── Invoice Show Page Cleanup
+│   ├── Removed attachment list display
+│   ├── Removed upload form
+│   ├── Removed attachment action buttons
+│   └── Removed attachment-related JavaScript
+├── Simple Link Implementation
+│   ├── Clean card design with upload icon
+│   ├── "Manage Attachments" heading
+│   ├── Descriptive text
+│   └── "Go to Attachments Page" button
+└── Dedicated Attachment Page
+    └── Full-featured attachment management
+```
+
 ### **Enhanced Processing Analytics Architecture** ✅ **COMPLETED**
 
 **Pattern**: Advanced document processing analytics with accurate calculations, individual document tracking, and comprehensive department efficiency analysis

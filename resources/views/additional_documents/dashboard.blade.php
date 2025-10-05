@@ -62,6 +62,183 @@
                 </div>
             </div>
 
+            <!-- Critical Alerts Banner -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    @if ($departmentAlerts['overdue_critical'] > 0)
+                        <div class="alert alert-danger alert-dismissible">
+                            <h4><i class="icon fas fa-exclamation-triangle"></i> Critical Alert!</h4>
+                            <strong>{{ $departmentAlerts['overdue_critical'] }}</strong> documents have been in your
+                            department for over 30 days and require immediate attention.
+                            <a href="{{ route('additional-documents.index', ['age_filter' => '30_plus', 'status_filter' => 'available,in_transit']) }}"
+                                class="btn btn-danger btn-sm ml-2">
+                                <i class="fas fa-eye"></i> View Critical Documents
+                            </a>
+                        </div>
+                    @endif
+
+                    @if ($departmentAlerts['overdue_warning'] > 0)
+                        <div class="alert alert-warning alert-dismissible">
+                            <h4><i class="icon fas fa-clock"></i> Warning!</h4>
+                            <strong>{{ $departmentAlerts['overdue_warning'] }}</strong> documents have been in your
+                            department for 14-30 days.
+                            <a href="{{ route('additional-documents.index', ['age_filter' => '15_30', 'status_filter' => 'available,in_transit']) }}"
+                                class="btn btn-warning btn-sm ml-2">
+                                <i class="fas fa-eye"></i> View Warning Documents
+                            </a>
+                        </div>
+                    @endif
+
+                    @if ($departmentAlerts['stuck_documents'] > 0)
+                        <div class="alert alert-info alert-dismissible">
+                            <h4><i class="icon fas fa-info-circle"></i> Attention!</h4>
+                            <strong>{{ $departmentAlerts['stuck_documents'] }}</strong> documents have been available in
+                            your department for over 7 days without being distributed.
+                            <a href="{{ route('additional-documents.index', ['age_filter' => '8_14', 'status_filter' => 'available']) }}"
+                                class="btn btn-info btn-sm ml-2">
+                                <i class="fas fa-eye"></i> View Stuck Documents
+                            </a>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Enhanced Age & Status Metrics -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-clock mr-2"></i>
+                                Document Age in Current Department
+                                <small class="text-muted">(Based on arrival at
+                                    {{ auth()->user()->department->name ?? 'your department' }})</small>
+                                @if ($departmentAlerts['overdue_critical'] > 0 || $departmentAlerts['overdue_warning'] > 0)
+                                    <span class="badge badge-danger ml-2">Action Required</span>
+                                @endif
+                            </h3>
+                            <div class="card-tools">
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                    onclick="refreshAgeAnalysis()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Enhanced Age Cards with Action Buttons -->
+                            <div class="row">
+                                @foreach ($ageAndStatus['age_breakdown'] as $age => $count)
+                                    <div class="col-md-3 mb-3">
+                                        <div
+                                            class="info-box {{ $count > 0 && $age === '30_plus_days' ? 'bg-danger' : 'bg-light' }}">
+                                            <span
+                                                class="info-box-icon bg-{{ app('App\Http\Controllers\AdditionalDocumentDashboardController')->getAgeColor($age) }}">
+                                                <i
+                                                    class="fas fa-{{ $age === '0-7_days' ? 'check' : ($age === '8-14_days' ? 'clock' : ($age === '15-30_days' ? 'calendar' : 'exclamation-triangle')) }}"></i>
+                                            </span>
+                                            <div class="info-box-content">
+                                                <span class="info-box-text">
+                                                    {{ str_replace('_', ' ', $age) }}
+                                                    @if ($age === '30_plus_days' && $count > 0)
+                                                        <span class="badge badge-danger ml-1">URGENT</span>
+                                                    @endif
+                                                </span>
+                                                <span class="info-box-number">{{ $count }}</span>
+                                                <div class="progress">
+                                                    <div class="progress-bar bg-{{ app('App\Http\Controllers\AdditionalDocumentDashboardController')->getAgeColor($age) }}"
+                                                        style="width: {{ array_sum($ageAndStatus['age_breakdown']) > 0 ? ($count / array_sum($ageAndStatus['age_breakdown'])) * 100 : 0 }}%">
+                                                    </div>
+                                                </div>
+                                                @if ($count > 0)
+                                                    <a href="{{ route('additional-documents.index', ['age_filter' => str_replace('_', '_', $age)]) }}"
+                                                        class="btn btn-sm btn-outline-{{ app('App\Http\Controllers\AdditionalDocumentDashboardController')->getAgeColor($age) }} mt-2">
+                                                        <i class="fas fa-eye"></i> View Documents
+                                                    </a>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <!-- Enhanced Status by Age Table with Action Links -->
+                            <h6 class="mt-4">
+                                Status Breakdown by Age
+                                <small class="text-muted">(Click counts to view specific documents)</small>
+                            </h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="thead-dark">
+                                        <tr>
+                                            <th>Age Group</th>
+                                            <th>Available</th>
+                                            <th>In Transit</th>
+                                            <th>Distributed</th>
+                                            <th>Unaccounted</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($ageAndStatus['status_by_age'] as $age => $statuses)
+                                            <tr
+                                                class="{{ $age === '30_plus_days' && array_sum($statuses) > 0 ? 'table-danger' : '' }}">
+                                                <td>
+                                                    <strong>{{ str_replace('_', ' ', $age) }}</strong>
+                                                    @if ($age === '30_plus_days' && array_sum($statuses) > 0)
+                                                        <span class="badge badge-danger ml-1">CRITICAL</span>
+                                                    @endif
+                                                </td>
+                                                @foreach (['available', 'in_transit', 'distributed', 'unaccounted_for'] as $status)
+                                                    <td>
+                                                        @if ($statuses[$status] > 0)
+                                                            <a href="{{ route('additional-documents.index', ['age_filter' => str_replace('_', '_', $age), 'status_filter' => $status]) }}"
+                                                                class="badge badge-{{ app('App\Http\Controllers\AdditionalDocumentDashboardController')->getStatusColor($status) }} badge-clickable">
+                                                                {{ $statuses[$status] }}
+                                                            </a>
+                                                        @else
+                                                            <span
+                                                                class="badge badge-secondary">{{ $statuses[$status] }}</span>
+                                                        @endif
+                                                    </td>
+                                                @endforeach
+                                                <td>
+                                                    @if (array_sum($statuses) > 0)
+                                                        <div class="btn-group btn-group-sm">
+                                                            <a href="{{ route('additional-documents.index', ['age_filter' => str_replace('_', '_', $age)]) }}"
+                                                                class="btn btn-outline-primary btn-xs">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                            @if ($age === '30_plus_days' && ($statuses['available'] > 0 || $statuses['in_transit'] > 0))
+                                                                <a href="{{ route('distributions.create', ['urgent' => true, 'age_filter' => $age]) }}"
+                                                                    class="btn btn-outline-danger btn-xs">
+                                                                    <i class="fas fa-paper-plane"></i>
+                                                                </a>
+                                                            @endif
+                                                        </div>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Department-specific aging explanation -->
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-info-circle"></i> How Aging is Calculated</h6>
+                                <p class="mb-0">
+                                    Document aging is calculated based on when each document <strong>arrived at your current
+                                        department</strong>,
+                                    not when it was originally created or first received. This ensures accurate tracking of
+                                    how long
+                                    documents have been in your department's possession.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Document Status Overview -->
             <div class="row">
                 <div class="col-12">
@@ -151,74 +328,7 @@
                 </div>
             </div>
 
-            <!-- Age & Status Metrics -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="fas fa-clock mr-2"></i>
-                                Document Age & Status Analysis
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                @foreach ($ageAndStatus['age_breakdown'] as $age => $count)
-                                    <div class="col-md-3 mb-3">
-                                        <div class="info-box bg-light">
-                                            <span
-                                                class="info-box-icon bg-{{ app('App\Http\Controllers\AdditionalDocumentDashboardController')->getAgeColor($age) }}">
-                                                <i
-                                                    class="fas fa-{{ $age === '0-7_days' ? 'check' : ($age === '8-14_days' ? 'clock' : ($age === '15-30_days' ? 'calendar' : 'exclamation')) }}"></i>
-                                            </span>
-                                            <div class="info-box-content">
-                                                <span class="info-box-text">{{ str_replace('_', ' ', $age) }}</span>
-                                                <span class="info-box-number">{{ $count }}</span>
-                                                <div class="progress">
-                                                    <div class="progress-bar bg-{{ app('App\Http\Controllers\AdditionalDocumentDashboardController')->getAgeColor($age) }}"
-                                                        style="width: {{ array_sum($ageAndStatus['age_breakdown']) > 0 ? ($count / array_sum($ageAndStatus['age_breakdown'])) * 100 : 0 }}%">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
 
-                            <!-- Status by Age Table -->
-                            <h6 class="mt-4">Status Breakdown by Age</h6>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Age Group</th>
-                                            <th>Available</th>
-                                            <th>In Transit</th>
-                                            <th>Distributed</th>
-                                            <th>Unaccounted</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($ageAndStatus['status_by_age'] as $age => $statuses)
-                                            <tr>
-                                                <td><strong>{{ str_replace('_', ' ', $age) }}</strong></td>
-                                                @foreach (['available', 'in_transit', 'distributed', 'unaccounted_for'] as $status)
-                                                    <td>
-                                                        <span
-                                                            class="badge badge-{{ app('App\Http\Controllers\AdditionalDocumentDashboardController')->getStatusColor($status) }}">
-                                                            {{ $statuses[$status] }}
-                                                        </span>
-                                                    </td>
-                                                @endforeach
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Workflow Metrics & PO Analysis -->
             <div class="row">
@@ -546,7 +656,44 @@
             document.body.removeChild(a);
         }
 
-        // Auto-refresh every 5 minutes
+        // Enhanced refresh functionality
+        function refreshAgeAnalysis() {
+            // Show loading indicator
+            const refreshBtn = document.querySelector('[onclick="refreshAgeAnalysis()"]');
+            const originalText = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            refreshBtn.disabled = true;
+
+            // Reload the page after a short delay to show the loading state
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        }
+
+        // Auto-refresh every 2 minutes for critical alerts
+        setInterval(function() {
+            // Only refresh if there are critical alerts
+            const criticalAlerts = @json($departmentAlerts ?? []);
+            if (criticalAlerts.overdue_critical > 0 || criticalAlerts.overdue_warning > 0) {
+                location.reload();
+            }
+        }, 120000); // 2 minutes
+
+        // Add click handlers for badge links
+        document.addEventListener('DOMContentLoaded', function() {
+            const clickableBadges = document.querySelectorAll('.badge-clickable');
+            clickableBadges.forEach(badge => {
+                badge.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const href = this.getAttribute('href');
+                    if (href) {
+                        window.location.href = href;
+                    }
+                });
+            });
+        });
+
+        // Auto-refresh every 5 minutes for general updates
         setInterval(function() {
             location.reload();
         }, 300000);

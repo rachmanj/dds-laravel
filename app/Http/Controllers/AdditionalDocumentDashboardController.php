@@ -24,8 +24,11 @@ class AdditionalDocumentDashboardController extends Controller
         // Get document type analysis
         $typeAnalysis = $this->getDocumentTypeAnalysis($user, $userLocationCode, $isAdmin);
 
-        // Get age and status metrics
+        // Get age and status metrics with department-specific aging
         $ageAndStatus = $this->getAgeAndStatusMetrics($user, $userLocationCode, $isAdmin);
+
+        // Get department-specific aging alerts
+        $departmentAlerts = $this->getDepartmentSpecificAgingAlerts($user, $userLocationCode, $isAdmin);
 
         // Get location and movement analysis
         $locationAnalysis = $this->getLocationAnalysis($user, $userLocationCode, $isAdmin);
@@ -40,6 +43,7 @@ class AdditionalDocumentDashboardController extends Controller
             'statusOverview',
             'typeAnalysis',
             'ageAndStatus',
+            'departmentAlerts',
             'locationAnalysis',
             'poAnalysis',
             'workflowMetrics'
@@ -104,7 +108,6 @@ class AdditionalDocumentDashboardController extends Controller
         }
 
         $documents = (clone $query)->get();
-        $now = Carbon::now();
 
         $ageBreakdown = [
             '0-7_days' => 0,
@@ -121,28 +124,56 @@ class AdditionalDocumentDashboardController extends Controller
         ];
 
         foreach ($documents as $document) {
-            $age = $document->created_at->diffInDays($now);
+            // Use the new department-specific aging calculation
+            $ageCategory = $document->current_location_age_category;
             $status = $document->distribution_status;
 
-            if ($age <= 7) {
-                $ageBreakdown['0-7_days']++;
-                $statusByAge['0-7_days'][$status]++;
-            } elseif ($age <= 14) {
-                $ageBreakdown['8-14_days']++;
-                $statusByAge['8-14_days'][$status]++;
-            } elseif ($age <= 30) {
-                $ageBreakdown['15-30_days']++;
-                $statusByAge['15-30_days'][$status]++;
-            } else {
-                $ageBreakdown['30_plus_days']++;
-                $statusByAge['30_plus_days'][$status]++;
-            }
+            $ageBreakdown[$ageCategory]++;
+            $statusByAge[$ageCategory][$status]++;
         }
 
         return [
             'age_breakdown' => $ageBreakdown,
             'status_by_age' => $statusByAge
         ];
+    }
+
+    /**
+     * Get department-specific aging alerts
+     */
+    private function getDepartmentSpecificAgingAlerts($user, $userLocationCode, $isAdmin)
+    {
+        $query = AdditionalDocument::query();
+
+        if (!$isAdmin && $userLocationCode) {
+            $query->where('cur_loc', $userLocationCode);
+        }
+
+        $documents = (clone $query)->get();
+
+        $alerts = [
+            'overdue_critical' => 0,
+            'overdue_warning' => 0,
+            'stuck_documents' => 0,
+            'recently_arrived' => 0
+        ];
+
+        foreach ($documents as $document) {
+            $daysInCurrentLocation = $document->days_in_current_location;
+            $status = $document->distribution_status;
+
+            if ($daysInCurrentLocation > 30 && in_array($status, ['available', 'in_transit'])) {
+                $alerts['overdue_critical']++;
+            } elseif ($daysInCurrentLocation > 14 && $daysInCurrentLocation <= 30 && in_array($status, ['available', 'in_transit'])) {
+                $alerts['overdue_warning']++;
+            } elseif ($daysInCurrentLocation > 7 && $status === 'available') {
+                $alerts['stuck_documents']++;
+            } elseif ($daysInCurrentLocation <= 3) {
+                $alerts['recently_arrived']++;
+            }
+        }
+
+        return $alerts;
     }
 
     private function getLocationAnalysis($user, $userLocationCode, $isAdmin)

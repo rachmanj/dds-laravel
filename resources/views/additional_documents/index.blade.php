@@ -71,6 +71,52 @@
             font-family: 'Courier New', monospace;
             font-size: 0.9rem;
         }
+
+        /* Fixed table header styles */
+        .table-fixed-header {
+            position: relative;
+        }
+
+        .table-fixed-header thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #343a40;
+            color: white;
+        }
+
+        .table-fixed-header thead th {
+            background-color: #343a40 !important;
+            color: white !important;
+            border-color: #495057 !important;
+            font-weight: bold;
+            padding: 12px 8px;
+        }
+
+        .table-responsive {
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+        }
+
+        /* Ensure proper scrolling */
+        .table-responsive::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
     </style>
 @endsection
 
@@ -271,9 +317,9 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="documents-table" class="table table-bordered table-striped">
-                            <thead>
+                    <div class="table-responsive" style="max-height: 600px;">
+                        <table id="documents-table" class="table table-bordered table-striped table-fixed-header">
+                            <thead class="thead-dark">
                                 <tr>
                                     <th>No</th>
                                     <th>Document Number</th>
@@ -408,7 +454,8 @@
                     },
                     {
                         data: 'days_difference',
-                        name: 'days_difference'
+                        name: 'days_difference',
+                        className: 'text-right'
                     },
                     {
                         data: 'actions',

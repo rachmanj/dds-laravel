@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Carbon\Carbon;
 
 class AdditionalDocument extends Model
 {
@@ -162,5 +163,84 @@ class AdditionalDocument extends Model
     {
         return $this->belongsToMany(Distribution::class, 'distribution_documents', 'document_id', 'distribution_id')
             ->wherePivot('document_type', AdditionalDocument::class);
+    }
+
+    /**
+     * Get the date when this document was last received at its current location
+     * This is used for accurate aging calculation per department
+     */
+    public function getCurrentLocationArrivalDateAttribute()
+    {
+        // If document has never been distributed, use original receive_date
+        if ($this->distribution_status === 'available' && !$this->hasBeenDistributed()) {
+            return $this->receive_date ?: $this->created_at;
+        }
+
+        // Find the most recent distribution where this document was received
+        $lastDistribution = $this->distributions()
+            ->whereHas('documents', function ($query) {
+                $query->where('document_id', $this->id)
+                    ->where('document_type', AdditionalDocument::class)
+                    ->where('receiver_verification_status', 'verified');
+            })
+            ->whereNotNull('received_at')
+            ->orderBy('received_at', 'desc')
+            ->first();
+
+        if ($lastDistribution) {
+            return $lastDistribution->received_at;
+        }
+
+        // Fallback to original receive_date
+        return $this->receive_date ?: $this->created_at;
+    }
+
+    /**
+     * Calculate how many days this document has been in its current location
+     */
+    public function getDaysInCurrentLocationAttribute()
+    {
+        $arrivalDate = $this->current_location_arrival_date;
+        return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
+    }
+
+    /**
+     * Get age category for current location
+     */
+    public function getCurrentLocationAgeCategoryAttribute()
+    {
+        $days = $this->days_in_current_location;
+
+        if ($days <= 7) {
+            return '0-7_days';
+        } elseif ($days <= 14) {
+            return '8-14_days';
+        } elseif ($days <= 30) {
+            return '15-30_days';
+        } else {
+            return '30_plus_days';
+        }
+    }
+
+    /**
+     * Check if document has been distributed before
+     */
+    public function hasBeenDistributed()
+    {
+        return $this->distributions()->exists();
+    }
+
+    /**
+     * Get distribution history for this document
+     */
+    public function getDistributionHistory()
+    {
+        return $this->distributions()
+            ->with(['originDepartment', 'destinationDepartment', 'documents' => function ($query) {
+                $query->where('document_id', $this->id)
+                    ->where('document_type', AdditionalDocument::class);
+            }])
+            ->orderBy('received_at', 'desc')
+            ->get();
     }
 }

@@ -136,26 +136,28 @@
                                 </div>
                             </div>
 
-                            <table id="invoices-table" class="table table-bordered table-striped">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 50px;">#</th>
-                                        <th>Invoice #</th>
-                                        <th>Supplier</th>
-                                        <th>Type</th>
-                                        <th>Invoice Date</th>
-                                        <th>Receive Date</th>
-                                        <th>PO Number</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                        <th>Current Location</th>
-                                        <th>Days</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                </tbody>
-                            </table>
+                            <div class="table-responsive" style="max-height: 600px;">
+                                <table id="invoices-table" class="table table-bordered table-striped table-fixed-header">
+                                    <thead class="thead-dark">
+                                        <tr>
+                                            <th style="width: 50px;">#</th>
+                                            <th>Invoice #</th>
+                                            <th>Supplier</th>
+                                            <th>Type</th>
+                                            <th>Invoice Date</th>
+                                            <th>Receive Date</th>
+                                            <th>PO Number</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Current Location</th>
+                                            <th>Days</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -205,6 +207,52 @@
 
         .badge.badge-info {
             background-color: #17a2b8;
+        }
+
+        /* Fixed table header styles */
+        .table-fixed-header {
+            position: relative;
+        }
+
+        .table-fixed-header thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #343a40;
+            color: white;
+        }
+
+        .table-fixed-header thead th {
+            background-color: #343a40 !important;
+            color: white !important;
+            border-color: #495057 !important;
+            font-weight: bold;
+            padding: 12px 8px;
+        }
+
+        .table-responsive {
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+        }
+
+        /* Ensure proper scrolling */
+        .table-responsive::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
         }
     </style>
 @endsection
@@ -328,7 +376,8 @@
                     },
                     {
                         data: 'formatted_amount',
-                        name: 'amount'
+                        name: 'amount',
+                        className: 'text-right'
                     },
                     {
                         data: 'status_badge',
@@ -340,7 +389,8 @@
                     },
                     {
                         data: 'days_difference',
-                        name: 'days_difference'
+                        name: 'days_difference',
+                        className: 'text-right'
                     },
                     {
                         data: 'actions',

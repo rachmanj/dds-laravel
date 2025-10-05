@@ -34,12 +34,16 @@ class DashboardController extends Controller
         // Get SAP document metrics by department
         $sapDocumentMetrics = $this->getSapDocumentMetrics($user, $userLocationCode);
 
+        // Get department-specific aging alerts
+        $departmentAgingAlerts = $this->getDepartmentSpecificAgingAlerts($user, $userLocationCode);
+
         return view('dashboard', compact(
             'metrics',
             'documentAgeBreakdown',
             'pendingDistributions',
             'recentActivity',
-            'sapDocumentMetrics'
+            'sapDocumentMetrics',
+            'departmentAgingAlerts'
         ))->with([
             'getActivityIcon' => fn($action) => $this->getActivityIcon($action),
             'getActivityColor' => fn($action) => $this->getActivityColor($action)
@@ -68,19 +72,34 @@ class DashboardController extends Controller
 
         $inTransitCount = $inTransitQuery->count() + $inTransitQuery2->count();
 
-        // Overdue documents (>14 days in department)
-        $overdueDate = Carbon::now()->subDays(14);
-        $overdueInvoicesQuery = Invoice::where('distribution_status', 'distributed')
-            ->where('created_at', '<', $overdueDate);
-        $overdueAdditionalQuery = AdditionalDocument::where('distribution_status', 'distributed')
-            ->where('created_at', '<', $overdueDate);
+        // Overdue documents (>14 days in current department) - using department-specific aging
+        $overdueInvoicesQuery = Invoice::query();
+        $overdueAdditionalQuery = AdditionalDocument::query();
 
         if (!$isAdmin && $userLocationCode) {
             $overdueInvoicesQuery->where('cur_loc', $userLocationCode);
             $overdueAdditionalQuery->where('cur_loc', $userLocationCode);
         }
 
-        $overdueCount = $overdueInvoicesQuery->count() + $overdueAdditionalQuery->count();
+        // Get all documents and filter by department-specific aging
+        $allInvoices = $overdueInvoicesQuery->get();
+        $allAdditionalDocs = $overdueAdditionalQuery->get();
+
+        $overdueCount = 0;
+
+        // Count invoices with >14 days in current department
+        foreach ($allInvoices as $invoice) {
+            if ($invoice->days_in_current_location > 14) {
+                $overdueCount++;
+            }
+        }
+
+        // Count additional documents with >14 days in current department
+        foreach ($allAdditionalDocs as $doc) {
+            if ($doc->days_in_current_location > 14) {
+                $overdueCount++;
+            }
+        }
 
         // Unaccounted documents
         $unaccountedInvoicesQuery = Invoice::where('distribution_status', 'unaccounted_for');
@@ -105,34 +124,39 @@ class DashboardController extends Controller
     {
         $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
 
-        // Get documents in user's department
-        $invoicesQuery = Invoice::where('distribution_status', 'distributed');
-        $additionalQuery = AdditionalDocument::where('distribution_status', 'distributed');
+        // Get documents in user's department - include all statuses for comprehensive view
+        $invoicesQuery = Invoice::query();
+        $additionalQuery = AdditionalDocument::query();
 
         if (!$isAdmin && $userLocationCode) {
             $invoicesQuery->where('cur_loc', $userLocationCode);
             $additionalQuery->where('cur_loc', $userLocationCode);
         }
 
-        $now = Carbon::now();
-
-        // Age breakdown for invoices
+        // Get all documents (not just distributed) for comprehensive aging analysis
         $invoices = $invoicesQuery->get();
-        $invoiceAgeBreakdown = $this->categorizeDocumentsByAge($invoices, $now);
-
-        // Age breakdown for additional documents
         $additionalDocs = $additionalQuery->get();
-        $additionalAgeBreakdown = $this->categorizeDocumentsByAge($additionalDocs, $now);
 
-        // Combine both
+        // Use department-specific aging calculations
+        $invoiceAgeBreakdown = $this->categorizeDocumentsByDepartmentSpecificAge($invoices);
+        $additionalAgeBreakdown = $this->categorizeDocumentsByDepartmentSpecificAge($additionalDocs);
+
+        // Combine both document types
         return [
             '0_7_days' => $invoiceAgeBreakdown['0_7_days'] + $additionalAgeBreakdown['0_7_days'],
             '8_14_days' => $invoiceAgeBreakdown['8_14_days'] + $additionalAgeBreakdown['8_14_days'],
             '15_plus_days' => $invoiceAgeBreakdown['15_plus_days'] + $additionalAgeBreakdown['15_plus_days'],
+            'total_documents' => $invoices->count() + $additionalDocs->count(),
+            'invoices_count' => $invoices->count(),
+            'additional_docs_count' => $additionalDocs->count(),
         ];
     }
 
-    private function categorizeDocumentsByAge($documents, $now)
+    /**
+     * NEW: Categorize documents using department-specific aging calculations
+     * Uses our new accessors: days_in_current_location and current_location_age_category
+     */
+    private function categorizeDocumentsByDepartmentSpecificAge($documents)
     {
         $breakdown = [
             '0_7_days' => 0,
@@ -141,18 +165,81 @@ class DashboardController extends Controller
         ];
 
         foreach ($documents as $document) {
-            $daysInDepartment = $document->created_at->diffInDays($now);
+            // Use our department-specific aging accessor
+            $ageCategory = $document->current_location_age_category;
 
-            if ($daysInDepartment <= 7) {
-                $breakdown['0_7_days']++;
-            } elseif ($daysInDepartment <= 14) {
-                $breakdown['8_14_days']++;
-            } else {
-                $breakdown['15_plus_days']++;
+            // Map the age category to our breakdown keys
+            switch ($ageCategory) {
+                case '0-7_days':
+                    $breakdown['0_7_days']++;
+                    break;
+                case '8-14_days':
+                    $breakdown['8_14_days']++;
+                    break;
+                case '15-30_days':
+                case '30_plus_days':
+                    $breakdown['15_plus_days']++;
+                    break;
+                default:
+                    // Fallback for any unexpected categories
+                    $breakdown['0_7_days']++;
+                    break;
             }
         }
 
         return $breakdown;
+    }
+
+    /**
+     * NEW: Get department-specific aging alerts for Dashboard 1
+     * Similar to AdditionalDocumentDashboardController but tailored for Dashboard 1
+     */
+    private function getDepartmentSpecificAgingAlerts($user, $userLocationCode)
+    {
+        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+
+        // Get all documents in user's department
+        $invoicesQuery = Invoice::query();
+        $additionalQuery = AdditionalDocument::query();
+
+        if (!$isAdmin && $userLocationCode) {
+            $invoicesQuery->where('cur_loc', $userLocationCode);
+            $additionalQuery->where('cur_loc', $userLocationCode);
+        }
+
+        $invoices = $invoicesQuery->get();
+        $additionalDocs = $additionalQuery->get();
+        $allDocuments = $invoices->concat($additionalDocs);
+
+        $alerts = [
+            'overdue_critical' => 0,    // >30 days
+            'overdue_warning' => 0,    // 15-30 days
+            'stuck_documents' => 0,    // 7+ days in available status
+            'recently_arrived' => 0,   // ≤3 days
+            'total_documents' => $allDocuments->count(),
+            'departments_affected' => []
+        ];
+
+        foreach ($allDocuments as $document) {
+            $daysInCurrentLocation = $document->days_in_current_location;
+            $status = $document->distribution_status;
+
+            if ($daysInCurrentLocation > 30 && in_array($status, ['available', 'in_transit'])) {
+                $alerts['overdue_critical']++;
+            } elseif ($daysInCurrentLocation > 14 && $daysInCurrentLocation <= 30 && in_array($status, ['available', 'in_transit'])) {
+                $alerts['overdue_warning']++;
+            } elseif ($daysInCurrentLocation > 7 && $status === 'available') {
+                $alerts['stuck_documents']++;
+            } elseif ($daysInCurrentLocation <= 3) {
+                $alerts['recently_arrived']++;
+            }
+        }
+
+        // Get unique departments affected
+        $departments = $allDocuments->pluck('cur_loc')->unique()->filter()->values()->toArray();
+        $alerts['departments_affected'] = $departments;
+
+        return $alerts;
     }
 
     private function getPendingDistributions($user, $userLocationCode)

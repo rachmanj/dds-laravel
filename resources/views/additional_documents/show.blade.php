@@ -266,7 +266,7 @@
 
                 fetch(
                         `{{ url('api/v1/processing-analytics/document-timeline') }}?document_id={{ $additionalDocument->id }}&document_type=additional_document`
-                        )
+                    )
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
@@ -297,15 +297,27 @@
                             <p class="text-info mb-0">${data.document.type.charAt(0).toUpperCase() + data.document.type.slice(1)}</p>
                         </div>
                         <div class="col-md-3">
-                            <strong>Receive Date:</strong>
-                            <p class="text-success mb-0">${new Date(data.document.receive_date).toLocaleDateString()}</p>
+                            <strong>Current Location Arrival:</strong>
+                            <p class="text-success mb-0">${new Date(data.document.current_location_arrival_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}).replace(/ /g, '-')}</p>
                         </div>
                         <div class="col-md-3">
-                            <strong>Current Status:</strong>
-                            <p class="text-warning mb-0">${data.current_status.charAt(0).toUpperCase() + data.current_status.slice(1)}</p>
+                            <strong>Days in Current Location:</strong>
+                            <p class="text-warning mb-0 text-right">${Math.round(data.document.days_in_current_location * 10) / 10} days</p>
                         </div>
                     </div>
                 `;
+
+                // Add journey summary if available
+                if (data.journey_summary) {
+                    const summary = data.journey_summary;
+                    html += `
+                        <div class="alert ${summary.is_delayed ? 'alert-danger' : 'alert-info'}">
+                            <h6><i class="fas fa-${summary.is_delayed ? 'exclamation-triangle' : 'info-circle'}"></i> Journey Summary</h6>
+                            <p><strong>Status:</strong> ${summary.status} | <strong>Current Location:</strong> ${summary.current_location} | <strong>Total Days:</strong> ${Math.round(summary.total_days * 10) / 10} | <strong>Departments Visited:</strong> ${summary.departments_visited}</p>
+                            ${summary.recommendations.length > 0 ? `<p><strong>Recommendations:</strong> ${summary.recommendations.join(' ')}</p>` : ''}
+                        </div>
+                    `;
+                }
 
                 if (data.timeline.length === 0) {
                     html +=
@@ -313,27 +325,34 @@
                 } else {
                     html += `
                         <div class="timeline-container">
-                            <h6><strong>Processing Timeline (Total: ${data.total_processing_days} days)</strong></h6>
+                            <h6><strong>Department-Specific Processing Timeline (Total: ${Math.round(data.total_processing_days * 10) / 10} days)</strong></h6>
                             <div class="timeline">
                     `;
 
                     data.timeline.forEach((step, index) => {
                         const statusClass = getStatusClass(step.status);
                         const statusText = getStatusText(step.status);
+                        const isDelayed = step.processing_days > 14;
+                        const itemClass = step.is_current ? 'current' : (isDelayed ? 'delayed' : '');
 
                         html += `
-                            <div class="timeline-item ${step.status}">
+                            <div class="timeline-item ${itemClass}">
+                                <div class="timeline-marker">
+                                    <i class="fas fa-${step.is_current ? 'play' : 'check'}"></i>
+                                </div>
                                 <div class="timeline-content">
                                     <div class="timeline-header">
                                         <h6 class="timeline-title">Step ${step.step}: ${step.department}</h6>
                                         <span class="timeline-badge ${statusClass}">${statusText}</span>
+                                        ${isDelayed ? '<span class="badge badge-danger ml-1">DELAYED</span>' : ''}
                                     </div>
                                     <div class="timeline-details">
-                                        <p><strong>Start Date:</strong> ${new Date(step.start_date).toLocaleDateString()}</p>
-                                        ${step.end_date ? `<p><strong>End Date:</strong> ${new Date(step.end_date).toLocaleDateString()}</p>` : ''}
-                                        <p><strong>Processing Days:</strong> <span class="timeline-duration">${step.processing_days} days</span></p>
+                                        <p><strong>Arrival Date:</strong> ${new Date(step.arrival_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}).replace(/ /g, '-')}</p>
+                                        ${step.departure_date ? `<p><strong>Departure Date:</strong> ${new Date(step.departure_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}).replace(/ /g, '-')}</p>` : ''}
+                                        <p><strong>Processing Days:</strong> <span class="timeline-duration ${isDelayed ? 'text-danger' : ''} text-right">${Math.round(step.processing_days * 10) / 10} days</span></p>
                                         ${step.next_department ? `<p><strong>Next Department:</strong> ${step.next_department}</p>` : ''}
                                         ${step.distribution_number ? `<p><strong>Distribution:</strong> ${step.distribution_number}</p>` : ''}
+                                        ${step.location_code ? `<p><strong>Location Code:</strong> ${step.location_code}</p>` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -346,13 +365,10 @@
                     `;
                 }
 
-                // Add processing statistics
+                // Add enhanced processing statistics
+                const metrics = data.metrics || {};
                 const timeline = data.timeline;
                 const totalDays = data.total_processing_days;
-                const departmentsVisited = timeline.length;
-                const avgPerDepartment = departmentsVisited > 0 ? Math.round(totalDays / departmentsVisited) : 0;
-                const longestStay = timeline.length > 0 ? Math.max(...timeline.map(step => step.processing_days)) :
-                    0;
 
                 html += `
                     <div class="row mt-3">
@@ -361,7 +377,7 @@
                                 <span class="info-box-icon bg-info"><i class="fas fa-clock"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">Total Processing Days</span>
-                                    <span class="info-box-number">${totalDays}</span>
+                                    <span class="info-box-number text-right">${Math.round(totalDays * 10) / 10}</span>
                                 </div>
                             </div>
                         </div>
@@ -370,7 +386,7 @@
                                 <span class="info-box-icon bg-success"><i class="fas fa-building"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">Departments Visited</span>
-                                    <span class="info-box-number">${departmentsVisited}</span>
+                                    <span class="info-box-number">${metrics.total_departments || timeline.length}</span>
                                 </div>
                             </div>
                         </div>
@@ -379,7 +395,7 @@
                                 <span class="info-box-icon bg-warning"><i class="fas fa-chart-line"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">Average per Department</span>
-                                    <span class="info-box-number">${avgPerDepartment}</span>
+                                    <span class="info-box-number text-right">${Math.round((metrics.average_stay || 0) * 10) / 10}</span>
                                 </div>
                             </div>
                         </div>
@@ -388,12 +404,26 @@
                                 <span class="info-box-icon bg-danger"><i class="fas fa-exclamation-triangle"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">Longest Stay</span>
-                                    <span class="info-box-number">${longestStay}</span>
+                                    <span class="info-box-number text-right">${Math.round((metrics.longest_stay || 0) * 10) / 10}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 `;
+
+                // Add delayed departments alert if any
+                if (metrics.delayed_departments && metrics.delayed_departments.length > 0) {
+                    html += `
+                        <div class="alert alert-warning mt-3">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Delayed Departments</h6>
+                            <ul class="mb-0">
+                           ${metrics.delayed_departments.map(dept => 
+                               `<li><strong>${dept.department}</strong>: ${Math.round(dept.days * 10) / 10} days ${dept.status === 'current' ? '(Current)' : '(Completed)'}</li>`
+                           ).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
 
                 content.html(html);
             }
@@ -411,6 +441,8 @@
                 switch (status) {
                     case 'completed':
                         return 'badge-success';
+                    case 'current':
+                        return 'badge-primary';
                     case 'in_progress':
                         return 'badge-warning';
                     case 'pending':
@@ -424,6 +456,8 @@
                 switch (status) {
                     case 'completed':
                         return 'Completed';
+                    case 'current':
+                        return 'Current';
                     case 'in_progress':
                         return 'In Progress';
                     case 'pending':

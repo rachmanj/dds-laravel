@@ -4,6 +4,9 @@
     Dashboard
 @endsection
 
+@push('styles')
+@endpush
+
 @section('breadcrumb_title')
     <li class="breadcrumb-item"><a href="/">Home</a></li>
     <li class="breadcrumb-item active">Dashboard</li>
@@ -64,29 +67,31 @@
                 </div>
             @endauth
 
-            <!-- Critical Alerts -->
-            @if (($metrics['overdue_documents'] ?? 0) > 0 || ($metrics['unaccounted_documents'] ?? 0) > 0)
+            <!-- Department-Specific Aging Alerts -->
+            @if (($departmentAgingAlerts['overdue_critical'] ?? 0) > 0 || ($departmentAgingAlerts['overdue_warning'] ?? 0) > 0)
                 <div class="row mb-4">
                     <div class="col-12">
-                        @if (($metrics['overdue_documents'] ?? 0) > 0)
+                        @if (($departmentAgingAlerts['overdue_critical'] ?? 0) > 0)
                             <div class="alert alert-danger alert-dismissible">
-                                <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
-                                <h5><i class="icon fas fa-exclamation-triangle"></i> Critical Alert!</h5>
-                                <strong>{{ $metrics['overdue_documents'] }}</strong> documents have been in your department
-                                for more than 14 days and require immediate attention.
-                                <a href="{{ route('additional-documents.index') }}?show_overdue=1" class="alert-link">View
-                                    Overdue Documents</a>
+                                <h4><i class="icon fas fa-exclamation-triangle"></i> Critical Aging Alert!</h4>
+                                <strong>{{ $departmentAgingAlerts['overdue_critical'] }}</strong> documents have been in
+                                your department for over 30 days and require immediate attention.
+                                <a href="{{ route('additional-documents.index', ['age_filter' => '30_plus_days', 'status_filter' => 'available,in_transit']) }}"
+                                    class="btn btn-danger btn-sm ml-2">
+                                    <i class="fas fa-eye"></i> View Critical Documents
+                                </a>
                             </div>
                         @endif
 
-                        @if (($metrics['unaccounted_documents'] ?? 0) > 0)
+                        @if (($departmentAgingAlerts['overdue_warning'] ?? 0) > 0)
                             <div class="alert alert-warning alert-dismissible">
-                                <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
-                                <h5><i class="icon fas fa-question-circle"></i> Discrepancy Alert!</h5>
-                                <strong>{{ $metrics['unaccounted_documents'] }}</strong> documents are marked as missing or
-                                damaged and need investigation.
-                                <a href="{{ route('distributions.index') }}?has_discrepancies=1" class="alert-link">View
-                                    Discrepancies</a>
+                                <h4><i class="icon fas fa-exclamation-circle"></i> Warning!</h4>
+                                <strong>{{ $departmentAgingAlerts['overdue_warning'] }}</strong> documents have been in your
+                                department for 15-30 days and need attention.
+                                <a href="{{ route('additional-documents.index', ['age_filter' => '15-30_days', 'status_filter' => 'available,in_transit']) }}"
+                                    class="btn btn-warning btn-sm ml-2">
+                                    <i class="fas fa-eye"></i> View Warning Documents
+                                </a>
                             </div>
                         @endif
                     </div>
@@ -223,11 +228,24 @@
                         <div class="card-header">
                             <h3 class="card-title">
                                 <i class="fas fa-chart-pie mr-2"></i>
-                                Document Age Breakdown in Your Department
+                                Document Age in Current Department
+                                <small class="text-muted">(Based on arrival at
+                                    {{ auth()->user()->department->name ?? 'your department' }})</small>
+                                @if (($departmentAgingAlerts['overdue_critical'] ?? 0) > 0 || ($departmentAgingAlerts['overdue_warning'] ?? 0) > 0)
+                                    <span class="badge badge-danger ml-2">Action Required</span>
+                                @endif
                             </h3>
                             <div class="card-tools">
                                 <span class="badge badge-info">Total:
-                                    {{ ($documentAgeBreakdown['0_7_days'] ?? 0) + ($documentAgeBreakdown['8_14_days'] ?? 0) + ($documentAgeBreakdown['15_plus_days'] ?? 0) }}</span>
+                                    {{ $documentAgeBreakdown['total_documents'] ?? 0 }}</span>
+                                <span class="badge badge-primary ml-1">Invoices:
+                                    {{ $documentAgeBreakdown['invoices_count'] ?? 0 }}</span>
+                                <span class="badge badge-secondary ml-1">Docs:
+                                    {{ $documentAgeBreakdown['additional_docs_count'] ?? 0 }}</span>
+                                <button type="button" class="btn btn-sm btn-outline-primary ml-2"
+                                    onclick="refreshAgingAnalysis()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
                             </div>
                         </div>
                         <div class="card-body">
@@ -241,7 +259,7 @@
                                         <div class="icon">
                                             <i class="fas fa-check-circle"></i>
                                         </div>
-                                        <a href="{{ route('additional-documents.index') }}?age_filter=0_7"
+                                        <a href="{{ route('additional-documents.index', ['age_filter' => '0-7_days']) }}"
                                             class="small-box-footer">
                                             View Details <i class="fas fa-arrow-circle-right"></i>
                                         </a>
@@ -256,7 +274,7 @@
                                         <div class="icon">
                                             <i class="fas fa-clock"></i>
                                         </div>
-                                        <a href="{{ route('additional-documents.index') }}?age_filter=8_14"
+                                        <a href="{{ route('additional-documents.index', ['age_filter' => '8-14_days']) }}"
                                             class="small-box-footer">
                                             View Details <i class="fas fa-arrow-circle-right"></i>
                                         </a>
@@ -271,12 +289,24 @@
                                         <div class="icon">
                                             <i class="fas fa-exclamation-triangle"></i>
                                         </div>
-                                        <a href="{{ route('additional-documents.index') }}?age_filter=15_plus"
+                                        <a href="{{ route('additional-documents.index', ['age_filter' => '15_plus_days']) }}"
                                             class="small-box-footer">
                                             View Details <i class="fas fa-arrow-circle-right"></i>
                                         </a>
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- Department-specific aging explanation -->
+                            <div class="alert alert-info mt-3">
+                                <h6><i class="fas fa-info-circle"></i> How Aging is Calculated</h6>
+                                <p class="mb-0">
+                                    Document aging is calculated based on when each document <strong>arrived at your current
+                                        department</strong>,
+                                    not when it was originally created or first received. This ensures accurate tracking of
+                                    how long
+                                    documents have been in your department's possession.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -685,78 +715,209 @@
     </section>
 @endsection
 
-@push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+@push('js')
     <script>
-        // Document Status Distribution Chart
-        const documentStatusCtx = document.getElementById('documentStatusChart').getContext('2d');
-        const documentStatusChart = new Chart(documentStatusCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Available', 'In Transit', 'Distributed', 'Unaccounted'],
-                datasets: [{
-                    data: [
-                        {{ ($metrics['pending_distributions'] ?? 0) + ($metrics['in_transit_documents'] ?? 0) }},
-                        {{ $metrics['in_transit_documents'] ?? 0 }},
-                        {{ ($documentAgeBreakdown['0_7_days'] ?? 0) + ($documentAgeBreakdown['8_14_days'] ?? 0) + ($documentAgeBreakdown['15_plus_days'] ?? 0) }},
-                        {{ $metrics['unaccounted_documents'] ?? 0 }}
-                    ],
-                    backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#6c757d'],
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    }
+        // Load Chart.js dynamically to ensure proper loading order
+        function loadChartJS() {
+            return new Promise((resolve, reject) => {
+                if (typeof Chart !== 'undefined') {
+                    resolve();
+                    return;
                 }
-            }
-        });
 
-        // Document Age Trend Chart
-        const documentAgeTrendCtx = document.getElementById('documentAgeTrendChart').getContext('2d');
-        const documentAgeTrendChart = new Chart(documentAgeTrendCtx, {
-            type: 'line',
-            data: {
-                labels: ['0-7 days', '8-14 days', '15+ days'],
-                datasets: [{
-                    label: 'Document Count',
-                    data: [
-                        {{ $documentAgeBreakdown['0_7_days'] ?? 0 }},
-                        {{ $documentAgeBreakdown['8_14_days'] ?? 0 }},
-                        {{ $documentAgeBreakdown['15_plus_days'] ?? 0 }}
-                    ],
-                    borderColor: '#007bff',
-                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
+                const script = document.createElement('script');
+                script.src = '{{ asset('adminlte/plugins/chart.js/Chart.min.js') }}';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+        // Initialize charts when both DOM and Chart.js are ready
+        function initializeCharts() {
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js is not loaded');
+                return;
+            }
+
+            // Document Status Distribution Chart - Enhanced with Department-Specific Data
+            const documentStatusCtx = document.getElementById('documentStatusChart');
+            if (!documentStatusCtx) {
+                console.error('documentStatusChart element not found');
+                return;
+            }
+
+            const documentStatusChart = new Chart(documentStatusCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Available', 'In Transit', 'Distributed', 'Unaccounted'],
+                    datasets: [{
+                        data: [
+                            {{ ($metrics['pending_distributions'] ?? 0) + ($metrics['in_transit_documents'] ?? 0) }},
+                            {{ $metrics['in_transit_documents'] ?? 0 }},
+                            {{ ($documentAgeBreakdown['0_7_days'] ?? 0) + ($documentAgeBreakdown['8_14_days'] ?? 0) + ($documentAgeBreakdown['15_plus_days'] ?? 0) }},
+                            {{ $metrics['unaccounted_documents'] ?? 0 }}
+                        ],
+                        backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#6c757d'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            stepSize: 1
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) :
+                                        0;
+                                    return `${label}: ${value} documents (${percentage}%)`;
+                                }
+                            }
                         }
                     }
                 }
+            });
+
+            // Document Age Trend Chart - Enhanced with Department-Specific Aging
+            const documentAgeTrendCtx = document.getElementById('documentAgeTrendChart');
+            if (!documentAgeTrendCtx) {
+                console.error('documentAgeTrendChart element not found');
+                return;
             }
+
+            const documentAgeTrendChart = new Chart(documentAgeTrendCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: ['0-7 days', '8-14 days', '15+ days'],
+                    datasets: [{
+                        label: 'Documents in Current Department',
+                        data: [
+                            {{ $documentAgeBreakdown['0_7_days'] ?? 0 }},
+                            {{ $documentAgeBreakdown['8_14_days'] ?? 0 }},
+                            {{ $documentAgeBreakdown['15_plus_days'] ?? 0 }}
+                        ],
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#007bff',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return 'Department-Specific Aging Analysis';
+                                },
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed.y;
+                                    const total = {{ $documentAgeBreakdown['total_documents'] ?? 0 }};
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) :
+                                        0;
+                                    return `${label}: ${value} documents (${percentage}% of total)`;
+                                },
+                                afterLabel: function(context) {
+                                    const value = context.parsed.y;
+                                    if (value > 0) {
+                                        return `Click to view ${context.label.toLowerCase()} documents`;
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            },
+                            title: {
+                                display: true,
+                                text: 'Number of Documents'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Days in Current Department'
+                            }
+                        }
+                    },
+                    onClick: function(event, elements) {
+                        if (elements.length > 0) {
+                            const elementIndex = elements[0].index;
+                            const ageFilters = ['0-7_days', '8-14_days', '15_plus_days'];
+                            const filter = ageFilters[elementIndex];
+                            if (filter) {
+                                window.location.href =
+                                    `{{ route('additional-documents.index') }}?age_filter=${filter}`;
+                            }
+                        }
+                    }
+                }
+            });
+
+        } // Close initializeCharts function
+
+        // Initialize charts when DOM and Chart.js are ready
+        document.addEventListener('DOMContentLoaded', function() {
+            loadChartJS().then(() => {
+                setTimeout(initializeCharts, 100);
+            }).catch(error => {
+                console.error('Failed to load Chart.js:', error);
+            });
         });
 
-        // Auto-refresh dashboard metrics every 5 minutes
+        // Also initialize charts immediately if DOM is already ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                loadChartJS().then(() => {
+                    setTimeout(initializeCharts, 100);
+                }).catch(error => {
+                    console.error('Failed to load Chart.js:', error);
+                });
+            });
+        } else {
+            // DOM is already ready
+            loadChartJS().then(() => {
+                setTimeout(initializeCharts, 100);
+            }).catch(error => {
+                console.error('Failed to load Chart.js:', error);
+            });
+        }
+
+        // Enhanced auto-refresh with aging alerts check
+        setInterval(function() {
+            const criticalAlerts = {{ $departmentAgingAlerts['overdue_critical'] ?? 0 }};
+            const warningAlerts = {{ $departmentAgingAlerts['overdue_warning'] ?? 0 }};
+
+            // Refresh more frequently if there are critical alerts
+            if (criticalAlerts > 0 || warningAlerts > 0) {
+                location.reload();
+            }
+        }, 120000); // 2 minutes for critical alerts
+
+        // Standard refresh every 5 minutes
         setInterval(function() {
             location.reload();
         }, 300000); // 5 minutes
@@ -771,14 +932,29 @@
             $('.alert').fadeOut('slow');
         }, 10000);
 
-        // Export dashboard data function
+        // Refresh aging analysis function
+        function refreshAgingAnalysis() {
+            const refreshBtn = document.querySelector('[onclick="refreshAgingAnalysis()"]');
+            if (refreshBtn) {
+                const originalText = refreshBtn.innerHTML;
+                refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+                refreshBtn.disabled = true;
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
+            }
+        }
+
+        // Export dashboard data function - Enhanced with department-specific data
         function exportDashboardData() {
             const data = {
                 metrics: @json($metrics),
                 documentAgeBreakdown: @json($documentAgeBreakdown),
+                departmentAgingAlerts: @json($departmentAgingAlerts),
                 exportDate: new Date().toISOString(),
                 user: '{{ auth()->user()->name }}',
-                department: '{{ auth()->user()->department->name ?? 'Not Assigned' }}'
+                department: '{{ auth()->user()->department->name ?? 'Not Assigned' }}',
+                agingMethod: 'Department-specific aging based on arrival at current department'
             };
 
             const blob = new Blob([JSON.stringify(data, null, 2)], {

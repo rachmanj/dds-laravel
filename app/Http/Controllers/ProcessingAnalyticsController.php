@@ -62,17 +62,34 @@ class ProcessingAnalyticsController extends Controller
     public function getProcessingTrends($monthsBack = 6)
     {
         try {
+            // Validate monthsBack parameter
+            if ($monthsBack < 1 || $monthsBack > 24) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'monthsBack must be between 1 and 24, got: ' . $monthsBack
+                ], 400);
+            }
+
             $data = $this->analyticsService->getProcessingTrends($monthsBack);
 
             return response()->json([
                 'success' => true,
                 'data' => $data,
-                'months_back' => $monthsBack
+                'months_back' => $monthsBack,
+                'timezone' => config('app.timezone', 'UTC'),
+                'calculated_at' => now()->toISOString()
             ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid date range: ' . $e->getMessage(),
+                'error_type' => 'validation_error'
+            ], 400);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'error_type' => 'server_error'
             ], 500);
         }
     }
@@ -343,5 +360,106 @@ class ProcessingAnalyticsController extends Controller
         $documentType = $request->get('document_type', 'invoice');
 
         return view('processing-analytics.document-journey', compact('documentId', 'documentType'));
+    }
+
+    /**
+     * NEW: Get department-specific processing metrics using our new aging calculations
+     */
+    public function getDepartmentSpecificMetrics($year, $month, $department = null)
+    {
+        try {
+            // Validate parameters
+            if ($year < 2020 || $year > now()->year) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid year. Must be between 2020 and current year.'
+                ], 400);
+            }
+
+            if ($month < 1 || $month > 12) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid month. Must be between 1 and 12.'
+                ], 400);
+            }
+
+            $data = $this->analyticsService->getDepartmentSpecificMetrics($year, $month, $department);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'filters' => [
+                    'year' => $year,
+                    'month' => $month,
+                    'department' => $department
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * NEW: Get department-specific aging alerts
+     */
+    public function getDepartmentAgingAlerts($department = null)
+    {
+        try {
+            $data = $this->analyticsService->getDepartmentAgingAlerts($department);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'filters' => [
+                    'department' => $department
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * NEW: Get department aging breakdown for specific department
+     */
+    public function getDepartmentAgingBreakdown($departmentId)
+    {
+        try {
+            // Validate department ID
+            if (!is_numeric($departmentId) || $departmentId <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid department ID'
+                ], 400);
+            }
+
+            $data = $this->analyticsService->getDepartmentAgingBreakdown($departmentId);
+
+            if (!$data) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Department not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'filters' => [
+                    'department_id' => $departmentId
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

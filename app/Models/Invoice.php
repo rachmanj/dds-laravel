@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Carbon\Carbon;
 
 class Invoice extends Model
 {
@@ -401,5 +402,70 @@ class Invoice extends Model
     public function hasAttachments(): bool
     {
         return $this->attachments()->exists();
+    }
+
+    /**
+     * Get the date when this invoice was last received at its current location
+     * This is used for accurate aging calculation per department
+     */
+    public function getCurrentLocationArrivalDateAttribute()
+    {
+        // If invoice has never been distributed, use original receive_date
+        if ($this->distribution_status === 'available' && !$this->hasBeenDistributed()) {
+            return $this->receive_date ?: $this->created_at;
+        }
+
+        // Find the most recent distribution where this invoice was received
+        $lastDistribution = $this->distributions()
+            ->whereHas('documents', function ($query) {
+                $query->where('document_id', $this->id)
+                    ->where('document_type', Invoice::class)
+                    ->where('receiver_verification_status', 'verified');
+            })
+            ->whereNotNull('received_at')
+            ->orderBy('received_at', 'desc')
+            ->first();
+
+        if ($lastDistribution) {
+            return $lastDistribution->received_at;
+        }
+
+        // Fallback to original receive_date
+        return $this->receive_date ?: $this->created_at;
+    }
+
+    /**
+     * Calculate how many days this invoice has been in its current location
+     */
+    public function getDaysInCurrentLocationAttribute()
+    {
+        $arrivalDate = $this->current_location_arrival_date;
+        return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
+    }
+
+    /**
+     * Get age category for current location
+     */
+    public function getCurrentLocationAgeCategoryAttribute()
+    {
+        $days = $this->days_in_current_location;
+
+        if ($days <= 7) {
+            return '0-7_days';
+        } elseif ($days <= 14) {
+            return '8-14_days';
+        } elseif ($days <= 30) {
+            return '15-30_days';
+        } else {
+            return '30_plus_days';
+        }
+    }
+
+    /**
+     * Check if invoice has been distributed before
+     */
+    public function hasBeenDistributed()
+    {
+        return $this->distributions()->exists();
     }
 }

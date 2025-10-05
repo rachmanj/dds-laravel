@@ -12,10 +12,78 @@ use Illuminate\Support\Facades\DB;
 
 class ProcessingAnalyticsService
 {
+    /**
+     * Application timezone for consistent date calculations
+     */
+    protected $timezone;
+
+    public function __construct()
+    {
+        $this->timezone = config('app.timezone', 'UTC');
+    }
+
+    /**
+     * Validate that a date range contains only historical data
+     */
+    private function validateHistoricalDateRange($startDate, $endDate)
+    {
+        $now = Carbon::now($this->timezone);
+        $currentMonthEnd = $now->copy()->endOfMonth();
+
+        // Ensure dates are not in the future beyond current month
+        if ($startDate->gt($currentMonthEnd) || $endDate->gt($currentMonthEnd)) {
+            throw new \InvalidArgumentException(
+                'Date range cannot include future months beyond current month. ' .
+                    'Current month: ' . $now->format('F Y')
+            );
+        }
+
+        // Ensure start date is not after end date
+        if ($startDate->gt($endDate)) {
+            throw new \InvalidArgumentException('Start date cannot be after end date');
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate month and year parameters
+     */
+    private function validateMonthYear($year, $month)
+    {
+        $now = Carbon::now($this->timezone);
+
+        // Validate year is not in the future beyond current year
+        if ($year > $now->year) {
+            throw new \InvalidArgumentException(
+                "Year {$year} is in the future. Maximum allowed year: {$now->year}"
+            );
+        }
+
+        // Validate month range
+        if ($month < 1 || $month > 12) {
+            throw new \InvalidArgumentException("Month must be between 1 and 12, got: {$month}");
+        }
+
+        // If it's the current year, validate month is not in the future
+        if ($year == $now->year && $month > $now->month) {
+            throw new \InvalidArgumentException(
+                "Month {$month} in year {$year} is in the future. Current month: {$now->month}"
+            );
+        }
+
+        return true;
+    }
     public function getMonthlyProcessingDays($year, $month, $department = null)
     {
+        // Validate input parameters
+        $this->validateMonthYear($year, $month);
+
         $startDate = Carbon::create($year, $month, 1)->startOfMonth();
         $endDate = $startDate->copy()->endOfMonth();
+
+        // Validate date range is historical
+        $this->validateHistoricalDateRange($startDate, $endDate);
 
         $query = Invoice::select([
             DB::raw('u.department_id'),
@@ -109,19 +177,46 @@ class ProcessingAnalyticsService
 
     public function getProcessingTrends($monthsBack = 6)
     {
-        $startDate = Carbon::now()->subMonths($monthsBack)->startOfMonth();
+        // Fix: Calculate the correct start date for historical data with timezone awareness
+        $currentDate = Carbon::now($this->timezone);
+        $currentMonthStart = $currentDate->copy()->startOfMonth();
+
+        // Start from the month that is $monthsBack months before the current month
+        $startDate = $currentMonthStart->copy()->subMonths($monthsBack - 1);
 
         $trendData = [];
         for ($i = 0; $i < $monthsBack; $i++) {
             $currentMonth = $startDate->copy()->addMonths($i);
-            $monthData = $this->getMonthlyProcessingDays($currentMonth->year, $currentMonth->month);
 
-            $trendData[] = [
-                'year' => $currentMonth->year,
-                'month' => $currentMonth->month,
-                'month_name' => $currentMonth->format('F Y'),
-                'data' => $monthData
-            ];
+            // Validation: Don't include future months beyond current month
+            if ($currentMonth->isFuture() || $currentMonth->gt($currentMonthStart)) {
+                break;
+            }
+
+            // Include months that are in the past or current month
+            if ($currentMonth->lte($currentMonthStart)) {
+                try {
+                    $monthData = $this->getMonthlyProcessingDays($currentMonth->year, $currentMonth->month);
+
+                    $trendData[] = [
+                        'year' => $currentMonth->year,
+                        'month' => $currentMonth->month,
+                        'month_name' => $currentMonth->format('F Y'),
+                        'data' => $monthData,
+                        'is_historical' => !$currentMonth->isSameMonth($currentMonthStart),
+                        'is_current_month' => $currentMonth->isSameMonth($currentMonthStart),
+                        'timezone' => $this->timezone,
+                        'calculated_at' => Carbon::now($this->timezone)->toISOString(),
+                        'date_range' => [
+                            'start' => $currentMonth->startOfMonth()->toISOString(),
+                            'end' => $currentMonth->endOfMonth()->toISOString()
+                        ]
+                    ];
+                } catch (\InvalidArgumentException $e) {
+                    // Skip months that fail validation (e.g., future months)
+                    continue;
+                }
+            }
         }
 
         return $trendData;
@@ -360,7 +455,7 @@ class ProcessingAnalyticsService
     }
 
     /**
-     * Get individual document processing timeline
+     * Get individual document processing timeline with department-specific aging
      * Shows complete journey of a document through departments
      */
     public function getDocumentProcessingTimeline($documentId, $documentType = 'invoice')
@@ -388,53 +483,72 @@ class ProcessingAnalyticsService
                 'origin_dept.name as origin_department',
                 'dest_dept.name as destination_department',
                 'origin_dept.id as origin_department_id',
-                'dest_dept.id as destination_department_id'
+                'dest_dept.id as destination_department_id',
+                'origin_dept.location_code as origin_location_code',
+                'dest_dept.location_code as destination_location_code'
             ])
             ->orderBy('d.sent_at', 'asc')
             ->get();
 
         $timeline = [];
-        $currentDate = $document->receive_date;
+        $currentLocationArrivalDate = $document->current_location_arrival_date;
+        $totalProcessingDays = 0;
 
-        foreach ($distributions as $index => $distribution) {
-            $processingDays = $distribution->sent_at ?
-                Carbon::parse($currentDate)->diffInDays(Carbon::parse($distribution->sent_at)) : 0;
-
+        // Add initial department (where document was first received)
+        if (!$document->hasBeenDistributed()) {
+            $daysInCurrentLocation = $document->days_in_current_location;
             $timeline[] = [
-                'step' => $index + 1,
-                'department' => $distribution->origin_department,
-                'department_id' => $distribution->origin_department_id,
-                'start_date' => $currentDate,
-                'end_date' => $distribution->sent_at,
-                'processing_days' => $processingDays,
-                'status' => $distribution->status,
-                'distribution_number' => $distribution->distribution_number,
-                'next_department' => $distribution->destination_department
+                'step' => 1,
+                'department' => $this->getDepartmentByLocationCode($document->cur_loc),
+                'department_id' => null,
+                'location_code' => $document->cur_loc,
+                'arrival_date' => $currentLocationArrivalDate,
+                'departure_date' => null,
+                'processing_days' => $daysInCurrentLocation,
+                'status' => 'current',
+                'distribution_number' => null,
+                'next_department' => null,
+                'is_current' => true
             ];
+            $totalProcessingDays += $daysInCurrentLocation;
+        } else {
+            // Document has been distributed - build timeline from distributions
+            foreach ($distributions as $index => $distribution) {
+                $arrivalDate = $distribution->received_at ?? $distribution->sent_at;
+                $departureDate = $distribution->sent_at;
 
-            $currentDate = $distribution->received_at ?? $distribution->sent_at;
-        }
+                // Calculate processing days in this department
+                $processingDays = 0;
+                if ($arrivalDate && $departureDate) {
+                    $processingDays = Carbon::parse($arrivalDate)->diffInDays(Carbon::parse($departureDate));
+                } elseif ($arrivalDate && !$departureDate) {
+                    // Still in this department
+                    $processingDays = Carbon::parse($arrivalDate)->diffInDays(now());
+                }
 
-        // Add current department if document is still in process
-        if (!empty($distributions)) {
-            $lastDistribution = $distributions->last();
-            if ($lastDistribution && $lastDistribution->status !== 'completed') {
-                $currentProcessingDays = $lastDistribution->received_at ?
-                    Carbon::parse($lastDistribution->received_at)->diffInDays(now()) : 0;
+                $isCurrent = ($index === count($distributions) - 1) && !$departureDate;
 
                 $timeline[] = [
-                    'step' => count($timeline) + 1,
-                    'department' => $lastDistribution->destination_department,
-                    'department_id' => $lastDistribution->destination_department_id,
-                    'start_date' => $lastDistribution->received_at,
-                    'end_date' => null,
-                    'processing_days' => $currentProcessingDays,
-                    'status' => 'in_progress',
-                    'distribution_number' => null,
-                    'next_department' => null
+                    'step' => $index + 1,
+                    'department' => $distribution->origin_department,
+                    'department_id' => $distribution->origin_department_id,
+                    'location_code' => $distribution->origin_location_code,
+                    'arrival_date' => $arrivalDate,
+                    'departure_date' => $departureDate,
+                    'processing_days' => $processingDays,
+                    'status' => $isCurrent ? 'current' : 'completed',
+                    'distribution_number' => $distribution->distribution_number,
+                    'next_department' => $distribution->destination_department,
+                    'is_current' => $isCurrent
                 ];
+
+                $totalProcessingDays += $processingDays;
             }
         }
+
+        // Calculate enhanced metrics
+        $metrics = $this->calculateDepartmentMetrics($timeline);
+        $journeySummary = $this->generateJourneySummary($document, $timeline);
 
         return [
             'document' => [
@@ -442,12 +556,111 @@ class ProcessingAnalyticsService
                 'number' => $documentType === 'invoice' ? $document->invoice_number : $document->document_number,
                 'type' => $documentType,
                 'receive_date' => $document->receive_date,
-                'created_at' => $document->created_at
+                'created_at' => $document->created_at,
+                'current_location_arrival_date' => $currentLocationArrivalDate,
+                'days_in_current_location' => $document->days_in_current_location
             ],
             'timeline' => $timeline,
-            'total_processing_days' => array_sum(array_column($timeline, 'processing_days')),
-            'current_status' => !empty($distributions) && $distributions->last() ? $distributions->last()->status : 'not_distributed'
+            'total_processing_days' => $totalProcessingDays,
+            'current_status' => $document->distribution_status,
+            'metrics' => $metrics,
+            'journey_summary' => $journeySummary
         ];
+    }
+
+    /**
+     * Calculate department-specific metrics
+     */
+    private function calculateDepartmentMetrics($timeline)
+    {
+        $metrics = [
+            'total_departments' => count($timeline),
+            'current_department' => null,
+            'longest_stay' => 0,
+            'shortest_stay' => PHP_INT_MAX,
+            'average_stay' => 0,
+            'delayed_departments' => []
+        ];
+
+        $totalDays = 0;
+        $completedSteps = array_filter($timeline, function ($step) {
+            return !$step['is_current'];
+        });
+
+        foreach ($timeline as $step) {
+            $processingDays = $step['processing_days'];
+            $totalDays += $processingDays;
+
+            if ($step['is_current']) {
+                $metrics['current_department'] = $step['department'];
+            }
+
+            if ($processingDays > $metrics['longest_stay']) {
+                $metrics['longest_stay'] = $processingDays;
+            }
+
+            if ($processingDays < $metrics['shortest_stay']) {
+                $metrics['shortest_stay'] = $processingDays;
+            }
+
+            // Flag departments with processing > 14 days
+            if ($processingDays > 14) {
+                $metrics['delayed_departments'][] = [
+                    'department' => $step['department'],
+                    'days' => $processingDays,
+                    'status' => $step['is_current'] ? 'current' : 'completed'
+                ];
+            }
+        }
+
+        if (count($completedSteps) > 0) {
+            $metrics['average_stay'] = round($totalDays / count($completedSteps), 1);
+        }
+
+        if ($metrics['shortest_stay'] === PHP_INT_MAX) {
+            $metrics['shortest_stay'] = 0;
+        }
+
+        return $metrics;
+    }
+
+    /**
+     * Generate journey summary
+     */
+    private function generateJourneySummary($document, $timeline)
+    {
+        $summary = [
+            'status' => $document->distribution_status,
+            'current_location' => $document->cur_loc,
+            'total_days' => array_sum(array_column($timeline, 'processing_days')),
+            'departments_visited' => count($timeline),
+            'is_delayed' => false,
+            'recommendations' => []
+        ];
+
+        // Check if document is delayed
+        $currentStep = array_filter($timeline, function ($step) {
+            return $step['is_current'];
+        });
+
+        if (!empty($currentStep)) {
+            $current = array_values($currentStep)[0];
+            if ($current['processing_days'] > 14) {
+                $summary['is_delayed'] = true;
+                $summary['recommendations'][] = "Document has been in {$current['department']} for {$current['processing_days']} days. Consider expediting processing.";
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Get department name by location code
+     */
+    private function getDepartmentByLocationCode($locationCode)
+    {
+        $department = Department::where('location_code', $locationCode)->first();
+        return $department ? $department->name : $locationCode;
     }
 
     /**
@@ -732,5 +945,340 @@ class ProcessingAnalyticsService
         }
 
         return $worstMonth;
+    }
+
+    /**
+     * Get department-specific processing metrics using our new aging calculations
+     * Uses current_location_arrival_date and days_in_current_location accessors
+     */
+    public function getDepartmentSpecificMetrics($year, $month, $department = null)
+    {
+        $startDate = Carbon::create($year, $month, 1)->startOfMonth();
+        $endDate = $startDate->copy()->endOfMonth();
+
+        // Validate date range is historical
+        $this->validateHistoricalDateRange($startDate, $endDate);
+
+        // Get invoices with department-specific aging
+        $invoices = Invoice::with(['distributions.documents', 'creator.department'])
+            ->where('receive_date', '>=', $startDate)
+            ->where('receive_date', '<=', $endDate)
+            ->when($department, function($query, $department) {
+                return $query->whereHas('creator.department', function($q) use ($department) {
+                    $q->where('id', $department);
+                });
+            })
+            ->get();
+
+        // Get additional documents with department-specific aging
+        $additionalDocs = AdditionalDocument::with(['distributions.documents', 'creator.department'])
+            ->where('receive_date', '>=', $startDate)
+            ->where('receive_date', '<=', $endDate)
+            ->when($department, function($query, $department) {
+                return $query->whereHas('creator.department', function($q) use ($department) {
+                    $q->where('id', $department);
+                });
+            })
+            ->get();
+
+        // Process invoices with department-specific aging
+        $invoiceMetrics = $this->processDocumentMetrics($invoices, 'invoice');
+        
+        // Process additional documents with department-specific aging
+        $additionalDocMetrics = $this->processDocumentMetrics($additionalDocs, 'additional_document');
+
+        return [
+            'invoices' => $invoiceMetrics,
+            'additional_documents' => $additionalDocMetrics,
+            'summary' => $this->generateDepartmentSpecificSummary($invoiceMetrics, $additionalDocMetrics),
+            'period' => [
+                'year' => $year,
+                'month' => $month,
+                'start_date' => $startDate->format('Y-m-d'),
+                'end_date' => $endDate->format('Y-m-d')
+            ]
+        ];
+    }
+
+    /**
+     * Process document metrics using department-specific aging calculations
+     */
+    private function processDocumentMetrics($documents, $documentType)
+    {
+        $metrics = [
+            'total_count' => $documents->count(),
+            'department_breakdown' => [],
+            'aging_categories' => [
+                '0-7_days' => 0,
+                '8-14_days' => 0,
+                '15-30_days' => 0,
+                '30_plus_days' => 0
+            ],
+            'current_location_metrics' => [],
+            'processing_efficiency' => []
+        ];
+
+        foreach ($documents as $document) {
+            $departmentId = $document->creator->department_id ?? null;
+            $departmentName = $document->creator->department->name ?? 'Unknown';
+            $currentLocationCode = $document->cur_loc;
+            
+            // Use our new department-specific aging accessors
+            $daysInCurrentLocation = $document->days_in_current_location;
+            $currentLocationArrivalDate = $document->current_location_arrival_date;
+            $ageCategory = $document->current_location_age_category;
+
+            // Initialize department breakdown
+            if (!isset($metrics['department_breakdown'][$departmentId])) {
+                $metrics['department_breakdown'][$departmentId] = [
+                    'department_name' => $departmentName,
+                    'total_documents' => 0,
+                    'current_location_days' => [],
+                    'aging_categories' => [
+                        '0-7_days' => 0,
+                        '8-14_days' => 0,
+                        '15-30_days' => 0,
+                        '30_plus_days' => 0
+                    ],
+                    'avg_days_in_current_location' => 0,
+                    'max_days_in_current_location' => 0,
+                    'min_days_in_current_location' => 0
+                ];
+            }
+
+            // Update department metrics
+            $metrics['department_breakdown'][$departmentId]['total_documents']++;
+            $metrics['department_breakdown'][$departmentId]['current_location_days'][] = $daysInCurrentLocation;
+            $metrics['department_breakdown'][$departmentId]['aging_categories'][$ageCategory]++;
+
+            // Update overall aging categories
+            $metrics['aging_categories'][$ageCategory]++;
+
+            // Track current location metrics
+            if (!isset($metrics['current_location_metrics'][$currentLocationCode])) {
+                $metrics['current_location_metrics'][$currentLocationCode] = [
+                    'location_code' => $currentLocationCode,
+                    'total_documents' => 0,
+                    'avg_days_in_location' => 0,
+                    'aging_breakdown' => [
+                        '0-7_days' => 0,
+                        '8-14_days' => 0,
+                        '15-30_days' => 0,
+                        '30_plus_days' => 0
+                    ]
+                ];
+            }
+
+            $metrics['current_location_metrics'][$currentLocationCode]['total_documents']++;
+            $metrics['current_location_metrics'][$currentLocationCode]['aging_breakdown'][$ageCategory]++;
+        }
+
+        // Calculate averages and statistics
+        foreach ($metrics['department_breakdown'] as $deptId => &$deptData) {
+            if (!empty($deptData['current_location_days'])) {
+                $deptData['avg_days_in_current_location'] = round(array_sum($deptData['current_location_days']) / count($deptData['current_location_days']), 1);
+                $deptData['max_days_in_current_location'] = max($deptData['current_location_days']);
+                $deptData['min_days_in_current_location'] = min($deptData['current_location_days']);
+            }
+            unset($deptData['current_location_days']); // Remove raw data to save memory
+        }
+
+        foreach ($metrics['current_location_metrics'] as $locCode => &$locData) {
+            if ($locData['total_documents'] > 0) {
+                // Calculate weighted average based on aging categories
+                $totalDays = ($locData['aging_breakdown']['0-7_days'] * 3.5) + 
+                           ($locData['aging_breakdown']['8-14_days'] * 11) + 
+                           ($locData['aging_breakdown']['15-30_days'] * 22.5) + 
+                           ($locData['aging_breakdown']['30_plus_days'] * 45); // Assume 45+ days for 30+ category
+                $locData['avg_days_in_location'] = round($totalDays / $locData['total_documents'], 1);
+            }
+        }
+
+        return $metrics;
+    }
+
+    /**
+     * Generate summary statistics for department-specific metrics
+     */
+    private function generateDepartmentSpecificSummary($invoiceMetrics, $additionalDocMetrics)
+    {
+        $totalDocuments = $invoiceMetrics['total_count'] + $additionalDocMetrics['total_count'];
+        
+        $combinedAgingCategories = [
+            '0-7_days' => $invoiceMetrics['aging_categories']['0-7_days'] + $additionalDocMetrics['aging_categories']['0-7_days'],
+            '8-14_days' => $invoiceMetrics['aging_categories']['8-14_days'] + $additionalDocMetrics['aging_categories']['8-14_days'],
+            '15-30_days' => $invoiceMetrics['aging_categories']['15-30_days'] + $additionalDocMetrics['aging_categories']['15-30_days'],
+            '30_plus_days' => $invoiceMetrics['aging_categories']['30_plus_days'] + $additionalDocMetrics['aging_categories']['30_plus_days']
+        ];
+
+        return [
+            'total_documents' => $totalDocuments,
+            'total_invoices' => $invoiceMetrics['total_count'],
+            'total_additional_documents' => $additionalDocMetrics['total_count'],
+            'aging_categories' => $combinedAgingCategories,
+            'critical_documents' => $combinedAgingCategories['30_plus_days'],
+            'warning_documents' => $combinedAgingCategories['15-30_days'],
+            'healthy_documents' => $combinedAgingCategories['0-7_days'] + $combinedAgingCategories['8-14_days'],
+            'departments_analyzed' => count($invoiceMetrics['department_breakdown']) + count($additionalDocMetrics['department_breakdown']),
+            'locations_analyzed' => count($invoiceMetrics['current_location_metrics']) + count($additionalDocMetrics['current_location_metrics'])
+        ];
+    }
+
+    /**
+     * Get department-specific aging alerts for Dashboard 2
+     */
+    public function getDepartmentAgingAlerts($department = null)
+    {
+        $query = Invoice::with(['distributions.documents', 'creator.department']);
+        
+        if ($department) {
+            $query->whereHas('creator.department', function($q) use ($department) {
+                $q->where('id', $department);
+            });
+        }
+
+        $invoices = $query->get();
+
+        $additionalDocsQuery = AdditionalDocument::with(['distributions.documents', 'creator.department']);
+        
+        if ($department) {
+            $additionalDocsQuery->whereHas('creator.department', function($q) use ($department) {
+                $q->where('id', $department);
+            });
+        }
+
+        $additionalDocs = $additionalDocsQuery->get();
+
+        $alerts = [
+            'overdue_critical' => 0,
+            'overdue_warning' => 0,
+            'stuck_documents' => 0,
+            'recently_arrived' => 0,
+            'critical_documents' => [],
+            'warning_documents' => [],
+            'departments_affected' => []
+        ];
+
+        // Process invoices
+        foreach ($invoices as $invoice) {
+            $this->processDocumentForAlerts($invoice, 'invoice', $alerts);
+        }
+
+        // Process additional documents
+        foreach ($additionalDocs as $doc) {
+            $this->processDocumentForAlerts($doc, 'additional_document', $alerts);
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Process individual document for aging alerts
+     */
+    private function processDocumentForAlerts($document, $documentType, &$alerts)
+    {
+        $daysInCurrentLocation = $document->days_in_current_location;
+        $status = $document->distribution_status;
+        $departmentName = $document->creator->department->name ?? 'Unknown';
+        
+        if (!in_array($departmentName, $alerts['departments_affected'])) {
+            $alerts['departments_affected'][] = $departmentName;
+        }
+
+        if ($daysInCurrentLocation > 30 && in_array($status, ['available', 'in_transit'])) {
+            $alerts['overdue_critical']++;
+            $alerts['critical_documents'][] = [
+                'id' => $document->id,
+                'number' => $document->invoice_number ?? $document->document_number,
+                'type' => $documentType,
+                'department' => $departmentName,
+                'days_in_current_location' => round($daysInCurrentLocation, 1),
+                'current_location' => $document->cur_loc,
+                'status' => $status
+            ];
+        } elseif ($daysInCurrentLocation > 14 && $daysInCurrentLocation <= 30 && in_array($status, ['available', 'in_transit'])) {
+            $alerts['overdue_warning']++;
+            $alerts['warning_documents'][] = [
+                'id' => $document->id,
+                'number' => $document->invoice_number ?? $document->document_number,
+                'type' => $documentType,
+                'department' => $departmentName,
+                'days_in_current_location' => round($daysInCurrentLocation, 1),
+                'current_location' => $document->cur_loc,
+                'status' => $status
+            ];
+        } elseif ($daysInCurrentLocation > 7 && $status === 'available') {
+            $alerts['stuck_documents']++;
+        } elseif ($daysInCurrentLocation <= 3) {
+            $alerts['recently_arrived']++;
+        }
+    }
+
+    /**
+     * Get department aging breakdown for specific department
+     */
+    public function getDepartmentAgingBreakdown($departmentId)
+    {
+        $department = Department::find($departmentId);
+        if (!$department) {
+            return null;
+        }
+
+        // Get invoices for this department
+        $invoices = Invoice::with(['distributions.documents'])
+            ->whereHas('creator.department', function($query) use ($departmentId) {
+                $query->where('id', $departmentId);
+            })
+            ->get();
+
+        // Get additional documents for this department
+        $additionalDocs = AdditionalDocument::with(['distributions.documents'])
+            ->whereHas('creator.department', function($query) use ($departmentId) {
+                $query->where('id', $departmentId);
+            })
+            ->get();
+
+        $breakdown = [
+            'department' => $department,
+            'total_documents' => $invoices->count() + $additionalDocs->count(),
+            'invoices' => $this->processDocumentMetrics($invoices, 'invoice'),
+            'additional_documents' => $this->processDocumentMetrics($additionalDocs, 'additional_document'),
+            'summary' => [
+                'avg_days_in_current_location' => 0,
+                'max_days_in_current_location' => 0,
+                'critical_documents_count' => 0,
+                'efficiency_score' => 0
+            ]
+        ];
+
+        // Calculate summary statistics
+        $allDaysInCurrentLocation = [];
+        $criticalCount = 0;
+
+        foreach ($invoices as $invoice) {
+            $days = $invoice->days_in_current_location;
+            $allDaysInCurrentLocation[] = $days;
+            if ($days > 30) $criticalCount++;
+        }
+
+        foreach ($additionalDocs as $doc) {
+            $days = $doc->days_in_current_location;
+            $allDaysInCurrentLocation[] = $days;
+            if ($days > 30) $criticalCount++;
+        }
+
+        if (!empty($allDaysInCurrentLocation)) {
+            $breakdown['summary']['avg_days_in_current_location'] = round(array_sum($allDaysInCurrentLocation) / count($allDaysInCurrentLocation), 1);
+            $breakdown['summary']['max_days_in_current_location'] = max($allDaysInCurrentLocation);
+            
+            // Calculate efficiency score (0-100, higher is better)
+            $avgDays = $breakdown['summary']['avg_days_in_current_location'];
+            $efficiencyScore = max(0, 100 - ($avgDays * 2)); // Penalty of 2 points per day
+            $breakdown['summary']['efficiency_score'] = round($efficiencyScore, 1);
+        }
+
+        $breakdown['summary']['critical_documents_count'] = $criticalCount;
+
+        return $breakdown;
     }
 }
