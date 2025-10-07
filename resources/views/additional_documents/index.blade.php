@@ -90,7 +90,19 @@
             color: white !important;
             border-color: #495057 !important;
             font-weight: bold;
-            padding: 12px 8px;
+            padding: 8px 4px;
+            font-size: 0.85rem;
+        }
+
+        /* Compact table styling */
+        .table-fixed-header tbody td {
+            padding: 6px 4px;
+            font-size: 0.8rem;
+            vertical-align: middle;
+        }
+
+        .table-fixed-header tbody td.text-right {
+            text-align: right;
         }
 
         .table-responsive {
@@ -116,6 +128,125 @@
 
         .table-responsive::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
+        }
+
+        /* Compact column widths and alignment */
+        .compact-table th:nth-child(1),
+        .compact-table td:nth-child(1) {
+            width: 40px;
+            text-align: right;
+        }
+
+        /* No - Right aligned */
+        .compact-table th:nth-child(2),
+        .compact-table td:nth-child(2) {
+            width: 120px;
+        }
+
+        /* Document Number */
+        .compact-table th:nth-child(3),
+        .compact-table td:nth-child(3) {
+            width: 100px;
+            text-align: center;
+        }
+
+        /* PO Number - Center aligned */
+        .compact-table th:nth-child(4),
+        .compact-table td:nth-child(4) {
+            width: 90px;
+        }
+
+        /* Vendor Code */
+        .compact-table th:nth-child(5),
+        .compact-table td:nth-child(5) {
+            width: 80px;
+        }
+
+        /* Type */
+        .compact-table th:nth-child(6),
+        .compact-table td:nth-child(6) {
+            width: 90px;
+            text-align: center;
+        }
+
+        /* Document Date - Center aligned */
+        .compact-table th:nth-child(7),
+        .compact-table td:nth-child(7) {
+            width: 90px;
+            text-align: center;
+        }
+
+        /* Receive Date - Center aligned */
+        .compact-table th:nth-child(8),
+        .compact-table td:nth-child(8) {
+            width: 100px;
+            text-align: center;
+        }
+
+        /* Current Location - Center aligned */
+        .compact-table th:nth-child(9),
+        .compact-table td:nth-child(9) {
+            width: 80px;
+            text-align: center;
+        }
+
+        /* Status - Center aligned */
+        .compact-table th:nth-child(10),
+        .compact-table td:nth-child(10) {
+            width: 60px;
+        }
+
+        /* Days */
+        .compact-table th:nth-child(11),
+        .compact-table td:nth-child(11) {
+            width: 120px;
+        }
+
+        /* Actions */
+
+        /* Additional compact styling */
+        .compact-table {
+            table-layout: fixed;
+        }
+
+        .compact-table td,
+        .compact-table th {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Allow text wrapping for specific columns */
+        .compact-table td:nth-child(2),
+        .compact-table th:nth-child(2) {
+            /* Document Number */
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        .compact-table td:nth-child(3),
+        .compact-table th:nth-child(3) {
+            /* PO Number */
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        .compact-table td:nth-child(8),
+        .compact-table th:nth-child(8) {
+            /* Current Location */
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        /* Ensure action buttons are compact */
+        .compact-table .btn {
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            line-height: 1.2;
+        }
+
+        .compact-table .btn-group .btn {
+            padding: 2px 4px;
         }
     </style>
 @endsection
@@ -318,12 +449,13 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive" style="max-height: 600px;">
-                        <table id="documents-table" class="table table-bordered table-striped table-fixed-header">
+                        <table id="documents-table"
+                            class="table table-bordered table-striped table-fixed-header compact-table">
                             <thead class="thead-dark">
                                 <tr>
                                     <th>No</th>
                                     <th>Document Number</th>
-                                    <th>PO Number</th>
+                                    <th>PO No.</th>
                                     <th>Vendor Code</th>
                                     <th>Type</th>
                                     <th>Document Date</th>
@@ -398,19 +530,25 @@
                         data: 'DT_RowIndex',
                         name: 'DT_RowIndex',
                         orderable: false,
-                        searchable: false
+                        searchable: false,
+                        width: '40px',
+                        className: 'text-right'
                     },
                     {
                         data: 'document_number',
-                        name: 'document_number'
+                        name: 'document_number',
+                        width: '120px'
                     },
                     {
                         data: 'po_no',
-                        name: 'po_no'
+                        name: 'po_no',
+                        width: '100px',
+                        className: 'text-center'
                     },
                     {
                         data: 'vendor_code',
                         name: 'vendor_code',
+                        width: '90px',
                         render: function(data, type, row) {
                             if (data) {
                                 return '<span class="badge badge-secondary">' + data + '</span>';
@@ -420,12 +558,14 @@
                     },
                     {
                         data: 'type.type_name',
-                        name: 'type.type_name'
+                        name: 'type.type_name',
+                        width: '80px'
                     },
                     {
                         data: 'document_date',
                         name: 'document_date',
-                        // className: 'date-column',
+                        width: '90px',
+                        className: 'text-center',
                         render: function(data, type, row) {
                             if (data) {
                                 return moment(data).format('DD-MMM-YYYY');
@@ -436,7 +576,8 @@
                     {
                         data: 'receive_date',
                         name: 'receive_date',
-                        // className: 'date-column',
+                        width: '90px',
+                        className: 'text-center',
                         render: function(data, type, row) {
                             if (data) {
                                 return moment(data).format('DD-MMM-YYYY');
@@ -446,22 +587,28 @@
                     },
                     {
                         data: 'cur_loc',
-                        name: 'cur_loc'
+                        name: 'cur_loc',
+                        width: '100px',
+                        className: 'text-center'
                     },
                     {
                         data: 'status',
-                        name: 'status'
+                        name: 'status',
+                        width: '80px',
+                        className: 'text-center'
                     },
                     {
                         data: 'days_difference',
                         name: 'days_difference',
-                        className: 'text-right'
+                        className: 'text-right',
+                        width: '60px'
                     },
                     {
                         data: 'actions',
                         name: 'actions',
                         orderable: false,
-                        searchable: false
+                        searchable: false,
+                        width: '120px'
                     }
                 ],
                 order: [
