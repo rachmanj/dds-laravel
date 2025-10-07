@@ -36,17 +36,23 @@
 
                         <div class="form-group">
                             <label for="receiver_id">To <span class="text-danger">*</span></label>
-                            <select name="receiver_id" id="receiver_id"
+                            <select name="receiver_id[]" id="receiver_id" multiple
                                 class="form-control select2bs4 @error('receiver_id') is-invalid @enderror" required>
-                                <option value="">Select recipient...</option>
                                 @foreach ($users as $user)
                                     <option value="{{ $user->id }}"
-                                        {{ old('receiver_id') == $user->id || ($replyTo && $replyTo->sender_id == $user->id) ? 'selected' : '' }}>
+                                        {{ (is_array(old('receiver_id')) && in_array($user->id, old('receiver_id'))) || ($replyTo && $replyTo->sender_id == $user->id) ? 'selected' : '' }}>
                                         {{ $user->name }} ({{ $user->email }})
                                     </option>
                                 @endforeach
                             </select>
+                            <small class="form-text text-muted">
+                                You can select multiple recipients by holding Ctrl (or Cmd on Mac) and clicking, or by
+                                typing to search.
+                            </small>
                             @error('receiver_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            @error('receiver_id.*')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
@@ -183,12 +189,51 @@
 @push('js')
     <script>
         $(document).ready(function() {
-            // Initialize Select2 for recipient dropdown
+            // Initialize Select2 for recipient dropdown with multi-select
             $('#receiver_id').select2({
                 theme: 'bootstrap4',
-                placeholder: 'Select recipient...',
+                placeholder: 'Select recipients...',
                 allowClear: true,
-                width: '100%'
+                width: '100%',
+                multiple: true,
+                tags: false,
+                tokenSeparators: [','],
+                closeOnSelect: false,
+                language: {
+                    noResults: function() {
+                        return "No users found";
+                    },
+                    searching: function() {
+                        return "Searching...";
+                    }
+                },
+                ajax: {
+                    url: '{{ route('messages.search-users') }}',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        return {
+                            q: params.term,
+                            page: params.page
+                        };
+                    },
+                    processResults: function(data, params) {
+                        params.page = params.page || 1;
+                        return {
+                            results: data.map(function(user) {
+                                return {
+                                    id: user.id,
+                                    text: user.name + ' (' + user.email + ')'
+                                };
+                            })
+                        };
+                    },
+                    cache: true
+                },
+                minimumInputLength: 0,
+                escapeMarkup: function(markup) {
+                    return markup;
+                }
             });
 
             // Update file input label when files are selected
@@ -228,6 +273,23 @@
                 // Add sending animation to the button
                 $sendButton.addClass('btn-sending');
 
+                // Validate that at least one recipient is selected
+                var selectedRecipients = $('#receiver_id').val();
+                if (!selectedRecipients || selectedRecipients.length === 0) {
+                    // Reset button state
+                    $sendButton.prop('disabled', false).removeClass('btn-sending');
+                    $btnText.removeClass('d-none');
+                    $btnLoading.addClass('d-none');
+
+                    // Show error message
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error('Please select at least one recipient.', 'Validation Error!');
+                    } else {
+                        alert('Please select at least one recipient.');
+                    }
+                    return;
+                }
+
                 // Submit form via AJAX
                 $.ajax({
                     url: $form.attr('action'),
@@ -240,10 +302,10 @@
                         $sendButton.removeClass('btn-sending').addClass('btn-success');
                         $btnLoading.html('<i class="fas fa-check mr-1"></i>Sent!');
 
-                        // Show success toast
+                        // Show success toast with recipient count
                         if (typeof toastr !== 'undefined') {
                             toastr.success(response.message, 'Success!', {
-                                timeOut: 3500,
+                                timeOut: 4000,
                                 onHidden: function() {
                                     // Redirect after animation
                                     window.location.href = response.redirect;
@@ -253,7 +315,7 @@
                             // Fallback redirect
                             setTimeout(function() {
                                 window.location.href = response.redirect;
-                            }, 2500);
+                            }, 3000);
                         }
                     },
                     error: function(xhr) {

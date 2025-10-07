@@ -79,7 +79,8 @@ class MessageController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'receiver_id' => 'required|exists:users,id',
+            'receiver_id' => 'required|array|min:1',
+            'receiver_id.*' => 'required|exists:users,id',
             'subject' => 'required|string|max:255',
             'body' => 'required|string',
             'parent_id' => 'nullable|exists:messages,id',
@@ -93,19 +94,24 @@ class MessageController extends Controller
         }
 
         $user = Auth::user();
+        $receiverIds = $request->receiver_id;
+        $createdMessages = [];
+        $attachmentFiles = $request->hasFile('attachments') ? $request->file('attachments') : [];
 
-        // Create the message
-        $message = Message::create([
-            'sender_id' => $user->id,
-            'receiver_id' => $request->receiver_id,
-            'subject' => $request->subject,
-            'body' => $request->body,
-            'parent_id' => $request->parent_id,
-        ]);
+        // Create a message for each recipient
+        foreach ($receiverIds as $receiverId) {
+            $message = Message::create([
+                'sender_id' => $user->id,
+                'receiver_id' => $receiverId,
+                'subject' => $request->subject,
+                'body' => $request->body,
+                'parent_id' => $request->parent_id,
+            ]);
 
-        // Handle file attachments
-        if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $file) {
+            $createdMessages[] = $message;
+
+            // Handle file attachments for each message
+            foreach ($attachmentFiles as $file) {
                 $path = $file->store('message-attachments', 'public');
 
                 $message->attachments()->create([
@@ -118,17 +124,23 @@ class MessageController extends Controller
             }
         }
 
+        $recipientCount = count($receiverIds);
+        $successMessage = $recipientCount === 1
+            ? 'Message sent successfully!'
+            : "Message sent successfully to {$recipientCount} recipients!";
+
         // Handle AJAX requests with animation response
         if ($request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Message sent successfully!',
-                'redirect' => route('messages.index')
+                'message' => $successMessage,
+                'redirect' => route('messages.index'),
+                'recipient_count' => $recipientCount
             ]);
         }
 
         return redirect()->route('messages.index')
-            ->with('success', 'Message sent successfully.');
+            ->with('success', $successMessage);
     }
 
     /**
