@@ -1,3 +1,87 @@
+## 2025-10-08 — Invoice Table Sorting & Dashboard Department-Specific Aging
+
+-   **Context**: Users needed to prioritize oldest invoices/documents but tables were not sorted by age. Invoice dashboard was missing department-specific aging analysis and had data display issues. Invoice Types Breakdown chart was not showing any data.
+
+-   **Decision**: Implement age-based sorting (oldest first) for both Invoice and Additional Documents tables, add comprehensive "Invoice Age in Current Department" section to match Additional Documents functionality, and fix chart data issues.
+
+-   **Alternatives Considered**:
+
+    1. **Client-side DataTable sorting** - Rejected because it would override server-side sorting and not work well with pagination
+    2. **Database-level ORDER BY** - Rejected because aging calculation requires model accessors and distribution relationship checks
+    3. **Simple created_at sorting** - Rejected because it doesn't reflect department-specific aging (when document arrived at current department)
+    4. **Keeping both age sections** - Rejected to avoid redundancy and confusion
+
+-   **Implementation**:
+
+    -   **Table Sorting**:
+
+        -   Server-side sorting using `sortByDesc()` on calculated `days_in_current_location` value
+        -   Applied to both `AdditionalDocumentController` and `InvoiceController`
+        -   Disabled DataTable client-side sorting (`order: []`) to preserve server-side order
+        -   Used model accessors for accurate department-specific aging calculation
+
+    -   **Invoice Dashboard Fixes**:
+
+        -   Fixed `getInvoiceTypeBreakdown()` to use `$type->type_name` instead of non-existent `$type->name`
+        -   Changed view from `@push('scripts')` to `@push('js')` to match layout stack expectations
+        -   Added `getInvoiceAgeAndStatusMetrics()` method for department-specific aging analysis
+
+    -   **Age Analysis Section**:
+
+        -   Added comprehensive section with 4 age category cards (0-7, 8-14, 15-30, 30+ days)
+        -   Implemented Status Breakdown by Age table showing distribution status for each age group
+        -   Added clickable badges and "View Invoices" buttons for interactive filtering
+        -   Included "How Aging is Calculated" info box for user education
+
+    -   **Visual Enhancements**:
+        -   Color-coded age indicators (green, orange, cyan, red)
+        -   "URGENT" and "CRITICAL" badges for 30+ days items
+        -   Progress bars showing percentage distribution
+        -   Red row highlighting with pulsing animation for critical items
+        -   Hover effects on info boxes and clickable badges
+
+-   **Technical Details**:
+
+    ```php
+    // Sorting Logic
+    $invoices = $query->get()->sortByDesc(function ($invoice) {
+        if ($invoice->distribution_status === 'available' && !$invoice->hasBeenDistributed()) {
+            $dateToUse = $invoice->receive_date;
+        } else {
+            $dateToUse = $invoice->current_location_arrival_date;
+        }
+        return $dateToUse ? $dateToUse->diffInDays(now()) : 0;
+    })->values();
+
+    // Age Metrics Calculation
+    foreach ($invoices as $invoice) {
+        $ageCategory = $invoice->current_location_age_category;
+        $status = $invoice->distribution_status;
+        $ageBreakdown[$ageCategory]++;
+        $statusByAge[$ageCategory][$status]++;
+    }
+    ```
+
+-   **Files Modified**:
+
+    -   `app/Http/Controllers/AdditionalDocumentController.php` (lines 138-143, 627-631)
+    -   `app/Http/Controllers/InvoiceController.php` (lines 89-99)
+    -   `app/Http/Controllers/InvoiceDashboardController.php` (lines 40-41, 288, 343-380)
+    -   `resources/views/invoices/index.blade.php` (line 557)
+    -   `resources/views/invoices/dashboard.blade.php` (multiple sections)
+
+-   **Implications**:
+
+    -   Users can now immediately identify oldest invoices requiring action
+    -   Department-specific aging provides accurate tracking of time in current department
+    -   Consistent user experience between Additional Documents and Invoices modules
+    -   Visual indicators and animations draw attention to urgent items
+    -   Interactive elements enable quick filtering and navigation
+
+-   **Review Date**: 2025-11-08 (1 month) - Assess user feedback on sorting and aging display
+
+---
+
 ## 2025-10-03 — Department Monthly Performance Chart Implementation
 
 -   **Context**: User request to add a new chart showing monthly performance for selected departments for current year (or selected year) with department selection functionality. Need to provide detailed monthly analysis with comprehensive filtering options.

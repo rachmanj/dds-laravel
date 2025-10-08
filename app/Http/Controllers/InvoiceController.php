@@ -86,7 +86,20 @@ class InvoiceController extends Controller
             // Don't apply location filter - already handled above
         }
 
-        return DataTables::of($query)
+        // Get invoices and sort by days in current location (oldest first - highest days first)
+        $invoices = $query->get()->sortByDesc(function ($invoice) {
+            // For available invoices that haven't been distributed, use receive_date
+            if ($invoice->distribution_status === 'available' && !$invoice->hasBeenDistributed()) {
+                $dateToUse = $invoice->receive_date;
+            } else {
+                // For distributed invoices, use the model's current_location_arrival_date
+                $dateToUse = $invoice->current_location_arrival_date;
+            }
+            return $dateToUse ? $dateToUse->diffInDays(now()) : 0;
+        })->values();
+
+
+        return DataTables::of($invoices)
             ->addColumn('supplier_name', function ($invoice) {
                 return $invoice->supplier ? $invoice->supplier->name : '-';
             })
@@ -160,7 +173,7 @@ class InvoiceController extends Controller
             'invoice_project' => ['nullable', 'string', 'max:30', 'exists:projects,code'],
             'payment_project' => ['nullable', 'string', 'max:30', 'exists:projects,code'],
             'currency' => ['required', 'string', 'max:3'],
-            'amount' => ['required', 'numeric', 'min:0'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
             'type_id' => ['required', 'exists:invoice_types,id'],
             'payment_date' => ['nullable', 'date', 'after_or_equal:receive_date'],
             'remarks' => ['nullable', 'string'],
@@ -291,7 +304,7 @@ class InvoiceController extends Controller
             'invoice_project' => ['nullable', 'string', 'max:30', 'exists:projects,code'],
             'payment_project' => ['nullable', 'string', 'max:30', 'exists:projects,code'],
             'currency' => ['required', 'string', 'max:3'],
-            'amount' => ['required', 'numeric', 'min:0'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
             'type_id' => ['required', 'exists:invoice_types,id'],
             'payment_date' => ['nullable', 'date', 'after_or_equal:receive_date'],
             'remarks' => ['nullable', 'string'],

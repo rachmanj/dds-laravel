@@ -554,9 +554,7 @@
                         width: '120px'
                     }
                 ],
-                order: [
-                    [4, 'desc']
-                ],
+                order: [],
                 pageLength: 25,
                 responsive: true
             });

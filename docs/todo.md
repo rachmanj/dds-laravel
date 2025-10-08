@@ -1,8 +1,106 @@
 # DDS Laravel Development Todo
 
-# DDS Laravel Development Todo
-
 ## 🎯 **Current Sprint**
+
+### **Invoice Table Sorting & Dashboard Enhancements** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED** - Invoice and Additional Documents table sorting improvements and comprehensive dashboard enhancements  
+**Implementation Date**: 2025-10-08  
+**Actual Effort**: ~3 hours (sorting logic + dashboard fixes + age section implementation + testing)
+
+**Feature Overview**: Successfully implemented age-based sorting for both Invoice and Additional Documents tables, fixed Invoice Types Breakdown chart, redesigned age breakdown section, and added comprehensive department-specific aging analysis to Invoice dashboard.
+
+**Core Accomplishments**:
+
+-   ✅ **Table Sorting by Age (Oldest First)**:
+
+    -   Modified `AdditionalDocumentController::data()` and `export()` methods to sort by `days_in_current_location` descending
+    -   Modified `InvoiceController::data()` method with same sorting logic
+    -   Disabled DataTable default client-side sorting in `resources/views/invoices/index.blade.php` to preserve server-side order
+    -   Oldest documents (highest days) now appear first in both tables
+    -   Example: `TEST-ZERO-001` invoice with 276 days now in first row
+    -   Consistent behavior across Additional Documents and Invoices
+
+-   ✅ **Invoice Types Breakdown Chart Fix**:
+
+    -   Fixed controller to use `$type->type_name` instead of non-existent `$type->name` field
+    -   Fixed view to use `@push('js')` instead of `@push('scripts')` to match layout expectations
+    -   Chart now displays correctly with 7 invoice types and accurate data
+    -   Verified Chart.js loading and rendering with correct data values
+
+-   ✅ **Age Breakdown Redesign**:
+
+    -   Redesigned with modern gradient cards and animations
+    -   Added priority-based animations (pulsing for urgent items)
+    -   Large, bold numbers (3rem) for immediate visual impact
+    -   "Review Now" badges with blinking animation
+    -   Progress bar showing age distribution percentages
+    -   Note: Later removed this section to avoid duplication with comprehensive age section
+
+-   ✅ **Invoice Age in Current Department Section**:
+
+    -   Added `getInvoiceAgeAndStatusMetrics()` method to `InvoiceDashboardController`
+    -   Implemented 4 age category cards (0-7, 8-14, 15-30, 30+ days)
+    -   Added Status Breakdown by Age table with clickable badges
+    -   Interactive filtering by age + status combination
+    -   "View Invoices" action buttons on each card
+    -   "URGENT" and "CRITICAL" badges for 30+ days
+    -   Red row highlighting with pulsing animation for critical items
+    -   "How Aging is Calculated" info box
+    -   Uses `current_location_age_category` accessor for accurate department-specific aging
+
+-   ✅ **Dashboard Cleanup**:
+
+    -   Removed redundant age breakdown section from Distribution Status card
+    -   Cleaned up unused CSS styles
+    -   Streamlined dashboard layout for better user experience
+
+**Technical Implementation**:
+
+-   **Files Modified**:
+
+    -   `app/Http/Controllers/AdditionalDocumentController.php` (lines 138-143, 627-631)
+    -   `app/Http/Controllers/InvoiceController.php` (lines 89-99)
+    -   `app/Http/Controllers/InvoiceDashboardController.php` (added method at lines 343-380)
+    -   `resources/views/invoices/index.blade.php` (line 557: changed order to empty array)
+    -   `resources/views/invoices/dashboard.blade.php` (multiple sections: styles, age section, cleanup)
+
+-   **Key Logic**:
+    -   Sorting uses `sortByDesc()` on `days_in_current_location` calculated value
+    -   For available invoices: uses `receive_date` directly
+    -   For distributed invoices: uses `current_location_arrival_date` accessor
+    -   Age categorization: 0-7, 8-14, 15-30, 30+ days
+    -   Status breakdown by age: available, in_transit, distributed, unaccounted_for
+
+**Current Data Snapshot** (2025-10-08):
+
+-   Total Invoices: 52
+-   Age Distribution:
+    -   0-7 days: 47 invoices (90.4%) - Recent
+    -   8-14 days: 4 invoices (7.7%) - Needs attention
+    -   15-30 days: 0 invoices
+    -   30+ days: 1 invoice (1.9%) - Critical (`TEST-ZERO-001` with 276 days)
+-   All invoices currently in "Available" status
+
+**Benefits**:
+
+-   Users can immediately identify oldest invoices requiring action
+-   Department-specific aging provides accurate tracking
+-   Visual indicators (colors, badges, animations) draw attention to urgent items
+-   Clickable elements enable quick filtering and navigation
+-   Consistent experience between Additional Documents and Invoices
+
+**Testing & Verification**:
+
+-   ✅ Verified sorting works correctly in both tables
+-   ✅ Verified `TEST-ZERO-001` appears in first row with 276 days
+-   ✅ Verified Invoice Types chart displays all types
+-   ✅ Verified age breakdown cards show correct counts
+-   ✅ Verified status breakdown table accurate
+-   ✅ Verified all interactive elements (buttons, badges, links) work
+-   ✅ Verified animations and styling render correctly
+
+---
 
 ### **Table Compact Styling and Alignment Improvements** ✅ **COMPLETED**
 

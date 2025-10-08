@@ -37,13 +37,17 @@ class InvoiceDashboardController extends Controller
         // Get invoice types breakdown
         $typeBreakdown = $this->getInvoiceTypeBreakdown($user, $userLocationCode, $isAdmin);
 
+        // Get invoice age and status metrics (department-specific aging)
+        $invoiceAgeAndStatus = $this->getInvoiceAgeAndStatusMetrics($user, $userLocationCode, $isAdmin);
+
         return view('invoices.dashboard', compact(
             'statusOverview',
             'financialMetrics',
             'processingMetrics',
             'distributionStatus',
             'supplierAnalysis',
-            'typeBreakdown'
+            'typeBreakdown',
+            'invoiceAgeAndStatus'
         ));
     }
 
@@ -285,11 +289,12 @@ class InvoiceDashboardController extends Controller
             $count = (clone $query)->where('type_id', $type->id)->count();
             $amount = (clone $query)->where('type_id', $type->id)->sum('amount');
 
-            $breakdown[$type->name] = [
+            $breakdown[$type->type_name] = [
                 'count' => $count,
                 'amount' => $amount
             ];
         }
+
 
         return $breakdown;
     }
@@ -329,5 +334,48 @@ class InvoiceDashboardController extends Controller
             'cancel' => 'ban',
             default => 'file-invoice'
         };
+    }
+
+    /**
+     * Get invoice age and status metrics based on department-specific aging
+     * (when invoice arrived at current department, not when it was created)
+     */
+    private function getInvoiceAgeAndStatusMetrics($user, $userLocationCode, $isAdmin)
+    {
+        $query = Invoice::query();
+
+        if (!$isAdmin && $userLocationCode) {
+            $query->where('cur_loc', $userLocationCode);
+        }
+
+        $invoices = (clone $query)->get();
+
+        $ageBreakdown = [
+            '0-7_days' => 0,
+            '8-14_days' => 0,
+            '15-30_days' => 0,
+            '30_plus_days' => 0
+        ];
+
+        $statusByAge = [
+            '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+            '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+            '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+            '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0]
+        ];
+
+        foreach ($invoices as $invoice) {
+            // Use the department-specific aging calculation
+            $ageCategory = $invoice->current_location_age_category;
+            $status = $invoice->distribution_status;
+
+            $ageBreakdown[$ageCategory]++;
+            $statusByAge[$ageCategory][$status]++;
+        }
+
+        return [
+            'age_breakdown' => $ageBreakdown,
+            'status_by_age' => $statusByAge
+        ];
     }
 }

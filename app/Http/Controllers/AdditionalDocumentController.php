@@ -135,7 +135,12 @@ class AdditionalDocumentController extends Controller
             // Don't apply additional filters - show all documents
         }
 
-        $documents = $query->orderBy('created_at', 'desc')->get();
+        // Get documents and sort by days in current location (oldest first - highest days first)
+        // Calculate days difference in the query for better performance
+        $documents = $query->get()->sortByDesc(function ($document) {
+            $arrivalDate = $document->current_location_arrival_date;
+            return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
+        })->values();
 
         return DataTables::of($documents)
             ->addIndexColumn()
@@ -619,7 +624,11 @@ class AdditionalDocumentController extends Controller
             // Apply the same filters as the data method
             $this->applySearchFilters($query, $request);
 
-            $documents = $query->orderBy('created_at', 'desc')->get();
+            // Sort by days in current location (oldest first - highest days first) for consistency with main table
+            $documents = $query->get()->sortByDesc(function ($document) {
+                $arrivalDate = $document->current_location_arrival_date;
+                return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
+            })->values();
 
             // Transform data for export
             $exportData = $documents->map(function ($document) {

@@ -6,6 +6,94 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Invoice Table Sorting & Dashboard Enhancements** ✅ **COMPLETED** (2025-10-08)
+
+**Pattern**: Age-based sorting and comprehensive department-specific aging analysis for invoices and additional documents
+
+**Implementation**:
+
+-   **Table Sorting Enhancement**: Implemented server-side sorting by document age (oldest first) for both Invoice and Additional Documents tables
+-   **Dashboard Data Fixes**: Resolved Invoice Types Breakdown chart data display issues
+-   **Age Analysis Section**: Added comprehensive "Invoice Age in Current Department" section matching Additional Documents functionality
+-   **Visual Redesign**: Enhanced age breakdown section with modern design and animations
+-   **Department-Specific Aging**: Accurate tracking based on arrival at current department, not original creation date
+
+**Technical Architecture**:
+
+```
+Invoice Aging & Sorting System
+├── Table Sorting Layer
+│   ├── AdditionalDocumentController::data() - sortByDesc(days_in_current_location)
+│   ├── AdditionalDocumentController::export() - Same sorting for exports
+│   ├── InvoiceController::data() - sortByDesc(days_in_current_location)
+│   └── DataTable configuration - Disabled client-side sorting (order: [])
+├── Age Calculation Layer (Model Accessors)
+│   ├── current_location_arrival_date - When document arrived at current dept
+│   │   ├── For available: uses receive_date or created_at
+│   │   └── For distributed: uses received_at from latest verified distribution
+│   ├── days_in_current_location - Days since arrival at current dept
+│   └── current_location_age_category - Categorizes into 0-7, 8-14, 15-30, 30+ days
+├── Dashboard Controller Enhancement
+│   ├── InvoiceDashboardController::getInvoiceAgeAndStatusMetrics()
+│   ├── Age breakdown by 4 categories
+│   ├── Status breakdown by age (available, in_transit, distributed, unaccounted_for)
+│   └── Fixed getInvoiceTypeBreakdown() - Use type_name instead of name
+└── Dashboard View Enhancement
+    ├── Invoice Age in Current Department section
+    │   ├── 4 age category cards with progress bars
+    │   ├── Status Breakdown by Age table
+    │   ├── Clickable badges for filtering
+    │   ├── "View Invoices" action buttons
+    │   └── "How Aging is Calculated" info box
+    ├── Fixed Chart.js loading (@push('js') instead of @push('scripts'))
+    └── Removed redundant age breakdown from Distribution Status
+```
+
+**Key Features**:
+
+-   **Oldest-First Sorting**: Documents with highest days in current location appear first
+-   **Department-Specific Aging**: Calculates age from arrival at current department
+-   **4 Age Categories**: 0-7 days (Recent), 8-14 days (Needs Attention), 15-30 days, 30+ days (Urgent)
+-   **Status Cross-Reference**: Shows distribution status breakdown for each age group
+-   **Interactive Filtering**: Clickable badges and buttons to view filtered invoices
+-   **Visual Indicators**: Color coding (green/orange/cyan/red) and urgency badges
+-   **Chart Fixes**: Invoice Types Breakdown now displays correctly with all 7 types
+
+**Code Examples**:
+
+```php
+// Controller Sorting Logic (InvoiceController.php)
+$invoices = $query->get()->sortByDesc(function ($invoice) {
+    if ($invoice->distribution_status === 'available' && !$invoice->hasBeenDistributed()) {
+        $dateToUse = $invoice->receive_date;
+    } else {
+        $dateToUse = $invoice->current_location_arrival_date;
+    }
+    return $dateToUse ? $dateToUse->diffInDays(now()) : 0;
+})->values();
+
+// Age Categorization (Invoice Model)
+public function getCurrentLocationAgeCategoryAttribute()
+{
+    $days = $this->days_in_current_location;
+
+    if ($days <= 7) return '0-7_days';
+    elseif ($days <= 14) return '8-14_days';
+    elseif ($days <= 30) return '15-30_days';
+    else return '30_plus_days';
+}
+```
+
+**Benefits**:
+
+-   ✅ Priority management - Oldest invoices prominently displayed
+-   ✅ Workflow efficiency - Quick identification of aged invoices
+-   ✅ Accurate tracking - Department-specific aging calculation
+-   ✅ Consistency - Same logic across invoices and additional documents
+-   ✅ Actionable insights - Direct links to filtered views
+
+---
+
 ### **Dashboard Integration and Chart Persistence System** ✅ **COMPLETED**
 
 **Pattern**: Robust dashboard integration with department-specific aging and persistent chart rendering

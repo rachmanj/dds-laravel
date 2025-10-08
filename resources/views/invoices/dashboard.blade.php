@@ -10,6 +10,83 @@
     <li class="breadcrumb-item active">Dashboard</li>
 @endsection
 
+@push('styles')
+    <style>
+        /* Badge clickable styling */
+        .badge-clickable {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .badge-clickable:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            text-decoration: none;
+        }
+
+        /* Info box styling for age breakdown */
+        .info-box {
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            transition: transform 0.2s ease;
+        }
+
+        .info-box:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .info-box-icon {
+            border-radius: 8px 0 0 8px;
+        }
+
+        /* Table styling */
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-danger {
+            animation: highlight-danger 2s infinite;
+        }
+
+        @keyframes highlight-danger {
+
+            0%,
+            100% {
+                background-color: rgba(220, 53, 69, 0.1);
+            }
+
+            50% {
+                background-color: rgba(220, 53, 69, 0.2);
+            }
+        }
+
+        .btn-xs {
+            padding: 2px 8px;
+            font-size: 0.75rem;
+        }
+
+        /* Urgent badge animation */
+        .badge-danger {
+            animation: pulse-badge 1.5s infinite;
+        }
+
+        @keyframes pulse-badge {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+    </style>
+@endpush
+
 @section('content')
     <!-- Main content -->
     <section class="content">
@@ -94,6 +171,180 @@
                                     </div>
                                 @endforeach
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice Age in Current Department (Department-Specific Aging) -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-clock mr-2"></i>
+                                Invoice Age in Current Department
+                                <small class="text-muted">(Based on arrival at
+                                    {{ auth()->user()->department->name ?? 'your department' }})</small>
+                            </h3>
+                            <div class="card-tools">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="location.reload()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Age Cards with Action Buttons -->
+                            <div class="row">
+                                @foreach ($invoiceAgeAndStatus['age_breakdown'] ?? [] as $age => $count)
+                                    <div class="col-md-3 mb-3">
+                                        <div
+                                            class="info-box {{ $count > 0 && $age === '30_plus_days' ? 'bg-danger' : 'bg-light' }}">
+                                            <span
+                                                class="info-box-icon bg-{{ $age === '0-7_days' ? 'success' : ($age === '8-14_days' ? 'warning' : ($age === '15-30_days' ? 'info' : 'danger')) }}">
+                                                <i
+                                                    class="fas fa-{{ $age === '0-7_days' ? 'check' : ($age === '8-14_days' ? 'clock' : ($age === '15-30_days' ? 'calendar' : 'exclamation-triangle')) }}"></i>
+                                            </span>
+                                            <div class="info-box-content">
+                                                <span class="info-box-text">
+                                                    {{ str_replace('_', ' ', $age) }}
+                                                    @if ($age === '30_plus_days' && $count > 0)
+                                                        <span class="badge badge-danger ml-1">URGENT</span>
+                                                    @endif
+                                                </span>
+                                                <span class="info-box-number">{{ $count }}</span>
+                                                <div class="progress">
+                                                    <div class="progress-bar bg-{{ $age === '0-7_days' ? 'success' : ($age === '8-14_days' ? 'warning' : ($age === '15-30_days' ? 'info' : 'danger')) }}"
+                                                        style="width: {{ array_sum($invoiceAgeAndStatus['age_breakdown'] ?? []) > 0 ? ($count / array_sum($invoiceAgeAndStatus['age_breakdown'] ?? [])) * 100 : 0 }}%">
+                                                    </div>
+                                                </div>
+                                                @if ($count > 0)
+                                                    <a href="{{ route('invoices.index', ['age_filter' => str_replace('_', '_', $age)]) }}"
+                                                        class="btn btn-sm btn-outline-{{ $age === '0-7_days' ? 'success' : ($age === '8-14_days' ? 'warning' : ($age === '15-30_days' ? 'info' : 'danger')) }} mt-2">
+                                                        <i class="fas fa-eye"></i> View Invoices
+                                                    </a>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <!-- Status by Age Table with Action Links -->
+                            <h6 class="mt-4">
+                                Status Breakdown by Age
+                                <small class="text-muted">(Click counts to view specific invoices)</small>
+                            </h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="thead-dark">
+                                        <tr>
+                                            <th>Age Group</th>
+                                            <th>Available</th>
+                                            <th>In Transit</th>
+                                            <th>Distributed</th>
+                                            <th>Unaccounted</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($invoiceAgeAndStatus['status_by_age'] ?? [] as $age => $statuses)
+                                            <tr
+                                                class="{{ $age === '30_plus_days' && array_sum($statuses) > 0 ? 'table-danger' : '' }}">
+                                                <td>
+                                                    <strong>{{ str_replace('_', ' ', $age) }}</strong>
+                                                    @if ($age === '30_plus_days' && array_sum($statuses) > 0)
+                                                        <span class="badge badge-danger ml-1">CRITICAL</span>
+                                                    @endif
+                                                </td>
+                                                @foreach (['available', 'in_transit', 'distributed', 'unaccounted_for'] as $status)
+                                                    <td>
+                                                        @if ($statuses[$status] > 0)
+                                                            <a href="{{ route('invoices.index', ['age_filter' => str_replace('_', '_', $age), 'status_filter' => $status]) }}"
+                                                                class="badge badge-{{ $status === 'available' ? 'success' : ($status === 'in_transit' ? 'warning' : ($status === 'distributed' ? 'info' : 'danger')) }} badge-clickable">
+                                                                {{ $statuses[$status] }}
+                                                            </a>
+                                                        @else
+                                                            <span
+                                                                class="badge badge-secondary">{{ $statuses[$status] }}</span>
+                                                        @endif
+                                                    </td>
+                                                @endforeach
+                                                <td>
+                                                    @if (array_sum($statuses) > 0)
+                                                        <a href="{{ route('invoices.index', ['age_filter' => str_replace('_', '_', $age)]) }}"
+                                                            class="btn btn-outline-primary btn-xs">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- How Aging is Calculated Info Box -->
+                            <div class="alert alert-info mt-3">
+                                <h6><i class="fas fa-info-circle"></i> How Aging is Calculated</h6>
+                                <p class="mb-0">
+                                    Invoice aging is calculated based on when each invoice <strong>arrived at your current
+                                        department</strong>, not when it was originally created or first received. This
+                                    ensures
+                                    accurate tracking of how long invoices have been in your department's possession.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Distribution Status & Invoice Types -->
+            <div class="row">
+                <!-- Distribution Status -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-truck mr-2"></i>
+                                Distribution Status
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                @foreach ($distributionStatus['status_counts'] ?? [] as $status => $count)
+                                    <div class="col-md-6 mb-3">
+                                        <div
+                                            class="small-box bg-{{ app('App\Http\Controllers\InvoiceDashboardController')->getDistributionStatusColor($status) }}">
+                                            <div class="inner">
+                                                <h3>{{ $count }}</h3>
+                                                <p>{{ ucwords(str_replace('_', ' ', $status)) }}</p>
+                                            </div>
+                                            <div class="icon">
+                                                <i
+                                                    class="fas fa-{{ $status === 'available' ? 'check' : ($status === 'in_transit' ? 'truck' : ($status === 'distributed' ? 'download' : 'exclamation-triangle')) }}"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invoice Types -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-chart-pie mr-2"></i>
+                                Invoice Types Breakdown
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="invoiceTypeChart"
+                                style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
                         </div>
                     </div>
                 </div>
@@ -229,75 +480,7 @@
                 </div>
             </div>
 
-            <!-- Distribution Status & Invoice Types -->
-            <div class="row">
-                <!-- Distribution Status -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="fas fa-truck mr-2"></i>
-                                Distribution Status
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                @foreach ($distributionStatus['status_counts'] ?? [] as $status => $count)
-                                    <div class="col-md-6 mb-3">
-                                        <div
-                                            class="small-box bg-{{ app('App\Http\Controllers\InvoiceDashboardController')->getDistributionStatusColor($status) }}">
-                                            <div class="inner">
-                                                <h3>{{ $count }}</h3>
-                                                <p>{{ ucwords(str_replace('_', ' ', $status)) }}</p>
-                                            </div>
-                                            <div class="icon">
-                                                <i
-                                                    class="fas fa-{{ $status === 'available' ? 'check' : ($status === 'in_transit' ? 'truck' : ($status === 'distributed' ? 'download' : 'exclamation-triangle')) }}"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
 
-                            <!-- Age Breakdown -->
-                            <h6 class="mt-3">Invoice Age Breakdown</h6>
-                            <div class="row">
-                                @foreach ($distributionStatus['age_breakdown'] ?? [] as $age => $count)
-                                    <div class="col-md-4">
-                                        <div class="info-box bg-light">
-                                            <span
-                                                class="info-box-icon bg-{{ $age === '0-7_days' ? 'success' : ($age === '8-14_days' ? 'warning' : 'danger') }}">
-                                                <i
-                                                    class="fas fa-{{ $age === '0-7_days' ? 'check' : ($age === '8-14_days' ? 'clock' : 'exclamation') }}"></i>
-                                            </span>
-                                            <div class="info-box-content">
-                                                <span class="info-box-text">{{ str_replace('_', ' ', $age) }}</span>
-                                                <span class="info-box-number">{{ $count }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Invoice Types -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="fas fa-chart-pie mr-2"></i>
-                                Invoice Types Breakdown
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="invoiceTypeChart"
-                                style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Supplier Analysis -->
             <div class="row">
@@ -381,7 +564,7 @@
     </section>
 @endsection
 
-@push('scripts')
+@push('js')
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Invoice Type Chart
