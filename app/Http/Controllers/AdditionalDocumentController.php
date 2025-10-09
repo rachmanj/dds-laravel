@@ -37,6 +37,7 @@ class AdditionalDocumentController extends Controller
 
     public function data(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $showAllRecords = $request->get('show_all', false);
 
@@ -207,6 +208,7 @@ class AdditionalDocumentController extends Controller
             'cur_loc' => 'nullable|string|max:50',
         ]);
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $data = $request->only([
             'type_id',
@@ -558,6 +560,7 @@ class AdditionalDocumentController extends Controller
     public function createOnTheFly(Request $request)
     {
         // Check permission using the specific permission
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         if (!$user->can('on-the-fly-addoc-feature')) {
             return response()->json([
@@ -843,14 +846,17 @@ class AdditionalDocumentController extends Controller
         }
 
         // Show all records permission check
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
         if ($request->filled('show_all_records') && $request->show_all_records === 'on') {
-            if (!auth()->user()->can('see-all-record-switch')) {
+            if (!$user->can('see-all-record-switch')) {
                 // Fallback to user's department only
-                $query->where('cur_loc', auth()->user()->department_location_code);
+                $query->where('cur_loc', $user->department_location_code);
             }
         } else {
             // Default: show only user's department records
-            $query->where('cur_loc', auth()->user()->department_location_code);
+            $query->where('cur_loc', $user->department_location_code);
         }
     }
 }

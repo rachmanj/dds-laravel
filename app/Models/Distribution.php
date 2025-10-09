@@ -166,9 +166,12 @@ class Distribution extends Model
      */
     public static function getNextSequence(int $year, int $departmentId): int
     {
-        // Get all existing sequences for this department/year
+        // Use lockForUpdate to prevent race conditions
+        // Also exclude soft-deleted records to allow sequence reuse
         $existingSequences = static::where('year', $year)
             ->where('origin_department_id', $departmentId)
+            ->whereNull('deleted_at')
+            ->lockForUpdate()
             ->pluck('sequence')
             ->sort()
             ->values();
