@@ -468,4 +468,13 @@ class Invoice extends Model
     {
         return $this->distributions()->exists();
     }
+
+    /**
+     * Check if invoice location can be manually changed
+     * Location cannot be changed if invoice has any distribution history
+     */
+    public function canChangeLocationManually(): bool
+    {
+        return !$this->hasBeenDistributed();
+    }
 }

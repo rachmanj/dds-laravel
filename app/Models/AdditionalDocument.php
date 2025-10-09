@@ -231,6 +231,15 @@ class AdditionalDocument extends Model
     }
 
     /**
+     * Check if document location can be manually changed
+     * Location cannot be changed if document has any distribution history
+     */
+    public function canChangeLocationManually(): bool
+    {
+        return !$this->hasBeenDistributed();
+    }
+
+    /**
      * Get distribution history for this document
      */
     public function getDistributionHistory()

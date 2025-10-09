@@ -293,6 +293,17 @@ class InvoiceController extends Controller
             }
         }
 
+        // Check if location change is being attempted
+        if ($request->has('cur_loc') && $request->cur_loc !== $invoice->cur_loc) {
+            if (!$invoice->canChangeLocationManually()) {
+                return redirect()->back()
+                    ->withErrors([
+                        'cur_loc' => 'Cannot change location manually. This invoice has distribution history. Location can only be changed through the distribution process.'
+                    ])
+                    ->withInput();
+            }
+        }
+
         $request->validate([
             'invoice_number' => ['required', 'string', 'max:255', new UniqueInvoicePerSupplier($invoice->id)],
             'faktur_no' => ['nullable', 'string', 'max:255'],

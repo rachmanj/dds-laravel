@@ -301,6 +301,17 @@ class AdditionalDocumentController extends Controller
             abort(403, 'You do not have permission to edit this document.');
         }
 
+        // Check if location change is being attempted
+        if ($request->has('cur_loc') && $request->cur_loc !== $additionalDocument->cur_loc) {
+            if (!$additionalDocument->canChangeLocationManually()) {
+                return redirect()->back()
+                    ->withErrors([
+                        'cur_loc' => 'Cannot change location manually. This document has distribution history. Location can only be changed through the distribution process.'
+                    ])
+                    ->withInput();
+            }
+        }
+
         $request->validate([
             'type_id' => 'required|exists:additional_document_types,id',
             'document_number' => 'required|string|max:255',

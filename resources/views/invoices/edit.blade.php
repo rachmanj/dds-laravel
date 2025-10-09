@@ -499,9 +499,17 @@
                                         <div class="form-group">
                                             <label for="cur_loc">Current Location <span
                                                     class="text-danger">*</span></label>
+                                            @php
+                                                $hasDistributions = $invoice->hasBeenDistributed();
+                                                $canChangeLocation = $invoice->canChangeLocationManually();
+                                                $isDisabledByRole = !auth()
+                                                    ->user()
+                                                    ->hasRole(['superadmin', 'admin']);
+                                                $isDisabledByDistribution = !$canChangeLocation;
+                                                $isDisabled = $isDisabledByRole || $isDisabledByDistribution;
+                                            @endphp
                                             <select class="form-control @error('cur_loc') is-invalid @enderror"
-                                                id="cur_loc" name="cur_loc"
-                                                {{ !auth()->user()->hasRole(['superadmin', 'admin'])? 'disabled': '' }}
+                                                id="cur_loc" name="cur_loc" {{ $isDisabled ? 'disabled' : '' }}
                                                 required>
                                                 <option value="">Select Location</option>
                                                 @foreach ($departments as $dept)
@@ -517,11 +525,20 @@
                                                     @endif
                                                 @endforeach
                                             </select>
+                                            @if ($isDisabledByDistribution)
+                                                <input type="hidden" name="cur_loc" value="{{ $invoice->cur_loc }}">
+                                            @endif
                                             @error('cur_loc')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
                                             <small class="form-text text-muted">
-                                                @if (!auth()->user()->hasRole(['superadmin', 'admin']))
+                                                @if ($isDisabledByDistribution)
+                                                    <span class="text-warning">
+                                                        <i class="fas fa-lock"></i> Location locked - This invoice has
+                                                        distribution history.
+                                                        Location can only be changed through the distribution process.
+                                                    </span>
+                                                @elseif (!auth()->user()->hasRole(['superadmin', 'admin']))
                                                     This is set to your department's location and cannot be changed.
                                                 @else
                                                     You can change the location as you have administrative privileges.

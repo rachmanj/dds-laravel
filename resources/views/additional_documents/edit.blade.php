@@ -311,10 +311,15 @@
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label for="cur_loc">Current Location</label>
+                                            @php
+                                                $hasDistributions = $additionalDocument->hasBeenDistributed();
+                                                $canChangeLocation = $additionalDocument->canChangeLocationManually();
+                                            @endphp
                                             @if (auth()->user()->hasAnyRole(['superadmin', 'admin', 'accounting']))
                                                 <select
                                                     class="form-control select2bs4 @error('cur_loc') is-invalid @enderror"
-                                                    id="cur_loc" name="cur_loc">
+                                                    id="cur_loc" name="cur_loc"
+                                                    {{ !$canChangeLocation ? 'disabled' : '' }}>
                                                     <option value="">Select Location</option>
                                                     @foreach ($departments as $department)
                                                         <option value="{{ $department->location_code }}"
@@ -323,6 +328,15 @@
                                                         </option>
                                                     @endforeach
                                                 </select>
+                                                @if (!$canChangeLocation)
+                                                    <input type="hidden" name="cur_loc"
+                                                        value="{{ $additionalDocument->cur_loc }}">
+                                                    <small class="text-warning">
+                                                        <i class="fas fa-lock"></i> Location locked - This document has
+                                                        distribution history.
+                                                        Location can only be changed through the distribution process.
+                                                    </small>
+                                                @endif
                                             @else
                                                 <input type="text" class="form-control" id="cur_loc"
                                                     value="{{ $additionalDocument->cur_loc ?? 'Not assigned' }}"

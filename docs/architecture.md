@@ -6,6 +6,117 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Document Location Change Validation System** ✅ **COMPLETED** (2025-10-09)
+
+**Pattern**: Multi-layer validation system to prevent manual location changes for documents with distribution history
+
+**Business Rule**: Once a document (invoice or additional document) enters the distribution workflow, its location can ONLY be changed through the distribution process itself, not through manual editing.
+
+**Implementation**:
+
+-   **Model Layer**: Added `canChangeLocationManually()` method to both `AdditionalDocument` and `Invoice` models
+-   **Controller Validation**: Pre-validation checks in update methods before processing form data
+-   **View Layer**: Disabled location dropdown with visual indicators when document has distribution history
+-   **Data Integrity**: Hidden input preserves original location value when field is disabled
+
+**Technical Architecture**:
+
+```
+Location Change Validation System
+├── Model Layer (Business Logic)
+│   ├── AdditionalDocument::canChangeLocationManually()
+│   │   └── Returns !hasBeenDistributed()
+│   ├── Invoice::canChangeLocationManually()
+│   │   └── Returns !hasBeenDistributed()
+│   ├── hasBeenDistributed()
+│   │   └── Checks if distributions()->exists()
+│   └── distributions() - Relationship to distribution history
+├── Controller Layer (Backend Validation)
+│   ├── AdditionalDocumentController::update()
+│   │   ├── Checks if cur_loc is being changed
+│   │   ├── Validates canChangeLocationManually()
+│   │   └── Returns error if location change attempted on distributed document
+│   └── InvoiceController::update()
+│       ├── Same validation logic as AdditionalDocumentController
+│       └── Works alongside existing role-based access control
+└── View Layer (Frontend Prevention)
+    ├── additional_documents/edit.blade.php
+    │   ├── @php checks: hasBeenDistributed() & canChangeLocationManually()
+    │   ├── Disabled dropdown when document has distributions
+    │   ├── Hidden input to preserve location value
+    │   └── Warning message with lock icon
+    └── invoices/edit.blade.php
+        ├── Combined distribution + role-based disabling logic
+        ├── Disabled when: has distributions OR insufficient role
+        └── Context-specific warning messages
+```
+
+**Validation Flow**:
+
+```php
+// 1. Model Method - Business Logic
+public function canChangeLocationManually(): bool
+{
+    return !$this->hasBeenDistributed();
+}
+
+// 2. Controller Validation - Pre-check before update
+if ($request->has('cur_loc') && $request->cur_loc !== $additionalDocument->cur_loc) {
+    if (!$additionalDocument->canChangeLocationManually()) {
+        return redirect()->back()
+            ->withErrors([
+                'cur_loc' => 'Cannot change location manually. This document has distribution history.
+                              Location can only be changed through the distribution process.'
+            ])
+            ->withInput();
+    }
+}
+
+// 3. View Layer - Frontend Prevention
+@php
+    $hasDistributions = $additionalDocument->hasBeenDistributed();
+    $canChangeLocation = $additionalDocument->canChangeLocationManually();
+@endphp
+
+<select id="cur_loc" name="cur_loc" {{ !$canChangeLocation ? 'disabled' : '' }}>
+    <!-- options -->
+</select>
+
+@if (!$canChangeLocation)
+    <input type="hidden" name="cur_loc" value="{{ $additionalDocument->cur_loc }}">
+    <small class="text-warning">
+        <i class="fas fa-lock"></i> Location locked - This document has distribution history.
+    </small>
+@endif
+```
+
+**Key Features**:
+
+-   **Multi-Layer Security**: Frontend disabled + Backend validation + Database consistency
+-   **Bypass Prevention**: Even if frontend is circumvented, backend blocks the change
+-   **User-Friendly Messages**: Clear explanations with lock icons for locked fields
+-   **Data Preservation**: Hidden input ensures original location is submitted when disabled
+-   **Audit Trail**: Location changes only through documented distribution process
+-   **Consistent Logic**: Same validation pattern across invoices and additional documents
+
+**Security Benefits**:
+
+-   ✅ **Data Integrity**: Distribution workflow is single source of truth for location tracking
+-   ✅ **Audit Compliance**: All location changes are tracked through distribution system
+-   ✅ **Workflow Enforcement**: Prevents circumvention of business process
+-   ✅ **Historical Accuracy**: Maintains accurate distribution history and location timeline
+-   ✅ **User Education**: Warning messages explain why field is locked
+
+**Test Scenarios**:
+
+| Scenario             | Document ID     | Has Distributions | Location Field   | Backend    | Result                               |
+| -------------------- | --------------- | ----------------- | ---------------- | ---------- | ------------------------------------ |
+| Edit with history    | 222 (251006202) | ✅ Yes (1)        | 🔒 Disabled      | ❌ Blocked | Location unchanged                   |
+| Edit without history | 129 (251006149) | ❌ No (0)         | ✅ Enabled       | ✅ Allowed | Location changed successfully        |
+| Bypass attempt       | 222 (251006202) | ✅ Yes (1)        | 🕵️ Forced via JS | ❌ Blocked | Validation error, location unchanged |
+
+---
+
 ### **Invoice Table Sorting & Dashboard Enhancements** ✅ **COMPLETED** (2025-10-08)
 
 **Pattern**: Age-based sorting and comprehensive department-specific aging analysis for invoices and additional documents

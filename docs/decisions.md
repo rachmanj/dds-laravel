@@ -1,3 +1,122 @@
+## 2025-10-09 — Document Location Change Validation System
+
+-   **Context**: Documents were entering the distribution workflow, but users with sufficient permissions (superadmin/admin/accounting) could manually change the `cur_loc` (current location) field via the edit page, bypassing the distribution process. This created data integrity issues where the distribution system showed one location while the document record showed another, breaking audit trails and location history accuracy.
+
+-   **Decision**: Implement a multi-layer validation system that prevents manual location changes for any document (invoice or additional document) that has distribution history. Location changes must only occur through the distribution process itself.
+
+-   **Alternatives Considered**:
+
+    1. **Remove location field from edit page entirely** - Rejected because new documents without distribution history need to have their initial location set
+    2. **Role-based restriction only** - Rejected because even superadmins should not bypass the distribution workflow for documents already in the system
+    3. **Warning message only (no enforcement)** - Rejected because it doesn't prevent the data integrity issue
+    4. **Backend validation only** - Rejected because it provides poor UX; users should see the field is locked before attempting to submit
+
+-   **Implementation**:
+
+    -   **Model Layer (Business Logic)**:
+
+        ```php
+        // Added to both AdditionalDocument and Invoice models
+        public function canChangeLocationManually(): bool
+        {
+            return !$this->hasBeenDistributed();
+        }
+        ```
+
+        -   Leverages existing `hasBeenDistributed()` method that checks `distributions()->exists()`
+        -   Returns `true` only if document has never been in a distribution
+        -   Single source of truth for location change permission
+
+    -   **Controller Layer (Backend Validation)**:
+
+        ```php
+        // AdditionalDocumentController::update() and InvoiceController::update()
+        if ($request->has('cur_loc') && $request->cur_loc !== $additionalDocument->cur_loc) {
+            if (!$additionalDocument->canChangeLocationManually()) {
+                return redirect()->back()
+                    ->withErrors([
+                        'cur_loc' => 'Cannot change location manually. This document has distribution history.
+                                      Location can only be changed through the distribution process.'
+                    ])
+                    ->withInput();
+            }
+        }
+        ```
+
+        -   Pre-validation before processing update request
+        -   Only checks if location is actually being changed
+        -   Returns with error and preserves form input
+        -   Prevents bypass attempts even if frontend is circumvented
+
+    -   **View Layer (Frontend Prevention)**:
+
+        ```blade
+        @php
+            $hasDistributions = $additionalDocument->hasBeenDistributed();
+            $canChangeLocation = $additionalDocument->canChangeLocationManually();
+        @endphp
+
+        <select id="cur_loc" name="cur_loc" {{ !$canChangeLocation ? 'disabled' : '' }}>
+            <!-- options -->
+        </select>
+
+        @if (!$canChangeLocation)
+            <input type="hidden" name="cur_loc" value="{{ $additionalDocument->cur_loc }}">
+            <small class="text-warning">
+                <i class="fas fa-lock"></i> Location locked - This document has distribution history.
+            </small>
+        @endif
+        ```
+
+        -   Checks permissions at page load time
+        -   Disables dropdown visually with clear explanation
+        -   Hidden input preserves original value when disabled
+        -   Warning message with lock icon for user education
+
+-   **Technical Details**:
+
+    **Files Modified:**
+
+    -   `app/Models/AdditionalDocument.php` - Added `canChangeLocationManually()` method
+    -   `app/Models/Invoice.php` - Added `canChangeLocationManually()` method
+    -   `app/Http/Controllers/AdditionalDocumentController.php` - Added location change validation (lines 304-313)
+    -   `app/Http/Controllers/InvoiceController.php` - Added location change validation (lines 296-305)
+    -   `resources/views/additional_documents/edit.blade.php` - Added frontend prevention logic (lines 314-347)
+    -   `resources/views/invoices/edit.blade.php` - Added frontend prevention logic (lines 502-544)
+
+    **Validation Flow:**
+
+    ```
+    User attempts location change
+    ↓
+    Frontend: Check canChangeLocationManually()
+    ├─ If false → Dropdown disabled + warning shown
+    └─ If true → Dropdown enabled
+    ↓
+    User submits form
+    ↓
+    Backend: Controller validates
+    ├─ Compare request cur_loc vs current cur_loc
+    ├─ If different → Check canChangeLocationManually()
+    │  ├─ If false → Return error, preserve input
+    │  └─ If true → Proceed with update
+    └─ If same → No validation needed
+    ↓
+    Database updated (or validation error returned)
+    ```
+
+-   **Impact**:
+
+    -   **Data Integrity**: Distribution workflow is now the single source of truth for location tracking
+    -   **Audit Trail**: All location changes are documented through distribution records
+    -   **User Experience**: Clear visual feedback when field is locked with explanatory message
+    -   **Security**: Multi-layer protection prevents bypass attempts
+    -   **Backward Compatibility**: Existing documents without distributions can still have location changed manually
+
+-   **Review Date**: 2026-01-09 (Review after 3 months of production use)
+
+---
+
 ## 2025-10-08 — Invoice Table Sorting & Dashboard Department-Specific Aging
 
 -   **Context**: Users needed to prioritize oldest invoices/documents but tables were not sorted by age. Invoice dashboard was missing department-specific aging analysis and had data display issues. Invoice Types Breakdown chart was not showing any data.
