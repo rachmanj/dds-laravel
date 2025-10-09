@@ -321,6 +321,7 @@ class AdditionalDocumentController extends Controller
             'vendor_code',
             'project',
             'receive_date',
+            'cur_loc',
             'remarks'
         ]);
 
