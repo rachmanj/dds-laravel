@@ -7,7 +7,9 @@ use App\Models\AdditionalDocument;
 use App\Models\AdditionalDocumentType;
 use App\Models\Department;
 use App\Imports\AdditionalDocumentImport;
+use App\Imports\GeneralDocumentImport;
 use App\Exports\AdditionalDocumentTemplate;
+use App\Exports\GeneralDocumentTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -425,6 +427,15 @@ class AdditionalDocumentController extends Controller
         return view('additional_documents.import', compact('documentTypes', 'user'));
     }
 
+    public function importGeneral()
+    {
+        $this->authorize('import-general-documents');
+
+        $user = Auth::user();
+
+        return view('additional_documents.import-general', compact('user'));
+    }
+
     public function processImport(Request $request)
     {
         $this->authorize('import-additional-documents');
@@ -551,7 +562,132 @@ class AdditionalDocumentController extends Controller
 
     public function downloadTemplate()
     {
-        return Excel::download(new AdditionalDocumentTemplate(), 'additional_documents_template.xlsx');
+        return Excel::download(new AdditionalDocumentTemplate(), 'ito_documents_template.xlsx');
+    }
+
+    public function processGeneralImport(Request $request)
+    {
+        $this->authorize('import-general-documents');
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls|max:51200', // 50MB max
+        ]);
+
+        try {
+            $user = Auth::user();
+
+            // Validate file before processing
+            $file = $request->file('file');
+            if (!$file->isValid()) {
+                throw new \Exception('Invalid file uploaded');
+            }
+
+            // Check file size
+            if ($file->getSize() > 50 * 1024 * 1024) { // 50MB
+                throw new \Exception('File size exceeds 50MB limit');
+            }
+
+            // Validate Excel file format
+            $extension = strtolower($file->getClientOriginalExtension());
+            if (!in_array($extension, ['xlsx', 'xls'])) {
+                throw new \Exception('Invalid file format. Only .xlsx and .xls files are supported.');
+            }
+
+            // Try to read a small portion of the file to validate it's a valid Excel file
+            try {
+                $testData = Excel::toArray(new class implements \Maatwebsite\Excel\Concerns\ToArray {
+                    public function array(array $array)
+                    {
+                        return $array;
+                    }
+                }, $file);
+
+                if (empty($testData) || empty($testData[0])) {
+                    throw new \Exception('Excel file appears to be empty or cannot be read');
+                }
+            } catch (\Exception $e) {
+                throw new \Exception('Invalid Excel file format or corrupted file: ' . $e->getMessage());
+            }
+
+            // Default values based on user's department
+            $defaultValues = [
+                'cur_loc' => $user->department_location_code ?: 'DEFAULT',
+                'status' => 'open',
+            ];
+
+            // Log import attempt for debugging
+            Log::info('Starting General Excel import:', [
+                'file_name' => $file->getClientOriginalName(),
+                'file_size' => $file->getSize(),
+                'default_values' => $defaultValues
+            ]);
+
+            // Create import instance
+            $import = new GeneralDocumentImport($defaultValues);
+
+            // Process the import
+            Excel::import($import, $file);
+
+            // Get results
+            $successCount = $import->getSuccessCount();
+            $skippedCount = $import->getSkippedCount();
+            $errors = $import->getErrors();
+            $documentTypeCounts = $import->getDocumentTypeCounts();
+
+            // Prepare success message for Toastr
+            $toastrMessage = "General documents import completed successfully!";
+            if ($successCount > 0) {
+                $toastrMessage .= " {$successCount} documents imported.";
+            }
+            if ($skippedCount > 0) {
+                $toastrMessage .= " {$skippedCount} rows skipped.";
+            }
+            if (!empty($errors)) {
+                $toastrMessage .= " " . count($errors) . " errors found.";
+            }
+
+            // Prepare summary data for the view
+            $importSummary = [
+                'success_count' => $successCount,
+                'skipped_count' => $skippedCount,
+                'error_count' => count($errors),
+                'errors' => $errors,
+                'total_processed' => $successCount + $skippedCount + count($errors),
+                'file_name' => $request->file('file')->getClientOriginalName(),
+                'imported_at' => now()->format('d/m/Y H:i:s'),
+                'document_type' => 'General Documents (DO/GR/MR)',
+                'duplicate_action' => 'skip',
+                'check_duplicates' => true,
+                'document_type_counts' => $documentTypeCounts,
+            ];
+
+            return redirect()->route('additional-documents.import-general')
+                ->with('general_import_success', $toastrMessage)
+                ->with('general_import_summary', $importSummary);
+        } catch (\Exception $e) {
+            Log::error('General import error: ' . $e->getMessage());
+            Log::error('General import error trace: ' . $e->getTraceAsString());
+
+            // Provide more specific error messages for common issues
+            $errorMessage = 'General import failed: ' . $e->getMessage();
+
+            if (str_contains($e->getMessage(), 'Column count doesn\'t match value count')) {
+                $errorMessage = 'General import failed: Excel column structure mismatch. Please use the provided general template format.';
+            } elseif (str_contains($e->getMessage(), 'SQLSTATE[21S01]')) {
+                $errorMessage = 'General import failed: Database column mismatch. Please check the Excel template format.';
+            }
+
+            return redirect()->route('additional-documents.import-general')
+                ->with('general_error', $errorMessage)
+                ->withInput();
+        }
+    }
+
+    public function downloadGeneralTemplate()
+    {
+        $this->authorize('import-general-documents');
+
+        return Excel::download(new GeneralDocumentTemplate(), 'general_documents_template.xlsx');
     }
 
     /**

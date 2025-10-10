@@ -36,12 +36,22 @@
         </li>
 
         <!-- Import Documents -->
-        <li class="nav-item">
-            <a href="{{ route('additional-documents.import') }}"
-                class="nav-link {{ request()->routeIs('additional-documents.import') ? 'active' : '' }}">
-                <i class="far fa-circle nav-icon"></i>
-                <p>Import Documents</p>
-            </a>
-        </li>
+        @if (auth()->user()->can('import-additional-documents') || auth()->user()->can('import-general-documents'))
+            <li class="nav-item">
+                @if (auth()->user()->can('import-additional-documents'))
+                    <a href="{{ route('additional-documents.import') }}"
+                        class="nav-link {{ request()->routeIs('additional-documents.import*') ? 'active' : '' }}">
+                        <i class="far fa-circle nav-icon"></i>
+                        <p>Import Documents</p>
+                    </a>
+                @else
+                    <a href="{{ route('additional-documents.import-general') }}"
+                        class="nav-link {{ request()->routeIs('additional-documents.import*') ? 'active' : '' }}">
+                        <i class="far fa-circle nav-icon"></i>
+                        <p>Import Documents</p>
+                    </a>
+                @endif
+            </li>
+        @endif
     </ul>
 </li>

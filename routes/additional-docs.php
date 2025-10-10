@@ -11,6 +11,11 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     Route::get('import', [\App\Http\Controllers\AdditionalDocumentController::class, 'import'])->name('import');
     Route::post('import', [\App\Http\Controllers\AdditionalDocumentController::class, 'processImport'])->name('process-import');
     Route::get('download-template', [\App\Http\Controllers\AdditionalDocumentController::class, 'downloadTemplate'])->name('download-template');
+
+    // General documents import routes (separate page with permission)
+    Route::get('import-general', [\App\Http\Controllers\AdditionalDocumentController::class, 'importGeneral'])->name('import-general')->middleware('permission:import-general-documents');
+    Route::post('process-general-import', [\App\Http\Controllers\AdditionalDocumentController::class, 'processGeneralImport'])->name('process-general-import')->middleware('permission:import-general-documents');
+    Route::get('download-general-template', [\App\Http\Controllers\AdditionalDocumentController::class, 'downloadGeneralTemplate'])->name('download-general-template')->middleware('permission:import-general-documents');
     Route::get('export', [\App\Http\Controllers\AdditionalDocumentController::class, 'export'])->name('export');
 
     // Search presets routes
