@@ -1,3 +1,132 @@
+### 2025-10-10 — Distribution Create: "Select All" Filter Bug Fix
+
+-   **Issue**: When filtering additional documents by type (DO or ITO) in the distribution create page and clicking "Select All", it was selecting ALL 251 documents instead of only the filtered/visible documents
+-   **Scope**: Fix "Select All" and "Deselect All" functionality for both invoices and additional documents in distribution create form
+-   **Implementation Date**: 2025-10-10
+-   **Status**: ✅ **COMPLETED** - All select/deselect buttons now correctly operate only on visible filtered rows
+
+#### **Bug Details**
+
+-   **Reported By**: User (tomi)
+-   **Steps to Reproduce**:
+    1. Login as tomi (password: 12345678)
+    2. Navigate to Distributions → Create Distribution
+    3. Select "Additional Document" as document type
+    4. Filter by "Delivery Order (DO)" - shows 36 documents
+    5. Click "Select All"
+    6. **Expected**: Select only 36 visible DO documents
+    7. **Actual (Bug)**: Selected all 251 documents (including hidden ITO documents)
+
+#### **Root Cause**
+
+The jQuery selectors were selecting all checkboxes with the class `.invoice-checkbox` and `.additional-doc-checkbox`, regardless of whether their parent table rows were visible or hidden by filters. When documents were filtered, the non-matching rows were hidden with CSS `display: none`, but they remained in the DOM and were still being selected.
+
+**Buggy Code:**
+
+```javascript
+$("#selectAllAdditionalDocs").click(function () {
+    $(".additional-doc-checkbox").prop("checked", true); // Selects ALL, even hidden!
+    updateSelectedDocuments();
+    updatePreview();
+});
+```
+
+#### **Solution Implemented**
+
+Modified all four select/deselect button handlers to only target checkboxes within visible table rows using the `:visible` selector and proper table scope.
+
+**Fixed Code:**
+
+```javascript
+$("#selectAllAdditionalDocs").click(function () {
+    $("#additional-doc-table tbody tr:visible .additional-doc-checkbox").prop(
+        "checked",
+        true
+    );
+    updateSelectedDocuments();
+    updatePreview();
+});
+
+$("#deselectAllAdditionalDocs").click(function () {
+    $("#additional-doc-table tbody tr:visible .additional-doc-checkbox").prop(
+        "checked",
+        false
+    );
+    updateSelectedDocuments();
+    updatePreview();
+});
+
+$("#selectAllInvoices").click(function () {
+    $("#invoice-table tbody tr:visible .invoice-checkbox").prop(
+        "checked",
+        true
+    );
+    updateSelectedDocuments();
+    updatePreview();
+});
+
+$("#deselectAllInvoices").click(function () {
+    $("#invoice-table tbody tr:visible .invoice-checkbox").prop(
+        "checked",
+        false
+    );
+    updateSelectedDocuments();
+    updatePreview();
+});
+```
+
+**Key Changes:**
+
+-   Changed from: `.additional-doc-checkbox`
+-   Changed to: `#additional-doc-table tbody tr:visible .additional-doc-checkbox`
+-   Benefits:
+    1. `#additional-doc-table tbody` - Scopes to the specific table
+    2. `tr:visible` - Only selects rows that are currently visible (not hidden by filters)
+    3. `.additional-doc-checkbox` - Then finds checkboxes within those visible rows
+
+#### **Files Modified**
+
+-   `resources/views/distributions/create.blade.php` - Updated all four button handlers (lines 721-743)
+
+#### **Test Results** ✅
+
+**Test 1: Filter by Delivery Order (DO)**
+
+-   Total documents available: 251
+-   Filtered DO documents: 36
+-   Click "Select All"
+-   **Result**: ✅ Selected exactly 36 documents (console log: "Selected docs: 36")
+-   **Before fix**: ❌ Would select all 251 documents
+
+**Test 2: Filter by ITO**
+
+-   Total documents available: 251
+-   Filtered ITO documents: 215
+-   Click "Select All"
+-   **Result**: ✅ Selected exactly 215 documents (console log: "Selected docs: 215")
+-   **Before fix**: ❌ Would select all 251 documents
+
+**Test 3: No Filter (All Types)**
+
+-   Total documents available: 251
+-   Click "Select All"
+-   **Result**: ✅ Selected all 251 documents (expected behavior)
+
+**Test 4: Deselect All**
+
+-   After selecting documents, click "Deselect All"
+-   **Result**: ✅ Correctly deselects only visible filtered documents
+
+#### **Impact & Benefits**
+
+-   ✅ Users can now accurately select all documents of a specific type without accidentally including hidden documents
+-   ✅ Distribution creation workflow is now more reliable and predictable
+-   ✅ Prevents data integrity issues from accidentally distributing wrong documents
+-   ✅ Improves user experience and reduces potential for user errors
+-   ✅ Same fix applied to invoice selection for consistency
+
+---
+
 ### 2025-10-08 — Invoice Table Sorting & Dashboard Enhancements
 
 -   **Issue**: Invoices and Additional Documents tables were not sorted by age, making it difficult to prioritize oldest documents. Invoice dashboard was missing key features and had data display issues.
@@ -12880,7 +13009,6 @@ function updateFormProgress() {
 **Version**: 4.15  
 **Status**: ✅ **Production Ready** - Additional Documents UI/UX standardized to match invoice create page
 
-
 ---
 
 ## Distribution Sequence Generation - Critical Bug Fixes
@@ -12894,26 +13022,28 @@ function updateFormProgress() {
 During testing of the distribution creation workflow (user: tomi, sending Delivery Order documents to Accounting department), encountered a critical duplicate key constraint violation error:
 
 ```
-SQLSTATE[23000]: Integrity constraint violation: 1062 
+SQLSTATE[23000]: Integrity constraint violation: 1062
 Duplicate entry '2025-9-2' for key 'distributions.distributions_year_dept_seq_unique'
 ```
 
 ### Root Causes
 
 1. **Race Condition in Sequence Generation**:
-   - `Distribution::getNextSequence()` method lacked database-level row locking
-   - Multiple simultaneous requests could generate identical sequence numbers
-   - No transaction isolation preventing concurrent access
+
+    - `Distribution::getNextSequence()` method lacked database-level row locking
+    - Multiple simultaneous requests could generate identical sequence numbers
+    - No transaction isolation preventing concurrent access
 
 2. **Soft-Delete Blocking Issue**:
-   - Soft-deleted distributions (with `deleted_at` timestamp) remained in database
-   - Unique constraint didn't consider `deleted_at` column
-   - Deleted distributions permanently blocked sequence number reuse
-   - Production analysis: Distribution #4 was soft-deleted but blocking sequence #2
+    - Soft-deleted distributions (with `deleted_at` timestamp) remained in database
+    - Unique constraint didn't consider `deleted_at` column
+    - Deleted distributions permanently blocked sequence number reuse
+    - Production analysis: Distribution #4 was soft-deleted but blocking sequence #2
 
 ### Solutions Implemented
 
 **Fix 1: Added Database Row Locking**
+
 ```php
 // Added lockForUpdate() to prevent race conditions
 $existingSequences = static::where('year', $year)
@@ -12923,6 +13053,7 @@ $existingSequences = static::where('year', $year)
 ```
 
 **Fix 2: Exclude Soft-Deleted Records**
+
 ```php
 // Added whereNull('deleted_at') to allow sequence reuse
 $existingSequences = static::where('year', $year)
@@ -12933,12 +13064,14 @@ $existingSequences = static::where('year', $year)
 ```
 
 **Fix 3: Database Cleanup**
-- Production database: Found 2 draft distributions
-- Distribution #3: Legitimate WIP by Dias Kristian Arima (preserved)
-- Distribution #4: Soft-deleted blocking sequence #2 (removed via `forceDelete()`)
+
+-   Production database: Found 2 draft distributions
+-   Distribution #3: Legitimate WIP by Dias Kristian Arima (preserved)
+-   Distribution #4: Soft-deleted blocking sequence #2 (removed via `forceDelete()`)
 
 **Fix 4: Documentation Migration**
-- Created migration: `2025_10_09_112248_update_distributions_unique_constraint_for_soft_deletes.php`
+
+-   Created migration: `2025_10_09_112248_update_distributions_unique_constraint_for_soft_deletes.php`
 
 ### Files Modified
 
@@ -12956,15 +13089,17 @@ $existingSequences = static::where('year', $year)
 ### Impact
 
 **Before Fix**:
-- ❌ Race conditions causing duplicate sequence attempts
-- ❌ Soft-deleted distributions blocking sequences
-- ❌ Distribution creation failing with constraint violations
+
+-   ❌ Race conditions causing duplicate sequence attempts
+-   ❌ Soft-deleted distributions blocking sequences
+-   ❌ Distribution creation failing with constraint violations
 
 **After Fix**:
-- ✅ Thread-safe sequence generation with database locking
-- ✅ Soft-deleted distributions don't interfere
-- ✅ Sequence numbers can be reused after deletion
-- ✅ Robust, production-ready distribution workflow
+
+-   ✅ Thread-safe sequence generation with database locking
+-   ✅ Soft-deleted distributions don't interfere
+-   ✅ Sequence numbers can be reused after deletion
+-   ✅ Robust, production-ready distribution workflow
 
 ### Key Learnings
 
@@ -12978,4 +13113,3 @@ $existingSequences = static::where('year', $year)
 
 **Status**: ✅ **RESOLVED & PRODUCTION READY**  
 **Next Steps**: Deploy to production following deployment checklist
-

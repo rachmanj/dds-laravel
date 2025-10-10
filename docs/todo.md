@@ -2,6 +2,39 @@
 
 ## 🎯 **Current Sprint**
 
+### **Distribution Create: Select All Filter Bug** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED** - Fixed "Select All" functionality to only select filtered/visible documents  
+**Implementation Date**: 2025-10-10  
+**Reported By**: User (tomi)  
+**Severity**: MEDIUM - Data integrity issue causing wrong documents to be selected
+
+**Issue**: When filtering additional documents by type (DO or ITO) and clicking "Select All", all 251 documents were being selected instead of only the filtered/visible documents.
+
+**Root Cause**: jQuery selectors were targeting all checkboxes regardless of visibility. Hidden filtered rows (with `display:none`) were still being selected.
+
+**Solution**:
+
+-   Changed from: `.additional-doc-checkbox`
+-   Changed to: `#additional-doc-table tbody tr:visible .additional-doc-checkbox`
+-   Applied same fix to all four handlers: Select All/Deselect All for both invoices and additional documents
+
+**Test Results**:
+
+-   ✅ Filter by DO (36 docs) → Select All → Selects only 36
+-   ✅ Filter by ITO (215 docs) → Select All → Selects only 215
+-   ✅ Deselect All works correctly on filtered rows
+
+**Files Modified**:
+
+-   `resources/views/distributions/create.blade.php` (lines 721-743)
+
+**Documentation Updated**:
+
+-   `MEMORY.md` - Added comprehensive bug fix documentation
+
+---
+
 ### **Distribution Sequence Generation Bug Fixes** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED** - Critical bug fixes for distribution sequence generation race conditions and soft-delete handling  

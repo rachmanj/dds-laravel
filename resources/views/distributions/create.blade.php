@@ -719,25 +719,25 @@
 
             // Select all handlers
             $('#selectAllInvoices').click(function() {
-                $('.invoice-checkbox').prop('checked', true);
+                $('#invoice-table tbody tr:visible .invoice-checkbox').prop('checked', true);
                 updateSelectedDocuments();
                 updatePreview();
             });
 
             $('#deselectAllInvoices').click(function() {
-                $('.invoice-checkbox').prop('checked', false);
+                $('#invoice-table tbody tr:visible .invoice-checkbox').prop('checked', false);
                 updateSelectedDocuments();
                 updatePreview();
             });
 
             $('#selectAllAdditionalDocs').click(function() {
-                $('.additional-doc-checkbox').prop('checked', true);
+                $('#additional-doc-table tbody tr:visible .additional-doc-checkbox').prop('checked', true);
                 updateSelectedDocuments();
                 updatePreview();
             });
 
             $('#deselectAllAdditionalDocs').click(function() {
-                $('.additional-doc-checkbox').prop('checked', false);
+                $('#additional-doc-table tbody tr:visible .additional-doc-checkbox').prop('checked', false);
                 updateSelectedDocuments();
                 updatePreview();
             });

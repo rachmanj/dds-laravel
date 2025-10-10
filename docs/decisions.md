@@ -1,3 +1,76 @@
+## 2025-10-10 — Distribution Create: Select All with Filtered Results
+
+-   **Context**: When users filter documents by type (DO, ITO) in the distribution create page and click "Select All", the system was selecting all documents in the DOM instead of only the visible filtered documents. This created a data integrity risk where users could accidentally distribute documents they didn't intend to select.
+
+-   **Decision**: Use jQuery's `:visible` pseudo-selector combined with table-scoped selectors to ensure "Select All" and "Deselect All" buttons only operate on currently visible (filtered) table rows.
+
+-   **Alternatives Considered**:
+
+    1. **Track filtered document IDs in JavaScript array** - Rejected because it requires maintaining additional state and synchronizing it with filter changes, adding unnecessary complexity.
+
+    2. **Rebuild checkbox list on every filter change** - Rejected because it would require significant refactoring and could cause performance issues with large document sets.
+
+    3. **Disable "Select All" when filters are active** - Rejected because it reduces user convenience and doesn't solve the actual problem.
+
+    4. **Use data attributes to mark filtered documents** - Rejected because it's more complex than the `:visible` selector and requires additional JavaScript logic.
+
+-   **Implementation**:
+
+    ```javascript
+    // Before (BUGGY - selects all checkboxes regardless of visibility)
+    $("#selectAllAdditionalDocs").click(function () {
+        $(".additional-doc-checkbox").prop("checked", true);
+        updateSelectedDocuments();
+        updatePreview();
+    });
+
+    // After (CORRECT - only selects visible checkboxes)
+    $("#selectAllAdditionalDocs").click(function () {
+        $(
+            "#additional-doc-table tbody tr:visible .additional-doc-checkbox"
+        ).prop("checked", true);
+        updateSelectedDocuments();
+        updatePreview();
+    });
+    ```
+
+    **Key Components:**
+
+    -   `#additional-doc-table tbody` - Scopes to specific table body
+    -   `tr:visible` - Only selects table rows currently visible (not hidden by filters)
+    -   `.additional-doc-checkbox` - Finds checkboxes within those visible rows
+
+-   **Benefits**:
+
+    -   ✅ Simple and elegant solution using native jQuery selectors
+    -   ✅ No additional state management required
+    -   ✅ Works automatically with existing filter logic (which uses CSS `display: none`)
+    -   ✅ Performance efficient - jQuery optimizes `:visible` selector
+    -   ✅ Consistent with how filters already work (hiding rows vs removing from DOM)
+    -   ✅ Prevents accidental selection of wrong documents
+    -   ✅ Improves data integrity in distribution workflow
+
+-   **Files Modified**:
+
+    -   `resources/views/distributions/create.blade.php` - Updated all four handlers (Select All/Deselect All for invoices and additional documents)
+
+-   **Testing**:
+
+    -   Filter by DO (36 docs) → Select All → ✅ Selects exactly 36
+    -   Filter by ITO (215 docs) → Select All → ✅ Selects exactly 215
+    -   No filter (251 docs) → Select All → ✅ Selects all 251
+    -   Deselect All → ✅ Only deselects visible filtered rows
+
+-   **Implications**:
+
+    -   This pattern should be used consistently for any future "Select All" implementations that work with filtered data
+    -   The filter logic must continue using CSS `display: none` rather than removing elements from DOM
+    -   If filter implementation changes (e.g., to use DOM removal), this selector logic must be updated accordingly
+
+-   **Review Date**: 2026-01-10 (3 months) - Verify if filter implementation has changed
+
+---
+
 ## 2025-10-09 — Distribution Sequence Generation: Database Locking and Soft-Delete Handling
 
 -   **Context**: Distribution creation was failing with duplicate key constraint violations during concurrent operations. Two critical issues were discovered: (1) Race conditions in sequence number generation allowing multiple requests to generate the same sequence, and (2) Soft-deleted distributions blocking sequence number reuse due to unique constraint not considering the `deleted_at` column.
