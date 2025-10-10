@@ -1,3 +1,133 @@
+## 2025-10-09 — Distribution Sequence Generation: Database Locking and Soft-Delete Handling
+
+-   **Context**: Distribution creation was failing with duplicate key constraint violations during concurrent operations. Two critical issues were discovered: (1) Race conditions in sequence number generation allowing multiple requests to generate the same sequence, and (2) Soft-deleted distributions blocking sequence number reuse due to unique constraint not considering the `deleted_at` column.
+
+-   **Decision**: Implement pessimistic locking with `lockForUpdate()` for thread-safe sequence generation and exclude soft-deleted records using `whereNull('deleted_at')` to allow sequence number reuse after deletions.
+
+-   **Alternatives Considered**:
+
+    1. **Optimistic Locking with Retry Logic** - Rejected because it would require complex retry mechanisms and could lead to poor user experience with multiple retry attempts
+
+    2. **Database-Level Partial Unique Index** - Rejected because MySQL 5.7 doesn't support functional indexes well, and would require database schema changes across all environments
+
+    3. **Composite Unique Key Including deleted_at** - Rejected because it would complicate queries unnecessarily and add `NULL` handling complexity
+
+    4. **Application-Level Sequence Table** - Rejected because it adds complexity and doesn't leverage existing database features
+
+    5. **Use MAX(sequence) + 1 Only** - Rejected because it doesn't allow filling gaps and would permanently waste sequence numbers
+
+-   **Implementation**:
+
+    -   **Model Layer (Sequence Generation)**:
+
+        ```php
+        // Distribution::getNextSequence() method
+        public static function getNextSequence(int $year, int $departmentId): int
+        {
+            // Use lockForUpdate to prevent race conditions
+            // Also exclude soft-deleted records to allow sequence reuse
+            $existingSequences = static::where('year', $year)
+                ->where('origin_department_id', $departmentId)
+                ->whereNull('deleted_at')      // Critical: Exclude soft-deleted
+                ->lockForUpdate()               // Critical: Prevent race conditions
+                ->pluck('sequence')
+                ->sort()
+                ->values();
+
+            if ($existingSequences->isEmpty()) {
+                return 1; // First sequence
+            }
+
+            // Find the first gap in the sequence, or use the next number after the highest
+            $expectedSequence = 1;
+            foreach ($existingSequences as $existingSequence) {
+                if ($existingSequence !== $expectedSequence) {
+                    return $expectedSequence;  // Found a gap
+                }
+                $expectedSequence++;
+            }
+
+            return $existingSequences->max() + 1;  // No gaps, use next
+        }
+        ```
+
+    -   **Key Technical Decisions**:
+
+        1. **Pessimistic Locking (`lockForUpdate()`)**: Chosen for critical operations where data integrity is paramount. Locks the rows being read until transaction commits, preventing concurrent modifications.
+
+        2. **Soft-Delete Awareness**: Added `whereNull('deleted_at')` to ensure soft-deleted records don't interfere with sequence calculation, allowing sequence number reuse.
+
+        3. **Gap-Filling Logic**: Maintains existing gap-filling behavior to reuse available sequence numbers efficiently.
+
+        4. **Transaction Scope**: Called within existing transaction in `DistributionController::store()`, ensuring proper rollback on failure.
+
+-   **Technical Details**:
+
+    **Files Modified:**
+
+    -   `app/Models/Distribution.php` - Added `lockForUpdate()` and `whereNull('deleted_at')` to `getNextSequence()` method (lines 167-196)
+    -   `database/migrations/2025_10_09_112248_update_distributions_unique_constraint_for_soft_deletes.php` - Documentation migration
+
+    **Database Constraint:**
+
+    ```sql
+    -- Existing unique constraint (unchanged)
+    UNIQUE KEY `distributions_year_dept_seq_unique` (year, origin_department_id, sequence)
+    ```
+
+    **Locking Behavior:**
+
+    -   `lockForUpdate()` acquires a `FOR UPDATE` lock on selected rows
+    -   Other transactions attempting to read the same rows will wait
+    -   Lock is released when transaction commits or rolls back
+    -   Short transaction duration minimizes contention
+
+    **Soft-Delete Handling:**
+
+    -   Laravel's soft deletes set `deleted_at` timestamp instead of removing records
+    -   Unique constraint doesn't consider `deleted_at`, so deleted records block reuse
+    -   `whereNull('deleted_at')` excludes them from sequence calculation
+    -   Allows deleted sequence numbers to be reused by new distributions
+
+-   **Production Database Cleanup**:
+
+    During deployment, discovered soft-deleted distributions blocking sequences:
+
+    -   Distribution #3: Legitimate WIP by Dias Kristian Arima (preserved)
+    -   Distribution #4: Soft-deleted but blocking sequence #2 (force deleted)
+
+    **Cleanup Command:**
+
+    ```php
+    App\Models\Distribution::onlyTrashed()->forceDelete();
+    ```
+
+-   **Testing Performed**:
+
+    -   ✅ Sequential distribution creation (no concurrent requests)
+    -   ✅ Soft-delete distribution and verify sequence reuse
+    -   ✅ Production data testing with user 'tomi'
+    -   ✅ Verified no duplicate key errors after fixes
+
+-   **Impact Assessment**:
+
+    **Before:**
+
+    -   ❌ Race conditions causing duplicate sequence attempts
+    -   ❌ Soft-deleted distributions permanently blocking sequences
+    -   ❌ Manual database cleanup required after each failure
+
+    **After:**
+
+    -   ✅ Thread-safe sequence generation with database locking
+    -   ✅ Soft-deleted distributions don't interfere with sequences
+    -   ✅ Sequence numbers can be reused after deletion
+    -   ✅ Robust, production-ready distribution workflow
+
+-   **Review Date**: 2026-01-09 (3 months) - Review performance impact and consider if optimistic locking would be beneficial for high-concurrency scenarios.
+
+---
+
 ## 2025-10-09 — Document Location Change Validation System
 
 -   **Context**: Documents were entering the distribution workflow, but users with sufficient permissions (superadmin/admin/accounting) could manually change the `cur_loc` (current location) field via the edit page, bypassing the distribution process. This created data integrity issues where the distribution system showed one location while the document record showed another, breaking audit trails and location history accuracy.

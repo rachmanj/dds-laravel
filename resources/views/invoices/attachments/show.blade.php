@@ -191,7 +191,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="attachments-table" class="table table-bordered table-striped">
+                        <table id="attachments-table" class="table table-bordered">
                             <thead>
                                 <tr>
                                     <th width="5%">#</th>
@@ -323,10 +323,6 @@
 @endsection
 
 @section('styles')
-    <!-- DataTables -->
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-    <link rel="stylesheet"
-        href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
     <!-- Toastr -->
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/toastr/toastr.min.css') }}">
     <!-- Dropzone -->
@@ -423,11 +419,6 @@
 @endsection
 
 @section('scripts')
-    <!-- DataTables -->
-    <script src="{{ asset('adminlte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('adminlte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-    <script src="{{ asset('adminlte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-    <script src="{{ asset('adminlte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
     <!-- SweetAlert2 -->
     <script src="{{ asset('adminlte/plugins/sweetalert2/sweetalert2.min.js') }}"></script>
     <!-- Toastr -->
@@ -436,6 +427,13 @@
     <script src="{{ asset('js/dropzone/dropzone-min.js') }}"></script>
 
     <script>
+        // Completely disable DataTables auto-initialization
+        if (typeof $.fn.dataTable !== 'undefined') {
+            $.fn.dataTable = function() {
+                return this;
+            };
+        }
+
         $(document).ready(function() {
             // Test if toastr is loaded
             if (typeof toastr !== 'undefined') {
@@ -444,30 +442,11 @@
                 console.error('Toastr is NOT loaded');
             }
 
-            // Initialize DataTable only if there are attachments
-            var attachmentsTable = null;
-            if ($('#attachments-table tbody tr').length > 0) {
-                attachmentsTable = $('#attachments-table').DataTable({
-                    "pageLength": 25,
-                    "order": [
-                        [6, "desc"]
-                    ], // Sort by upload date descending (column 6 is Upload Date)
-                    "language": {
-                        "search": "Search attachments:",
-                        "lengthMenu": "Show _MENU_ attachments per page",
-                        "info": "Showing _START_ to _END_ of _TOTAL_ attachments",
-                        "emptyTable": "No attachments found"
-                    },
-                    "columnDefs": [{
-                            "orderable": false,
-                            "targets": [7]
-                        } // Disable sorting on Actions column
-                    ]
-                });
-            }
+            console.log('Page ready - attachments: {{ $invoice->attachments->count() }}');
 
             // Initialize Dropzone
             Dropzone.autoDiscover = false;
+            console.log('Initializing Dropzone...');
 
             var myDropzone = new Dropzone("#invoice-dropzone", {
                 url: "{{ route('invoices.attachments.store', $invoice) }}",
@@ -531,8 +510,12 @@
 
                         uploadAllFiles(fileQueue, dropzone);
                     });
+
+                    console.log('Dropzone initialized successfully!');
                 }
             });
+
+            console.log('Dropzone instance created:', myDropzone);
 
             // Create file preview card
             function createFilePreviewCard(file) {
@@ -693,8 +676,11 @@
                 });
             }
 
-            // Add new row to DataTable
+            // Add new row to table
             function addRowToDataTable(attachment) {
+                // Remove "no attachments" row if it exists
+                $('#attachments-table tbody tr td[colspan]').parent().remove();
+
                 // Extract file extension from file_name
                 var fileExtension = attachment.file_name ? attachment.file_name.split('.').pop().toUpperCase() :
                     'FILE';
@@ -707,28 +693,30 @@
                     '<span class="badge badge-primary">' + attachment.category + '</span>' :
                     '<span class="badge badge-secondary">No Category</span>';
 
-                var rowData = [
-                    attachmentsTable.rows().count() + 1,
-                    '<i class="fas fa-file-pdf mr-2"></i>' + attachment.file_name + (attachment.description ?
-                        '<br><small class="text-muted">' +
-                        attachment.description + '</small>' : ''),
-                    '<span class="badge badge-info">' + fileExtension + '</span>',
-                    formattedSize,
-                    categoryBadge,
-                    'Prana Dian', // Default uploader name
-                    new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', {
+                var rowNumber = $('#attachments-table tbody tr').length + 1;
+
+                var rowHtml = '<tr>' +
+                    '<td>' + rowNumber + '</td>' +
+                    '<td><i class="fas fa-file-pdf mr-2"></i>' + attachment.file_name +
+                    (attachment.description ? '<br><small class="text-muted">' + attachment.description +
+                        '</small>' : '') + '</td>' +
+                    '<td><span class="badge badge-info">' + fileExtension + '</span></td>' +
+                    '<td>' + formattedSize + '</td>' +
+                    '<td>' + categoryBadge + '</td>' +
+                    '<td>' + (attachment.uploader_name || 'Prana Dian') + '</td>' +
+                    '<td>' + new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', {
                         hour: '2-digit',
                         minute: '2-digit'
-                    }),
-                    createActionButtons(attachment)
-                ];
+                    }) + '</td>' +
+                    '<td>' + createActionButtons(attachment) + '</td>' +
+                    '</tr>';
 
-                attachmentsTable.row.add(rowData).draw();
+                $('#attachments-table tbody').append(rowHtml);
 
                 // Update attachment count in header
-                var currentCount = parseInt($('.card-title').text().match(/\((\d+) files\)/)[1]);
-                $('.card-title').text($('.card-title').text().replace(/\(\d+ files\)/, '(' + (currentCount + 1) +
-                    ' files)'));
+                var currentCount = $('#attachments-table tbody tr').length;
+                $('.card-title').first().html('<i class="fas fa-paperclip mr-2"></i>Attachments (' + currentCount +
+                    ' files)');
             }
 
             // Create action buttons HTML
@@ -775,11 +763,18 @@
                 $('.category-filter').removeClass('active');
                 $(this).addClass('active');
 
-                // Filter DataTable
+                // Filter table rows
                 if (category === 'all') {
-                    attachmentsTable.column(4).search('').draw();
+                    $('#attachments-table tbody tr').show();
                 } else {
-                    attachmentsTable.column(4).search('^' + category + '$', true, false).draw();
+                    $('#attachments-table tbody tr').each(function() {
+                        var rowCategory = $(this).find('td:eq(4)').text().trim();
+                        if (rowCategory === category) {
+                            $(this).show();
+                        } else {
+                            $(this).hide();
+                        }
+                    });
                 }
             });
 
@@ -846,16 +841,16 @@
                                     console.error('Toastr not loaded');
                                     alert('Attachment deleted successfully!');
                                 }
-                                // Remove row from DataTable
+                                // Remove row from table
                                 var row = $(this).closest('tr');
-                                attachmentsTable.row(row).remove().draw();
+                                row.remove();
 
                                 // Update attachment count in header
-                                var currentCount = parseInt($('.card-title').text()
-                                    .match(/\((\d+) files\)/)[1]);
-                                $('.card-title').text($('.card-title').text().replace(
-                                    /\(\d+ files\)/, '(' + (currentCount - 1) +
-                                    ' files)'));
+                                var currentCount = $('#attachments-table tbody tr')
+                                    .length;
+                                $('.card-title').first().html(
+                                    '<i class="fas fa-paperclip mr-2"></i>Attachments (' +
+                                    currentCount + ' files)');
                             }.bind(this),
                             error: function(xhr) {
                                 console.log('Delete error:', xhr);
