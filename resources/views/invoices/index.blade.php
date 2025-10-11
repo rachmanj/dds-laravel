@@ -34,7 +34,7 @@
                                                 <i class="fas fa-search"></i> Advanced Search
                                             </h3>
                                             <div class="card-tools">
-                                                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                                <button type="button" class="btn btn-tool">
                                                     <i class="fas fa-plus"></i>
                                                 </button>
                                             </div>
@@ -155,8 +155,6 @@
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -165,7 +163,6 @@
             </div>
         </div>
     </section>
-    </div>
 @endsection
 
 @section('styles')
@@ -183,15 +180,6 @@
 
 
     <style>
-        /* Start search card in collapsed state */
-        .search-card .card-body {
-            display: none;
-        }
-
-        .search-card.collapsed .card-body {
-            display: block;
-        }
-
         /* Days column badge styling */
         .badge.badge-success {
             background-color: #28a745;
@@ -412,6 +400,9 @@
 
     <script>
         $(document).ready(function() {
+            // Initialize search card in collapsed state (must be first)
+            $('.search-card .card-body').hide();
+
             // Initialize Toastr
             if (typeof toastr !== 'undefined') {
                 toastr.options = {
@@ -474,7 +465,11 @@
                     data: function(d) {
                         d.show_all = $('#show_all_records').length > 0 && $('#show_all_records').is(
                             ':checked') ? 1 : 0;
+                        d.search_invoice_number = $('#search_invoice_number').val();
                         d.search_supplier = $('#search_supplier').val();
+                        d.search_po_no = $('#search_po_no').val();
+                        d.search_type = $('#search_type').val();
+                        d.search_status = $('#search_status').val();
                         d.search_invoice_project = $('#search_invoice_project').val();
                     }
                 },
@@ -575,44 +570,7 @@
                 if ($('#show_all_records').length > 0) {
                     $('#show_all_records').bootstrapSwitch('state', false);
                 }
-                table.search('').columns().search('').draw();
-            });
-
-            // Custom search functionality
-            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-                var invoiceNumber = $('#search_invoice_number').val().toLowerCase();
-                var supplier = $('#search_supplier').val().toLowerCase();
-                var poNo = $('#search_po_no').val().toLowerCase();
-                var type = $('#search_type').val();
-                var status = $('#search_status').val();
-                var invoiceProject = $('#search_invoice_project').val();
-
-                // Invoice number filter (now at index 1 due to index column)
-                if (invoiceNumber && data[1].toLowerCase().indexOf(invoiceNumber) === -1) {
-                    return false;
-                }
-
-                // Supplier filter (now at index 2 due to index column)
-                if (supplier && data[2].toLowerCase().indexOf(supplier) === -1) {
-                    return false;
-                }
-
-                // PO Number filter (now at index 6 due to index column)
-                if (poNo && data[6].toLowerCase().indexOf(poNo) === -1) {
-                    return false;
-                }
-
-                // Type filter (now at index 3 due to index column)
-                if (type && data[3] !== type) {
-                    return false;
-                }
-
-                // Status filter (now at index 8 due to index column)
-                if (status && data[8].indexOf(status) === -1) {
-                    return false;
-                }
-
-                return true;
+                table.search('').ajax.reload();
             });
 
             // Toggle show all records
@@ -629,10 +587,10 @@
                 var icon = $(this).find('i');
 
                 if (cardBody.is(':visible')) {
-                    cardBody.slideUp();
+                    cardBody.hide();
                     icon.removeClass('fa-minus').addClass('fa-plus');
                 } else {
-                    cardBody.slideDown();
+                    cardBody.show();
                     icon.removeClass('fa-plus').addClass('fa-minus');
                 }
             });

@@ -9,14 +9,245 @@
     <li class="breadcrumb-item active">Additional Documents</li>
 @endsection
 
+@section('content')
+    <section class="content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <!-- Search and Filter Card -->
+                    <div class="card search-card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-search"></i> Search & Filter
+                            </h3>
+                            <div class="card-tools">
+                                <button type="button" class="btn btn-tool">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <form id="search-form">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="search_number">Document Number</label>
+                                            <input type="text" class="form-control" id="search_number"
+                                                name="search_number" placeholder="Search by document number">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="search_po_no">PO Number</label>
+                                            <input type="text" class="form-control" id="search_po_no" name="search_po_no"
+                                                placeholder="Search by PO number">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="search_vendor_code">Vendor Code</label>
+                                            <input type="text" class="form-control" id="search_vendor_code"
+                                                name="search_vendor_code" placeholder="Search by vendor code">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="search_content">Content Search</label>
+                                            <input type="text" class="form-control" id="search_content"
+                                                name="search_content" placeholder="Search in remarks and attachments">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="filter_type">Document Type</label>
+                                            <select class="form-control" id="filter_type" name="filter_type">
+                                                <option value="">All Types</option>
+                                                @foreach ($documentTypes as $type)
+                                                    <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="filter_status">Status</label>
+                                            <select class="form-control" id="filter_status" name="filter_status">
+                                                <option value="">All Statuses</option>
+                                                <option value="open">Open</option>
+                                                <option value="closed">Closed</option>
+                                                <option value="cancelled">Cancelled</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="filter_vendor_code">Vendor Code</label>
+                                            <select class="form-control" id="filter_vendor_code" name="filter_vendor_code">
+                                                <option value="">All Vendor Codes</option>
+                                                @foreach ($vendorCodes ?? [] as $vendorCode)
+                                                    <option value="{{ $vendorCode }}">{{ $vendorCode }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="filter_location">Location</label>
+                                            <select class="form-control" id="filter_location" name="filter_location">
+                                                <option value="">All Locations</option>
+                                                @foreach ($departments ?? [] as $dept)
+                                                    <option value="{{ $dept->location_code }}">{{ $dept->location_code }} -
+                                                        {{ $dept->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="date_range">Date Range</label>
+                                            <input type="text" class="form-control" id="date_range" name="date_range"
+                                                placeholder="Select date range">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="date_type">Date Type</label>
+                                            <select class="form-control" id="date_type" name="date_type">
+                                                <option value="created_at">Created Date</option>
+                                                <option value="document_date">Document Date</option>
+                                                <option value="receive_date">Receive Date</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="search_preset">Search Presets</label>
+                                            <div class="input-group">
+                                                <select class="form-control" id="search_preset" name="search_preset">
+                                                    <option value="">Select Preset</option>
+                                                    <option value="recent">Recent Documents (Last 30 days)</option>
+                                                    <option value="open">Open Documents</option>
+                                                    <option value="my_department">My Department Only</option>
+                                                    <option value="this_month">This Month</option>
+                                                    <option value="last_month">Last Month</option>
+                                                </select>
+                                                <div class="input-group-append">
+                                                    <button type="button" class="btn btn-outline-success"
+                                                        id="save-preset" title="Save Current Search">
+                                                        <i class="fas fa-save"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @can('see-all-record-switch')
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="show_all_records">
+                                                    <input type="checkbox" id="show_all_records" data-bootstrap-switch>
+                                                    Show All Records
+                                                </label>
+                                                <small class="form-text text-muted">
+                                                    Toggle to view all documents across all locations
+                                                </small>
+                                            </div>
+                                        </div>
+                                    @endcan
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="form-group">
+                                            <div class="d-flex justify-content-between">
+                                                <div>
+                                                    <button type="submit" class="btn btn-primary mr-2">
+                                                        <i class="fas fa-search"></i> Search
+                                                    </button>
+                                                    <button type="button" class="btn btn-secondary mr-2"
+                                                        id="reset-search">
+                                                        <i class="fas fa-undo"></i> Reset
+                                                    </button>
+                                                    <button type="button" class="btn btn-info mr-2" id="export-results">
+                                                        <i class="fas fa-download"></i> Export Results
+                                                    </button>
+                                                </div>
+                                                <div>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-info-circle"></i>
+                                                        Use multiple criteria for advanced filtering. Search presets help
+                                                        save time.
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Main Content Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-file-alt"></i> Additional Documents
+                            </h3>
+                            <div class="card-tools">
+                                <a href="{{ route('additional-documents.create') }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus"></i> Add New Document
+                                </a>
+                                @can('import-additional-documents')
+                                    <a href="{{ route('additional-documents.import') }}" class="btn btn-success btn-sm">
+                                        <i class="fas fa-upload"></i> Import Documents
+                                    </a>
+                                @endcan
+                                {{-- <a href="{{ route('additional-documents.download-template') }}" class="btn btn-info btn-sm">
+                            <i class="fas fa-download"></i> Download Template
+                        </a> --}}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive" style="max-height: 600px;">
+                                <table id="documents-table"
+                                    class="table table-bordered table-striped table-fixed-header compact-table">
+                                    <thead class="thead-dark">
+                                        <tr>
+                                            <th>No</th>
+                                            <th>Document Number</th>
+                                            <th>PO No.</th>
+                                            <th>Vendor Code</th>
+                                            <th>Type</th>
+                                            <th>Document Date</th>
+                                            <th>Receive Date</th>
+                                            <th>Current Location</th>
+                                            <th>Status</th>
+                                            <th>Days</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+@endsection
+
 @section('styles')
     <!-- DataTables -->
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+    <link rel="stylesheet"
+        href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
     <!-- Toastr -->
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/toastr/toastr.min.css') }}">
     <!-- Bootstrap Switch -->
-    <link rel="stylesheet" href="{{ asset('adminlte/plugins/bootstrap-switch/css/bootstrap3/bootstrap-switch.min.css') }}">
+    <link rel="stylesheet"
+        href="{{ asset('adminlte/plugins/bootstrap-switch/css/bootstrap3/bootstrap-switch.min.css') }}">
 
     <style>
         .btn-group .btn {
@@ -251,229 +482,6 @@
     </style>
 @endsection
 
-@section('content')
-    <section class="content">
-        <div class="container-fluid">
-            <!-- Search and Filter Card -->
-            <div class="card search-card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-search"></i> Search & Filter
-                    </h3>
-                    <div class="card-tools">
-                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="card-body" style="display: none;">
-                    <form id="search-form">
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="search_number">Document Number</label>
-                                    <input type="text" class="form-control" id="search_number" name="search_number"
-                                        placeholder="Search by document number">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="search_po_no">PO Number</label>
-                                    <input type="text" class="form-control" id="search_po_no" name="search_po_no"
-                                        placeholder="Search by PO number">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="search_vendor_code">Vendor Code</label>
-                                    <input type="text" class="form-control" id="search_vendor_code"
-                                        name="search_vendor_code" placeholder="Search by vendor code">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="search_content">Content Search</label>
-                                    <input type="text" class="form-control" id="search_content" name="search_content"
-                                        placeholder="Search in remarks and attachments">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="filter_type">Document Type</label>
-                                    <select class="form-control" id="filter_type" name="filter_type">
-                                        <option value="">All Types</option>
-                                        @foreach ($documentTypes as $type)
-                                            <option value="{{ $type->id }}">{{ $type->type_name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="filter_status">Status</label>
-                                    <select class="form-control" id="filter_status" name="filter_status">
-                                        <option value="">All Statuses</option>
-                                        <option value="open">Open</option>
-                                        <option value="closed">Closed</option>
-                                        <option value="cancelled">Cancelled</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="filter_vendor_code">Vendor Code</label>
-                                    <select class="form-control" id="filter_vendor_code" name="filter_vendor_code">
-                                        <option value="">All Vendor Codes</option>
-                                        @foreach ($vendorCodes ?? [] as $vendorCode)
-                                            <option value="{{ $vendorCode }}">{{ $vendorCode }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="filter_location">Location</label>
-                                    <select class="form-control" id="filter_location" name="filter_location">
-                                        <option value="">All Locations</option>
-                                        @foreach ($departments ?? [] as $dept)
-                                            <option value="{{ $dept->location_code }}">{{ $dept->location_code }} -
-                                                {{ $dept->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="date_range">Date Range</label>
-                                    <input type="text" class="form-control" id="date_range" name="date_range"
-                                        placeholder="Select date range">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="date_type">Date Type</label>
-                                    <select class="form-control" id="date_type" name="date_type">
-                                        <option value="created_at">Created Date</option>
-                                        <option value="document_date">Document Date</option>
-                                        <option value="receive_date">Receive Date</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="search_preset">Search Presets</label>
-                                    <div class="input-group">
-                                        <select class="form-control" id="search_preset" name="search_preset">
-                                            <option value="">Select Preset</option>
-                                            <option value="recent">Recent Documents (Last 30 days)</option>
-                                            <option value="open">Open Documents</option>
-                                            <option value="my_department">My Department Only</option>
-                                            <option value="this_month">This Month</option>
-                                            <option value="last_month">Last Month</option>
-                                        </select>
-                                        <div class="input-group-append">
-                                            <button type="button" class="btn btn-outline-success" id="save-preset"
-                                                title="Save Current Search">
-                                                <i class="fas fa-save"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            @can('see-all-record-switch')
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="show_all_records">
-                                            <input type="checkbox" id="show_all_records" data-bootstrap-switch>
-                                            Show All Records
-                                        </label>
-                                        <small class="form-text text-muted">
-                                            Toggle to view all documents across all locations
-                                        </small>
-                                    </div>
-                                </div>
-                            @endcan
-                        </div>
-                        <div class="row">
-                            <div class="col-md-12">
-                                <div class="form-group">
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            <button type="submit" class="btn btn-primary mr-2">
-                                                <i class="fas fa-search"></i> Search
-                                            </button>
-                                            <button type="button" class="btn btn-secondary mr-2" id="reset-search">
-                                                <i class="fas fa-undo"></i> Reset
-                                            </button>
-                                            <button type="button" class="btn btn-info mr-2" id="export-results">
-                                                <i class="fas fa-download"></i> Export Results
-                                            </button>
-                                        </div>
-                                        <div>
-                                            <small class="text-muted">
-                                                <i class="fas fa-info-circle"></i>
-                                                Use multiple criteria for advanced filtering. Search presets help save time.
-                                            </small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Main Content Card -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-file-alt"></i> Additional Documents
-                    </h3>
-                    <div class="card-tools">
-                        <a href="{{ route('additional-documents.create') }}" class="btn btn-primary btn-sm">
-                            <i class="fas fa-plus"></i> Add New Document
-                        </a>
-                        @can('import-additional-documents')
-                            <a href="{{ route('additional-documents.import') }}" class="btn btn-success btn-sm">
-                                <i class="fas fa-upload"></i> Import Documents
-                            </a>
-                        @endcan
-                        {{-- <a href="{{ route('additional-documents.download-template') }}" class="btn btn-info btn-sm">
-                            <i class="fas fa-download"></i> Download Template
-                        </a> --}}
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive" style="max-height: 600px;">
-                        <table id="documents-table"
-                            class="table table-bordered table-striped table-fixed-header compact-table">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>No</th>
-                                    <th>Document Number</th>
-                                    <th>PO No.</th>
-                                    <th>Vendor Code</th>
-                                    <th>Type</th>
-                                    <th>Document Date</th>
-                                    <th>Receive Date</th>
-                                    <th>Current Location</th>
-                                    <th>Status</th>
-                                    <th>Days</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-@endsection
-
 @section('scripts')
     <!-- DataTables -->
     <script src="{{ asset('adminlte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
@@ -493,6 +501,9 @@
 
     <script>
         $(document).ready(function() {
+            // Initialize search card in collapsed state (must be first)
+            $('.search-card .card-body').hide();
+
             // Initialize Bootstrap Switch
             $("input[data-bootstrap-switch]").each(function() {
                 $(this).bootstrapSwitch();
@@ -518,6 +529,8 @@
                     data: function(d) {
                         d.search_number = $('#search_number').val();
                         d.search_po_no = $('#search_po_no').val();
+                        d.search_vendor_code = $('#search_vendor_code').val();
+                        d.search_content = $('#search_content').val();
                         d.filter_type = $('#filter_type').val();
                         d.filter_status = $('#filter_status').val();
                         d.filter_vendor_code = $('#filter_vendor_code').val();
@@ -666,10 +679,10 @@
                 var icon = $(this).find('i');
 
                 if (cardBody.is(':visible')) {
-                    cardBody.slideUp();
+                    cardBody.hide();
                     icon.removeClass('fa-minus').addClass('fa-plus');
                 } else {
-                    cardBody.slideDown();
+                    cardBody.show();
                     icon.removeClass('fa-plus').addClass('fa-minus');
                 }
             });
