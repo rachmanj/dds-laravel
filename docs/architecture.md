@@ -6,6 +6,165 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Separate Print Template Architecture** ✅ **IMPLEMENTED** (2025-10-11)
+
+**Pattern**: Document type-specific print templates for optimized transmittal advice generation
+
+**Business Context**: Invoice distributions and additional document distributions have fundamentally different data needs. Invoices require financial information (amounts, suppliers), while additional documents need tracking information (receive dates, locations, related invoices).
+
+**Architecture**:
+
+```
+Distribution Print System
+├── Controller Routing (DistributionController::print)
+│   ├── Loads relationships based on document type
+│   │   ├── Invoices: Load supplier, additionalDocuments.type
+│   │   └── Additional Documents: Load invoices (belongsToMany)
+│   └── Routes to appropriate view
+│       ├── document_type === 'invoice' → print-invoice.blade.php
+│       └── document_type === 'additional_document' → print-additional-document.blade.php
+│
+├── Invoice Print Template (print-invoice.blade.php)
+│   ├── Title: "Invoice Transmittal Advice"
+│   ├── Columns: NO | INVOICE TYPE | SUPPLIER | INVOICE NO. | INVOICE DATE | AMOUNT | PO NO | PROJECT
+│   └── Features:
+│       ├── Shows invoice amounts (critical financial data)
+│       ├── Displays supplier names from relationship
+│       └── Attached documents in compact single-line format
+│
+└── Additional Document Print Template (print-additional-document.blade.php)
+    ├── Title: "Document Transmittal Advice"
+    ├── Columns: NO. (right) | DOC NO. | DOC DATE | DOC TYPE | PO NO | INV NO | PROJECT
+    └── Features:
+        ├── Removed AMOUNT column (always N/A)
+        ├── Added INV NO column (shows related invoices)
+        ├── Simplified 7-column layout
+        └── Right-aligned NO. column for better readability
+```
+
+**Implementation Details**:
+
+```php
+// Controller: app/Http/Controllers/DistributionController.php
+public function print(Distribution $distribution): View
+{
+    // Load relationships based on document type
+    foreach ($distribution->documents as $distributionDocument) {
+        if ($distributionDocument->document_type === Invoice::class) {
+            $invoice = $distributionDocument->document;
+            if ($invoice) {
+                $invoice->load(['additionalDocuments.type', 'supplier']);
+            }
+        } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+            $additionalDoc = $distributionDocument->document;
+            if ($additionalDoc) {
+                $additionalDoc->load('invoices');
+            }
+        }
+    }
+
+    // Route to appropriate view
+    if ($distribution->document_type === 'invoice') {
+        return view('distributions.print-invoice', compact('distribution'));
+    } else {
+        return view('distributions.print-additional-document', compact('distribution'));
+    }
+}
+```
+
+**Key Benefits**:
+
+-   ✅ **Optimized Columns**: Each template shows only relevant fields
+-   ✅ **No Wasted Space**: Removed irrelevant columns (e.g., AMOUNT for additional documents)
+-   ✅ **Better Clarity**: Distinct titles and layouts for each document type
+-   ✅ **Future Flexibility**: Templates can evolve independently
+-   ✅ **Professional Output**: Tailored to specific business needs
+
+**Files**:
+
+-   `resources/views/distributions/print-invoice.blade.php`
+-   `resources/views/distributions/print-additional-document.blade.php`
+-   `app/Http/Controllers/DistributionController.php`
+
+---
+
+### **Table Column Organization Pattern** ✅ **IMPLEMENTED** (2025-10-11)
+
+**Pattern**: Strategic column organization with dedicated columns for related entity data
+
+**Business Context**: Users need to quickly identify relationships between documents (e.g., which invoices are linked to additional documents, which supplier an invoice belongs to) without clicking through multiple pages.
+
+**Implementation Examples**:
+
+**1. Distribution View - Supplier as Dedicated Column**:
+
+```
+Before: Document column contained everything (number, type, supplier, date)
+After:  Separate columns for better scannability
+
+| Document | Supplier | Type | Sender Status | Receiver Status | Overall Status |
+|----------|----------|------|---------------|-----------------|----------------|
+| Invoice# | Supplier | Type | Status        | Status          | Status         |
+| Type     | Name     |      |               |                 |                |
+| Date     |          |      |               |                 |                |
+```
+
+**2. Additional Documents Index - Invoice Number Column**:
+
+```
+Column Order: No | Doc No | DocDate | Type | PO No | VendorCode | Inv No | RecDate | CurLoc | Days | Action
+
+- "Inv No" column shows belongsToMany relationship
+- Displays comma-separated invoice numbers if multiple
+- Shows "-" if no related invoices
+- Enables quick identification of invoice-document relationships
+```
+
+**3. Additional Document Print - Invoice Relationship**:
+
+```
+Simplified Columns: NO. | DOC NO. | DOC DATE | DOC TYPE | PO NO | INV NO | PROJECT
+
+- NO. right-aligned for better readability
+- INV NO shows related invoice numbers
+- Focused on essential information only
+```
+
+**Implementation Pattern**:
+
+```php
+// Backend: Eager load relationships to prevent N+1 queries
+$query = AdditionalDocument::with(['type', 'creator', 'invoices']);
+
+// DataTables: Add computed column
+->addColumn('invoice_numbers', function ($document) {
+    if ($document->invoices && $document->invoices->count() > 0) {
+        $invoiceNumbers = $document->invoices->pluck('invoice_number')->toArray();
+        return '<small class="text-muted">' . implode(', ', $invoiceNumbers) . '</small>';
+    }
+    return '<span class="text-muted">-</span>';
+})
+->rawColumns(['invoice_numbers', 'days_difference', 'actions'])
+```
+
+**Key Principles**:
+
+-   ✅ **Relationship Visibility**: Related entity data in dedicated columns
+-   ✅ **Eager Loading**: Prevent N+1 query issues
+-   ✅ **Conditional Display**: Show appropriate data based on document type
+-   ✅ **Null Safety**: Use `??` operators and null checks
+-   ✅ **Column Alignment**: Right-align numbers, center dates, left-align text
+
+**Files**:
+
+-   `app/Http/Controllers/AdditionalDocumentController.php`
+-   `app/Http/Controllers/DistributionController.php`
+-   `resources/views/distributions/show.blade.php`
+-   `resources/views/additional_documents/index.blade.php`
+-   `resources/views/distributions/print-additional-document.blade.php`
+
+---
+
 ### **Document Location Change Validation System** ✅ **COMPLETED** (2025-10-09)
 
 **Pattern**: Multi-layer validation system to prevent manual location changes for documents with distribution history

@@ -515,11 +515,12 @@
                         <table class="table table-bordered table-hover">
                             <thead class="thead-light">
                                 <tr>
-                                    <th width="25%">Document</th>
-                                    <th width="15%">Type</th>
-                                    <th width="20%">Sender Status</th>
-                                    <th width="20%">Receiver Status</th>
-                                    <th width="20%">Overall Status</th>
+                                    <th width="20%">Document</th>
+                                    <th width="15%">Supplier</th>
+                                    <th width="13%">Type</th>
+                                    <th width="17%">Sender Status</th>
+                                    <th width="17%">Receiver Status</th>
+                                    <th width="18%">Overall Status</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -580,8 +581,18 @@
                                                     <br>
                                                     <small
                                                         class="text-muted">{{ $invoice->type->type_name ?? 'N/A' }}</small>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-calendar"></i>
+                                                        {{ $invoice->invoice_date ? $invoice->invoice_date->format('d M Y') : 'N/A' }}
+                                                    </small>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ $invoice->supplier->name ?? 'N/A' }}
+                                            </small>
                                         </td>
                                         <td>
                                             <span class="badge badge-primary">Invoice</span>
@@ -655,6 +666,9 @@
                                                 </div>
                                             </td>
                                             <td>
+                                                <small class="text-muted">-</small>
+                                            </td>
+                                            <td>
                                                 <span class="badge badge-info">Additional Document</span>
                                             </td>
                                             <td>
@@ -712,6 +726,9 @@
                                                             class="text-muted">{{ $additionalDoc->type->type_name ?? 'N/A' }}</small>
                                                     </div>
                                                 </div>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">-</small>
                                             </td>
                                             <td>
                                                 <span class="badge badge-info">Additional Document</span>
@@ -779,6 +796,9 @@
                                                 </div>
                                             </td>
                                             <td>
+                                                <small class="text-muted">-</small>
+                                            </td>
+                                            <td>
                                                 <span class="badge badge-info">Additional Document</span>
                                             </td>
                                             <td>
@@ -812,7 +832,7 @@
 
                                 @if ($distribution->documents->count() === 0)
                                     <tr>
-                                        <td colspan="5" class="text-center py-4">
+                                        <td colspan="6" class="text-center py-4">
                                             <div class="text-muted">
                                                 <i class="fas fa-file-alt fa-2x mb-2"></i>
                                                 <p>No documents found in this distribution</p>

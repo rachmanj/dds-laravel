@@ -2,6 +2,77 @@
 
 ## 🎯 **Current Sprint**
 
+### **Distribution & Document UI/UX Enhancements** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED & PRODUCTION READY**  
+**Implementation Date**: 2025-10-11  
+**Requested By**: User  
+**Priority**: HIGH - UI/UX improvements for better information display
+
+**Feature**: Comprehensive enhancements to distribution and additional document views including supplier column separation, invoice number columns, column reordering, and separate optimized print templates.
+
+**Key Deliverables**:
+
+1. **Distribution View - Supplier Column Restructuring** ✅
+
+    - Added dedicated "Supplier" column in Distributed Documents table
+    - Moved supplier info from Document column to new Supplier column
+    - Better data organization and scannability
+
+2. **Additional Documents Index - Invoice Column & Reordering** ✅
+
+    - Added "Inv No" column showing related invoice numbers
+    - Reordered columns: No | Doc No | DocDate | Type | PO No | VendorCode | Inv No | RecDate | CurLoc | Days | Action
+    - Removed unused Status column
+    - Backend eager loads invoices relationship
+
+3. **Additional Document Show Page - Vendor Code Field** ✅
+
+    - Added Vendor Code to Document Information section
+    - Enhanced Remarks display with better styling
+
+4. **Distribution Print Views - Column Mismatch Fix** ✅
+
+    - Fixed column alignment in transmittal advice print tables
+    - Document type now shows in correct column
+    - Vendor/Supplier displays appropriate data
+
+5. **Separate Optimized Print Templates** ✅
+    - Created `print-invoice.blade.php` with invoice-specific columns
+    - Created `print-additional-document.blade.php` with simplified, focused columns
+    - Controller routes to appropriate template based on document type
+
+**Test Results**:
+
+-   ✅ Distribution #25/000HACC/DDS/0001: Single invoice display verified
+-   ✅ Distribution #25/000HACC/DDS/0003: 38 mixed documents display correctly
+-   ✅ Distribution #9 print: Additional documents with optimized 7-column layout
+-   ✅ Distribution #12 print: Invoices with amount column and attached documents
+-   ✅ Additional documents index: Invoice numbers display correctly
+
+**Files Created**:
+
+-   `resources/views/distributions/print-invoice.blade.php` (409 lines)
+-   `resources/views/distributions/print-additional-document.blade.php` (425 lines)
+
+**Files Modified**:
+
+-   `app/Http/Controllers/DistributionController.php`
+-   `app/Http/Controllers/AdditionalDocumentController.php`
+-   `resources/views/distributions/show.blade.php`
+-   `resources/views/distributions/partials/additional-document-table.blade.php`
+-   `resources/views/distributions/partials/invoice-table.blade.php`
+-   `resources/views/additional_documents/index.blade.php`
+-   `resources/views/additional_documents/show.blade.php`
+
+**Documentation Updated**:
+
+-   `MEMORY.md` - Added comprehensive implementation details for all enhancements
+-   `docs/todo.md` - This entry
+-   `docs/architecture.md` - To be updated with new patterns
+
+---
+
 ### **General Document Import Feature** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED & PRODUCTION READY**  

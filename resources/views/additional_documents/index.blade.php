@@ -216,16 +216,16 @@
                                     <thead class="thead-dark">
                                         <tr>
                                             <th>No</th>
-                                            <th>Document Number</th>
-                                            <th>PO No.</th>
-                                            <th>Vendor Code</th>
+                                            <th>Doc No</th>
+                                            <th>DocDate</th>
                                             <th>Type</th>
-                                            <th>Document Date</th>
-                                            <th>Receive Date</th>
-                                            <th>Current Location</th>
-                                            <th>Status</th>
+                                            <th>PO No</th>
+                                            <th>VendorCode</th>
+                                            <th>Inv No</th>
+                                            <th>RecDate</th>
+                                            <th>CurLoc</th>
                                             <th>Days</th>
-                                            <th>Actions</th>
+                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                 </table>
@@ -553,6 +553,23 @@
                         width: '120px'
                     },
                     {
+                        data: 'document_date',
+                        name: 'document_date',
+                        width: '90px',
+                        className: 'text-center',
+                        render: function(data, type, row) {
+                            if (data) {
+                                return moment(data).format('DD-MMM-YY');
+                            }
+                            return '-';
+                        }
+                    },
+                    {
+                        data: 'type.type_name',
+                        name: 'type.type_name',
+                        width: '80px'
+                    },
+                    {
                         data: 'po_no',
                         name: 'po_no',
                         width: '100px',
@@ -570,21 +587,11 @@
                         }
                     },
                     {
-                        data: 'type.type_name',
-                        name: 'type.type_name',
-                        width: '80px'
-                    },
-                    {
-                        data: 'document_date',
-                        name: 'document_date',
-                        width: '90px',
-                        className: 'text-center',
-                        render: function(data, type, row) {
-                            if (data) {
-                                return moment(data).format('DD-MMM-YYYY');
-                            }
-                            return '-';
-                        }
+                        data: 'invoice_numbers',
+                        name: 'invoice_numbers',
+                        orderable: false,
+                        searchable: false,
+                        width: '120px'
                     },
                     {
                         data: 'receive_date',
@@ -593,7 +600,7 @@
                         className: 'text-center',
                         render: function(data, type, row) {
                             if (data) {
-                                return moment(data).format('DD-MMM-YYYY');
+                                return moment(data).format('DD-MMM-YY');
                             }
                             return '-';
                         }
@@ -602,12 +609,6 @@
                         data: 'cur_loc',
                         name: 'cur_loc',
                         width: '100px',
-                        className: 'text-center'
-                    },
-                    {
-                        data: 'status',
-                        name: 'status',
-                        width: '80px',
                         className: 'text-center'
                     },
                     {
@@ -625,7 +626,7 @@
                     }
                 ],
                 order: [
-                    [10, 'desc']
+                    [9, 'desc']
                 ],
                 pageLength: 25,
                 responsive: true,

@@ -71,6 +71,10 @@
                                             <td><strong>Project:</strong></td>
                                             <td>{{ $additionalDocument->project ?? 'N/A' }}</td>
                                         </tr>
+                                        <tr>
+                                            <td><strong>Vendor Code:</strong></td>
+                                            <td>{{ $additionalDocument->vendor_code ?? 'N/A' }}</td>
+                                        </tr>
                                     </table>
                                 </div>
                                 <div class="col-md-6">
@@ -131,11 +135,11 @@
                             </div>
 
                             @if ($additionalDocument->remarks)
-                                <div class="row">
+                                <div class="row mt-3">
                                     <div class="col-md-12">
                                         <div class="form-group">
-                                            <label><strong>Remarks:</strong></label>
-                                            <div class="alert alert-light border">
+                                            <label><strong><i class="fas fa-comment"></i> Remarks:</strong></label>
+                                            <div class="alert alert-info border">
                                                 {{ $additionalDocument->remarks }}
                                             </div>
                                         </div>

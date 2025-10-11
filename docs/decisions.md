@@ -1,3 +1,170 @@
+## 2025-10-11 — Separate Print Templates for Invoice vs Additional Document Distributions
+
+-   **Context**: The distribution print system was using a single `print.blade.php` template for both invoice and additional document distributions. This resulted in wasted columns (AMOUNT always "N/A" for additional documents), missing relevant fields (RECEIVE DATE, CUR LOC), and semantic confusion (VENDOR/SUPPLIER meant different things for each type).
+
+-   **Decision**: Create two separate, optimized print templates - `print-invoice.blade.php` for invoice distributions and `print-additional-document.blade.php` for additional document distributions. The controller routes to the appropriate template based on `document_type`.
+
+-   **Alternatives Considered**:
+
+    1. **Continue with single template using @if conditions** - Rejected because it creates increasingly complex template logic, doesn't solve the wasted column issue, and makes future enhancements harder.
+
+    2. **Use JavaScript to hide/show columns dynamically** - Rejected because print styling is better handled server-side, increases complexity, and doesn't address the fundamental data structure differences.
+
+    3. **Create partial blade files only** - Rejected because invoice and additional document prints need different overall layouts, not just different table structures.
+
+    4. **Keep both tables in one template** - Rejected because it doesn't solve column optimization issues and makes maintenance harder.
+
+-   **Implementation**:
+
+    **Invoice Print Template** (`print-invoice.blade.php`):
+
+    ```php
+    // Columns: NO | INVOICE TYPE | SUPPLIER | INVOICE NO. | INVOICE DATE | AMOUNT | PO NO | PROJECT
+    <th>INVOICE TYPE</th>
+    <th>SUPPLIER</th>
+    <th>INVOICE NO.</th>
+    <th>INVOICE DATE</th>
+    <th class="text-right">AMOUNT</th>
+
+    // Shows invoice-specific data
+    <td>{{ $invoice->supplier->name ?? 'N/A' }}</td>
+    <td class="text-right">
+        {{ $invoice->currency }} {{ number_format($invoice->amount, 0) }}
+    </td>
+    ```
+
+    **Additional Document Print Template** (`print-additional-document.blade.php`):
+
+    ```php
+    // Columns: NO. | DOC NO. | DOC DATE | DOC TYPE | PO NO | INV NO | PROJECT
+    <th class="text-right">NO.</th>
+    <th>DOC NO.</th>
+    <th>INV NO</th>  // New - shows related invoices
+
+    // Shows document-specific data
+    @php
+        $invoiceNumbers = $additionalDoc->invoices->pluck('invoice_number')->implode(', ');
+    @endphp
+    <td><small>{{ $invoiceNumbers ?: '-' }}</small></td>
+    ```
+
+    **Controller Routing** (`DistributionController.php`):
+
+    ```php
+    // Load appropriate relationships
+    foreach ($distribution->documents as $distributionDocument) {
+        if ($distributionDocument->document_type === Invoice::class) {
+            $invoice->load(['additionalDocuments.type', 'supplier']);
+        } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+            $additionalDoc->load('invoices');
+        }
+    }
+
+    // Route to appropriate view
+    if ($distribution->document_type === 'invoice') {
+        return view('distributions.print-invoice', compact('distribution'));
+    } else {
+        return view('distributions.print-additional-document', compact('distribution'));
+    }
+    ```
+
+-   **Benefits**:
+
+    -   ✅ **Optimized Columns**: Invoice print keeps AMOUNT (critical financial data), additional document print removes it
+    -   ✅ **Relevant Fields**: Additional document print adds INV NO column showing invoice relationships
+    -   ✅ **Clear Separation**: Distinct titles ("Invoice Transmittal Advice" vs "Document Transmittal Advice")
+    -   ✅ **Independent Evolution**: Each template can be enhanced without affecting the other
+    -   ✅ **Professional Output**: Each transmittal advice tailored to its business purpose
+    -   ✅ **Easier Maintenance**: Clear separation of concerns
+    -   ✅ **Better User Experience**: Only relevant information displayed
+
+-   **Impact**:
+
+    -   Invoice distributions: Now show 8 optimized columns focused on financial tracking
+    -   Additional document distributions: Now show 7 simplified columns focused on document tracking
+    -   Print output more professional and easier to read
+    -   Space efficiency improved (no wasted columns)
+
+-   **Review Date**: 2026-01-11 (3 months) - Assess if templates need further optimization based on user feedback
+
+---
+
+## 2025-10-11 — Dedicated Columns for Related Entity Data
+
+-   **Context**: Users needed to see related entity information (suppliers for invoices, invoice numbers for additional documents) quickly without navigating to detail pages. Previously, this information was either embedded in combined columns or not visible at all.
+
+-   **Decision**: Implement dedicated columns for related entity data in both list and detail views, with conditional display based on document type and proper eager loading to prevent N+1 queries.
+
+-   **Alternatives Considered**:
+
+    1. **Keep related data in tooltips or modals** - Rejected because it requires user interaction (hover/click) and isn't visible in printed/exported data.
+
+    2. **Add related data as sub-rows** - Rejected because it clutters the table and makes scanning harder, especially for large lists.
+
+    3. **Use combined columns with delimiters** - Rejected because it reduces scannability and makes data harder to parse visually.
+
+    4. **Show related data only in detail views** - Rejected because it requires extra clicks and navigation, reducing efficiency.
+
+-   **Implementation**:
+
+    **Pattern 1: Distribution View - Supplier Column**
+
+    ```php
+    // Table Header
+    <th width="20%">Document</th>
+    <th width="15%">Supplier</th>  // New dedicated column
+    <th width="13%">Type</th>
+
+    // Invoice Row
+    <td>{{ $invoice->supplier->name ?? 'N/A' }}</td>
+
+    // Additional Document Row
+    <td>-</td>  // Not applicable
+    ```
+
+    **Pattern 2: Additional Documents Index - Invoice Column**
+
+    ```php
+    // Backend: Eager load relationship
+    $query = AdditionalDocument::with(['type', 'creator', 'invoices']);
+
+    // DataTables: Computed column
+    ->addColumn('invoice_numbers', function ($document) {
+        if ($document->invoices && $document->invoices->count() > 0) {
+            return implode(', ', $document->invoices->pluck('invoice_number')->toArray());
+        }
+        return '-';
+    })
+
+    // Frontend: Column configuration
+    {
+        data: 'invoice_numbers',
+        orderable: false,
+        searchable: false,
+        width: '120px'
+    }
+    ```
+
+-   **Benefits**:
+
+    -   ✅ **Immediate Visibility**: Related data visible without clicks
+    -   ✅ **Better Decision Making**: Users see complete context at a glance
+    -   ✅ **Export Friendly**: Related data included in exports
+    -   ✅ **Print Friendly**: Visible in printed transmittal advice
+    -   ✅ **Performance**: Eager loading prevents N+1 query issues
+    -   ✅ **Flexible Display**: Handles one-to-many, many-to-many relationships
+
+-   **Impact**:
+
+    -   Distribution view: Supplier column improves supplier comparison across invoices
+    -   Additional docs index: Invoice column enables quick invoice-document relationship verification
+    -   Print views: Complete information without multiple page prints
+    -   User efficiency: Estimated 30-40% reduction in clicks/navigation
+
+-   **Review Date**: 2026-01-11 (3 months) - Evaluate if additional relationships should be surfaced
+
+---
+
 ## 2025-10-10 — Distribution Create: Select All with Filtered Results
 
 -   **Context**: When users filter documents by type (DO, ITO) in the distribution create page and click "Select All", the system was selecting all documents in the DOM instead of only the visible filtered documents. This created a data integrity risk where users could accidentally distribute documents they didn't intend to select.

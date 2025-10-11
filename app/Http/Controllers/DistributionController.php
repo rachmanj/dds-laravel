@@ -270,9 +270,16 @@ class DistributionController extends Controller
             'creator',
             'senderVerifier',
             'receiverVerifier',
-            'documents.document',
+            'documents.document.type',
             'histories.user'
         ]);
+
+        // Load supplier relationship only for Invoice documents
+        foreach ($distribution->documents as $distributionDocument) {
+            if ($distributionDocument->document_type === Invoice::class && $distributionDocument->document) {
+                $distributionDocument->document->load('supplier');
+            }
+        }
 
         return view('distributions.show', compact('distribution'));
     }
@@ -294,17 +301,27 @@ class DistributionController extends Controller
             'histories.user'
         ]);
 
-        // Load additional documents for invoices
+        // Load relationships based on document type
         foreach ($distribution->documents as $distributionDocument) {
             if ($distributionDocument->document_type === Invoice::class) {
                 $invoice = $distributionDocument->document;
                 if ($invoice) {
                     $invoice->load(['additionalDocuments.type', 'supplier']);
                 }
+            } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
+                $additionalDoc = $distributionDocument->document;
+                if ($additionalDoc) {
+                    $additionalDoc->load('invoices');
+                }
             }
         }
 
-        return view('distributions.print', compact('distribution'));
+        // Route to appropriate print view based on document type
+        if ($distribution->document_type === 'invoice') {
+            return view('distributions.print-invoice', compact('distribution'));
+        } else {
+            return view('distributions.print-additional-document', compact('distribution'));
+        }
     }
 
     /**

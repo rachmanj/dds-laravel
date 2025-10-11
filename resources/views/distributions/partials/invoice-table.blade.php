@@ -45,8 +45,9 @@
                 @foreach ($invoice->additionalDocuments as $addDoc)
                     <tr class="additional-doc-row">
                         <td></td>
-                        <td style="padding-left: 20px;">{{ $addDoc->type->type_name ?? 'Additional Document' }}</td>
-                        <td></td>
+                        <td style="padding-left: 20px;"><em>{{ $addDoc->type->type_name ?? 'Additional Document' }}</em>
+                        </td>
+                        <td>{{ $addDoc->vendor_code ?? '-' }}</td>
                         <td>{{ $addDoc->document_number ?? 'N/A' }}</td>
                         <td>{{ $addDoc->document_date ? \Carbon\Carbon::parse($addDoc->document_date)->setTimezone('Asia/Singapore')->format('d-M-Y') : 'N/A' }}
                         </td>

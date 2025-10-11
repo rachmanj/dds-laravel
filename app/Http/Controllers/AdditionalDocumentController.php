@@ -43,7 +43,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
         $showAllRecords = $request->get('show_all', false);
 
-        $query = AdditionalDocument::with(['type', 'creator']);
+        $query = AdditionalDocument::with(['type', 'creator', 'invoices']);
 
         // Apply search filters
         if ($request->filled('search_number')) {
@@ -166,6 +166,13 @@ class AdditionalDocumentController extends Controller
                     return '<span class="badge badge-danger">' . $roundedDays . '</span>';
                 }
             })
+            ->addColumn('invoice_numbers', function ($document) {
+                if ($document->invoices && $document->invoices->count() > 0) {
+                    $invoiceNumbers = $document->invoices->pluck('invoice_number')->toArray();
+                    return '<small class="text-muted">' . implode(', ', $invoiceNumbers) . '</small>';
+                }
+                return '<span class="text-muted">-</span>';
+            })
             ->addColumn('actions', function ($document) use ($user) {
                 $actions = '<div class="btn-group" style="gap:2px;">';
                 $actions .= '<button type="button" class="btn btn-info btn-xs show-document" data-id="' . $document->id . '" title="View Document"><i class="fas fa-eye"></i></button>';
@@ -181,7 +188,7 @@ class AdditionalDocumentController extends Controller
                 $actions .= '</div>';
                 return $actions;
             })
-            ->rawColumns(['days_difference', 'actions'])
+            ->rawColumns(['invoice_numbers', 'days_difference', 'actions'])
             ->make(true);
     }
 
