@@ -88,6 +88,65 @@
         .document-summary-item:last-child {
             border-bottom: none;
         }
+
+        /* Floating Action Buttons */
+        .floating-actions {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+            background: white;
+            padding: 12px;
+        }
+
+        .floating-actions .btn {
+            font-size: 16px;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .floating-actions .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease;
+        }
+
+        .floating-actions .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+
+        .floating-actions .btn-primary:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        /* Add bottom padding to content to prevent overlap */
+        .card-body {
+            padding-bottom: 100px !important;
+        }
+
+        /* Responsive - hide on mobile */
+        @media (max-width: 768px) {
+            .floating-actions {
+                bottom: 10px;
+                right: 10px;
+                left: 10px;
+                justify-content: center;
+                padding: 10px;
+            }
+
+            .floating-actions .btn {
+                flex: 1;
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+        }
     </style>
 @endsection
 
@@ -433,18 +492,17 @@
                                     </div>
                                 </div>
 
-                                <!-- Form Actions -->
-                                <div class="row mt-4">
-                                    <div class="col-12">
-                                        <button type="submit" class="btn btn-primary" id="submitBtn">
-                                            <i class="fas fa-save"></i> Create Distribution
-                                        </button>
-                                        <a href="{{ route('distributions.index') }}" class="btn btn-secondary">
-                                            <i class="fas fa-times"></i> Cancel
-                                        </a>
-                                    </div>
-                                </div>
                             </form>
+
+                            <!-- Floating Action Buttons -->
+                            <div class="floating-actions">
+                                <button type="submit" form="distributionForm" class="btn btn-primary" id="submitBtn">
+                                    <i class="fas fa-save"></i> Create Distribution
+                                </button>
+                                <a href="{{ route('distributions.index') }}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
