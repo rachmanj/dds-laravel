@@ -51,8 +51,8 @@
         });
     }
 
-    // Update message count every 30 seconds
-    setInterval(updateUnreadMessageCount, 30000);
+    // Update message count every 30 minutes
+    setInterval(updateUnreadMessageCount, 1800000);
 
     // Initialize Toastr for notifications
     if (typeof toastr !== "undefined") {
