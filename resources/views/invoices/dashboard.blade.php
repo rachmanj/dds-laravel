@@ -565,7 +565,7 @@
 @endsection
 
 @push('js')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ asset('adminlte/plugins/chart.js/Chart.min.js') }}"></script>
     <script>
         // Invoice Type Chart
         const invoiceTypeCtx = document.getElementById('invoiceTypeChart').getContext('2d');

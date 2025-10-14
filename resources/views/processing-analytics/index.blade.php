@@ -95,17 +95,23 @@
                             <!-- Department-Specific Aging Alerts -->
                             <div class="row mb-4" id="departmentAgingAlerts" style="display: none;">
                                 <div class="col-12">
-                                    <div class="alert alert-danger alert-dismissible" id="criticalAgingAlert" style="display: none;">
+                                    <div class="alert alert-danger alert-dismissible" id="criticalAgingAlert"
+                                        style="display: none;">
                                         <h4><i class="icon fas fa-exclamation-triangle"></i> Critical Aging Alert!</h4>
-                                        <span id="criticalAgingCount">0</span> documents have been in departments for over 30 days.
-                                        <button type="button" class="btn btn-danger btn-sm ml-2" id="viewCriticalDocuments">
+                                        <span id="criticalAgingCount">0</span> documents have been in departments for over
+                                        30 days.
+                                        <button type="button" class="btn btn-danger btn-sm ml-2"
+                                            id="viewCriticalDocuments">
                                             <i class="fas fa-eye"></i> View Critical Documents
                                         </button>
                                     </div>
-                                    <div class="alert alert-warning alert-dismissible" id="warningAgingAlert" style="display: none;">
+                                    <div class="alert alert-warning alert-dismissible" id="warningAgingAlert"
+                                        style="display: none;">
                                         <h4><i class="icon fas fa-exclamation-circle"></i> Warning!</h4>
-                                        <span id="warningAgingCount">0</span> documents have been in departments for 15-30 days.
-                                        <button type="button" class="btn btn-warning btn-sm ml-2" id="viewWarningDocuments">
+                                        <span id="warningAgingCount">0</span> documents have been in departments for 15-30
+                                        days.
+                                        <button type="button" class="btn btn-warning btn-sm ml-2"
+                                            id="viewWarningDocuments">
                                             <i class="fas fa-eye"></i> View Warning Documents
                                         </button>
                                     </div>
@@ -175,11 +181,11 @@
                                                     <thead>
                                                         <tr>
                                                             <th>Department</th>
-                                                            <th>Invoice Count</th>
-                                                            <th>Avg Processing Days (Invoices)</th>
-                                                            <th>Document Count</th>
-                                                            <th>Avg Processing Days (Documents)</th>
-                                                            <th>Overall Avg Days</th>
+                                                            <th class="text-right">Invoice Count</th>
+                                                            <th class="text-right">Avg Processing Days (Invoices)</th>
+                                                            <th class="text-right">Document Count</th>
+                                                            <th class="text-right">Avg Processing Days (Documents)</th>
+                                                            <th class="text-right">Overall Avg Days</th>
                                                             <th>Efficiency Score</th>
                                                         </tr>
                                                     </thead>
@@ -427,16 +433,18 @@
                             $('#exportBtn').on('click', exportData);
                             $('#helpBtn').on('click', showHelp);
                             $('#loadDepartmentData').on('click', loadDepartmentMonthlyData);
-                            
+
                             // NEW: Aging alert event handlers
                             $('#viewCriticalDocuments').on('click', function() {
                                 // Navigate to invoices/additional documents with critical aging filter
-                                window.location.href = '{{ url("invoices") }}?age_filter=30_plus_days&status_filter=available,in_transit';
+                                window.location.href =
+                                    '{{ url('invoices') }}?age_filter=30_plus_days&status_filter=available,in_transit';
                             });
-                            
+
                             $('#viewWarningDocuments').on('click', function() {
                                 // Navigate to invoices/additional documents with warning aging filter
-                                window.location.href = '{{ url("invoices") }}?age_filter=15-30_days&status_filter=available,in_transit';
+                                window.location.href =
+                                    '{{ url('invoices') }}?age_filter=15-30_days&status_filter=available,in_transit';
                             });
 
                             function initializeCharts() {
@@ -601,7 +609,7 @@
                             // NEW: Update department-specific chart
                             function updateDepartmentSpecificChart(data) {
                                 const chart = echarts.init(document.getElementById('departmentSpecificChart'));
-                                
+
                                 const departments = [];
                                 const currentLocationDays = [];
                                 const totalProcessingDays = [];
@@ -610,7 +618,8 @@
                                 Object.values(data.invoices.department_breakdown).forEach(dept => {
                                     departments.push(dept.department_name);
                                     currentLocationDays.push(dept.avg_days_in_current_location || 0);
-                                    totalProcessingDays.push(dept.avg_days_in_current_location || 0); // For now, same as current location
+                                    totalProcessingDays.push(dept.avg_days_in_current_location ||
+                                        0); // For now, same as current location
                                 });
 
                                 const option = {
@@ -645,8 +654,7 @@
                                         type: 'value',
                                         name: 'Days'
                                     },
-                                    series: [
-                                        {
+                                    series: [{
                                             name: 'Days in Current Department',
                                             type: 'bar',
                                             data: currentLocationDays,
@@ -671,13 +679,36 @@
                             // NEW: Update aging categories chart
                             function updateAgingCategoriesChart(data) {
                                 const chart = echarts.init(document.getElementById('agingCategoriesChart'));
-                                
+
                                 const categories = data.summary.aging_categories;
-                                const chartData = [
-                                    { value: categories['0-7_days'], name: '0-7 Days', itemStyle: { color: '#27ae60' } },
-                                    { value: categories['8-14_days'], name: '8-14 Days', itemStyle: { color: '#f39c12' } },
-                                    { value: categories['15-30_days'], name: '15-30 Days', itemStyle: { color: '#e67e22' } },
-                                    { value: categories['30_plus_days'], name: '30+ Days', itemStyle: { color: '#e74c3c' } }
+                                const chartData = [{
+                                        value: categories['0-7_days'],
+                                        name: '0-7 Days',
+                                        itemStyle: {
+                                            color: '#27ae60'
+                                        }
+                                    },
+                                    {
+                                        value: categories['8-14_days'],
+                                        name: '8-14 Days',
+                                        itemStyle: {
+                                            color: '#f39c12'
+                                        }
+                                    },
+                                    {
+                                        value: categories['15-30_days'],
+                                        name: '15-30 Days',
+                                        itemStyle: {
+                                            color: '#e67e22'
+                                        }
+                                    },
+                                    {
+                                        value: categories['30_plus_days'],
+                                        name: '30+ Days',
+                                        itemStyle: {
+                                            color: '#e74c3c'
+                                        }
+                                    }
                                 ];
 
                                 const option = {
@@ -1038,11 +1069,11 @@
                                     const row = `
                 <tr>
                     <td><strong>${item.dept.name}</strong></td>
-                    <td>${item.invoiceCount}</td>
-                    <td>${item.invoiceDays.toFixed(2)}</td>
-                    <td>${item.docCount}</td>
-                    <td>${item.docDays.toFixed(2)}</td>
-                    <td>${item.overallAvg.toFixed(2)}</td>
+                    <td class="text-right">${item.invoiceCount}</td>
+                    <td class="text-right">${item.invoiceDays.toFixed(2)}</td>
+                    <td class="text-right">${item.docCount}</td>
+                    <td class="text-right">${item.docDays.toFixed(2)}</td>
+                    <td class="text-right">${item.overallAvg.toFixed(2)}</td>
                     <td>${efficiencyBadge}</td>
                 </tr>
             `;
@@ -1188,24 +1219,139 @@
                             });
 
                             // Load departments for department selection
-                            function loadDepartments() {
-                                // Add departments with correct IDs from database
+                            async function loadDepartments() {
                                 const departmentSelect = document.getElementById('departmentSelect');
 
                                 // Clear existing options except the first one
                                 departmentSelect.innerHTML = '<option value="">Select Department</option>';
 
-                                // Add Accounting department (ID: 15)
-                                const accountingOption = document.createElement('option');
-                                accountingOption.value = '15';
-                                accountingOption.textContent = 'Accounting';
-                                departmentSelect.appendChild(accountingOption);
+                                try {
+                                    // Fetch all departments from the backend
+                                    const response = await fetch('{{ url('api/v1/departments') }}');
+                                    const data = await response.json();
 
-                                // Add Logistic department (ID: 9)
-                                const logisticOption = document.createElement('option');
-                                logisticOption.value = '9';
-                                logisticOption.textContent = 'Logistic';
-                                departmentSelect.appendChild(logisticOption);
+                                    if (data.success && data.data && data.data.departments) {
+                                        // Sort departments by name for better UX
+                                        const sortedDepartments = data.data.departments.sort((a, b) => a.name.localeCompare(b
+                                            .name));
+
+                                        // Add all departments to the select
+                                        sortedDepartments.forEach(dept => {
+                                            const option = document.createElement('option');
+                                            option.value = dept.id;
+                                            option.textContent = dept.name;
+                                            departmentSelect.appendChild(option);
+                                        });
+                                    } else {
+                                        console.error('Failed to load departments:', data.error);
+                                        // Fallback to hardcoded departments if API fails
+                                        addFallbackDepartments(departmentSelect);
+                                    }
+                                } catch (error) {
+                                    console.error('Error loading departments:', error);
+                                    // Fallback to hardcoded departments if API fails
+                                    addFallbackDepartments(departmentSelect);
+                                }
+                            }
+
+                            // Fallback function for hardcoded departments
+                            function addFallbackDepartments(departmentSelect) {
+                                const fallbackDepartments = [{
+                                        id: 15,
+                                        name: 'Accounting'
+                                    },
+                                    {
+                                        id: 9,
+                                        name: 'Logistic'
+                                    },
+                                    {
+                                        id: 1,
+                                        name: 'Management / BOD'
+                                    },
+                                    {
+                                        id: 2,
+                                        name: 'Internal Audit & System'
+                                    },
+                                    {
+                                        id: 3,
+                                        name: 'Corporate Secretary'
+                                    },
+                                    {
+                                        id: 4,
+                                        name: 'APS - Arka Project Support'
+                                    },
+                                    {
+                                        id: 5,
+                                        name: 'Relationship & Coordination'
+                                    },
+                                    {
+                                        id: 6,
+                                        name: 'Design & Construction'
+                                    },
+                                    {
+                                        id: 7,
+                                        name: 'Finance'
+                                    },
+                                    {
+                                        id: 8,
+                                        name: 'Human Capital & Support'
+                                    },
+                                    {
+                                        id: 10,
+                                        name: 'Warehouse 017C'
+                                    },
+                                    {
+                                        id: 11,
+                                        name: 'Warehouse 021C'
+                                    },
+                                    {
+                                        id: 12,
+                                        name: 'Warehouse 022C'
+                                    },
+                                    {
+                                        id: 13,
+                                        name: 'Warehouse 023C'
+                                    },
+                                    {
+                                        id: 14,
+                                        name: 'Warehouse 025C'
+                                    },
+                                    {
+                                        id: 16,
+                                        name: 'Cashier HO'
+                                    },
+                                    {
+                                        id: 17,
+                                        name: 'Plant'
+                                    },
+                                    {
+                                        id: 18,
+                                        name: 'Procurement'
+                                    },
+                                    {
+                                        id: 19,
+                                        name: 'Operation & Production'
+                                    },
+                                    {
+                                        id: 20,
+                                        name: 'Safety'
+                                    },
+                                    {
+                                        id: 21,
+                                        name: 'Information Technology'
+                                    },
+                                    {
+                                        id: 22,
+                                        name: 'Research & Development'
+                                    }
+                                ];
+
+                                fallbackDepartments.forEach(dept => {
+                                    const option = document.createElement('option');
+                                    option.value = dept.id;
+                                    option.textContent = dept.name;
+                                    departmentSelect.appendChild(option);
+                                });
                             }
 
                             // Load department monthly performance data
@@ -1225,7 +1371,7 @@
 
                                 fetch(
                                         `{{ url('api/v1/processing-analytics/department-monthly-performance') }}?year=${year}&department_id=${departmentId}&document_type=${documentType}`
-                                        )
+                                    )
                                     .then(response => response.json())
                                     .then(data => {
                                         if (data.success) {

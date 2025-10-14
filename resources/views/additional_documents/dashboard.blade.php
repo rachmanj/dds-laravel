@@ -566,7 +566,7 @@
 @endsection
 
 @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ asset('adminlte/plugins/chart.js/Chart.min.js') }}"></script>
     <script>
         // Document Type Chart
         const documentTypeCtx = document.getElementById('documentTypeChart').getContext('2d');

@@ -281,7 +281,7 @@
     </section>
 
     <!-- JavaScript for Filtering, Search, and Chart -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ asset('adminlte/plugins/chart.js/Chart.min.js') }}"></script>
     <script>
         $(document).ready(function() {
             // Filter functionality

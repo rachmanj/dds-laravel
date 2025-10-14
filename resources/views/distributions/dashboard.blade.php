@@ -351,76 +351,114 @@
     </section>
 @endsection
 
-@push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+@push('js')
     <script>
-        // Distribution Type Chart
-        const distributionTypeCtx = document.getElementById('distributionTypeChart').getContext('2d');
-        const distributionTypeChart = new Chart(distributionTypeCtx, {
-            type: 'doughnut',
-            data: {
-                labels: @json(array_keys($typeBreakdown)),
-                datasets: [{
-                    data: @json(array_values($typeBreakdown)),
-                    backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545', '#6c757d', '#fd7e14'],
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    }
+        // Load Chart.js dynamically to ensure proper loading order
+        function loadChartJS() {
+            return new Promise((resolve, reject) => {
+                if (typeof Chart !== 'undefined') {
+                    resolve();
+                    return;
                 }
-            }
-        });
 
-        // Department Performance Chart
-        const departmentPerformanceCtx = document.getElementById('departmentPerformanceChart').getContext('2d');
-        const departmentPerformanceChart = new Chart(departmentPerformanceCtx, {
-            type: 'bar',
-            data: {
-                labels: @json(array_keys($departmentPerformance)),
-                datasets: [{
-                    label: 'Created',
-                    data: @json(array_column($departmentPerformance, 'created')),
-                    backgroundColor: 'rgba(40, 167, 69, 0.8)',
-                    borderColor: '#28a745',
-                    borderWidth: 1
-                }, {
-                    label: 'Received',
-                    data: @json(array_column($departmentPerformance, 'received')),
-                    backgroundColor: 'rgba(23, 162, 184, 0.8)',
-                    borderColor: '#17a2b8',
-                    borderWidth: 1
-                }, {
-                    label: 'Completed',
-                    data: @json(array_column($departmentPerformance, 'completed')),
-                    backgroundColor: 'rgba(255, 193, 7, 0.8)',
-                    borderColor: '#ffc107',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top'
-                    }
+                const script = document.createElement('script');
+                script.src = '{{ asset('adminlte/plugins/chart.js/Chart.min.js') }}';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Initialize charts when both DOM and Chart.js are ready
+        function initializeCharts() {
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js is not loaded');
+                return;
+            }
+
+            // Distribution Type Chart
+            const distributionTypeCtx = document.getElementById('distributionTypeChart');
+            if (!distributionTypeCtx) {
+                console.error('distributionTypeChart element not found');
+                return;
+            }
+
+            const distributionTypeChart = new Chart(distributionTypeCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: @json(array_keys($typeBreakdown)),
+                    datasets: [{
+                        data: @json(array_values($typeBreakdown)),
+                        backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545', '#6c757d', '#fd7e14'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            stepSize: 1
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
                         }
                     }
                 }
-            }
+            });
+
+            // Department Performance Chart
+            const departmentPerformanceCtx = document.getElementById('departmentPerformanceChart').getContext('2d');
+            const departmentPerformanceChart = new Chart(departmentPerformanceCtx, {
+                type: 'bar',
+                data: {
+                    labels: @json(array_keys($departmentPerformance)),
+                    datasets: [{
+                        label: 'Created',
+                        data: @json(array_column($departmentPerformance, 'created')),
+                        backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                        borderColor: '#28a745',
+                        borderWidth: 1
+                    }, {
+                        label: 'Received',
+                        data: @json(array_column($departmentPerformance, 'received')),
+                        backgroundColor: 'rgba(23, 162, 184, 0.8)',
+                        borderColor: '#17a2b8',
+                        borderWidth: 1
+                    }, {
+                        label: 'Completed',
+                        data: @json(array_column($departmentPerformance, 'completed')),
+                        backgroundColor: 'rgba(255, 193, 7, 0.8)',
+                        borderColor: '#ffc107',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize charts when DOM and Chart.js are ready
+        document.addEventListener('DOMContentLoaded', function() {
+            loadChartJS().then(() => {
+                setTimeout(initializeCharts, 100);
+            }).catch(error => {
+                console.error('Failed to load Chart.js:', error);
+            });
         });
 
         // Export function

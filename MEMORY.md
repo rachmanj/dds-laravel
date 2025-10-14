@@ -1,3 +1,156 @@
+### 2025-10-14 — Fixed Department Selection in Dashboard 2 Processing Analytics
+
+-   **Issue**: Only 2 departments (Accounting and Logistic) appeared in Department Monthly Performance section dropdown
+-   **Scope**: Dashboard 2 (Processing Analytics) - Department Monthly Performance section
+-   **Implementation Date**: 2025-10-14
+-   **Status**: ✅ **COMPLETED & FIXED**
+
+#### **Problem Statement**
+
+Users reported that the Department Monthly Performance section in Dashboard 2 (Processing Analytics) only showed 2 departments in the selection dropdown, limiting the ability to analyze performance across all departments in the organization.
+
+#### **Root Cause Analysis**
+
+**Issue Found in Code:**
+
+The `loadDepartments()` JavaScript function in `resources/views/processing-analytics/index.blade.php` was hardcoded to only add 2 departments:
+
+```javascript
+function loadDepartments() {
+    // Only added Accounting (ID: 15) and Logistic (ID: 9)
+    const accountingOption = document.createElement("option");
+    accountingOption.value = "15";
+    accountingOption.textContent = "Accounting";
+    departmentSelect.appendChild(accountingOption);
+
+    const logisticOption = document.createElement("option");
+    logisticOption.value = "9";
+    logisticOption.textContent = "Logistic";
+    departmentSelect.appendChild(logisticOption);
+}
+```
+
+**Database Verification:**
+
+Confirmed that all 22 departments exist in the database:
+
+-   Management / BOD, Internal Audit & System, Corporate Secretary, APS - Arka Project Support, Relationship & Coordination, Design & Construction, Finance, Human Capital & Support, Logistic, Warehouse 017C, Warehouse 021C, Warehouse 022C, Warehouse 023C, Warehouse 025C, Accounting, Cashier HO, Plant, Procurement, Operation & Production, Safety, Information Technology, Research & Development
+
+#### **Solution Implemented**
+
+**File:** `resources/views/processing-analytics/index.blade.php`
+
+**Updated JavaScript Function:**
+
+```javascript
+async function loadDepartments() {
+    const departmentSelect = document.getElementById("departmentSelect");
+    departmentSelect.innerHTML = '<option value="">Select Department</option>';
+
+    try {
+        // Fetch all departments from the backend API
+        const response = await fetch('{{ url("api/v1/departments") }}');
+        const data = await response.json();
+
+        if (data.success && data.data && data.data.departments) {
+            // Sort departments by name for better UX
+            const sortedDepartments = data.data.departments.sort((a, b) =>
+                a.name.localeCompare(b.name)
+            );
+
+            // Add all departments to the select
+            sortedDepartments.forEach((dept) => {
+                const option = document.createElement("option");
+                option.value = dept.id;
+                option.textContent = dept.name;
+                departmentSelect.appendChild(option);
+            });
+        } else {
+            // Fallback to hardcoded departments if API fails
+            addFallbackDepartments(departmentSelect);
+        }
+    } catch (error) {
+        console.error("Error loading departments:", error);
+        // Fallback to hardcoded departments if API fails
+        addFallbackDepartments(departmentSelect);
+    }
+}
+
+// Comprehensive fallback with all 22 departments
+function addFallbackDepartments(departmentSelect) {
+    const fallbackDepartments = [
+        { id: 15, name: "Accounting" },
+        { id: 9, name: "Logistic" },
+        { id: 1, name: "Management / BOD" },
+        { id: 2, name: "Internal Audit & System" },
+        { id: 3, name: "Corporate Secretary" },
+        { id: 4, name: "APS - Arka Project Support" },
+        { id: 5, name: "Relationship & Coordination" },
+        { id: 6, name: "Design & Construction" },
+        { id: 7, name: "Finance" },
+        { id: 8, name: "Human Capital & Support" },
+        { id: 10, name: "Warehouse 017C" },
+        { id: 11, name: "Warehouse 021C" },
+        { id: 12, name: "Warehouse 022C" },
+        { id: 13, name: "Warehouse 023C" },
+        { id: 14, name: "Warehouse 025C" },
+        { id: 16, name: "Cashier HO" },
+        { id: 17, name: "Plant" },
+        { id: 18, name: "Procurement" },
+        { id: 19, name: "Operation & Production" },
+        { id: 20, name: "Safety" },
+        { id: 21, name: "Information Technology" },
+        { id: 22, name: "Research & Development" },
+    ];
+
+    fallbackDepartments.forEach((dept) => {
+        const option = document.createElement("option");
+        option.value = dept.id;
+        option.textContent = dept.name;
+        departmentSelect.appendChild(option);
+    });
+}
+```
+
+#### **Technical Details**
+
+**API Integration:**
+
+-   Uses existing `/api/v1/departments` endpoint from `InvoiceApiController::getDepartments()`
+-   Handles API response structure: `data.data.departments`
+-   Implements proper error handling and fallback mechanism
+
+**User Experience Improvements:**
+
+-   Departments sorted alphabetically for better usability
+-   Comprehensive fallback ensures functionality even if API fails
+-   Maintains existing functionality while expanding options
+
+#### **Impact**
+
+✅ **Complete Department Coverage** - All 22 departments now available for selection  
+✅ **Improved Analytics** - Users can analyze performance across entire organization  
+✅ **Better User Experience** - Alphabetically sorted department list  
+✅ **Robust Error Handling** - Fallback mechanism ensures reliability  
+✅ **No Breaking Changes** - Existing functionality preserved
+
+#### **Testing Results**
+
+✅ **Department Dropdown** - All 22 departments visible and selectable  
+✅ **API Integration** - Successfully fetches departments from backend  
+✅ **Fallback Mechanism** - Works correctly when API fails  
+✅ **Alphabetical Sorting** - Departments properly ordered for better UX  
+✅ **Cross-Browser Compatibility** - Works across different browsers
+
+#### **Files Modified**
+
+1. `resources/views/processing-analytics/index.blade.php` (lines 1191-1258)
+    - Updated `loadDepartments()` function to fetch from API
+    - Added comprehensive fallback with all 22 departments
+    - Implemented proper error handling and sorting
+
+---
+
 ### 2025-10-14 — Fixed Critical Distribution Creation Error
 
 -   **Issue**: Users encountering "Failed to create distribution. Check console for details" error
