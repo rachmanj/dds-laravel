@@ -2056,10 +2056,17 @@ Distribution  Documents   Destination  Documents   Documents        Distribution
 
 **Status Transitions**:
 
-1. **Available** (`distribution_status = 'available'`) → Can be selected for distribution
+1. **Available** (`distribution_status = 'available'`) → Can be selected for distribution ✅
 2. **In Transit** (`distribution_status = 'in_transit'`) → Cannot be selected for new distributions ✅
-3. **Distributed** (`distribution_status = 'distributed'`) → Cannot be selected for new distributions ✅
+3. **Distributed** (`distribution_status = 'distributed'`) → **Can be selected for re-distribution** ✅ **ENHANCED** (2025-10-14)
 4. **Unaccounted For** (`distribution_status = 'unaccounted_for'`) → Cannot be selected for new distributions ✅
+
+**Re-distribution Enhancement** (2025-10-14):
+
+-   **Business Requirement**: Documents need to be sent between departments multiple times
+-   **Implementation**: Modified `availableForDistribution()` scope to include `'distributed'` status
+-   **User Experience**: Added "Distribution Status" column with visual indicators
+-   **Data Integrity**: Still prevents selection of `in_transit` and `unaccounted_for` documents
 
 ### **On-the-Fly Document Creation Workflow**
 
@@ -2821,9 +2828,15 @@ $distribution->load(['documents.document', 'originDepartment', 'destinationDepar
 **Scope Usage**:
 
 ```php
-// Efficient filtering for available documents
-Invoice::availableForDistribution()->get();
-AdditionalDocument::availableForDistribution()->get();
+// Efficient filtering for available documents (includes distributed for re-distribution)
+Invoice::availableForDistribution()->get();           // Returns: available + distributed
+AdditionalDocument::availableForDistribution()->get(); // Returns: available + distributed
+
+// Model Implementation (2025-10-14 Enhancement)
+public function scopeAvailableForDistribution($query)
+{
+    return $query->whereIn('distribution_status', ['available', 'distributed']);
+}
 ```
 
 ### **Permission Checking**

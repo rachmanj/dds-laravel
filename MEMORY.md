@@ -1,3 +1,79 @@
+### 2025-10-14 — Enhanced Distribution System to Allow Re-distribution of Completed Documents
+
+-   **Feature**: Modified system to allow re-distribution of completed documents for business flexibility
+-   **Scope**: Distribution create functionality and document availability filtering
+-   **Implementation Date**: 2025-10-14
+-   **Status**: ✅ **COMPLETED & TESTED**
+
+#### **Problem Statement**
+
+Users needed to send previously distributed documents again between departments, but the system was preventing this by filtering out documents with `distribution_status = 'distributed'`. This limited business flexibility where documents need to be sent multiple times between departments.
+
+#### **Solution Implemented**
+
+**Backend Changes:**
+
+1. **Updated AdditionalDocument Model** (`app/Models/AdditionalDocument.php`):
+
+    - Modified `availableForDistribution()` scope to include both `'available'` and `'distributed'` statuses
+    - Updated documentation to reflect that distributed documents are now included for re-distribution
+
+2. **Updated Invoice Model** (`app/Models/Invoice.php`):
+    - Applied same changes to invoice model for consistency
+    - Both models now allow re-distribution of completed documents
+
+**Frontend Enhancements:**
+
+3. **Enhanced Distribution Create Page** (`resources/views/distributions/create.blade.php`):
+    - Added "Distribution Status" column to both invoice and additional document tables
+    - Implemented visual status indicators with badges and icons:
+        - **Available**: Green badge with check circle icon
+        - **Previously Distributed**: Blue badge with paper plane icon
+        - **In Transit**: Yellow badge with truck icon
+        - **Unaccounted**: Red badge with warning triangle icon
+
+#### **Testing Results**
+
+✅ **Document Availability**: Previously distributed documents now appear in selection list
+
+-   Tested with 12 ITO documents (251006202-236) from completed distribution `25/000HLOG/DDS/0001`
+-   All documents now show with "Previously Distributed" status and are selectable
+
+✅ **User Experience**: Clear visual indicators help users understand document history
+
+-   Users can see which documents were previously distributed
+-   Status badges provide immediate visual feedback
+
+✅ **Bulk Selection**: Multiple previously distributed documents can be selected together
+
+-   Successfully tested selecting 4 documents for re-distribution
+-   System properly handles mixed status documents (available + distributed)
+
+✅ **Business Logic**: Maintains data integrity while enabling flexibility
+
+-   Documents still cannot be selected if `in_transit` or `unaccounted_for`
+-   Only allows re-distribution of completed distributions
+
+#### **Impact**
+
+✅ **Business Flexibility** - Documents can now be sent between departments multiple times  
+✅ **Improved UX** - Clear visual indicators show document distribution history  
+✅ **Data Integrity** - Still prevents selection of in-transit or unaccounted documents  
+✅ **Backward Compatibility** - No breaking changes to existing functionality  
+✅ **Scalable Solution** - Works for both invoices and additional documents
+
+#### **Files Modified**
+
+1. `app/Models/AdditionalDocument.php` (lines 115-127)
+    - Updated `availableForDistribution()` scope method
+2. `app/Models/Invoice.php` (lines 121-133)
+    - Updated `availableForDistribution()` scope method
+3. `resources/views/distributions/create.blade.php` (lines 298-477)
+    - Added Distribution Status column to both tables
+    - Implemented visual status indicators with badges and icons
+
+---
+
 ### 2025-10-14 — Fixed Department Selection in Dashboard 2 Processing Analytics
 
 -   **Issue**: Only 2 departments (Accounting and Logistic) appeared in Department Monthly Performance section dropdown

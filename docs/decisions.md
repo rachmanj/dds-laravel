@@ -1,3 +1,56 @@
+## 2025-10-14 — Enhanced Document Re-distribution System
+
+-   **Context**: The system was preventing re-distribution of completed documents (`distribution_status = 'distributed'`), limiting business flexibility where documents need to be sent between departments multiple times. Users reported inability to find previously distributed documents in the distribution create page.
+
+-   **Decision**: Modify the `availableForDistribution()` scope in both `AdditionalDocument` and `Invoice` models to include documents with `'distributed'` status, while maintaining protection for `'in_transit'` and `'unaccounted_for'` documents. Add visual indicators in the frontend to show distribution history.
+
+-   **Alternatives Considered**:
+
+    1. **Keep current restriction** - Rejected because it limits business flexibility and prevents legitimate re-distribution scenarios.
+
+    2. **Reset distribution status manually** - Rejected because it requires database manipulation, loses audit trail, and doesn't provide user-friendly interface.
+
+    3. **Create separate "re-distribution" workflow** - Rejected because it adds unnecessary complexity and duplicates existing functionality.
+
+    4. **Allow all statuses for re-distribution** - Rejected because `'in_transit'` and `'unaccounted_for'` documents should remain protected.
+
+-   **Implementation**:
+
+    **Backend Changes**:
+
+    ```php
+    // app/Models/AdditionalDocument.php & app/Models/Invoice.php
+    public function scopeAvailableForDistribution($query)
+    {
+        return $query->whereIn('distribution_status', ['available', 'distributed']);
+    }
+    ```
+
+    **Frontend Enhancements**:
+
+    ```php
+    // resources/views/distributions/create.blade.php
+    // Added "Distribution Status" column with visual indicators
+    @if($doc->distribution_status === 'available')
+        <span class="badge badge-success">
+            <i class="fas fa-check-circle"></i> Available
+        </span>
+    @elseif($doc->distribution_status === 'distributed')
+        <span class="badge badge-info">
+            <i class="fas fa-paper-plane"></i> Previously Distributed
+        </span>
+    ```
+
+-   **Consequences**:
+
+    -   **Positive**: Enhanced business flexibility, improved user experience with clear status indicators, maintained data integrity
+    -   **Negative**: None significant - system maintains protection for problematic statuses
+    -   **Trade-offs**: Slightly increased complexity in frontend display, but provides better user feedback
+
+-   **Review Date**: 2025-12-14 (2 months from implementation)
+
+---
+
 ## 2025-10-11 — Separate Print Templates for Invoice vs Additional Document Distributions
 
 -   **Context**: The distribution print system was using a single `print.blade.php` template for both invoice and additional document distributions. This resulted in wasted columns (AMOUNT always "N/A" for additional documents), missing relevant fields (RECEIVE DATE, CUR LOC), and semantic confusion (VENDOR/SUPPLIER meant different things for each type).

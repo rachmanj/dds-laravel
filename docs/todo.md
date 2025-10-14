@@ -2,6 +2,64 @@
 
 ## 🎯 **Current Sprint**
 
+### **Document Re-distribution System Enhancement** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED & PRODUCTION READY**  
+**Implementation Date**: 2025-10-14  
+**Requested By**: User  
+**Priority**: HIGH - Business flexibility enhancement
+
+**Feature**: Enhanced the distribution system to allow re-distribution of completed documents, enabling documents to be sent between departments multiple times while maintaining data integrity.
+
+**Key Deliverables**:
+
+1. **Backend Model Updates** ✅
+
+    - Modified `AdditionalDocument::availableForDistribution()` scope to include `'distributed'` status
+    - Modified `Invoice::availableForDistribution()` scope to include `'distributed'` status
+    - Maintained protection for `'in_transit'` and `'unaccounted_for'` documents
+
+2. **Frontend UI Enhancements** ✅
+
+    - Added "Distribution Status" column to both invoice and additional document tables
+    - Implemented visual status indicators with badges and icons:
+        - 🟢 **Available**: Green badge with check circle icon
+        - 🔵 **Previously Distributed**: Blue badge with paper plane icon
+        - 🟡 **In Transit**: Yellow badge with truck icon
+        - 🔴 **Unaccounted**: Red badge with warning triangle icon
+
+3. **User Experience Improvements** ✅
+
+    - Clear visual feedback on document distribution history
+    - Users can see which documents were previously distributed
+    - Maintains existing functionality while adding new capability
+
+**Test Results**:
+
+-   ✅ **Document Availability**: 12 previously distributed ITO documents (251006202-236) now appear in selection list
+-   ✅ **Status Indicators**: All documents show correct "Previously Distributed" status with blue badges
+-   ✅ **Bulk Selection**: Successfully tested selecting 4 documents for re-distribution
+-   ✅ **Data Integrity**: System still prevents selection of in-transit documents
+-   ✅ **Business Logic**: Completed distributions can now be re-distributed as needed
+
+**Files Modified**:
+
+-   `app/Models/AdditionalDocument.php` - Updated scope method
+-   `app/Models/Invoice.php` - Updated scope method
+-   `resources/views/distributions/create.blade.php` - Added status column and indicators
+-   `docs/architecture.md` - Updated system architecture documentation
+-   `docs/decisions.md` - Documented architectural decision
+-   `MEMORY.md` - Added implementation summary
+
+**Business Impact**:
+
+-   ✅ **Enhanced Flexibility**: Documents can be sent between departments multiple times
+-   ✅ **Improved UX**: Clear visual indicators show document distribution history
+-   ✅ **Data Integrity**: Still prevents problematic document selections
+-   ✅ **Backward Compatibility**: No breaking changes to existing functionality
+
+---
+
 ### **Distribution & Document UI/UX Enhancements** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED & PRODUCTION READY**  

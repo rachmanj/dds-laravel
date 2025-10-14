@@ -305,6 +305,7 @@
                                                             <th>PO Number</th>
                                                             <th>Amount</th>
                                                             <th>Status</th>
+                                                            <th>Distribution Status</th>
                                                             <th>Location</th>
                                                         </tr>
                                                     </thead>
@@ -325,6 +326,31 @@
                                                                         class="badge {{ $invoice->status_badge_class }}">
                                                                         {{ ucfirst($invoice->status) }}
                                                                     </span>
+                                                                </td>
+                                                                <td>
+                                                                    @if ($invoice->distribution_status === 'available')
+                                                                        <span class="badge badge-success">
+                                                                            <i class="fas fa-check-circle"></i> Available
+                                                                        </span>
+                                                                    @elseif($invoice->distribution_status === 'distributed')
+                                                                        <span class="badge badge-info">
+                                                                            <i class="fas fa-paper-plane"></i> Previously
+                                                                            Distributed
+                                                                        </span>
+                                                                    @elseif($invoice->distribution_status === 'in_transit')
+                                                                        <span class="badge badge-warning">
+                                                                            <i class="fas fa-truck"></i> In Transit
+                                                                        </span>
+                                                                    @elseif($invoice->distribution_status === 'unaccounted_for')
+                                                                        <span class="badge badge-danger">
+                                                                            <i class="fas fa-exclamation-triangle"></i>
+                                                                            Unaccounted
+                                                                        </span>
+                                                                    @else
+                                                                        <span class="badge badge-secondary">
+                                                                            {{ ucfirst($invoice->distribution_status) }}
+                                                                        </span>
+                                                                    @endif
                                                                 </td>
                                                                 <td>
                                                                     @if ($invoice->cur_loc === auth()->user()->department->location_code)
@@ -412,6 +438,7 @@
                                                             <th>PO Number</th>
                                                             {{-- <th>Project</th> --}}
                                                             <th>Status</th>
+                                                            <th>Distribution Status</th>
                                                             <th>Location</th>
                                                         </tr>
                                                     </thead>
@@ -433,6 +460,31 @@
                                                                         class="badge badge-{{ $doc->status === 'open' ? 'success' : 'secondary' }}">
                                                                         {{ ucfirst($doc->status) }}
                                                                     </span>
+                                                                </td>
+                                                                <td>
+                                                                    @if ($doc->distribution_status === 'available')
+                                                                        <span class="badge badge-success">
+                                                                            <i class="fas fa-check-circle"></i> Available
+                                                                        </span>
+                                                                    @elseif($doc->distribution_status === 'distributed')
+                                                                        <span class="badge badge-info">
+                                                                            <i class="fas fa-paper-plane"></i> Previously
+                                                                            Distributed
+                                                                        </span>
+                                                                    @elseif($doc->distribution_status === 'in_transit')
+                                                                        <span class="badge badge-warning">
+                                                                            <i class="fas fa-truck"></i> In Transit
+                                                                        </span>
+                                                                    @elseif($doc->distribution_status === 'unaccounted_for')
+                                                                        <span class="badge badge-danger">
+                                                                            <i class="fas fa-exclamation-triangle"></i>
+                                                                            Unaccounted
+                                                                        </span>
+                                                                    @else
+                                                                        <span class="badge badge-secondary">
+                                                                            {{ ucfirst($doc->distribution_status) }}
+                                                                        </span>
+                                                                    @endif
                                                                 </td>
                                                                 <td>
                                                                     @if ($doc->cur_loc === auth()->user()->department->location_code)

@@ -117,12 +117,13 @@ class AdditionalDocument extends Model
      * 
      * Documents are NOT available if they are:
      * - 'in_transit' (currently being distributed to another department)
-     * - 'distributed' (already distributed to another department)
      * - 'unaccounted_for' (missing or damaged in previous distribution)
+     * 
+     * Note: 'distributed' documents are now included to allow re-distribution
      */
     public function scopeAvailableForDistribution($query)
     {
-        return $query->where('distribution_status', 'available');
+        return $query->whereIn('distribution_status', ['available', 'distributed']);
     }
 
     /**

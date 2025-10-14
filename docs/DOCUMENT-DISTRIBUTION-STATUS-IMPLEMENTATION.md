@@ -256,13 +256,13 @@ private function updateDocumentLocations(Distribution $distribution): void
 **Updated Methods:**
 
 ```php
-// In create() method - Only show available documents
+// In create() method - Show available and distributed documents (2025-10-14 Enhancement)
 $invoices = Invoice::where('cur_loc', $user->department->location_code)
-    ->availableForDistribution()
+    ->availableForDistribution() // Now includes both 'available' and 'distributed' statuses
     ->get();
 
 $additionalDocuments = AdditionalDocument::where('cur_loc', $user->department->location_code)
-    ->availableForDistribution()
+    ->availableForDistribution() // Now includes both 'available' and 'distributed' statuses
     ->get();
 
 // In send() method - Mark documents as in_transit
@@ -326,8 +326,9 @@ Distribution Completed
 
 ### **1. Automatic Filtering**
 
--   **Create Distribution**: Only shows documents with `distribution_status = 'available'`
--   **Prevents Selection**: Documents with `in_transit`, `distributed`, or `unaccounted_for` status are automatically excluded
+-   **Create Distribution**: Shows documents with `distribution_status = 'available'` and `'distributed'` (2025-10-14 Enhancement)
+-   **Prevents Selection**: Documents with `in_transit` or `unaccounted_for` status are automatically excluded
+-   **Re-distribution**: Documents with `'distributed'` status can be selected for re-distribution (2025-10-14 Enhancement)
 
 ### **2. Status Enforcement**
 
