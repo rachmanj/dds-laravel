@@ -718,12 +718,12 @@ class InvoiceApiController extends Controller
 
             // If not found by invoice number, search by additional document number
             if (!$invoice) {
-                $additionalDocument = AdditionalDocument::with('invoice.supplier', 'invoice.type', 'invoice.user', 'invoice.distributions.type', 'invoice.distributions.originDepartment', 'invoice.distributions.destinationDepartment', 'invoice.distributions.creator')
+                $additionalDocument = AdditionalDocument::with('invoices.supplier', 'invoices.type', 'invoices.user', 'invoices.distributions.type', 'invoices.distributions.originDepartment', 'invoices.distributions.destinationDepartment', 'invoices.distributions.creator')
                     ->where('document_number', $documentNumber)
                     ->first();
 
-                if ($additionalDocument && $additionalDocument->invoice) {
-                    $invoice = $additionalDocument->invoice;
+                if ($additionalDocument && $additionalDocument->invoices->isNotEmpty()) {
+                    $invoice = $additionalDocument->invoices->first();
                     // Reload with all relationships
                     $invoice->load([
                         'supplier',

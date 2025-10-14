@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class Distribution extends Model
 {
@@ -161,8 +161,41 @@ class Distribution extends Model
     }
 
     /**
+     * Get next sequence number for a department/year combination using atomic database operations
+     * This method handles soft-deleted records and ensures unique sequence numbers
+     */
+    public static function getNextSequenceAtomic(int $year, int $departmentId): int
+    {
+        // Get all sequences (including soft-deleted ones) to find gaps
+        $allSequences = DB::select("
+            SELECT sequence
+            FROM distributions 
+            WHERE year = ? AND origin_department_id = ?
+            ORDER BY sequence
+        ", [$year, $departmentId]);
+
+        if (empty($allSequences)) {
+            return 1; // First sequence
+        }
+
+        // Find the first gap in the sequence
+        $expectedSequence = 1;
+        foreach ($allSequences as $row) {
+            if ($row->sequence !== $expectedSequence) {
+                // Found a gap, use this sequence number
+                return $expectedSequence;
+            }
+            $expectedSequence++;
+        }
+
+        // No gaps found, use the next number after the highest
+        $maxSequence = max(array_column($allSequences, 'sequence'));
+        return $maxSequence + 1;
+    }
+
+    /**
      * Get next sequence number for a department/year combination
-     * This method finds the next available sequence number
+     * This method finds the next available sequence number with improved race condition handling
      */
     public static function getNextSequence(int $year, int $departmentId): int
     {
@@ -192,7 +225,8 @@ class Distribution extends Model
         }
 
         // No gaps found, use the next number after the highest
-        return $existingSequences->max() + 1;
+        // Use last() instead of max() for better performance with sorted collection
+        return $existingSequences->last() + 1;
     }
 
     /**

@@ -73,6 +73,120 @@
 
 ---
 
+### **Distribution Create Page - Floating Action Buttons** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED & TESTED**  
+**Implementation Date**: 2025-10-13  
+**Requested By**: User  
+**Priority**: MEDIUM - UX improvement for distribution creation
+
+**Feature**: Implemented floating action buttons for the distribution create page to eliminate scrolling when working with large document lists (200+ documents).
+
+**Problem Solved**:
+
+Users had to scroll all the way down through hundreds of documents just to click the "Create Distribution" button, creating a poor user experience especially when only selecting a few documents.
+
+**Key Deliverables**:
+
+-   ✅ Fixed-position floating buttons at bottom-right corner
+-   ✅ Beautiful gradient purple/blue "Create Distribution" button
+-   ✅ Gray "Cancel" button for secondary action
+-   ✅ Smooth hover animations with lift effect
+-   ✅ Responsive design (adapts for mobile/tablet)
+-   ✅ No functionality lost - maintains form submission
+
+**Technical Implementation**:
+
+-   Added `.floating-actions` CSS class with `position: fixed`
+-   Z-index 1000 to stay above content
+-   Used `form="distributionForm"` attribute to maintain submission outside form tag
+-   Added padding-bottom to prevent content overlap
+-   Responsive breakpoints for mobile devices
+
+**Test Results**:
+
+-   ✅ Form submission works correctly via floating button
+-   ✅ Buttons remain visible while scrolling through 221 documents
+-   ✅ Confirmation modal triggers properly
+-   ✅ Document selection workflow unchanged
+-   ✅ Mobile responsive layout verified
+
+**Files Modified**:
+
+-   `resources/views/distributions/create.blade.php` (lines 92-150, 495-505)
+
+**Documentation Updated**:
+
+-   `MEMORY.md` - Added comprehensive implementation details with CSS examples
+-   `docs/todo.md` - This entry
+
+**User Impact**:
+
+-   **Before**: Users had to scroll through 200+ documents to find Create button
+-   **After**: Create/Cancel buttons always visible and accessible from anywhere on the page
+
+---
+
+### **Message Polling Interval Optimization** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED**  
+**Implementation Date**: 2025-10-13  
+**Requested By**: User (based on server log analysis)  
+**Priority**: LOW - Performance optimization
+
+**Feature**: Optimized the unread message count polling interval to reduce unnecessary server load and API calls.
+
+**Problem Solved**:
+
+The `/messages/unread-count` endpoint was being polled every 30 seconds by every active user session, causing:
+
+-   Excessive server load with constant database queries
+-   High network traffic for a low-priority background feature
+-   Cluttered server logs with repetitive polling entries
+
+**Key Deliverables**:
+
+-   ✅ Changed polling interval from 30 seconds to 30 minutes
+-   ✅ 60x reduction in API calls (120 calls/hour → 2 calls/hour per user)
+-   ✅ Maintained user experience - badge still updates on navigation
+-   ✅ Reduced server load significantly
+
+**Technical Implementation**:
+
+Changed `setInterval` from 30000ms (30 seconds) to 1800000ms (30 minutes) in the global scripts file.
+
+**Rationale**:
+
+-   Message notifications don't need real-time 30-second polling
+-   Users get immediate updates when navigating to messages page
+-   Badge updates on any page navigation or refresh
+-   Most users don't receive messages frequently enough to need aggressive polling
+-   30-minute passive polling is sufficient for background notifications
+
+**Impact Analysis**:
+
+-   **API Calls**: Reduced from 120/hour to 2/hour per user (60x improvement)
+-   **Database Queries**: 60x fewer queries to messages table
+-   **Server Load**: Significantly reduced background processing
+-   **User Experience**: No negative impact - notifications still work perfectly
+
+**Files Modified**:
+
+-   `resources/views/layouts/partials/scripts.blade.php` (line 55)
+
+**Documentation Updated**:
+
+-   `MEMORY.md` - Added rationale and impact analysis
+-   `docs/todo.md` - This entry
+
+**User Impact**:
+
+-   **Before**: API called every 30 seconds (aggressive polling)
+-   **After**: API called every 30 minutes (reasonable passive check)
+-   **Result**: No perceived change in functionality, massive reduction in server load
+
+---
+
 ### **General Document Import Feature** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED & PRODUCTION READY**  

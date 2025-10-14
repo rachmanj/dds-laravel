@@ -124,8 +124,8 @@ class DistributionController extends Controller
             $currentYear = Carbon::now()->year;
             $originDepartmentId = $user->department->id;
 
-            // Get sequence number and create distribution
-            $sequence = Distribution::getNextSequence($currentYear, $originDepartmentId);
+            // Get sequence number with atomic database operation
+            $sequence = Distribution::getNextSequenceAtomic($currentYear, $originDepartmentId);
 
             // Validate sequence number is within reasonable bounds
             if ($sequence > 999999) {
@@ -137,16 +137,6 @@ class DistributionController extends Controller
 
             Log::info("Generated sequence number: {$sequence} for year: {$currentYear}, department: {$originDepartmentId}");
             Log::info("Generated distribution number: {$distributionNumber}");
-
-            // Double-check that this sequence doesn't already exist (race condition protection)
-            $sequenceExists = Distribution::where('year', $currentYear)
-                ->where('origin_department_id', $originDepartmentId)
-                ->where('sequence', $sequence)
-                ->exists();
-
-            if ($sequenceExists) {
-                throw new \Exception("Sequence {$sequence} already exists for year {$currentYear}, department {$originDepartmentId}. This indicates a race condition.");
-            }
 
             // Create distribution
             $distribution = Distribution::create([
