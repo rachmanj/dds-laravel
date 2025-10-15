@@ -39,4 +39,5 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     Route::patch('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'update'])->name('update');
     Route::delete('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'destroy'])->name('destroy');
     Route::get('{additionalDocument}/download', [\App\Http\Controllers\AdditionalDocumentController::class, 'downloadAttachment'])->name('download');
+    Route::get('{additionalDocument}/preview', [\App\Http\Controllers\AdditionalDocumentController::class, 'previewAttachment'])->name('preview');
 });

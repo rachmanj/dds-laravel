@@ -371,9 +371,9 @@
                                             @if ($additionalDocument->attachment)
                                                 <div class="mb-2">
                                                     <strong>Current Attachment:</strong>
-                                                    <a href="{{ route('additional-documents.download', $additionalDocument) }}"
+                                                    <a href="{{ route('additional-documents.preview', $additionalDocument) }}"
                                                         class="btn btn-sm btn-info ml-2" target="_blank">
-                                                        <i class="fas fa-download"></i> Download Current
+                                                        <i class="fas fa-eye"></i> Preview Current
                                                     </a>
                                                 </div>
                                             @endif

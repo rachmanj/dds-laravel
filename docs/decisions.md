@@ -1,3 +1,77 @@
+## 2025-10-15 — Attachment Preview Functionality Implementation
+
+-   **Context**: Users needed to download attachment files to view them, creating unnecessary file downloads and cluttering local storage. The system lacked inline preview functionality for viewing attachments directly in the browser without downloading. Users frequently requested ability to quickly preview PDFs and images without the download step.
+
+-   **Decision**: Implement inline file preview system by creating a new `previewAttachment()` method alongside the existing `downloadAttachment()` method. Replace download buttons with preview buttons that open files in new tabs using `target="_blank"` and `Content-Disposition: inline` headers.
+
+-   **Alternatives Considered**:
+
+    1. **Keep download-only approach** - Rejected because it creates poor user experience with unnecessary downloads and storage clutter.
+
+    2. **Implement client-side preview with JavaScript** - Rejected because it requires additional libraries, increases bundle size, and doesn't work for all file types.
+
+    3. **Use third-party preview services** - Rejected because it adds external dependencies, potential security concerns, and additional costs.
+
+    4. **Create separate preview pages with embedded viewers** - Rejected because it adds complexity and doesn't leverage browser's native capabilities.
+
+    5. **Hybrid approach (preview + download options)** - Considered but rejected because it adds UI complexity and most users prefer preview-only workflow.
+
+-   **Implementation**:
+
+    **Backend Changes**:
+
+    ```php
+    // app/Http/Controllers/AdditionalDocumentController.php
+    public function previewAttachment(AdditionalDocument $additionalDocument)
+    {
+        // Same permission checks as download method
+        $user = Auth::user();
+        // ... permission validation logic ...
+
+        $filePath = storage_path('app/public/' . $additionalDocument->attachment);
+        $mimeType = mime_content_type($filePath);
+        $fileName = basename($additionalDocument->attachment);
+
+        return response()->file($filePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+        ]);
+    }
+    ```
+
+    **Route Addition**:
+
+    ```php
+    // routes/additional-docs.php
+    Route::get('{additionalDocument}/preview', [AdditionalDocumentController::class, 'previewAttachment'])->name('preview');
+    ```
+
+    **Frontend Changes**:
+
+    ```blade
+    {{-- Before: Download Button --}}
+    <a href="{{ route('additional-documents.download', $additionalDocument) }}"
+       class="btn btn-info" target="_blank">
+        <i class="fas fa-download"></i> Download Attachment
+    </a>
+
+    {{-- After: Preview Button --}}
+    <a href="{{ route('additional-documents.preview', $additionalDocument) }}"
+       class="btn btn-info" target="_blank">
+        <i class="fas fa-eye"></i> Preview Attachment
+    </a>
+    ```
+
+-   **Consequences**:
+
+    -   **Positive**: Improved user experience with faster file access, reduced local storage usage, better workflow integration with new tab opening, leverages browser's native file viewing capabilities
+    -   **Negative**: None significant - maintains same security model and permission controls
+    -   **Trade-offs**: Slightly different user behavior (preview vs download), but provides better overall experience
+
+-   **Review Date**: 2025-12-15 (2 months from implementation)
+
+---
+
 ## 2025-10-14 — Enhanced Document Re-distribution System
 
 -   **Context**: The system was preventing re-distribution of completed documents (`distribution_status = 'distributed'`), limiting business flexibility where documents need to be sent between departments multiple times. Users reported inability to find previously distributed documents in the distribution create page.

@@ -153,9 +153,9 @@
                                         <div class="form-group">
                                             <label><strong>Attachment:</strong></label>
                                             <div class="alert alert-info">
-                                                <a href="{{ route('additional-documents.download', $additionalDocument) }}"
+                                                <a href="{{ route('additional-documents.preview', $additionalDocument) }}"
                                                     class="btn btn-info" target="_blank">
-                                                    <i class="fas fa-download"></i> Download Attachment
+                                                    <i class="fas fa-eye"></i> Preview Attachment
                                                 </a>
                                                 <small class="ml-2">File:
                                                     {{ basename($additionalDocument->attachment) }}</small>

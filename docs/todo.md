@@ -2,6 +2,62 @@
 
 ## 🎯 **Current Sprint**
 
+### **Attachment Preview Functionality Implementation** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED & PRODUCTION READY**  
+**Implementation Date**: 2025-10-15  
+**Requested By**: User  
+**Priority**: MEDIUM - User experience enhancement
+
+**Feature**: Replaced download buttons with preview buttons for attachment files, enabling users to view attachments directly in the browser without downloading them.
+
+**Key Deliverables**:
+
+1. **Backend Preview Method** ✅
+
+    - Created `previewAttachment()` method in `AdditionalDocumentController`
+    - Uses `response()->file()` with `Content-Disposition: inline` for browser preview
+    - Maintains same permission checks and security as download method
+    - Detects MIME type using `mime_content_type()` for proper Content-Type headers
+
+2. **Preview Route Addition** ✅
+
+    - Added `GET {additionalDocument}/preview` route in `routes/additional-docs.php`
+    - Routes to `previewAttachment` method for inline file viewing
+    - Maintains same security and permission model
+
+3. **Frontend UI Updates** ✅
+
+    - Updated document show page: "Download Attachment" → "Preview Attachment" with eye icon (👁️)
+    - Updated document edit page: "Download Current" → "Preview Current" with eye icon (👁️)
+    - Added `target="_blank"` to open preview in new tab
+    - Maintains same styling and layout consistency
+
+4. **User Experience Improvements** ✅
+
+    - Users can preview files without downloading them
+    - Preview opens in new tab without interrupting current workflow
+    - Leverages browser's built-in PDF/image viewers
+    - Faster access to attachment content
+
+**Test Results**:
+
+-   ✅ **Preview Button Display**: Successfully shows "Preview Attachment" with eye icon (👁️)
+-   ✅ **New Tab Opening**: Clicking preview button opens new tab with `target="_blank"`
+-   ✅ **File Preview**: PDF opens in browser for inline viewing instead of downloading
+-   ✅ **Permission System**: Maintains same access controls as download functionality
+-   ✅ **User Experience**: Users can now preview files without downloading them
+
+**Files Modified**:
+
+-   `app/Http/Controllers/AdditionalDocumentController.php` - Added previewAttachment() method
+-   `routes/additional-docs.php` - Added preview route
+-   `resources/views/additional_documents/show.blade.php` - Updated download to preview button
+-   `resources/views/additional_documents/edit.blade.php` - Updated download to preview button
+-   `MEMORY.md` - Documented implementation details and testing results
+
+---
+
 ### **Document Re-distribution System Enhancement** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED & PRODUCTION READY**  

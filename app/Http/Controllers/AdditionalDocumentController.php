@@ -424,6 +424,45 @@ class AdditionalDocumentController extends Controller
         return response()->download($filePath);
     }
 
+    public function previewAttachment(AdditionalDocument $additionalDocument)
+    {
+        $user = Auth::user();
+
+        // Check if user can view this document
+        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+            $userLocationCode = $user->department_location_code;
+            if ($userLocationCode) {
+                // User has department, check if document location matches
+                if ($additionalDocument->cur_loc !== $userLocationCode) {
+                    abort(403, 'You do not have permission to preview this attachment.');
+                }
+            } else {
+                // User has no department, only allow previewing documents with no location or 'DEFAULT' location
+                if ($additionalDocument->cur_loc && $additionalDocument->cur_loc !== 'DEFAULT') {
+                    abort(403, 'You do not have permission to preview this attachment.');
+                }
+            }
+        }
+
+        if (!$additionalDocument->attachment) {
+            abort(404, 'No attachment found for this document.');
+        }
+
+        $filePath = storage_path('app/public/' . $additionalDocument->attachment);
+
+        if (!file_exists($filePath)) {
+            abort(404, 'Attachment file not found.');
+        }
+
+        $mimeType = mime_content_type($filePath);
+        $fileName = basename($additionalDocument->attachment);
+
+        return response()->file($filePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+        ]);
+    }
+
     public function import()
     {
         $this->authorize('import-additional-documents');

@@ -6,6 +6,127 @@ The DDS (Document Distribution System) is a comprehensive Laravel 11+ applicatio
 
 ## 🎨 **UI/UX Architecture Patterns**
 
+### **Attachment Preview Architecture** ✅ **IMPLEMENTED** (2025-10-15)
+
+**Pattern**: Inline file preview system for attachment viewing without downloads
+
+**Business Context**: Users frequently need to view attachment files (PDFs, images, documents) but downloading every file creates storage clutter and slows down workflow. The system needed inline preview capability to improve user experience.
+
+**Architecture**:
+
+```
+Attachment Preview System
+├── Controller Methods (AdditionalDocumentController)
+│   ├── downloadAttachment() - Legacy download method (preserved)
+│   └── previewAttachment() - New inline preview method
+│       ├── Same permission checks as download
+│       ├── Uses response()->file() with Content-Disposition: inline
+│       ├── Detects MIME type for proper Content-Type headers
+│       └── Serves file for browser inline viewing
+│
+├── Route Configuration (routes/additional-docs.php)
+│   ├── GET {additionalDocument}/download - Legacy download route
+│   └── GET {additionalDocument}/preview - New preview route
+│
+├── Frontend Implementation
+│   ├── Document Show Page (show.blade.php)
+│   │   ├── "Download Attachment" → "Preview Attachment"
+│   │   ├── Download icon (📥) → Eye icon (👁️)
+│   │   └── target="_blank" for new tab opening
+│   │
+│   └── Document Edit Page (edit.blade.php)
+│       ├── "Download Current" → "Preview Current"
+│       ├── Download icon (📥) → Eye icon (👁️)
+│       └── target="_blank" for new tab opening
+│
+└── Browser Integration
+    ├── PDF files: Opens in browser's built-in PDF viewer
+    ├── Images: Displays inline using browser's image viewer
+    ├── Documents: Uses browser's document preview capabilities
+    └── New tab: Maintains workflow continuity
+```
+
+**Implementation Details**:
+
+```php
+// Controller: app/Http/Controllers/AdditionalDocumentController.php
+public function previewAttachment(AdditionalDocument $additionalDocument)
+{
+    // Same permission checks as download method
+    $user = Auth::user();
+    if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+        $userLocationCode = $user->department_location_code;
+        if ($userLocationCode) {
+            if ($additionalDocument->cur_loc !== $userLocationCode) {
+                abort(403, 'You do not have permission to preview this attachment.');
+            }
+        } else {
+            if ($additionalDocument->cur_loc && $additionalDocument->cur_loc !== 'DEFAULT') {
+                abort(403, 'You do not have permission to preview this attachment.');
+            }
+        }
+    }
+
+    if (!$additionalDocument->attachment) {
+        abort(404, 'No attachment found for this document.');
+    }
+
+    $filePath = storage_path('app/public/' . $additionalDocument->attachment);
+    if (!file_exists($filePath)) {
+        abort(404, 'Attachment file not found.');
+    }
+
+    $mimeType = mime_content_type($filePath);
+    $fileName = basename($additionalDocument->attachment);
+
+    return response()->file($filePath, [
+        'Content-Type' => $mimeType,
+        'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+    ]);
+}
+```
+
+**Key Differences from Download**:
+
+-   **Response Method**: `response()->file()` instead of `response()->download()`
+-   **Content Disposition**: `inline` instead of `attachment`
+-   **User Experience**: Browser preview instead of forced download
+-   **Workflow**: New tab opening with `target="_blank"`
+
+**Frontend Implementation**:
+
+```blade
+{{-- Before: Download Button --}}
+<a href="{{ route('additional-documents.download', $additionalDocument) }}"
+   class="btn btn-info" target="_blank">
+    <i class="fas fa-download"></i> Download Attachment
+</a>
+
+{{-- After: Preview Button --}}
+<a href="{{ route('additional-documents.preview', $additionalDocument) }}"
+   class="btn btn-info" target="_blank">
+    <i class="fas fa-eye"></i> Preview Attachment
+</a>
+```
+
+**Key Benefits**:
+
+-   ✅ **Improved UX**: Users can quickly preview files without downloading
+-   ✅ **Reduced Storage**: No unnecessary local file downloads
+-   ✅ **Faster Access**: Leverages browser's built-in file viewers
+-   ✅ **Same Security**: Maintains all existing permission controls
+-   ✅ **Better Workflow**: Preview opens in new tab without interrupting current work
+-   ✅ **Browser Integration**: Uses native PDF/image viewing capabilities
+
+**Files**:
+
+-   `app/Http/Controllers/AdditionalDocumentController.php` - Added previewAttachment() method
+-   `routes/additional-docs.php` - Added preview route
+-   `resources/views/additional_documents/show.blade.php` - Updated to preview button
+-   `resources/views/additional_documents/edit.blade.php` - Updated to preview button
+
+---
+
 ### **Separate Print Template Architecture** ✅ **IMPLEMENTED** (2025-10-11)
 
 **Pattern**: Document type-specific print templates for optimized transmittal advice generation

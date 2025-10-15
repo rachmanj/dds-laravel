@@ -1,3 +1,123 @@
+### 2025-10-15 — Attachment Preview Functionality Implementation
+
+-   **Feature**: Replaced download buttons with preview buttons for attachment files
+-   **Scope**: Additional Documents attachment viewing functionality
+-   **Implementation Date**: 2025-10-15
+-   **Status**: ✅ **COMPLETED & TESTED**
+
+#### **Problem Statement**
+
+Users needed to download attachment files to view them, which created unnecessary file downloads and cluttered their local storage. The system lacked inline preview functionality for viewing attachments directly in the browser without downloading.
+
+#### **Solution Implemented**
+
+**Backend Changes:**
+
+1. **Created Preview Method** (`app/Http/Controllers/AdditionalDocumentController.php`):
+
+    - Added `previewAttachment()` method alongside existing `downloadAttachment()` method
+    - Uses `response()->file()` with `Content-Disposition: inline` for browser preview
+    - Maintains same permission checks and security as download method
+    - Detects MIME type using `mime_content_type()` for proper Content-Type headers
+
+2. **Added Preview Route** (`routes/additional-docs.php`):
+    - Added `GET {additionalDocument}/preview` route
+    - Routes to `previewAttachment` method for inline file viewing
+
+**Frontend Enhancements:**
+
+3. **Updated Document Show Page** (`resources/views/additional_documents/show.blade.php`):
+
+    - Changed "Download Attachment" button to "Preview Attachment"
+    - Updated icon from download (📥) to eye/preview (👁️)
+    - Added `target="_blank"` to open preview in new tab
+    - Maintains same styling and layout
+
+4. **Updated Document Edit Page** (`resources/views/additional_documents/edit.blade.php`):
+    - Changed "Download Current" button to "Preview Current"
+    - Updated icon from download (📥) to eye/preview (👁️)
+    - Added `target="_blank"` to open preview in new tab
+    - Maintains same styling and layout
+
+#### **Technical Implementation**
+
+**Preview Method Details:**
+
+```php
+public function previewAttachment(AdditionalDocument $additionalDocument)
+{
+    // Same permission checks as download method
+    $user = Auth::user();
+    // ... permission validation logic ...
+
+    $filePath = storage_path('app/public/' . $additionalDocument->attachment);
+    $mimeType = mime_content_type($filePath);
+    $fileName = basename($additionalDocument->attachment);
+
+    return response()->file($filePath, [
+        'Content-Type' => $mimeType,
+        'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+    ]);
+}
+```
+
+**Key Differences from Download:**
+
+-   Uses `response()->file()` instead of `response()->download()`
+-   Sets `Content-Disposition: inline` instead of `attachment`
+-   Opens in browser for inline viewing instead of forcing download
+
+#### **Testing Results**
+
+✅ **Preview Button Display**: Successfully shows "Preview Attachment" with eye icon (👁️)
+
+-   Tested on document "TEST-FILE-INPUT-2025-001" with PDF attachment
+-   Button displays correctly with proper styling and icon
+
+✅ **New Tab Opening**: Clicking preview button opens new tab with `target="_blank"`
+
+-   Preview opens in new tab without interrupting current workflow
+-   Original document details page remains accessible
+
+✅ **File Preview**: PDF opens in browser for inline viewing instead of downloading
+
+-   PDF displays directly in browser using built-in PDF viewer
+-   No local file download required
+
+✅ **Permission System**: Maintains same access controls as download functionality
+
+-   Same user permission checks applied
+-   Department location restrictions maintained
+-   Security model unchanged
+
+✅ **User Experience**: Users can now preview files without downloading them
+
+-   Faster access to attachment content
+-   No local storage clutter
+-   Better workflow integration
+
+#### **Impact**
+
+✅ **Improved User Experience** - Users can quickly preview files without downloading  
+✅ **Reduced Storage Usage** - No unnecessary local file downloads  
+✅ **Faster Access** - Leverages browser's built-in file viewers  
+✅ **Same Security** - Maintains all existing permission controls  
+✅ **Better Workflow** - Preview opens in new tab without interrupting current work  
+✅ **Browser Integration** - Uses native PDF/image viewing capabilities
+
+#### **Files Modified**
+
+1. `app/Http/Controllers/AdditionalDocumentController.php` (lines 427-464)
+    - Added `previewAttachment()` method with inline file serving
+2. `routes/additional-docs.php` (line 42)
+    - Added preview route: `GET {additionalDocument}/preview`
+3. `resources/views/additional_documents/show.blade.php` (lines 156-159)
+    - Updated download button to preview button with eye icon
+4. `resources/views/additional_documents/edit.blade.php` (lines 374-377)
+    - Updated download button to preview button with eye icon
+
+---
+
 ### 2025-10-14 — Enhanced Distribution System to Allow Re-distribution of Completed Documents
 
 -   **Feature**: Modified system to allow re-distribution of completed documents for business flexibility
