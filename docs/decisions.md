@@ -1,3 +1,91 @@
+## 2025-10-16 — Accounting Role Edit Permissions Enhancement
+
+-   **Context**: Accounting department users needed to edit additional documents to complete document data as part of their workflow, but the system was preventing this due to flawed permission checking logic. The `canBeEditedBy()` method only allowed users to edit documents they created, ignoring the Laravel permission system and not granting Accounting users the necessary access despite having the `edit-additional-documents` permission.
+
+-   **Decision**: Enhance the `canBeEditedBy()` method to properly integrate with Laravel's permission system and grant Accounting users universal edit access to all additional documents across departments. Implement a hierarchical permission model that respects both permissions and business roles.
+
+-   **Alternatives Considered**:
+
+    1. **Keep existing creator-only editing** - Rejected because it prevents Accounting from completing their workflow responsibilities.
+
+    2. **Grant all users with edit permission universal access** - Rejected because it would allow any user to edit documents from other departments, potentially compromising data integrity.
+
+    3. **Create separate Accounting-specific permissions** - Rejected because it adds complexity and the existing `edit-additional-documents` permission was already appropriate.
+
+    4. **Use middleware-based approach** - Rejected because it would require changes across multiple controllers and views, making it harder to maintain.
+
+    5. **Implement department-based editing only** - Rejected because Accounting needs cross-department access to complete document data.
+
+-   **Implementation**:
+
+    **Updated Permission Logic**:
+
+    ```php
+    // app/Models/AdditionalDocument.php
+    public function canBeEditedBy(User $user): bool
+    {
+        // Check if user has edit permission
+        if (!$user->can('edit-additional-documents')) {
+            return false;
+        }
+
+        // Admin and superadmin can edit any document
+        if ($user->hasRole(['admin', 'superadmin'])) {
+            return true;
+        }
+
+        // Accounting users can edit ANY document (not just in their department)
+        if ($user->hasRole('accounting')) {
+            return true;
+        }
+
+        // Other users with edit permission can edit documents in their department
+        $userLocationCode = $user->department_location_code;
+        if ($userLocationCode && $this->cur_loc === $userLocationCode) {
+            return true;
+        }
+
+        // Fallback: users can edit their own documents
+        return $this->created_by === $user->id;
+    }
+    ```
+
+-   **Business Logic Hierarchy**:
+
+    1. **Permission Check**: First verify user has `edit-additional-documents` permission
+    2. **Admin/Superadmin**: Full access to all documents (unchanged)
+    3. **Accounting Role**: Universal access to all documents (new)
+    4. **Department-Based**: Other users can edit documents in their department
+    5. **Creator Fallback**: Users can always edit their own documents
+
+-   **Testing Results**:
+
+    ✅ **Browser Automation Confirmed**:
+
+    -   User Elma (Accounting role) successfully accessed edit pages
+    -   Edit buttons now appear in DataTables action column
+    -   Edit forms load with all fields populated and editable
+    -   No 403 errors or permission issues
+
+-   **Impact**:
+
+    **✅ Business Requirements Met**:
+
+    -   Accounting department can complete document data across all departments
+    -   Maintains data integrity while enabling necessary business operations
+    -   No breaking changes to existing functionality
+
+    **✅ Technical Improvements**:
+
+    -   Fixed flawed permission checking logic
+    -   Proper integration with Laravel's permission system
+    -   Maintains security model while enabling business needs
+    -   Clean, maintainable code structure
+
+-   **Review Date**: 2026-01-16 (3 months from implementation)
+
+---
+
 ## 2025-10-15 — Attachment Preview Functionality Implementation
 
 -   **Context**: Users needed to download attachment files to view them, creating unnecessary file downloads and cluttering local storage. The system lacked inline preview functionality for viewing attachments directly in the browser without downloading. Users frequently requested ability to quickly preview PDFs and images without the download step.

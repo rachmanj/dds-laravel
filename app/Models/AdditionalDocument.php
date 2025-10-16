@@ -89,12 +89,28 @@ class AdditionalDocument extends Model
      */
     public function canBeEditedBy(User $user): bool
     {
+        // Check if user has edit permission
+        if (!$user->can('edit-additional-documents')) {
+            return false;
+        }
+
         // Admin and superadmin can edit any document
         if ($user->hasRole(['admin', 'superadmin'])) {
             return true;
         }
 
-        // Regular users can only edit their own documents
+        // Accounting users can edit ANY document (not just in their department)
+        if ($user->hasRole('accounting')) {
+            return true;
+        }
+
+        // Other users with edit permission can edit documents in their department
+        $userLocationCode = $user->department_location_code;
+        if ($userLocationCode && $this->cur_loc === $userLocationCode) {
+            return true;
+        }
+
+        // Fallback: users can edit their own documents
         return $this->created_by === $user->id;
     }
 

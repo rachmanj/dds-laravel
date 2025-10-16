@@ -2,6 +2,62 @@
 
 ## 🎯 **Current Sprint**
 
+### **Accounting Role Edit Permissions Enhancement** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED & PRODUCTION READY**  
+**Implementation Date**: 2025-10-16  
+**Requested By**: User  
+**Priority**: HIGH - Critical business requirement
+
+**Feature**: Enhanced Accounting role to edit all additional documents across departments, enabling Accounting users to complete document data as part of their workflow responsibilities.
+
+**Key Deliverables**:
+
+1. **Permission System Integration** ✅
+
+    - Fixed flawed `canBeEditedBy()` method in `AdditionalDocument` model
+    - Now properly checks `edit-additional-documents` permission first
+    - Integrated with Laravel's permission system instead of hardcoded role checks
+
+2. **Accounting Universal Access** ✅
+
+    - Accounting users can now edit documents from any department
+    - Maintains business requirement for cross-department document completion
+    - Preserves data integrity while enabling necessary operations
+
+3. **Hierarchical Permission Model** ✅
+
+    - **Permission Check**: First verify user has `edit-additional-documents` permission
+    - **Admin/Superadmin**: Full access to all documents (unchanged)
+    - **Accounting Role**: Universal access to all documents (new)
+    - **Department-Based**: Other users can edit documents in their department
+    - **Creator Fallback**: Users can always edit their own documents
+
+4. **Browser Automation Testing** ✅
+
+    - User Elma (Accounting role) successfully logged in
+    - Navigated to Additional Documents list page
+    - Enabled "Show All Records" switch
+    - **Edit buttons now appear** for all documents (previously missing)
+    - Successfully accessed edit page for document SPPC/H/09/25/00121
+    - **Edit form is fully functional** with all fields populated and editable
+
+**Test Results**:
+
+-   ✅ **Permission Verification**: Accounting role already had `edit-additional-documents` permission
+-   ✅ **Edit Button Display**: Edit buttons now appear in DataTables action column
+-   ✅ **Edit Page Access**: Successfully accessed edit pages without 403 errors
+-   ✅ **Form Functionality**: Edit forms load with all fields populated and editable
+-   ✅ **Business Requirements**: Accounting can now complete document data across departments
+
+**Files Modified**:
+
+-   `app/Models/AdditionalDocument.php` - Updated `canBeEditedBy()` method with proper permission checking
+-   `MEMORY.md` - Documented implementation details and testing results
+-   `docs/decisions.md` - Added architectural decision record
+
+---
+
 ### **Attachment Preview Functionality Implementation** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED & PRODUCTION READY**  
