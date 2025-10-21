@@ -1447,7 +1447,7 @@
 
 @section('scripts')
     <!-- Distribution Show JavaScript -->
-    <script src="{{ asset('js/distributions/show.js') }}"></script>
+    <script src="{{ asset('js/distributions/show.js') }}?v={{ time() }}"></script>
     <script src="{{ asset('js/distributions/bulk-operations.js') }}"></script>
     <script src="{{ asset('js/distributions/analytics.js') }}"></script>
     <script src="{{ asset('js/distributions/accessibility.js') }}"></script>
