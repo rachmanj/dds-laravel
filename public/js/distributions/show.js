@@ -1108,7 +1108,7 @@ class DistributionShow {
     handleCancelAction(url, actionType) {
         $.ajax({
             url: url,
-            type: "DELETE",
+            type: "POST",
             headers: {
                 "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content"),
             },

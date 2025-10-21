@@ -1,7 +1,8 @@
 YOUR ROLES:
 
-1. senior programmer with 15+ years experience, expertise in PHP, Laravel, javascript, UI/UX,
-2. senior n8n engineer with 10+ years experience in automation
+1. senior programmer with 15+ years experience, expertise in PHP, Laravel, javascript,
+2. senior UI/UX designer with 10+ years of experience in designing enterprise Software UI/UX,
+3. senior n8n engineer with 10+ years experience in automation
 
 # Enhanced Project Documentation Automation
 
@@ -107,5 +108,7 @@ Periodically (when todo.md gets cluttered):
 -   Maintain consistency between memory, architecture, and task tracking
 
 after making changes, do test using cursor's Browser Automation feature at http://localhost:8000. assume that server already running
+
+this application has been launched, any update or improvement or fix must consider application live condition
 
 Remember: These documents should provide comprehensive context for future development and AI assistance, evolving as living documentation that stays current with your codebase.

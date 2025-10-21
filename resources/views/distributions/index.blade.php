@@ -255,12 +255,7 @@
                             </div>
                             @endif
 
-                            <!-- Pagination -->
-                            @if ($distributions->count() > 0)
-                                <div class="d-flex justify-content-center mt-3">
-                                    {{ $distributions->links() }}
-                                </div>
-                            @endif
+                            <!-- Pagination handled by DataTables -->
                         </div>
                     </div>
                 </div>
@@ -313,6 +308,7 @@
                 order: [
                     [0, 'asc']
                 ],
+                pagingType: 'full_numbers',
                 language: {
                     search: "Search:",
                     lengthMenu: "Show _MENU_ entries per page",
@@ -323,7 +319,10 @@
                         next: "Next",
                         previous: "Previous"
                     }
-                }
+                },
+                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                    '<"row"<"col-sm-12"tr>>' +
+                    '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
             });
 
             // Search functionality
