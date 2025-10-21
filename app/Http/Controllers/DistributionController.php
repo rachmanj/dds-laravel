@@ -25,7 +25,7 @@ class DistributionController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
         $user = Auth::user();
         $query = Distribution::with(['type', 'originDepartment', 'destinationDepartment', 'creator']);
@@ -50,7 +50,27 @@ class DistributionController extends Controller
             }
         }
 
-        $distributions = $query->latest()->paginate(15);
+        // Server-side search functionality
+        if ($request->filled('search_distribution_number')) {
+            $query->where('distribution_number', 'like', '%' . $request->search_distribution_number . '%');
+        }
+
+        if ($request->filled('search_status') && $request->search_status !== 'all') {
+            $query->where('status', $request->search_status);
+        }
+
+        if ($request->filled('search_type') && $request->search_type !== 'all') {
+            $query->where('type_id', $request->search_type);
+        }
+
+        if ($request->filled('search_department') && $request->search_department !== 'all') {
+            $query->where(function ($q) use ($request) {
+                $q->where('origin_department_id', $request->search_department)
+                    ->orWhere('destination_department_id', $request->search_department);
+            });
+        }
+
+        $distributions = $query->latest()->paginate(15)->withQueryString();
         $distributionTypes = DistributionType::active()->get();
         $departments = Department::orderBy('name')->get();
 

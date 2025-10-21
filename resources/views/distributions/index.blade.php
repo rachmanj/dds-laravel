@@ -69,7 +69,8 @@
                                             </div>
                                         </div>
                                         <div class="card-body" style="display: none;">
-                                            <form id="searchForm">
+                                            <form id="searchForm" method="GET"
+                                                action="{{ route('distributions.index') }}">
                                                 <div class="row">
                                                     <div class="col-md-3">
                                                         <div class="form-group">
@@ -77,33 +78,48 @@
                                                                 Number</label>
                                                             <input type="text" class="form-control"
                                                                 id="search_distribution_number"
+                                                                name="search_distribution_number"
+                                                                value="{{ request('search_distribution_number') }}"
                                                                 placeholder="Search by number">
                                                         </div>
                                                     </div>
                                                     <div class="col-md-3">
                                                         <div class="form-group">
                                                             <label for="search_status">Status</label>
-                                                            <select class="form-control" id="search_status">
+                                                            <select class="form-control" id="search_status"
+                                                                name="search_status">
                                                                 <option value="">All Statuses</option>
-                                                                <option value="draft">Draft</option>
-                                                                <option value="verified_by_sender">Verified by Sender
-                                                                </option>
-                                                                <option value="sent">Sent</option>
-                                                                <option value="received">Received</option>
-                                                                <option value="verified_by_receiver">Verified by Receiver
-                                                                </option>
-                                                                <option value="completed">Completed</option>
+                                                                <option value="draft"
+                                                                    {{ request('search_status') == 'draft' ? 'selected' : '' }}>
+                                                                    Draft</option>
+                                                                <option value="verified_by_sender"
+                                                                    {{ request('search_status') == 'verified_by_sender' ? 'selected' : '' }}>
+                                                                    Verified by Sender</option>
+                                                                <option value="sent"
+                                                                    {{ request('search_status') == 'sent' ? 'selected' : '' }}>
+                                                                    Sent</option>
+                                                                <option value="received"
+                                                                    {{ request('search_status') == 'received' ? 'selected' : '' }}>
+                                                                    Received</option>
+                                                                <option value="verified_by_receiver"
+                                                                    {{ request('search_status') == 'verified_by_receiver' ? 'selected' : '' }}>
+                                                                    Verified by Receiver</option>
+                                                                <option value="completed"
+                                                                    {{ request('search_status') == 'completed' ? 'selected' : '' }}>
+                                                                    Completed</option>
                                                             </select>
                                                         </div>
                                                     </div>
                                                     <div class="col-md-3">
                                                         <div class="form-group">
                                                             <label for="search_type">Distribution Type</label>
-                                                            <select class="form-control" id="search_type">
+                                                            <select class="form-control" id="search_type"
+                                                                name="search_type">
                                                                 <option value="">All Types</option>
                                                                 @foreach ($distributionTypes as $type)
-                                                                    <option value="{{ $type->id }}">{{ $type->name }}
-                                                                    </option>
+                                                                    <option value="{{ $type->id }}"
+                                                                        {{ request('search_type') == $type->id ? 'selected' : '' }}>
+                                                                        {{ $type->name }}</option>
                                                                 @endforeach
                                                             </select>
                                                         </div>
@@ -111,11 +127,13 @@
                                                     <div class="col-md-3">
                                                         <div class="form-group">
                                                             <label for="search_department">Department</label>
-                                                            <select class="form-control" id="search_department">
+                                                            <select class="form-control" id="search_department"
+                                                                name="search_department">
                                                                 <option value="">All Departments</option>
                                                                 @foreach ($departments as $dept)
-                                                                    <option value="{{ $dept->id }}">{{ $dept->name }}
-                                                                    </option>
+                                                                    <option value="{{ $dept->id }}"
+                                                                        {{ request('search_department') == $dept->id ? 'selected' : '' }}>
+                                                                        {{ $dept->name }}</option>
                                                                 @endforeach
                                                             </select>
                                                         </div>
@@ -123,12 +141,13 @@
                                                 </div>
                                                 <div class="row mt-2">
                                                     <div class="col-md-12">
-                                                        <button type="button" class="btn btn-primary" id="applySearch">
+                                                        <button type="submit" class="btn btn-primary">
                                                             <i class="fas fa-search"></i> Apply Search
                                                         </button>
-                                                        <button type="button" class="btn btn-secondary" id="clearSearch">
+                                                        <a href="{{ route('distributions.index') }}"
+                                                            class="btn btn-secondary">
                                                             <i class="fas fa-times"></i> Clear Search
-                                                        </button>
+                                                        </a>
                                                     </div>
                                                 </div>
                                             </form>
@@ -255,7 +274,16 @@
                             </div>
                             @endif
 
-                            <!-- Pagination handled by DataTables -->
+                            <!-- Laravel Pagination -->
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <div>
+                                    Showing {{ $distributions->firstItem() ?? 0 }} to
+                                    {{ $distributions->lastItem() ?? 0 }} of {{ $distributions->total() }} entries
+                                </div>
+                                <div>
+                                    {{ $distributions->links() }}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -300,15 +328,14 @@
 
     <script>
         $(document).ready(function() {
-            // Initialize DataTable
+            // Initialize DataTable with server-side search disabled
             var table = $('#distributions-table').DataTable({
                 responsive: true,
                 autoWidth: false,
-                pageLength: 15,
-                order: [
-                    [0, 'asc']
-                ],
-                pagingType: 'full_numbers',
+                searching: false, // Disable client-side search
+                paging: false, // Disable client-side pagination
+                ordering: true, // Keep sorting enabled
+                info: false, // Disable info display (handled by Laravel pagination)
                 language: {
                     search: "Search:",
                     lengthMenu: "Show _MENU_ entries per page",
@@ -320,52 +347,10 @@
                         previous: "Previous"
                     }
                 },
-                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
-                    '<"row"<"col-sm-12"tr>>' +
-                    '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                dom: '<"row"<"col-sm-12"tr>>' // Simplified DOM without search and pagination
             });
 
-            // Search functionality
-            $('#applySearch').click(function() {
-                var distributionNumber = $('#search_distribution_number').val();
-                var status = $('#search_status').val();
-                var type = $('#search_type').val();
-                var department = $('#search_department').val();
-
-                table.draw();
-
-                // Custom filtering
-                $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-                    var rowDistributionNumber = data[1];
-                    var rowStatus = data[5];
-                    var rowType = data[2];
-                    var rowOrigin = data[3];
-
-                    if (distributionNumber && !rowDistributionNumber.toLowerCase().includes(
-                            distributionNumber.toLowerCase())) {
-                        return false;
-                    }
-                    if (status && !rowStatus.toLowerCase().includes(status.toLowerCase())) {
-                        return false;
-                    }
-                    if (type && !rowType.toLowerCase().includes(type.toLowerCase())) {
-                        return false;
-                    }
-                    if (department && !rowOrigin.toLowerCase().includes(department.toLowerCase())) {
-                        return false;
-                    }
-                    return true;
-                });
-
-                table.draw();
-            });
-
-            // Clear search
-            $('#clearSearch').click(function() {
-                $('#searchForm')[0].reset();
-                $.fn.dataTable.ext.search.pop();
-                table.draw();
-            });
+            // Server-side search is now handled by form submission
 
             // Delete distribution
             $('.delete-distribution').click(function() {
