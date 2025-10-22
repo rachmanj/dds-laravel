@@ -289,6 +289,10 @@ class DistributionController extends Controller
             if ($distributionDocument->document_type === Invoice::class && $distributionDocument->document) {
                 $distributionDocument->document->load('supplier');
             }
+            // Load invoices relationship for AdditionalDocument documents
+            if ($distributionDocument->document_type === AdditionalDocument::class && $distributionDocument->document) {
+                $distributionDocument->document->load('invoices');
+            }
         }
 
         return view('distributions.show', compact('distribution'));

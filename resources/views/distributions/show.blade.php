@@ -517,10 +517,11 @@
                                 <tr>
                                     <th width="20%">Document</th>
                                     <th width="15%">Supplier</th>
+                                    <th width="12%">Invoice No</th>
                                     <th width="13%">Type</th>
-                                    <th width="17%">Sender Status</th>
-                                    <th width="17%">Receiver Status</th>
-                                    <th width="18%">Overall Status</th>
+                                    <th width="15%">Sender Status</th>
+                                    <th width="15%">Receiver Status</th>
+                                    <th width="10%">Overall Status</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -592,6 +593,11 @@
                                         <td>
                                             <small class="text-muted">
                                                 {{ $invoice->supplier->name ?? 'N/A' }}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ $invoice->invoice_number ?? 'N/A' }}
                                             </small>
                                         </td>
                                         <td>
@@ -669,6 +675,11 @@
                                                 <small class="text-muted">-</small>
                                             </td>
                                             <td>
+                                                <small class="text-muted">
+                                                    {{ $invoice->invoice_number ?? 'N/A' }}
+                                                </small>
+                                            </td>
+                                            <td>
                                                 <span class="badge badge-info">Additional Document</span>
                                             </td>
                                             <td>
@@ -729,6 +740,15 @@
                                             </td>
                                             <td>
                                                 <small class="text-muted">-</small>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    @if ($additionalDoc->invoices && $additionalDoc->invoices->count() > 0)
+                                                        {{ $additionalDoc->invoices->pluck('invoice_number')->implode(', ') }}
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </small>
                                             </td>
                                             <td>
                                                 <span class="badge badge-info">Additional Document</span>
@@ -799,6 +819,15 @@
                                                 <small class="text-muted">-</small>
                                             </td>
                                             <td>
+                                                <small class="text-muted">
+                                                    @if ($additionalDoc->invoices && $additionalDoc->invoices->count() > 0)
+                                                        {{ $additionalDoc->invoices->pluck('invoice_number')->implode(', ') }}
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </small>
+                                            </td>
+                                            <td>
                                                 <span class="badge badge-info">Additional Document</span>
                                             </td>
                                             <td>
@@ -832,7 +861,7 @@
 
                                 @if ($distribution->documents->count() === 0)
                                     <tr>
-                                        <td colspan="6" class="text-center py-4">
+                                        <td colspan="7" class="text-center py-4">
                                             <div class="text-muted">
                                                 <i class="fas fa-file-alt fa-2x mb-2"></i>
                                                 <p>No documents found in this distribution</p>
