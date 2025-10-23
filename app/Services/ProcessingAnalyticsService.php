@@ -456,7 +456,7 @@ class ProcessingAnalyticsService
 
     /**
      * Get individual document processing timeline with department-specific aging
-     * Shows complete journey of a document through departments
+     * Shows complete journey of a document through departments with enhanced distribution details
      */
     public function getDocumentProcessingTimeline($documentId, $documentType = 'invoice')
     {
@@ -467,35 +467,146 @@ class ProcessingAnalyticsService
             return null;
         }
 
-        // Get all distributions for this document
+        // Get all distributions for this document with enhanced details
         $distributions = DB::table('distribution_documents as dd')
             ->join('distributions as d', 'dd.distribution_id', '=', 'd.id')
             ->join('departments as origin_dept', 'd.origin_department_id', '=', 'origin_dept.id')
             ->join('departments as dest_dept', 'd.destination_department_id', '=', 'dest_dept.id')
+            ->leftJoin('distribution_types as dt', 'd.type_id', '=', 'dt.id')
+            ->leftJoin('users as creator', 'd.created_by', '=', 'creator.id')
+            ->leftJoin('users as sender_verifier', 'd.sender_verified_by', '=', 'sender_verifier.id')
+            ->leftJoin('users as receiver_verifier', 'd.receiver_verified_by', '=', 'receiver_verifier.id')
             ->where('dd.document_id', $documentId)
             ->where('dd.document_type', $modelClass)
             ->select([
                 'd.id as distribution_id',
                 'd.distribution_number',
-                'd.status',
+                'd.status as distribution_status',
+                'd.document_type',
+                'd.created_at as distribution_created_at',
+                'd.sender_verified_at',
                 'd.sent_at',
                 'd.received_at',
+                'd.receiver_verified_at',
+                'd.sender_verification_notes',
+                'd.receiver_verification_notes',
+                'd.has_discrepancies',
+                'd.notes as distribution_notes',
                 'origin_dept.name as origin_department',
                 'dest_dept.name as destination_department',
                 'origin_dept.id as origin_department_id',
                 'dest_dept.id as destination_department_id',
                 'origin_dept.location_code as origin_location_code',
-                'dest_dept.location_code as destination_location_code'
+                'dest_dept.location_code as destination_location_code',
+                'dt.name as distribution_type',
+                'dt.code as distribution_type_code',
+                'creator.name as created_by_user',
+                'sender_verifier.name as sender_verified_by_user',
+                'receiver_verifier.name as receiver_verified_by_user',
+                'dd.sender_verified as document_sender_verified',
+                'dd.receiver_verified as document_receiver_verified',
+                'dd.sender_verification_status',
+                'dd.receiver_verification_status',
+                'dd.sender_verification_notes as document_sender_notes',
+                'dd.receiver_verification_notes as document_receiver_notes'
             ])
-            ->orderBy('d.sent_at', 'asc')
+            ->orderBy('d.created_at', 'asc')
             ->get();
 
         $timeline = [];
         $currentLocationArrivalDate = $document->current_location_arrival_date;
         $totalProcessingDays = 0;
 
-        // Add initial department (where document was first received)
-        if (!$document->hasBeenDistributed()) {
+        // Build complete timeline including origin and destination departments
+        if ($distributions->count() > 0) {
+            // Document has been distributed - build complete timeline
+            foreach ($distributions as $index => $distribution) {
+                // Add origin department step
+                $originArrivalDate = $distribution->distribution_created_at;
+                $originDepartureDate = $distribution->sent_at;
+
+                // Calculate processing days in origin department
+                $originProcessingDays = 0;
+                if ($originArrivalDate && $originDepartureDate) {
+                    $originProcessingDays = Carbon::parse($originArrivalDate)->diffInDays(Carbon::parse($originDepartureDate));
+                } elseif ($originArrivalDate && !$originDepartureDate) {
+                    // Still in origin department (shouldn't happen for completed distributions)
+                    $originProcessingDays = Carbon::parse($originArrivalDate)->diffInDays(now());
+                }
+
+                $timeline[] = [
+                    'step' => ($index * 2) + 1,
+                    'department' => $distribution->origin_department,
+                    'department_id' => $distribution->origin_department_id,
+                    'location_code' => $distribution->origin_location_code,
+                    'arrival_date' => $originArrivalDate,
+                    'departure_date' => $originDepartureDate,
+                    'processing_days' => $originProcessingDays,
+                    'status' => 'completed',
+                    'distribution_number' => $distribution->distribution_number,
+                    'distribution_type' => $distribution->distribution_type,
+                    'distribution_type_code' => $distribution->distribution_type_code,
+                    'distribution_status' => $distribution->distribution_status,
+                    'next_department' => $distribution->destination_department,
+                    'is_current' => false,
+                    'is_origin' => true,
+                    'verification_details' => [
+                        'sender_verified_at' => $distribution->sender_verified_at,
+                        'sender_verified_by' => $distribution->sender_verified_by_user,
+                        'sender_verification_notes' => $distribution->sender_verification_notes,
+                        'document_sender_verified' => $distribution->document_sender_verified,
+                        'document_sender_status' => $distribution->sender_verification_status,
+                        'document_sender_notes' => $distribution->document_sender_notes
+                    ]
+                ];
+
+                // Add destination department step
+                $destArrivalDate = $distribution->received_at ?? $distribution->sent_at;
+                $destDepartureDate = null; // Will be set by next distribution or remain null if current
+
+                // Check if this is the last distribution to determine if destination is current
+                $isLastDistribution = ($index === count($distributions) - 1);
+                $isCurrentDestination = $isLastDistribution && !$destDepartureDate;
+
+                // Calculate processing days in destination department
+                $destProcessingDays = 0;
+                if ($destArrivalDate && $destDepartureDate) {
+                    $destProcessingDays = Carbon::parse($destArrivalDate)->diffInDays(Carbon::parse($destDepartureDate));
+                } elseif ($destArrivalDate && !$destDepartureDate) {
+                    // Still in destination department
+                    $destProcessingDays = Carbon::parse($destArrivalDate)->diffInDays(now());
+                }
+
+                $timeline[] = [
+                    'step' => ($index * 2) + 2,
+                    'department' => $distribution->destination_department,
+                    'department_id' => $distribution->destination_department_id,
+                    'location_code' => $distribution->destination_location_code,
+                    'arrival_date' => $destArrivalDate,
+                    'departure_date' => $destDepartureDate,
+                    'processing_days' => $destProcessingDays,
+                    'status' => $isCurrentDestination ? 'current' : 'completed',
+                    'distribution_number' => $distribution->distribution_number,
+                    'distribution_type' => $distribution->distribution_type,
+                    'distribution_type_code' => $distribution->distribution_type_code,
+                    'distribution_status' => $distribution->distribution_status,
+                    'next_department' => null, // Will be set by next distribution if exists
+                    'is_current' => $isCurrentDestination,
+                    'is_origin' => false,
+                    'verification_details' => [
+                        'receiver_verified_at' => $distribution->receiver_verified_at,
+                        'receiver_verified_by' => $distribution->receiver_verified_by_user,
+                        'receiver_verification_notes' => $distribution->receiver_verification_notes,
+                        'document_receiver_verified' => $distribution->document_receiver_verified,
+                        'document_receiver_status' => $distribution->receiver_verification_status,
+                        'document_receiver_notes' => $distribution->document_receiver_notes
+                    ]
+                ];
+
+                $totalProcessingDays += $originProcessingDays + $destProcessingDays;
+            }
+        } else {
+            // Document has not been distributed - show current location only
             $daysInCurrentLocation = $document->days_in_current_location;
             $timeline[] = [
                 'step' => 1,
@@ -507,43 +618,15 @@ class ProcessingAnalyticsService
                 'processing_days' => $daysInCurrentLocation,
                 'status' => 'current',
                 'distribution_number' => null,
+                'distribution_type' => null,
+                'distribution_type_code' => null,
+                'distribution_status' => null,
                 'next_department' => null,
-                'is_current' => true
+                'is_current' => true,
+                'is_origin' => false,
+                'verification_details' => null
             ];
             $totalProcessingDays += $daysInCurrentLocation;
-        } else {
-            // Document has been distributed - build timeline from distributions
-            foreach ($distributions as $index => $distribution) {
-                $arrivalDate = $distribution->received_at ?? $distribution->sent_at;
-                $departureDate = $distribution->sent_at;
-
-                // Calculate processing days in this department
-                $processingDays = 0;
-                if ($arrivalDate && $departureDate) {
-                    $processingDays = Carbon::parse($arrivalDate)->diffInDays(Carbon::parse($departureDate));
-                } elseif ($arrivalDate && !$departureDate) {
-                    // Still in this department
-                    $processingDays = Carbon::parse($arrivalDate)->diffInDays(now());
-                }
-
-                $isCurrent = ($index === count($distributions) - 1) && !$departureDate;
-
-                $timeline[] = [
-                    'step' => $index + 1,
-                    'department' => $distribution->origin_department,
-                    'department_id' => $distribution->origin_department_id,
-                    'location_code' => $distribution->origin_location_code,
-                    'arrival_date' => $arrivalDate,
-                    'departure_date' => $departureDate,
-                    'processing_days' => $processingDays,
-                    'status' => $isCurrent ? 'current' : 'completed',
-                    'distribution_number' => $distribution->distribution_number,
-                    'next_department' => $distribution->destination_department,
-                    'is_current' => $isCurrent
-                ];
-
-                $totalProcessingDays += $processingDays;
-            }
         }
 
         // Calculate enhanced metrics
@@ -558,13 +641,36 @@ class ProcessingAnalyticsService
                 'receive_date' => $document->receive_date,
                 'created_at' => $document->created_at,
                 'current_location_arrival_date' => $currentLocationArrivalDate,
-                'days_in_current_location' => $document->days_in_current_location
+                'days_in_current_location' => $document->days_in_current_location,
+                'distribution_status' => $document->distribution_status,
+                'current_location' => $document->cur_loc
             ],
             'timeline' => $timeline,
             'total_processing_days' => $totalProcessingDays,
             'current_status' => $document->distribution_status,
             'metrics' => $metrics,
-            'journey_summary' => $journeySummary
+            'journey_summary' => $journeySummary,
+            'distributions' => $distributions->map(function ($dist) {
+                return [
+                    'id' => $dist->distribution_id,
+                    'distribution_number' => $dist->distribution_number,
+                    'distribution_type' => $dist->distribution_type,
+                    'distribution_type_code' => $dist->distribution_type_code,
+                    'status' => $dist->distribution_status,
+                    'created_at' => $dist->distribution_created_at,
+                    'sender_verified_at' => $dist->sender_verified_at,
+                    'sent_at' => $dist->sent_at,
+                    'received_at' => $dist->received_at,
+                    'receiver_verified_at' => $dist->receiver_verified_at,
+                    'origin_department' => $dist->origin_department,
+                    'destination_department' => $dist->destination_department,
+                    'created_by' => $dist->created_by_user,
+                    'sender_verified_by' => $dist->sender_verified_by_user,
+                    'receiver_verified_by' => $dist->receiver_verified_by_user,
+                    'has_discrepancies' => $dist->has_discrepancies,
+                    'notes' => $dist->distribution_notes
+                ];
+            })
         ];
     }
 
@@ -963,8 +1069,8 @@ class ProcessingAnalyticsService
         $invoices = Invoice::with(['distributions.documents', 'creator.department'])
             ->where('receive_date', '>=', $startDate)
             ->where('receive_date', '<=', $endDate)
-            ->when($department, function($query, $department) {
-                return $query->whereHas('creator.department', function($q) use ($department) {
+            ->when($department, function ($query, $department) {
+                return $query->whereHas('creator.department', function ($q) use ($department) {
                     $q->where('id', $department);
                 });
             })
@@ -974,8 +1080,8 @@ class ProcessingAnalyticsService
         $additionalDocs = AdditionalDocument::with(['distributions.documents', 'creator.department'])
             ->where('receive_date', '>=', $startDate)
             ->where('receive_date', '<=', $endDate)
-            ->when($department, function($query, $department) {
-                return $query->whereHas('creator.department', function($q) use ($department) {
+            ->when($department, function ($query, $department) {
+                return $query->whereHas('creator.department', function ($q) use ($department) {
                     $q->where('id', $department);
                 });
             })
@@ -983,7 +1089,7 @@ class ProcessingAnalyticsService
 
         // Process invoices with department-specific aging
         $invoiceMetrics = $this->processDocumentMetrics($invoices, 'invoice');
-        
+
         // Process additional documents with department-specific aging
         $additionalDocMetrics = $this->processDocumentMetrics($additionalDocs, 'additional_document');
 
@@ -1022,7 +1128,7 @@ class ProcessingAnalyticsService
             $departmentId = $document->creator->department_id ?? null;
             $departmentName = $document->creator->department->name ?? 'Unknown';
             $currentLocationCode = $document->cur_loc;
-            
+
             // Use our new department-specific aging accessors
             $daysInCurrentLocation = $document->days_in_current_location;
             $currentLocationArrivalDate = $document->current_location_arrival_date;
@@ -1086,10 +1192,10 @@ class ProcessingAnalyticsService
         foreach ($metrics['current_location_metrics'] as $locCode => &$locData) {
             if ($locData['total_documents'] > 0) {
                 // Calculate weighted average based on aging categories
-                $totalDays = ($locData['aging_breakdown']['0-7_days'] * 3.5) + 
-                           ($locData['aging_breakdown']['8-14_days'] * 11) + 
-                           ($locData['aging_breakdown']['15-30_days'] * 22.5) + 
-                           ($locData['aging_breakdown']['30_plus_days'] * 45); // Assume 45+ days for 30+ category
+                $totalDays = ($locData['aging_breakdown']['0-7_days'] * 3.5) +
+                    ($locData['aging_breakdown']['8-14_days'] * 11) +
+                    ($locData['aging_breakdown']['15-30_days'] * 22.5) +
+                    ($locData['aging_breakdown']['30_plus_days'] * 45); // Assume 45+ days for 30+ category
                 $locData['avg_days_in_location'] = round($totalDays / $locData['total_documents'], 1);
             }
         }
@@ -1103,7 +1209,7 @@ class ProcessingAnalyticsService
     private function generateDepartmentSpecificSummary($invoiceMetrics, $additionalDocMetrics)
     {
         $totalDocuments = $invoiceMetrics['total_count'] + $additionalDocMetrics['total_count'];
-        
+
         $combinedAgingCategories = [
             '0-7_days' => $invoiceMetrics['aging_categories']['0-7_days'] + $additionalDocMetrics['aging_categories']['0-7_days'],
             '8-14_days' => $invoiceMetrics['aging_categories']['8-14_days'] + $additionalDocMetrics['aging_categories']['8-14_days'],
@@ -1130,9 +1236,9 @@ class ProcessingAnalyticsService
     public function getDepartmentAgingAlerts($department = null)
     {
         $query = Invoice::with(['distributions.documents', 'creator.department']);
-        
+
         if ($department) {
-            $query->whereHas('creator.department', function($q) use ($department) {
+            $query->whereHas('creator.department', function ($q) use ($department) {
                 $q->where('id', $department);
             });
         }
@@ -1140,9 +1246,9 @@ class ProcessingAnalyticsService
         $invoices = $query->get();
 
         $additionalDocsQuery = AdditionalDocument::with(['distributions.documents', 'creator.department']);
-        
+
         if ($department) {
-            $additionalDocsQuery->whereHas('creator.department', function($q) use ($department) {
+            $additionalDocsQuery->whereHas('creator.department', function ($q) use ($department) {
                 $q->where('id', $department);
             });
         }
@@ -1180,7 +1286,7 @@ class ProcessingAnalyticsService
         $daysInCurrentLocation = $document->days_in_current_location;
         $status = $document->distribution_status;
         $departmentName = $document->creator->department->name ?? 'Unknown';
-        
+
         if (!in_array($departmentName, $alerts['departments_affected'])) {
             $alerts['departments_affected'][] = $departmentName;
         }
@@ -1226,14 +1332,14 @@ class ProcessingAnalyticsService
 
         // Get invoices for this department
         $invoices = Invoice::with(['distributions.documents'])
-            ->whereHas('creator.department', function($query) use ($departmentId) {
+            ->whereHas('creator.department', function ($query) use ($departmentId) {
                 $query->where('id', $departmentId);
             })
             ->get();
 
         // Get additional documents for this department
         $additionalDocs = AdditionalDocument::with(['distributions.documents'])
-            ->whereHas('creator.department', function($query) use ($departmentId) {
+            ->whereHas('creator.department', function ($query) use ($departmentId) {
                 $query->where('id', $departmentId);
             })
             ->get();
@@ -1270,7 +1376,7 @@ class ProcessingAnalyticsService
         if (!empty($allDaysInCurrentLocation)) {
             $breakdown['summary']['avg_days_in_current_location'] = round(array_sum($allDaysInCurrentLocation) / count($allDaysInCurrentLocation), 1);
             $breakdown['summary']['max_days_in_current_location'] = max($allDaysInCurrentLocation);
-            
+
             // Calculate efficiency score (0-100, higher is better)
             $avgDays = $breakdown['summary']['avg_days_in_current_location'];
             $efficiencyScore = max(0, 100 - ($avgDays * 2)); // Penalty of 2 points per day

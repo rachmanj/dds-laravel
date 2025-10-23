@@ -325,6 +325,25 @@
                     </div>
                 `;
 
+                // Add distribution summary if available
+                if (data.distributions && data.distributions.length > 0) {
+                    html += `
+                        <div class="alert alert-info mb-3">
+                            <h6><i class="fas fa-route"></i> Distribution Summary</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Total Distributions:</strong> ${data.distributions.length}<br>
+                                    <strong>Current Status:</strong> <span class="badge badge-${data.document.distribution_status === 'distributed' ? 'success' : 'warning'}">${data.document.distribution_status}</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Current Location:</strong> ${data.document.current_location}<br>
+                                    <strong>Total Processing Days:</strong> ${Math.round(data.total_processing_days * 10) / 10} days
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 // Add journey summary if available
                 if (data.journey_summary) {
                     const summary = data.journey_summary;
@@ -343,7 +362,7 @@
                 } else {
                     html += `
                         <div class="timeline-container">
-                            <h6><strong>Department-Specific Processing Timeline (Total: ${Math.round(data.total_processing_days * 10) / 10} days)</strong></h6>
+                            <h6><strong>Complete Document Journey Timeline (Total: ${Math.round(data.total_processing_days * 10) / 10} days)</strong></h6>
                             <div class="timeline">
                     `;
 
@@ -351,16 +370,21 @@
                         const statusClass = getStatusClass(step.status);
                         const statusText = getStatusText(step.status);
                         const isDelayed = step.processing_days > 14;
-                        const itemClass = step.is_current ? 'current' : (isDelayed ? 'delayed' : '');
+                        const itemClass = step.is_current ? 'current' : (isDelayed ? 'delayed' : (step
+                            .is_origin ? 'origin' : 'destination'));
+                        const isOrigin = step.is_origin;
 
                         html += `
                             <div class="timeline-item ${itemClass}">
                                 <div class="timeline-marker">
-                                    <i class="fas fa-${step.is_current ? 'play' : 'check'}"></i>
+                                    <i class="fas fa-${step.is_current ? 'play' : (isOrigin ? 'paper-plane' : 'check')}"></i>
                                 </div>
                                 <div class="timeline-content">
                                     <div class="timeline-header">
-                                        <h6 class="timeline-title">Step ${step.step}: ${step.department}</h6>
+                                        <h6 class="timeline-title">
+                                            Step ${step.step}: ${step.department}
+                                            ${isOrigin ? '<span class="badge badge-secondary ml-2">Origin</span>' : ''}
+                                        </h6>
                                         <span class="timeline-badge ${statusClass}">${statusText}</span>
                                         ${isDelayed ? '<span class="badge badge-danger ml-1">DELAYED</span>' : ''}
                                     </div>
@@ -369,8 +393,24 @@
                                         ${step.departure_date ? `<p><strong>Departure Date:</strong> ${new Date(step.departure_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}).replace(/ /g, '-')}</p>` : ''}
                                         <p><strong>Processing Days:</strong> <span class="timeline-duration ${isDelayed ? 'text-danger' : ''} text-right">${Math.round(step.processing_days * 10) / 10} days</span></p>
                                         ${step.next_department ? `<p><strong>Next Department:</strong> ${step.next_department}</p>` : ''}
-                                        ${step.distribution_number ? `<p><strong>Distribution:</strong> ${step.distribution_number}</p>` : ''}
+                                        ${step.distribution_number ? `<p><strong>Distribution:</strong> <span class="badge badge-info">${step.distribution_number}</span></p>` : ''}
+                                        ${step.distribution_type ? `<p><strong>Distribution Type:</strong> ${step.distribution_type} (${step.distribution_type_code})</p>` : ''}
                                         ${step.location_code ? `<p><strong>Location Code:</strong> ${step.location_code}</p>` : ''}
+                                        
+                                        ${step.verification_details ? `
+                                                <div class="verification-details mt-2">
+                                                    <h6><i class="fas fa-shield-alt"></i> Verification Details</h6>
+                                                    ${isOrigin ? `
+                                                    <p><strong>Sender Verified:</strong> ${step.verification_details.sender_verified_at ? new Date(step.verification_details.sender_verified_at).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}).replace(/ /g, '-') : 'Not verified'}</p>
+                                                    <p><strong>Verified By:</strong> ${step.verification_details.sender_verified_by || 'N/A'}</p>
+                                                    ${step.verification_details.sender_verification_notes ? `<p><strong>Notes:</strong> ${step.verification_details.sender_verification_notes}</p>` : ''}
+                                                ` : `
+                                                    <p><strong>Receiver Verified:</strong> ${step.verification_details.receiver_verified_at ? new Date(step.verification_details.receiver_verified_at).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}).replace(/ /g, '-') : 'Not verified'}</p>
+                                                    <p><strong>Verified By:</strong> ${step.verification_details.receiver_verified_by || 'N/A'}</p>
+                                                    ${step.verification_details.receiver_verification_notes ? `<p><strong>Notes:</strong> ${step.verification_details.receiver_verification_notes}</p>` : ''}
+                                                `}
+                                                </div>
+                                            ` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -578,6 +618,45 @@
         .timeline-duration {
             font-weight: bold;
             color: #007bff;
+        }
+
+        .verification-details {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .verification-details h6 {
+            color: #495057;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .verification-details p {
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+
+        .timeline-item.origin {
+            border-left: 3px solid #17a2b8;
+        }
+
+        .timeline-item.destination {
+            border-left: 3px solid #28a745;
+        }
+
+        .timeline-item.current {
+            border-left: 3px solid #007bff;
+        }
+
+        .timeline-item.delayed {
+            border-left: 3px solid #dc3545;
+        }
+
+        .timeline-item.completed {
+            border-left: 3px solid #6c757d;
         }
     </style>
 @endsection
