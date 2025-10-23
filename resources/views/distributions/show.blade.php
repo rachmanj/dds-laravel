@@ -734,7 +734,7 @@
                                                         <strong>{{ $additionalDoc->document_number ?? 'N/A' }}</strong>
                                                         <br>
                                                         <small
-                                                            class="text-muted">{{ $additionalDoc->type->type_name ?? 'N/A' }}</small>
+                                                            class="text-muted">{{ $additionalDoc && $additionalDoc->type ? $additionalDoc->type->type_name : 'N/A' }}</small>
                                                     </div>
                                                 </div>
                                             </td>
@@ -743,7 +743,7 @@
                                             </td>
                                             <td>
                                                 <small class="text-muted">
-                                                    @if ($additionalDoc->invoices && $additionalDoc->invoices->count() > 0)
+                                                    @if ($additionalDoc && $additionalDoc->invoices && $additionalDoc->invoices->count() > 0)
                                                         {{ $additionalDoc->invoices->pluck('invoice_number')->implode(', ') }}
                                                     @else
                                                         -
@@ -811,7 +811,7 @@
                                                         <strong>{{ $additionalDoc->document_number ?? 'N/A' }}</strong>
                                                         <br>
                                                         <small
-                                                            class="text-muted">{{ $additionalDoc->type->type_name ?? 'N/A' }}</small>
+                                                            class="text-muted">{{ $additionalDoc && $additionalDoc->type ? $additionalDoc->type->type_name : 'N/A' }}</small>
                                                     </div>
                                                 </div>
                                             </td>
@@ -820,7 +820,7 @@
                                             </td>
                                             <td>
                                                 <small class="text-muted">
-                                                    @if ($additionalDoc->invoices && $additionalDoc->invoices->count() > 0)
+                                                    @if ($additionalDoc && $additionalDoc->invoices && $additionalDoc->invoices->count() > 0)
                                                         {{ $additionalDoc->invoices->pluck('invoice_number')->implode(', ') }}
                                                     @else
                                                         -

@@ -282,6 +282,9 @@
 
     <!-- JavaScript for Filtering, Search, and Chart -->
     <script src="{{ asset('adminlte/plugins/chart.js/Chart.min.js') }}"></script>
+@endsection
+
+@push('js')
     <script>
         $(document).ready(function() {
             // Filter functionality
@@ -405,4 +408,4 @@
             });
         });
     </script>
-@endsection
+@endpush
