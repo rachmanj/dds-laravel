@@ -107,7 +107,7 @@ Periodically (when todo.md gets cluttered):
 -   Update multiple files when changes affect multiple areas
 -   Maintain consistency between memory, architecture, and task tracking
 
-after making changes, do test using cursor's Browser Automation feature at http://localhost:8000. assume that server already running
+after making changes, do test using chrome-devtools MCP at http://localhost:8000. assume that server already running
 
 this application has been launched, any update or improvement or fix must consider application live condition
 

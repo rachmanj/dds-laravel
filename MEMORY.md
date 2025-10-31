@@ -1,3 +1,136 @@
+### 2025-10-30 — Accounting Role Invoice Cross-Department Access
+
+-   **Feature**: Extended Accounting role authorization to allow cross-department access to invoices and invoice attachments
+-   **Scope**: Invoice and Invoice Attachment authorization system
+-   **Implementation Date**: 2025-10-30
+-   **Status**: ✅ **COMPLETED & TESTED**
+
+#### **Problem Statement**
+
+User elma (Accounting role, department 000HACC) was unable to view invoice #6 located at Finance department (001HFIN), receiving a 403 Forbidden error. Accounting department users need access to invoices from all departments to perform their accounting responsibilities, but the system was restricting access based on department location.
+
+#### **Root Cause Analysis**
+
+**Issue Found in Authorization Logic:**
+
+The invoice authorization checks in `InvoiceController` and `InvoiceAttachmentController` only allowed `superadmin` and `admin` roles to bypass location restrictions:
+
+```php
+// Before - Only superadmin/admin could access all departments
+if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+    $locationCode = $user->department_location_code;
+    if ($locationCode && $invoice->cur_loc !== $locationCode) {
+        abort(403, 'You can only view invoices from your department location.');
+    }
+}
+```
+
+**Problems:**
+
+1. **Missing Accounting role**: Accounting users couldn't access invoices from other departments
+2. **Inconsistent pattern**: Additional documents already had cross-department access for Accounting role (implemented 2025-10-16)
+3. **Business requirement**: Accounting needs to view/manage invoices from all departments for accounting duties
+
+#### **Solution Implemented**
+
+**Updated Authorization Logic:**
+
+Changed all invoice-related authorization checks to include `accounting` role alongside `superadmin` and `admin`:
+
+```php
+// After - Accounting role now has cross-department access
+if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+    $locationCode = $user->department_location_code;
+    if ($locationCode && $invoice->cur_loc !== $locationCode) {
+        abort(403, 'You can only view invoices from your department location.');
+    }
+}
+```
+
+**Files Modified:**
+
+1. **InvoiceController.php**:
+   - `show()` - Invoice detail view
+   - `edit()` - Invoice edit form
+   - `update()` - Invoice update functionality
+   - `destroy()` - Invoice deletion
+   - `data()` - Invoice listing queries
+
+2. **InvoiceAttachmentController.php**:
+   - `update()` - Attachment edit
+   - `store()` - Attachment upload
+   - `download()` - Attachment download
+   - `destroy()` - Attachment deletion
+   - `preview()` - Attachment preview
+   - `show()` - Attachment page view
+   - `data()` - Attachment listing queries
+
+3. **Api/InvoiceAttachmentController.php**:
+   - `getInvoiceAttachments()` - API attachment retrieval
+   - `getAttachmentStats()` - API statistics queries
+
+#### **Authorization Hierarchy**
+
+1. **Superadmin/Admin**: Full access to all invoices across all departments (unchanged)
+2. **Accounting Role**: Universal access to all invoices across all departments (new)
+3. **Department-Based**: Other users can only access invoices in their department location (unchanged)
+4. **Permission-Based**: Users must still have appropriate permissions (e.g., `view-invoices`, `edit-invoices`) to perform actions
+
+#### **Testing Results**
+
+✅ **Browser Test Confirmed**:
+
+-   User elma (Accounting role, department 000HACC) successfully accessed invoice #6 (located at 001HFIN)
+-   Invoice detail page loads correctly with all information displayed
+-   No 403 Forbidden errors
+-   All invoice-related functionality accessible (view, edit, attachments)
+
+✅ **Authorization Verification**:
+
+-   Accounting role users can now view invoices from any department
+-   Accounting role users can edit/delete invoices from any department
+-   Accounting role users can manage attachments for invoices from any department
+-   Non-accounting users still restricted to their department location
+-   Permission system still enforced (users need appropriate permissions)
+
+#### **Impact**
+
+**✅ Business Requirements Met**:
+
+-   Accounting department can now view and manage invoices from all departments
+-   Enables Accounting to perform cross-department accounting duties
+-   Maintains existing security model for non-accounting users
+-   No breaking changes to existing functionality
+
+**✅ Technical Improvements**:
+
+-   Consistent authorization pattern across invoice and additional document modules
+-   Uses Spatie Permission `hasAnyRole()` method for cleaner code
+-   Maintains location-based security for regular users
+-   Centralized authorization logic in controllers
+
+**✅ Consistency with Existing Patterns**:
+
+-   Follows same pattern established for Additional Documents (2025-10-16)
+-   Maintains consistency in authorization logic throughout the application
+-   Uses role-based hierarchy with permission checks
+
+#### **Files Modified**
+
+1. `app/Http/Controllers/InvoiceController.php` (5 methods updated)
+2. `app/Http/Controllers/InvoiceAttachmentController.php` (7 methods updated)
+3. `app/Http/Controllers/Api/InvoiceAttachmentController.php` (2 methods updated)
+
+#### **Production Readiness**
+
+✅ **Fully Tested** - Browser automation confirmed functionality  
+✅ **Security Maintained** - All existing security checks preserved  
+✅ **Business Requirements Met** - Accounting can access invoices from all departments  
+✅ **No Breaking Changes** - Existing functionality unchanged  
+✅ **Consistent Pattern** - Matches existing additional document authorization pattern
+
+---
+
 ### 2025-10-22 — Distribution List Pagination Symbols Fix
 
 -   **Feature**: Fixed large pagination symbols issue on distribution list page

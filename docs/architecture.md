@@ -2811,27 +2811,38 @@ DistributionHistory::create([
 **Permission Checking Pattern**:
 
 ```php
-// Consistent pattern used throughout the codebase
-if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
-    // Regular user restrictions
-    $query->where('destination_department_id', $user->department->id)
-          ->where('status', 'sent');
+// Consistent pattern used throughout the codebase for invoice and additional document access
+if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+    // Regular user restrictions - location-based filtering
+    $locationCode = $user->department_location_code;
+    if ($locationCode) {
+        $query->where('cur_loc', $locationCode);
+    }
 }
 ```
 
 **Benefits**:
 
--   **Performance**: Uses PHP array operations instead of method calls
--   **Consistency**: Same pattern across all permission checks
+-   **Performance**: Uses Spatie Permission's optimized role checking
+-   **Consistency**: Same pattern across invoice and additional document modules
 -   **Maintainability**: Easy to understand and modify permission logic
+-   **Business Alignment**: Accounting role has cross-department access for accounting duties
 
 ### **Department Isolation**
 
-**Access Control**:
+**Access Control Hierarchy**:
 
--   **Regular Users**: Can only see distributions related to their department
--   **Admin/Superadmin**: Can access all distributions across departments
--   **Data Filtering**: All queries respect user's department location
+1.   **Superadmin/Admin**: Full access to all documents across all departments
+2.   **Accounting Role**: Universal access to invoices and additional documents across all departments (enables cross-department accounting duties)
+3.   **Regular Users**: Can only see documents in their department location
+4.   **Permission-Based**: All actions still require appropriate permissions (e.g., `view-invoices`, `edit-invoices`)
+
+**Document Access Patterns**:
+
+-   **Invoices**: Location-based filtering with Accounting role exception (implemented 2025-10-30)
+-   **Additional Documents**: Location-based filtering with Accounting role exception (implemented 2025-10-16)
+-   **Distributions**: Department-based filtering, Admin/Superadmin exception
+-   **Data Filtering**: All queries respect user's department location unless user has privileged role
 
 ## 🗄️ **Database Architecture**
 

@@ -1,3 +1,108 @@
+## 2025-10-30 — Accounting Role Invoice Cross-Department Access
+
+-   **Context**: Accounting department users needed to view and manage invoices from all departments as part of their accounting responsibilities, but the system was restricting access based on department location. User elma (Accounting role, department 000HACC) was unable to view invoice #6 located at Finance department (001HFIN), receiving a 403 Forbidden error.
+
+-   **Decision**: Extend Accounting role authorization to allow cross-department access to invoices and invoice attachments, matching the existing pattern used for additional documents. Accounting users should have universal view/edit/delete access to invoices across all department locations.
+
+-   **Alternatives Considered**:
+
+    1. **Keep existing location-based restriction** - Rejected because Accounting needs access to invoices from all departments to perform their accounting duties.
+
+    2. **Grant all users with invoice permissions universal access** - Rejected because it would compromise data security and department isolation for non-accounting users.
+
+    3. **Create separate Accounting-specific invoice permissions** - Rejected because it adds unnecessary complexity; the existing permission system with role checks is sufficient.
+
+    4. **Implement department whitelist for Accounting** - Rejected because Accounting needs access to all departments, making a whitelist unnecessary.
+
+    5. **Use separate controllers for Accounting users** - Rejected because it would duplicate code and create maintenance burden.
+
+-   **Implementation**:
+
+    **Updated Authorization Logic**:
+
+    Changed all invoice-related authorization checks from:
+    ```php
+    if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        // Location-based restriction
+    }
+    ```
+    or
+    ```php
+    if (!$user->hasRole(['superadmin', 'admin'])) {
+        // Location-based restriction
+    }
+    ```
+
+    To:
+    ```php
+    if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+        // Location-based restriction only for non-privileged users
+    }
+    ```
+
+    **Files Modified**:
+
+    -   `app/Http/Controllers/InvoiceController.php`:
+        -   `show()` - Invoice detail view
+        -   `edit()` - Invoice edit form
+        -   `update()` - Invoice update
+        -   `destroy()` - Invoice deletion
+        -   `data()` - Invoice listing queries
+
+    -   `app/Http/Controllers/InvoiceAttachmentController.php`:
+        -   `update()` - Attachment edit
+        -   `store()` - Attachment upload
+        -   `download()` - Attachment download
+        -   `destroy()` - Attachment deletion
+        -   `preview()` - Attachment preview
+        -   `show()` - Attachment page view
+        -   `data()` - Attachment listing queries
+
+    -   `app/Http/Controllers/Api/InvoiceAttachmentController.php`:
+        -   `getInvoiceAttachments()` - API attachment retrieval
+        -   `getAttachmentStats()` - API statistics queries
+
+-   **Authorization Hierarchy**:
+
+    1. **Superadmin/Admin**: Full access to all invoices across all departments (unchanged)
+    2. **Accounting Role**: Universal access to all invoices across all departments (new)
+    3. **Department-Based**: Other users can only access invoices in their department location (unchanged)
+    4. **Permission-Based**: Users must still have appropriate permissions (e.g., `view-invoices`, `edit-invoices`) to perform actions
+
+-   **Testing Results**:
+
+    ✅ **Browser Test Confirmed**:
+
+    -   User elma (Accounting role, department 000HACC) successfully accessed invoice #6 (located at 001HFIN)
+    -   Invoice detail page loads correctly with all information displayed
+    -   No 403 Forbidden errors
+    -   All invoice-related functionality accessible (view, edit, attachments)
+
+-   **Impact**:
+
+    **✅ Business Requirements Met**:
+
+    -   Accounting department can now view and manage invoices from all departments
+    -   Enables Accounting to perform cross-department accounting duties
+    -   Maintains existing security model for non-accounting users
+    Boundary enforcement: Other roles remain restricted to their department locations
+    -   No breaking changes to existing functionality
+
+    **✅ Technical Improvements**:
+
+    -   Consistent authorization pattern across invoice and additional document modules
+    -   Uses Spatie Permission `hasAnyRole()` method for cleaner code
+    -   Maintains location-based security for regular users
+    -   Centralized authorization logic in controllers
+
+-   **Consistency with Existing Patterns**:
+
+    This implementation follows the same pattern established for Additional Documents (2025-10-16), where Accounting role users have universal access across departments. This maintains consistency in authorization logic throughout the application.
+
+-   **Review Date**: 2026-01-30 (3 months from implementation)
+
+---
+
 ## 2025-10-16 — Accounting Role Edit Permissions Enhancement
 
 -   **Context**: Accounting department users needed to edit additional documents to complete document data as part of their workflow, but the system was preventing this due to flawed permission checking logic. The `canBeEditedBy()` method only allowed users to edit documents they created, ignoring the Laravel permission system and not granting Accounting users the necessary access despite having the `edit-additional-documents` permission.

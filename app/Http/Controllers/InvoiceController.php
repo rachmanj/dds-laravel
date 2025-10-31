@@ -38,8 +38,8 @@ class InvoiceController extends Controller
         $user = Auth::user();
         $query = Invoice::with(['supplier', 'type', 'creator', 'attachments']);
 
-        // Apply location-based filtering unless user is admin/superadmin
-        if (!$request->show_all && !array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        // Apply location-based filtering unless user is admin/superadmin/accounting
+        if (!$request->show_all && !$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
                 $query->where('cur_loc', $locationCode);
@@ -248,7 +248,7 @@ class InvoiceController extends Controller
         // Check if user can view this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only view invoices from your department location.');
@@ -265,7 +265,7 @@ class InvoiceController extends Controller
         // Check if user can edit this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only edit invoices from your department location.');
@@ -286,7 +286,7 @@ class InvoiceController extends Controller
         // Check if user can edit this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only edit invoices from your department location.');
@@ -364,7 +364,7 @@ class InvoiceController extends Controller
         // Check if user can delete this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only delete invoices from your department location.');

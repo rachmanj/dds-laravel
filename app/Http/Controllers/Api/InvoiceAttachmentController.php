@@ -31,7 +31,7 @@ class InvoiceAttachmentController extends Controller
         }
 
         // Check if user can view this invoice's attachments
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 return response()->json([
@@ -63,8 +63,8 @@ class InvoiceAttachmentController extends Controller
         $user = \Illuminate\Support\Facades\Auth::user();
         $query = Invoice::with(['attachments.uploader']);
 
-        // Filter by user's department location if not admin/superadmin
-        if (!$user->hasRole(['superadmin', 'admin'])) {
+        // Filter by user's department location if not admin/superadmin/accounting
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
                 $query->where('cur_loc', $locationCode);
