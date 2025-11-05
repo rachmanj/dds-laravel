@@ -278,10 +278,10 @@
                                                     </select>
                                                 </div>
                                                 <div class="col-md-3">
-                                                    <select class="form-control" id="invoice-supplier-filter">
+                                                    <select class="form-control select2bs4" id="invoice-supplier-filter">
                                                         <option value="">All Suppliers</option>
-                                                        @foreach ($invoices->pluck('supplier')->unique()->sort() as $supplier)
-                                                            <option value="{{ $supplier }}">{{ $supplier }}
+                                                        @foreach ($invoices->pluck('supplier')->filter()->unique('id')->sortBy('name') as $supplier)
+                                                            <option value="{{ $supplier->name }}">{{ $supplier->name }}
                                                             </option>
                                                         @endforeach
                                                     </select>
@@ -393,7 +393,7 @@
                                         <div class="card-body">
                                             <!-- Search and Filter Controls -->
                                             <div class="row mb-3">
-                                                <div class="col-md-4">
+                                                <div class="col-md-3">
                                                     <div class="input-group">
                                                         <div class="input-group-prepend">
                                                             <span class="input-group-text"><i
@@ -403,15 +403,16 @@
                                                             id="additional-doc-search" placeholder="Search documents...">
                                                     </div>
                                                 </div>
-                                                <div class="col-md-3">
+                                                <div class="col-md-2">
                                                     <select class="form-control" id="additional-doc-status-filter">
                                                         <option value="">All Status</option>
                                                         <option value="open">Open</option>
                                                         <option value="verify">Verify</option>
                                                     </select>
                                                 </div>
-                                                <div class="col-md-3">
-                                                    <select class="form-control" id="additional-doc-type-filter">
+                                                <div class="col-md-2">
+                                                    <select class="form-control select2bs4"
+                                                        id="additional-doc-type-filter">
                                                         <option value="">All Types</option>
                                                         @foreach ($additionalDocuments->pluck('type.type_name')->unique()->filter()->sort() as $type)
                                                             <option value="{{ $type }}">{{ $type }}
@@ -420,6 +421,16 @@
                                                     </select>
                                                 </div>
                                                 <div class="col-md-2">
+                                                    <select class="form-control select2bs4"
+                                                        id="additional-doc-project-filter">
+                                                        <option value="">All Projects</option>
+                                                        @foreach ($additionalDocuments->pluck('project')->filter()->unique()->sort() as $project)
+                                                            <option value="{{ $project }}">{{ $project }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
                                                     <button type="button" class="btn btn-outline-secondary btn-block"
                                                         id="clear-additional-doc-filters">
                                                         <i class="fas fa-times"></i> Clear
@@ -436,7 +447,7 @@
                                                             <th>Document Number</th>
                                                             <th>Type</th>
                                                             <th>PO Number</th>
-                                                            {{-- <th>Project</th> --}}
+                                                            <th>Project</th>
                                                             <th>Status</th>
                                                             <th>Distribution Status</th>
                                                             <th>Location</th>
@@ -454,7 +465,7 @@
                                                                 <td>{{ $doc->document_number }}</td>
                                                                 <td>{{ $doc->type->type_name ?? 'N/A' }}</td>
                                                                 <td>{{ $doc->po_no ?? 'N/A' }}</td>
-                                                                {{-- <td>{{ $doc->project ?? 'N/A' }}</td> --}}
+                                                                <td>{{ $doc->project ?? 'N/A' }}</td>
                                                                 <td>
                                                                     <span
                                                                         class="badge badge-{{ $doc->status === 'open' ? 'success' : 'secondary' }}">
@@ -701,6 +712,57 @@
                 placeholder: 'Select an option'
             });
 
+            // Initialize Select2 for supplier filter
+            $('#invoice-supplier-filter').select2({
+                theme: 'bootstrap4',
+                placeholder: 'All Suppliers',
+                allowClear: true,
+                width: '100%'
+            });
+
+            // Initialize Select2 for additional document filters
+            $('#additional-doc-type-filter, #additional-doc-project-filter').select2({
+                theme: 'bootstrap4',
+                placeholder: 'All',
+                allowClear: true,
+                width: '100%'
+            });
+
+            // Additional document filter function
+            function filterAdditionalDocTable(searchTerm, statusFilter, typeFilter, projectFilter) {
+                var table = $('#additional-doc-table tbody tr');
+                var visibleCount = 0;
+
+                table.each(function() {
+                    var row = $(this);
+                    var documentNumber = row.find('td:nth-child(2)').text().toLowerCase();
+                    var docType = row.find('td:nth-child(3)').text().toLowerCase();
+                    var poNo = row.find('td:nth-child(4)').text().toLowerCase();
+                    var project = row.find('td:nth-child(5)').text().toLowerCase();
+                    var status = row.find('td:nth-child(6)').text().toLowerCase();
+                    var distributionStatus = row.find('td:nth-child(7)').text().toLowerCase();
+
+                    var matchesSearch = !searchTerm || documentNumber.includes(searchTerm) || docType
+                        .includes(searchTerm) || poNo.includes(searchTerm) || project.includes(searchTerm);
+                    var matchesStatus = !statusFilter || status.includes(statusFilter);
+                    var matchesType = !typeFilter || docType.includes(typeFilter.toLowerCase());
+                    var matchesProject = !projectFilter || project.includes(projectFilter.toLowerCase());
+
+                    if (matchesSearch && matchesStatus && matchesType && matchesProject) {
+                        row.show();
+                        visibleCount++;
+                    } else {
+                        row.hide();
+                    }
+                });
+
+                // Update visible count
+                var countElement = $('#additional-document-selection .card-header h6');
+                var originalText = countElement.text();
+                var baseText = originalText.replace(/\(\d+\)/, '');
+                countElement.text(baseText + ' (' + visibleCount + ')');
+            }
+
             // Document type change handler
             $('#document_type').change(function() {
                 var documentType = $(this).val();
@@ -729,7 +791,7 @@
             });
 
             // Search and Filter Functions
-            function filterTable(tableId, searchTerm, statusFilter, typeFilter) {
+            function filterTable(tableId, searchTerm, statusFilter, supplierFilter) {
                 var table = $('#' + tableId + ' tbody tr');
                 var visibleCount = 0;
 
@@ -743,6 +805,7 @@
 
                     var matchesSearch = true;
                     var matchesStatus = true;
+                    var matchesSupplier = true;
                     var matchesType = true;
 
                     // Search filter
@@ -761,12 +824,18 @@
                         matchesStatus = status.includes(statusFilter);
                     }
 
-                    // Type filter (for additional documents)
-                    if (typeFilter && tableId === 'additional-doc-table') {
-                        matchesType = docType.includes(typeFilter);
+                    // Supplier filter (for invoices)
+                    if (supplierFilter && tableId === 'invoice-table') {
+                        matchesSupplier = supplier.includes(supplierFilter);
                     }
 
-                    if (matchesSearch && matchesStatus && matchesType) {
+                    // Type filter (for additional documents - supplierFilter parameter represents typeFilter for this table)
+                    if (supplierFilter && tableId === 'additional-doc-table') {
+                        // For additional docs table, supplierFilter parameter is actually typeFilter
+                        matchesType = docType.includes(supplierFilter.toLowerCase());
+                    }
+
+                    if (matchesSearch && matchesStatus && matchesSupplier && matchesType) {
                         row.show();
                         visibleCount++;
                     } else {
@@ -810,21 +879,26 @@
                 var searchTerm = $(this).val().toLowerCase();
                 var statusFilter = $('#additional-doc-status-filter').val().toLowerCase();
                 var typeFilter = $('#additional-doc-type-filter').val().toLowerCase();
-                filterTable('additional-doc-table', searchTerm, statusFilter, typeFilter);
+                var projectFilter = $('#additional-doc-project-filter').val().toLowerCase();
+                filterAdditionalDocTable(searchTerm, statusFilter, typeFilter, projectFilter);
             });
 
-            $('#additional-doc-status-filter, #additional-doc-type-filter').on('change', function() {
-                var searchTerm = $('#additional-doc-search').val().toLowerCase();
-                var statusFilter = $('#additional-doc-status-filter').val().toLowerCase();
-                var typeFilter = $('#additional-doc-type-filter').val().toLowerCase();
-                filterTable('additional-doc-table', searchTerm, statusFilter, typeFilter);
-            });
+            $('#additional-doc-status-filter, #additional-doc-type-filter, #additional-doc-project-filter').on(
+                'change',
+                function() {
+                    var searchTerm = $('#additional-doc-search').val().toLowerCase();
+                    var statusFilter = $('#additional-doc-status-filter').val().toLowerCase();
+                    var typeFilter = $('#additional-doc-type-filter').val().toLowerCase();
+                    var projectFilter = $('#additional-doc-project-filter').val().toLowerCase();
+                    filterAdditionalDocTable(searchTerm, statusFilter, typeFilter, projectFilter);
+                });
 
             $('#clear-additional-doc-filters').on('click', function() {
                 $('#additional-doc-search').val('');
                 $('#additional-doc-status-filter').val('');
-                $('#additional-doc-type-filter').val('');
-                filterTable('additional-doc-table', '', '', '');
+                $('#additional-doc-type-filter').val('').trigger('change');
+                $('#additional-doc-project-filter').val('').trigger('change');
+                filterAdditionalDocTable('', '', '', '');
             });
 
             // Select all handlers
