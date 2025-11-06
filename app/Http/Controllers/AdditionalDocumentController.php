@@ -129,8 +129,13 @@ class AdditionalDocumentController extends Controller
         }
 
         // Apply distribution status filtering for non-admin users when show_all is false
+        // Include 'in_transit' when age_filter is provided to show all aging documents
         if (!$showAllRecords && !array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
-            $query->whereIn('distribution_status', ['available', 'distributed']);
+            $statuses = ['available', 'distributed'];
+            if ($request->filled('age_filter')) {
+                $statuses[] = 'in_transit';
+            }
+            $query->whereIn('distribution_status', $statuses);
         }
 
         // Show all records for users with see-all-record-switch permission if requested
@@ -144,6 +149,26 @@ class AdditionalDocumentController extends Controller
             $arrivalDate = $document->current_location_arrival_date;
             return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
         })->values();
+
+        // Apply age filter if provided
+        if ($request->filled('age_filter')) {
+            $ageFilter = $request->get('age_filter');
+            $documents = $documents->filter(function ($document) use ($ageFilter) {
+                $ageCategory = $document->current_location_age_category;
+                
+                switch ($ageFilter) {
+                    case '0-7_days':
+                        return $ageCategory === '0-7_days';
+                    case '8-14_days':
+                        return $ageCategory === '8-14_days';
+                    case '15_plus_days':
+                    case '15-30_days':
+                        return in_array($ageCategory, ['15-30_days', '30_plus_days']);
+                    default:
+                        return true;
+                }
+            })->values();
+        }
 
         return DataTables::of($documents)
             ->addIndexColumn()

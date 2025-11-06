@@ -520,6 +520,14 @@
             // Clear date range on page load and ensure it's empty by default
             $('#date_range').val('');
 
+            // Get URL parameters
+            function getUrlParameter(name) {
+                name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+                var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+                var results = regex.exec(location.search);
+                return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+            }
+
             // Initialize DataTable
             var table = $('#documents-table').DataTable({
                 processing: true,
@@ -537,6 +545,11 @@
                         d.date_range = $('#date_range').val();
                         d.show_all = $('#show_all_records').length > 0 && $('#show_all_records').is(
                             ':checked') ? 1 : 0;
+                        // Pass age_filter from URL
+                        var ageFilter = getUrlParameter('age_filter');
+                        if (ageFilter) {
+                            d.age_filter = ageFilter;
+                        }
                     }
                 },
                 columns: [{
