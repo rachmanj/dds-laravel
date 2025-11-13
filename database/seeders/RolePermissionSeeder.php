@@ -42,6 +42,7 @@ class RolePermissionSeeder extends Seeder
             'delete-additional-documents',
             'import-additional-documents',
             'on-the-fly-addoc-feature',
+            'sync-sap-ito',
 
             // Invoices
             'view-invoices',
@@ -116,6 +117,7 @@ class RolePermissionSeeder extends Seeder
             'delete-additional-documents',
             'import-additional-documents',
             'on-the-fly-addoc-feature',
+            'sync-sap-ito',
             'view-invoices',
             'create-invoices',
             'edit-invoices',
@@ -167,6 +169,7 @@ class RolePermissionSeeder extends Seeder
             'delete-additional-documents',
             'import-additional-documents',
             'on-the-fly-addoc-feature',
+            'sync-sap-ito',
             'view-invoices',
             'create-invoices',
             'edit-invoices',

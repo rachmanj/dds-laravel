@@ -36,6 +36,10 @@ class Invoice extends Model
         'duration2',
         'sap_doc',
         'flag',
+        'sap_status',
+        'sap_doc_num',
+        'sap_error_message',
+        'sap_last_attempted_at',
     ];
 
     protected $casts = [
@@ -332,6 +336,15 @@ class Invoice extends Model
         return '<span class="badge ' . $color . '">' . ucfirst($this->payment_status) . '</span>';
     }
 
+    public function getSapStatusBadgeAttribute()
+    {
+        return match($this->sap_status) {
+            'pending' => '<span class="badge bg-warning">SAP Pending</span>',
+            'posted' => '<span class="badge bg-success">SAP Posted: ' . $this->sap_doc_num . '</span>',
+            'failed' => '<span class="badge bg-danger">SAP Failed: ' . ($this->sap_error_message ?? 'Unknown error') . '</span>',
+            default => '<span class="badge bg-secondary">Not Sent to SAP</span>',
+        };
+    }
 
 
     /**

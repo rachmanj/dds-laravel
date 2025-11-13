@@ -119,8 +119,8 @@ class AdditionalDocument extends Model
      */
     public function canBeDeletedBy(User $user): bool
     {
-        // Admin and superadmin can delete any document
-        if ($user->hasRole(['admin', 'superadmin'])) {
+        // Admin, superadmin, and accounting can delete any document
+        if ($user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
             return true;
         }
 

@@ -1,3 +1,93 @@
+## 2025-11-13 — SAP B1 ITO Sync: Direct OData Queries vs Query Execution
+
+-   **Context**: Implementing SAP B1 integration to sync Inventory Transfer Orders (ITO) from SAP to Laravel. Initial approach attempted to execute pre-defined User Queries via SAP Service Layer, but encountered endpoint compatibility issues. The `list_ito` query exists in SAP B1 but couldn't be executed through standard query execution endpoints.
+
+-   **Decision**: Use direct OData entity queries as primary method, with query execution as fallback. Query `InventoryTransferRequests` entity directly using OData filters instead of executing SQL queries.
+
+-   **Alternatives Considered**:
+
+    1. **Execute User Queries via Service Layer** - Attempted multiple endpoint formats (`SQLQueries`, `UserQueries`, `Queries`, `QueryService_ExecuteQuery`) but all failed with "Unrecognized resource path" or "Service Not Found" errors. SAP B1 10.0 Service Layer doesn't expose a reliable query execution endpoint.
+
+    2. **Create new queries via API** - Rejected because it requires additional SAP configuration and doesn't solve the endpoint compatibility issue.
+
+    3. **Use direct OData queries only** - Chosen as primary method because:
+       - Standard OData protocol, well-documented
+       - No dependency on SAP query configuration
+       - More flexible filtering and field selection
+       - Better error handling and debugging
+
+    4. **Hybrid approach with fallback** - Chosen as final implementation:
+       - Primary: Direct OData queries on `InventoryTransferRequests` entity
+       - Fallback: Query execution (if direct query fails)
+       - Auto-discovery of correct entity and field names
+
+-   **Implementation**:
+
+    **Service Layer Architecture**:
+    ```php
+    SapService::getStockTransferRequests($startDate, $endDate)
+    ├── Auto-detect entity (InventoryTransferRequests, StockTransfers, StockTransferDrafts)
+    ├── Auto-discover date field (DocDate, CreationDate, CreateDate)
+    ├── Test TransferType filter (skip if returns 0 records)
+    └── Query with OData filters: DocDate ge datetime'...' and DocDate le datetime'...'
+    ```
+
+    **Key Technical Decisions**:
+    - **Date Field**: Use `DocDate` instead of `CreationDate` (matches SQL query logic)
+    - **TransferType Filter**: Make optional - test first, skip if filters out all records
+    - **Session Management**: Automatic re-login on 401 errors with retry logic
+    - **Synchronous Processing**: Run job synchronously in controller for immediate user feedback
+    - **Field Mapping**: Handle multiple field name variations (DocNum vs Reference1, FromWarehouse vs Filler)
+
+-   **Trade-offs**:
+
+    **Advantages**:
+    - ✅ Works reliably with SAP B1 10.0 Service Layer
+    - ✅ No dependency on SAP query configuration
+    - ✅ Better error messages and debugging
+    - ✅ More flexible for future enhancements
+
+    **Disadvantages**:
+    - ⚠️ Requires field mapping (SAP entity fields vs SQL query fields)
+    - ⚠️ Some fields not directly available (po_no, U_NAME) - would need additional queries
+    - ⚠️ More complex than executing a single SQL query
+
+-   **Files Modified**:
+    - `app/Services/SapService.php`: Added `getStockTransferRequests()` method
+    - `app/Jobs/SyncSapItoDocumentsJob.php`: Dual-strategy implementation with field mapping
+    - `app/Console/Commands/TestSapConnection.php`: Comprehensive endpoint testing
+    - `app/Console/Commands/TestSapSync.php`: Sync testing with debugging
+
+-   **Status**: ✅ **IMPLEMENTED & TESTED**  
+-   **Date**: 2025-11-13
+
+## 2025-11-13 — SAP ITO Sync Permission-Based Access Control
+
+-   **Context**: SAP ITO Sync feature needed proper access control. Initially used role-based middleware (`role:admin|superadmin`), but business requirement specified that `accounting` role should also have access.
+
+-   **Decision**: Create dedicated permission `sync-sap-ito` and assign to `superadmin`, `admin`, and `accounting` roles. Use permission-based middleware instead of role-based.
+
+-   **Alternatives Considered**:
+
+    1. **Keep role-based middleware** - Rejected because it's less flexible and harder to maintain when roles change.
+
+    2. **Add accounting to role middleware** - Rejected because permission-based approach is more maintainable and follows Laravel best practices.
+
+    3. **Create permission and use it** - Chosen because:
+       - Follows existing permission pattern in the application
+       - Easy to modify access without code changes
+       - Consistent with other features (import-additional-documents, etc.)
+
+-   **Implementation**:
+    - Created `sync-sap-ito` permission in `RolePermissionSeeder`
+    - Assigned to: `superadmin` (all permissions), `admin`, `accounting`
+    - Updated route middleware: `permission:sync-sap-ito`
+    - Updated menu visibility: `@can('sync-sap-ito')`
+    - Menu highlighting: Parent menu expands when on SAP ITO Sync page
+
+-   **Status**: ✅ **IMPLEMENTED**  
+-   **Date**: 2025-11-13
+
 ## 2025-10-30 — Accounting Role Invoice Cross-Department Access
 
 -   **Context**: Accounting department users needed to view and manage invoices from all departments as part of their accounting responsibilities, but the system was restricting access based on department location. User elma (Accounting role, department 000HACC) was unable to view invoice #6 located at Finance department (001HFIN), receiving a 403 Forbidden error.

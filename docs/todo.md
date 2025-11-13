@@ -1,5 +1,84 @@
 # DDS Laravel Development Todo
 
+## ✅ **Recently Completed**
+
+### **SAP B1 ITO Sync Integration** ✅ **COMPLETED**
+
+**Status**: ✅ **COMPLETED & PRODUCTION READY**  
+**Implementation Date**: 2025-11-13  
+**Requested By**: User  
+**Priority**: HIGH - Critical business requirement for SAP integration
+
+**Feature**: On-demand synchronization of Inventory Transfer Orders (ITO) from SAP B1 to Laravel database via web interface.
+
+**Key Deliverables**:
+
+1. **SAP B1 Service Layer Integration** ✅
+   - Created `SapService` for centralized SAP API communication
+   - Implemented login, session management, and automatic re-authentication
+   - Direct OData entity queries on `InventoryTransferRequests`
+   - Auto-discovery of correct entity names and field mappings
+   - Fallback to query execution if direct queries fail
+
+2. **ITO Document Synchronization** ✅
+   - `SyncSapItoDocumentsJob` handles data fetching and transformation
+   - Maps SAP entity fields to Laravel `AdditionalDocument` model
+   - Duplicate prevention by checking `document_number` (ito_no)
+   - Comprehensive error handling and logging
+
+3. **Web Interface** ✅
+   - User-friendly form at `/admin/sap-sync-ito`
+   - Date range selection (start date, end date)
+   - Real-time Toastr notifications with success/error messages
+   - Results display showing created and skipped record counts
+   - Loading states during sync operation
+
+4. **Permission System** ✅
+   - Created `sync-sap-ito` permission
+   - Assigned to: `superadmin`, `admin`, `accounting` roles
+   - Permission-based route protection
+   - Menu visibility based on permission
+
+5. **Testing & Debugging Tools** ✅
+   - `php artisan sap:test-connection` - Test SAP connectivity and discover entities
+   - `php artisan sap:test-sync` - Test sync with date ranges
+   - Comprehensive logging to `sap_logs` table
+   - Detailed error messages and debugging information
+
+**Technical Highlights**:
+- **Dual Query Strategy**: Direct OData queries (primary) + Query execution (fallback)
+- **Smart Field Mapping**: Handles multiple field name variations
+- **Session Management**: Automatic re-login on 401 errors
+- **Synchronous Processing**: Immediate user feedback (runs job synchronously)
+- **Menu Integration**: Proper highlighting and parent menu expansion
+
+**Test Results**:
+- ✅ SAP connection successful
+- ✅ Entity discovery working (`InventoryTransferRequests` with `DocDate` field)
+- ✅ Data sync successful (1 record created in test)
+- ✅ Duplicate prevention working
+- ✅ User notifications displaying correctly
+- ✅ Permission system working
+
+**Files Created/Modified**:
+- `app/Services/SapService.php` - SAP API client
+- `app/Jobs/SyncSapItoDocumentsJob.php` - Sync job
+- `app/Http/Controllers/AdditionalDocumentController.php` - Web interface
+- `app/Console/Commands/TestSapConnection.php` - Connection testing
+- `app/Console/Commands/TestSapSync.php` - Sync testing
+- `resources/views/admin/sap-sync-ito.blade.php` - Sync form
+- `database/seeders/RolePermissionSeeder.php` - Permission setup
+- `config/sap.php` - SAP configuration
+- `routes/web.php` - Permission-protected routes
+
+**Next Steps** (Future Enhancements):
+- Query related entities for missing fields (po_no, U_NAME)
+- Add support for `U_MIS_TransferType = 'OUT'` filter if needed
+- Implement async job processing for large date ranges
+- Add batch processing for better performance
+
+---
+
 ## 🎯 **Current Sprint**
 
 ### **Accounting Role Edit Permissions Enhancement** ✅ **COMPLETED**
@@ -3911,3 +3990,11 @@ DistributionHistory::create([
     -   **Description**: Provide an interface on the "Create Distribution" or "Distribution Details" page to view and optionally remove automatically included additional documents.
     -   **Estimated Effort**: 1-2 days
     -   **Dependencies**: Frontend JavaScript, Backend logic for managing linked documents.
+
+### **Recently Completed**
+- Implemented SAP ITO query sync feature, including job, UI, and logging - completed 2025-11-10. Test with real SAP data.
+- Implemented SAP invoice creation feature - completed 2025-11-10.
+- Implemented reconciliation and monitoring - completed 2025-11-10.
+
+### **Current Tasks**
+- Fix Pennant feature flags if needed.

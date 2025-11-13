@@ -1,6 +1,6 @@
 <!-- Additional Documents -->
-<li class="nav-item {{ request()->routeIs('additional-documents.*') ? 'menu-open' : '' }}">
-    <a href="#" class="nav-link {{ request()->routeIs('additional-documents.*') ? 'active' : '' }}">
+<li class="nav-item {{ request()->routeIs('additional-documents.*') || request()->routeIs('admin.sap-sync-ito') ? 'menu-open' : '' }}">
+    <a href="#" class="nav-link {{ request()->routeIs('additional-documents.*') || request()->routeIs('admin.sap-sync-ito') ? 'active' : '' }}">
         <i class="nav-icon fas fa-file-alt"></i>
         <p>
             Additional Documents
@@ -51,6 +51,17 @@
                         <p>Import Documents</p>
                     </a>
                 @endif
+            </li>
+        @endif
+
+        <!-- SAP ITO Sync -->
+        @if (auth()->user()->can('sync-sap-ito'))
+            <li class="nav-item">
+                <a href="{{ route('admin.sap-sync-ito') }}"
+                    class="nav-link {{ request()->routeIs('admin.sap-sync-ito') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>SAP ITO Sync</p>
+                </a>
             </li>
         @endif
     </ul>

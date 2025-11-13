@@ -12,10 +12,12 @@ use App\Exports\AdditionalDocumentTemplate;
 use App\Exports\GeneralDocumentTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Yajra\DataTables\Facades\DataTables;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Jobs\SyncSapItoDocumentsJob;
 
 class AdditionalDocumentController extends Controller
 {
@@ -43,7 +45,31 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
         $showAllRecords = $request->get('show_all', false);
 
-        $query = AdditionalDocument::with(['type', 'creator', 'invoices']);
+        // Main query with optimized database-level arrival date calculation
+        // This avoids N+1 queries by calculating arrival_date and days_in_location in SQL
+        $query = AdditionalDocument::query()
+            ->select('additional_documents.*')
+            ->selectRaw('COALESCE(
+                (SELECT received_at FROM distributions 
+                 INNER JOIN distribution_documents ON distributions.id = distribution_documents.distribution_id
+                 WHERE distribution_documents.document_type = \'App\\\\Models\\\\AdditionalDocument\'
+                   AND distribution_documents.document_id = additional_documents.id
+                   AND distribution_documents.receiver_verification_status = \'verified\'
+                   AND distributions.received_at IS NOT NULL
+                 ORDER BY distributions.received_at DESC LIMIT 1),
+                COALESCE(additional_documents.receive_date, additional_documents.created_at)
+            ) as arrival_date')
+            ->selectRaw('DATEDIFF(NOW(), COALESCE(
+                (SELECT received_at FROM distributions 
+                 INNER JOIN distribution_documents ON distributions.id = distribution_documents.distribution_id
+                 WHERE distribution_documents.document_type = \'App\\\\Models\\\\AdditionalDocument\'
+                   AND distribution_documents.document_id = additional_documents.id
+                   AND distribution_documents.receiver_verification_status = \'verified\'
+                   AND distributions.received_at IS NOT NULL
+                 ORDER BY distributions.received_at DESC LIMIT 1),
+                COALESCE(additional_documents.receive_date, additional_documents.created_at)
+            )) as days_in_location')
+            ->with(['type', 'creator', 'invoices']);
 
         // Apply search filters
         if ($request->filled('search_number')) {
@@ -120,17 +146,20 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        // Apply location-based filtering unless user is admin/superadmin and show_all is requested
-        if (!$showAllRecords && !array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+        // Accounting, admin, and superadmin users see all records by default
+        $isPrivilegedUser = $user->hasAnyRole(['admin', 'superadmin', 'accounting']);
+        
+        // Apply location-based filtering unless user is privileged or show_all is requested
+        if (!$isPrivilegedUser && (!$showAllRecords || !$user->can('see-all-record-switch'))) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
                 $query->where('cur_loc', $locationCode);
             }
         }
 
-        // Apply distribution status filtering for non-admin users when show_all is false
+        // Apply distribution status filtering for non-privileged users when show_all is false
         // Include 'in_transit' when age_filter is provided to show all aging documents
-        if (!$showAllRecords && !array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+        if (!$isPrivilegedUser && (!$showAllRecords || !$user->can('see-all-record-switch'))) {
             $statuses = ['available', 'distributed'];
             if ($request->filled('age_filter')) {
                 $statuses[] = 'in_transit';
@@ -138,45 +167,34 @@ class AdditionalDocumentController extends Controller
             $query->whereIn('distribution_status', $statuses);
         }
 
-        // Show all records for users with see-all-record-switch permission if requested
-        if ($showAllRecords && $user->can('see-all-record-switch')) {
-            // Don't apply additional filters - show all documents
-        }
-
-        // Get documents and sort by days in current location (oldest first - highest days first)
-        // Calculate days difference in the query for better performance
-        $documents = $query->get()->sortByDesc(function ($document) {
-            $arrivalDate = $document->current_location_arrival_date;
-            return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
-        })->values();
-
-        // Apply age filter if provided
+        // Apply age filter at database level if provided
         if ($request->filled('age_filter')) {
             $ageFilter = $request->get('age_filter');
-            $documents = $documents->filter(function ($document) use ($ageFilter) {
-                $ageCategory = $document->current_location_age_category;
-                
-                switch ($ageFilter) {
-                    case '0-7_days':
-                        return $ageCategory === '0-7_days';
-                    case '8-14_days':
-                        return $ageCategory === '8-14_days';
-                    case '15_plus_days':
-                    case '15-30_days':
-                        return in_array($ageCategory, ['15-30_days', '30_plus_days']);
-                    default:
-                        return true;
-                }
-            })->values();
+            $query->havingRaw('days_in_location >= 0'); // Ensure days_in_location is calculated
+            
+            switch ($ageFilter) {
+                case '0-7_days':
+                    $query->havingRaw('days_in_location <= 7');
+                    break;
+                case '8-14_days':
+                    $query->havingRaw('days_in_location > 7 AND days_in_location <= 14');
+                    break;
+                case '15_plus_days':
+                case '15-30_days':
+                    $query->havingRaw('days_in_location > 14');
+                    break;
+            }
         }
 
-        return DataTables::of($documents)
+        // Use DataTables with database-level sorting and pagination
+        return DataTables::of($query)
             ->addIndexColumn()
+            ->orderColumn('days_difference', 'days_in_location $1')
             ->addColumn('days_difference', function ($document) {
-                // Use department-specific aging calculation
-                $daysInCurrentLocation = $document->days_in_current_location;
+                // Use pre-calculated days_in_location from query
+                $daysInCurrentLocation = $document->days_in_location ?? $document->days_in_current_location;
 
-                if ($daysInCurrentLocation == 0) {
+                if ($daysInCurrentLocation == 0 || $daysInCurrentLocation === null) {
                     return '<span class="text-muted">-</span>';
                 }
 
@@ -291,7 +309,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -421,7 +439,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -454,7 +472,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin'])) {
+        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -1056,6 +1074,12 @@ class AdditionalDocumentController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
+        // Accounting users see all records by default
+        if ($user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
+            // Privileged users see all records - no filtering needed
+            return;
+        }
+
         if ($request->filled('show_all_records') && $request->show_all_records === 'on') {
             if (!$user->can('see-all-record-switch')) {
                 // Fallback to user's department only
@@ -1064,6 +1088,58 @@ class AdditionalDocumentController extends Controller
         } else {
             // Default: show only user's department records
             $query->where('cur_loc', $user->department_location_code);
+        }
+    }
+
+    public function sapSyncItoForm()
+    {
+        return view('admin.sap-sync-ito');
+    }
+
+    public function sapSyncIto(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        try {
+            // Run job synchronously to get immediate results
+            $sapService = app(\App\Services\SapService::class);
+            $job = new \App\Jobs\SyncSapItoDocumentsJob($request->start_date, $request->end_date);
+            
+            // Execute the job and capture results
+            $job->handle($sapService);
+            
+            // Get the latest log entry to show results
+            $logEntry = DB::table('sap_logs')
+                ->where('action', 'query_sync')
+                ->latest()
+                ->first();
+            
+            if ($logEntry && $logEntry->status === 'success') {
+                $response = json_decode($logEntry->response_payload, true);
+                $successCount = $response['success'] ?? 0;
+                $skippedCount = $response['skipped'] ?? 0;
+                
+                $message = "Sync completed successfully! ";
+                $message .= "Created: {$successCount} record(s), ";
+                $message .= "Skipped: {$skippedCount} record(s)";
+                
+                return redirect()->route('admin.sap-sync-ito')
+                    ->with('success', $message)
+                    ->with('sync_results', [
+                        'success' => $successCount,
+                        'skipped' => $skippedCount,
+                    ]);
+            } else {
+                $errorMessage = $logEntry->error_message ?? 'Unknown error occurred';
+                return redirect()->route('admin.sap-sync-ito')
+                    ->with('error', 'Sync failed: ' . substr($errorMessage, 0, 200));
+            }
+        } catch (\Exception $e) {
+            return redirect()->route('admin.sap-sync-ito')
+                ->with('error', 'Sync failed: ' . $e->getMessage());
         }
     }
 }

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Yajra\DataTables\Facades\DataTables;
 use Carbon\Carbon;
+use App\Jobs\CreateSapApInvoiceJob;
 
 class InvoiceController extends Controller
 {
@@ -36,7 +37,32 @@ class InvoiceController extends Controller
     {
         /** @var User $user */
         $user = Auth::user();
-        $query = Invoice::with(['supplier', 'type', 'creator', 'attachments']);
+        
+        // Main query with optimized database-level arrival date calculation
+        // This avoids N+1 queries by calculating arrival_date and days_in_location in SQL
+        $query = Invoice::query()
+            ->select('invoices.*')
+            ->selectRaw('COALESCE(
+                (SELECT received_at FROM distributions 
+                 INNER JOIN distribution_documents ON distributions.id = distribution_documents.distribution_id
+                 WHERE distribution_documents.document_type = \'App\\\\Models\\\\Invoice\'
+                   AND distribution_documents.document_id = invoices.id
+                   AND distribution_documents.receiver_verification_status = \'verified\'
+                   AND distributions.received_at IS NOT NULL
+                 ORDER BY distributions.received_at DESC LIMIT 1),
+                COALESCE(invoices.receive_date, invoices.created_at)
+            ) as arrival_date')
+            ->selectRaw('DATEDIFF(NOW(), COALESCE(
+                (SELECT received_at FROM distributions 
+                 INNER JOIN distribution_documents ON distributions.id = distribution_documents.distribution_id
+                 WHERE distribution_documents.document_type = \'App\\\\Models\\\\Invoice\'
+                   AND distribution_documents.document_id = invoices.id
+                   AND distribution_documents.receiver_verification_status = \'verified\'
+                   AND distributions.received_at IS NOT NULL
+                 ORDER BY distributions.received_at DESC LIMIT 1),
+                COALESCE(invoices.receive_date, invoices.created_at)
+            )) as days_in_location')
+            ->with(['supplier', 'type', 'creator', 'attachments']);
 
         // Apply location-based filtering unless user is admin/superadmin/accounting
         if (!$request->show_all && !$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
@@ -79,27 +105,14 @@ class InvoiceController extends Controller
             $query->where('invoice_project', $request->search_invoice_project);
         }
 
-
-
         // Show all records for users with see-all-record-switch permission if requested
         if ($request->show_all && $user->can('see-all-record-switch')) {
             // Don't apply location filter - already handled above
         }
 
-        // Get invoices and sort by days in current location (oldest first - highest days first)
-        $invoices = $query->get()->sortByDesc(function ($invoice) {
-            // For available invoices that haven't been distributed, use receive_date
-            if ($invoice->distribution_status === 'available' && !$invoice->hasBeenDistributed()) {
-                $dateToUse = $invoice->receive_date;
-            } else {
-                // For distributed invoices, use the model's current_location_arrival_date
-                $dateToUse = $invoice->current_location_arrival_date;
-            }
-            return $dateToUse ? $dateToUse->diffInDays(now()) : 0;
-        })->values();
-
-
-        return DataTables::of($invoices)
+        // Use DataTables with database-level sorting and pagination
+        return DataTables::of($query)
+            ->orderColumn('days_difference', 'days_in_location $1')
             ->addColumn('supplier_name', function ($invoice) {
                 return $invoice->supplier ? $invoice->supplier->name : '-';
             })
@@ -119,10 +132,10 @@ class InvoiceController extends Controller
                 return $invoice->status_badge;
             })
             ->addColumn('days_difference', function ($invoice) {
-                // Use department-specific aging calculation
-                $daysInCurrentLocation = $invoice->days_in_current_location;
+                // Use pre-calculated days_in_location from query
+                $daysInCurrentLocation = $invoice->days_in_location ?? $invoice->days_in_current_location;
 
-                if ($daysInCurrentLocation == 0) {
+                if ($daysInCurrentLocation == 0 || $daysInCurrentLocation === null) {
                     return '<span class="text-muted">-</span>';
                 }
 
@@ -677,5 +690,21 @@ class InvoiceController extends Controller
             'success' => true,
             'invoices' => $recentInvoices,
         ]);
+    }
+
+    public function sapSync(Invoice $invoice)
+    {
+        if ($invoice->status !== 'approved') {
+            return back()->with('error', 'Invoice must be approved before sending to SAP.');
+        }
+
+        if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
+            return back()->with('error', 'Invoice is already sent or pending in SAP.');
+        }
+
+        $invoice->update(['sap_status' => 'pending']);
+        CreateSapApInvoiceJob::dispatch($invoice);
+
+        return back()->with('success', 'Invoice queued for SAP posting.');
     }
 }

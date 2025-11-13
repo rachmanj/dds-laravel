@@ -87,6 +87,20 @@
                                             <td>{!! $invoice->status_badge !!}</td>
                                         </tr>
                                         <tr>
+                                            <td><strong>SAP Status:</strong></td>
+                                            <td>{!! $invoice->sap_status_badge !!}</td>
+                                        </tr>
+                                        @if ($invoice->sap_status === 'failed' && (auth()->user()->can('edit-invoices') || auth()->user()->can('update-invoice') || auth()->user()->hasRole('superadmin')))
+                                            <tr>
+                                                <td colspan="2">
+                                                    <form action="{{ route('invoices.sap-sync', $invoice) }}" method="POST">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-warning btn-sm">Retry SAP Sync</button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        @endif
+                                        <tr>
                                             <td><strong>Current Location:</strong></td>
                                             <td>{{ $invoice->cur_loc }}</td>
                                         </tr>

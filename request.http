@@ -5,6 +5,13 @@
 # - docs/API_TEST_SCRIPT.md - Testing guide and examples
 #
 # This file contains quick test requests for development and testing
+#
+# SAP Environment Variables
+# These variables are loaded from http-client.env.json (copy from http-client.env.json.example)
+# Values should match your Laravel .env: SAP_DB_NAME, SAP_USER, SAP_PASSWORD
+@SAP_DB_NAME = 
+@SAP_USER = 
+@SAP_PASSWORD = 
 
 ### Health Check (No Authentication Required)
 # GET http://localhost:8000/api/health
@@ -100,3 +107,16 @@ Accept: application/json
 GET http://localhost:8000/api/v1/documents/
 X-API-Key: mantapjiwa
 Accept: application/json
+
+### Test API SAP
+# Note: Variables are defined in http-client.env.json or http-client.private.env.json
+# Setup: Copy http-client.env.json.example to http-client.env.json and fill in values from your .env file
+# These should match your Laravel .env values: SAP_DB_NAME, SAP_USER, SAP_PASSWORD
+POST https://arkasrv2:50000/b1s/v1/Login
+Content-Type: application/json
+
+{
+    "CompanyDB": "{{SAP_DB_NAME}}",
+    "UserName": "{{SAP_USER}}",
+    "Password": "{{SAP_PASSWORD}}"
+}

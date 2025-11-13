@@ -1,3 +1,49 @@
+### 2025-11-13 — SAP B1 Service Layer Integration: Direct OData Queries
+
+**Key Learning**: SAP B1 10.0 Service Layer doesn't reliably support executing User Queries via standard endpoints. Direct OData entity queries are more reliable and flexible.
+
+**Implementation Details**:
+- **Primary Method**: Query `InventoryTransferRequests` entity directly using OData filters
+- **Date Field**: Use `DocDate` instead of `CreationDate` (matches SQL query logic from `list_ITO.sql`)
+- **Entity Discovery**: Auto-detect correct entity name (`InventoryTransferRequests`, `StockTransfers`, `StockTransferDrafts`)
+- **Field Mapping**: Handle variations (DocNum vs Reference1, FromWarehouse vs Filler)
+- **Filter Testing**: Test `U_MIS_TransferType = 'OUT'` filter first, skip if it returns 0 records
+
+**Session Management**:
+- SAP Service Layer uses cookie-based sessions
+- Automatic re-login on 401 errors with retry logic
+- Session cookies stored in Guzzle CookieJar
+
+**Error Handling**:
+- Comprehensive logging to `sap_logs` table
+- Detailed error messages for debugging
+- Graceful fallback if primary method fails
+
+**User Experience**:
+- Synchronous job execution for immediate feedback
+- Toastr notifications with success/error counts
+- Loading states during sync operation
+- Results display showing created and skipped records
+
+**Files**: `app/Services/SapService.php`, `app/Jobs/SyncSapItoDocumentsJob.php`, `app/Http/Controllers/AdditionalDocumentController.php`
+
+### 2025-11-13 — Permission-Based Access Control for SAP Features
+
+**Key Learning**: Use dedicated permissions instead of role-based middleware for better maintainability.
+
+**Implementation**:
+- Created `sync-sap-ito` permission
+- Assigned to: `superadmin`, `admin`, `accounting` roles
+- Route protection: `permission:sync-sap-ito` middleware
+- Menu visibility: `@can('sync-sap-ito')` directive
+
+**Benefits**:
+- Easy to modify access without code changes
+- Consistent with existing permission patterns
+- Better separation of concerns
+
+**Files**: `database/seeders/RolePermissionSeeder.php`, `routes/web.php`, `resources/views/layouts/partials/menu/additional-documents.blade.php`
+
 ### 2025-10-30 — Accounting Role Invoice Cross-Department Access
 
 -   **Feature**: Extended Accounting role authorization to allow cross-department access to invoices and invoice attachments
