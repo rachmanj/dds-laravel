@@ -70,8 +70,9 @@ class TestSapSync extends Command
             $this->info("   Querying with date filter: {$startDate} to {$endDate}...");
             
             // Try querying with different date fields and filters to see which one works
+            // Prioritize CreateDate to match SQL query
             $this->info("   Testing different date fields and filters...");
-            $dateFieldsToTest = ['DocDate', 'CreationDate'];
+            $dateFieldsToTest = ['CreateDate', 'CreationDate', 'DocDate'];
             $workingField = null;
             $workingFilter = null;
             
@@ -99,27 +100,104 @@ class TestSapSync extends Command
                         $workingFilter = $testFilter;
                         $this->info("     ✓ {$dateField} works without TransferType filter!");
                         
-                        // Test 2: With TransferType filter
-                        $testFilterWithType = $testFilter . " and U_MIS_TransferType eq 'OUT'";
-                        $this->line("     Testing with {$dateField} + TransferType='OUT' filter...");
+                        // Test 2: Check what TransferType values exist in the records
+                        // Try both direct access and DynamicProperties
+                        $this->line("     Checking U_MIS_TransferType field values in sample records...");
                         try {
-                            $testResponse2 = $client->get('InventoryTransferRequests', [
+                            // Try with DynamicProperties first (for UDFs)
+                            $sampleResponse = $client->get('InventoryTransferRequests', [
                                 'query' => [
-                                    '$filter' => $testFilterWithType,
-                                    '$top' => 5
+                                    '$filter' => $testFilter,
+                                    '$top' => 10,
+                                    '$select' => 'DocNum,DocDate,CreationDate,DynamicProperties'
                                 ]
                             ]);
-                            $testResult2 = json_decode($testResponse2->getBody()->getContents(), true);
-                            $count2 = isset($testResult2['value']) ? count($testResult2['value']) : 0;
-                            $this->line("       Found {$count2} records with TransferType='OUT'");
-                            if ($count2 > 0) {
-                                $workingFilter = $testFilterWithType;
-                                $this->info("     ✓ TransferType filter also works!");
-                            } else {
-                                $this->warn("     ⚠ No records with TransferType='OUT' - will use filter without it");
+                            $sampleResult = json_decode($sampleResponse->getBody()->getContents(), true);
+                            
+                            // Also try direct access
+                            try {
+                                $sampleResponseDirect = $client->get('InventoryTransferRequests', [
+                                    'query' => [
+                                        '$filter' => $testFilter,
+                                        '$top' => 10,
+                                        '$select' => 'DocNum,DocDate,CreationDate,U_MIS_TransferType'
+                                    ]
+                                ]);
+                                $sampleResultDirect = json_decode($sampleResponseDirect->getBody()->getContents(), true);
+                                if (isset($sampleResultDirect['value']) && count($sampleResultDirect['value']) > 0) {
+                                    $sampleResult = $sampleResultDirect; // Prefer direct if available
+                                }
+                            } catch (\Exception $e) {
+                                // Direct access might not work, use DynamicProperties
+                            }
+                            
+                            if (isset($sampleResult['value']) && count($sampleResult['value']) > 0) {
+                                $transferTypes = [];
+                                foreach ($sampleResult['value'] as $rec) {
+                                    // Try direct access first
+                                    $type = $rec['U_MIS_TransferType'] ?? null;
+                                    
+                                    // Try DynamicProperties
+                                    if ($type === null && isset($rec['DynamicProperties'])) {
+                                        if (is_array($rec['DynamicProperties'])) {
+                                            $type = $rec['DynamicProperties']['U_MIS_TransferType'] ?? null;
+                                            // Case-insensitive search
+                                            if ($type === null) {
+                                                foreach ($rec['DynamicProperties'] as $key => $value) {
+                                                    if (strtoupper($key) === 'U_MIS_TRANSFERTYPE') {
+                                                        $type = $value;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    $type = $type ?? 'NULL';
+                                    if (!isset($transferTypes[$type])) {
+                                        $transferTypes[$type] = 0;
+                                    }
+                                    $transferTypes[$type]++;
+                                }
+                                $this->line("       TransferType values found: " . json_encode($transferTypes));
+                                
+                                // Now test with OUT filter - try both direct and DynamicProperties syntax
+                                $filterVariations = [
+                                    "U_MIS_TransferType eq 'OUT'",
+                                    "DynamicProperties/U_MIS_TransferType eq 'OUT'",
+                                ];
+                                
+                                $filterWorked = false;
+                                foreach ($filterVariations as $filterVar) {
+                                    $testFilterWithType = $testFilter . " and " . $filterVar;
+                                    $this->line("     Testing with {$dateField} + {$filterVar}...");
+                                    try {
+                                        $testResponse2 = $client->get('InventoryTransferRequests', [
+                                            'query' => [
+                                                '$filter' => $testFilterWithType,
+                                                '$top' => 10
+                                            ]
+                                        ]);
+                                        $testResult2 = json_decode($testResponse2->getBody()->getContents(), true);
+                                        $count2 = isset($testResult2['value']) ? count($testResult2['value']) : 0;
+                                        $this->line("       Found {$count2} records with {$filterVar}");
+                                        if ($count2 > 0) {
+                                            $workingFilter = $testFilterWithType;
+                                            $this->info("     ✓ U_MIS_TransferType filter works with '{$filterVar}'!");
+                                            $filterWorked = true;
+                                            break;
+                                        }
+                                    } catch (\Exception $e) {
+                                        $this->line("       Error: " . substr($e->getMessage(), 0, 60));
+                                    }
+                                }
+                                
+                                if (!$filterWorked) {
+                                    $this->warn("     ⚠ No records found with U_MIS_TransferType='OUT' using any filter syntax");
+                                }
                             }
                         } catch (\Exception $e) {
-                            $this->warn("     ⚠ TransferType filter failed: " . substr($e->getMessage(), 0, 50));
+                            $this->warn("     ⚠ Could not check TransferType values: " . substr($e->getMessage(), 0, 50));
                         }
                         break;
                     }

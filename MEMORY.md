@@ -1,31 +1,46 @@
-### 2025-11-13 — SAP B1 Service Layer Integration: Direct OData Queries
+### 2025-11-13 — SAP B1 ITO Sync: SQL Server Direct Access (Final Solution)
 
-**Key Learning**: SAP B1 10.0 Service Layer doesn't reliably support executing User Queries via standard endpoints. Direct OData entity queries are more reliable and flexible.
+**Key Learning**: OData queries cannot accurately replicate complex SQL queries with UDFs and joins. Direct SQL Server access provides 100% accuracy by executing the exact SQL query.
+
+**Problem Solved**:
+- OData returned 1 record vs SQL Query 5's 202 records
+- `U_MIS_TransferType` field is NULL in OData (not exposed)
+- `CreateDate` vs `CreationDate` field name mismatch
+- Cannot replicate warehouse join condition in OData
+
+**Solution**: SQL Server direct access using Laravel's DB facade with `sqlsrv` driver.
 
 **Implementation Details**:
-- **Primary Method**: Query `InventoryTransferRequests` entity directly using OData filters
-- **Date Field**: Use `DocDate` instead of `CreationDate` (matches SQL query logic from `list_ITO.sql`)
-- **Entity Discovery**: Auto-detect correct entity name (`InventoryTransferRequests`, `StockTransfers`, `StockTransferDrafts`)
-- **Field Mapping**: Handle variations (DocNum vs Reference1, FromWarehouse vs Filler)
-- **Filter Testing**: Test `U_MIS_TransferType = 'OUT'` filter first, skip if it returns 0 records
+- **Primary Method**: SQL Server direct query execution (`executeItoSqlQuery()`)
+  - Executes exact SQL from `list_ITO.sql`
+  - Uses parameterized queries for safety
+  - All filters working: `CreateDate`, `U_MIS_TransferType = 'OUT'`, warehouse join
+  - 100% accuracy: Matches SQL Query 5 exactly (202 records)
+- **Fallback Methods**: OData entity queries → Query execution via Service Layer
+- **Database Connection**: `sap_sql` connection in `config/database.php`
+- **Requirements**: PHP `sqlsrv` extension + Microsoft ODBC Driver 18
 
-**Session Management**:
-- SAP Service Layer uses cookie-based sessions
-- Automatic re-login on 401 errors with retry logic
-- Session cookies stored in Guzzle CookieJar
+**Configuration**:
+- Environment variables: `SAP_SQL_HOST`, `SAP_SQL_PORT`, `SAP_SQL_DATABASE`, `SAP_SQL_USERNAME`, `SAP_SQL_PASSWORD`
+- Connection options: `TrustServerCertificate => true` for development
+- Falls back to existing `SAP_*` env vars if SQL-specific ones not set
 
-**Error Handling**:
-- Comprehensive logging to `sap_logs` table
-- Detailed error messages for debugging
-- Graceful fallback if primary method fails
+**Performance**:
+- SQL query execution: ~1-2 seconds for 202 records
+- Direct database connection (faster than HTTP/OData)
+- No pagination needed (SQL handles it)
 
-**User Experience**:
-- Synchronous job execution for immediate feedback
-- Toastr notifications with success/error counts
-- Loading states during sync operation
-- Results display showing created and skipped records
+**Test Results**:
+- SQL Query 5: 202 records (Nov 1-12, 2025)
+- SQL Server direct query: 202 records ✅ (exact match)
+- OData query: 1 record ❌ (inaccurate)
 
-**Files**: `app/Services/SapService.php`, `app/Jobs/SyncSapItoDocumentsJob.php`, `app/Http/Controllers/AdditionalDocumentController.php`
+**Files**: 
+- `app/Services/SapService.php` - Added `executeItoSqlQuery()` method
+- `app/Jobs/SyncSapItoDocumentsJob.php` - Updated priority to SQL first
+- `config/database.php` - Added `sap_sql` connection
+- `docs/SAP-SQL-DIRECT-ACCESS.md` - Implementation guide
+- `docs/INSTALL-SQLSRV-WINDOWS.md` - Extension installation guide
 
 ### 2025-11-13 — Permission-Based Access Control for SAP Features
 

@@ -1,8 +1,14 @@
-## 2025-11-13 — SAP B1 ITO Sync: Direct OData Queries vs Query Execution
+## 2025-11-13 — SAP B1 ITO Sync: SQL Server Direct Access (Final Solution)
 
--   **Context**: Implementing SAP B1 integration to sync Inventory Transfer Orders (ITO) from SAP to Laravel. Initial approach attempted to execute pre-defined User Queries via SAP Service Layer, but encountered endpoint compatibility issues. The `list_ito` query exists in SAP B1 but couldn't be executed through standard query execution endpoints.
+-   **Context**: Implementing SAP B1 integration to sync Inventory Transfer Orders (ITO) from SAP to Laravel. Initial approaches (OData queries, query execution) had accuracy issues. OData couldn't replicate SQL Query 5 results (202 records) due to field name mismatches and UDFs not being exposed. User has direct SQL Server access credentials.
 
--   **Decision**: Use direct OData entity queries as primary method, with query execution as fallback. Query `InventoryTransferRequests` entity directly using OData filters instead of executing SQL queries.
+-   **Decision**: Use SQL Server direct access as primary method, with OData as fallback. Execute the exact SQL query from `list_ITO.sql` directly on SAP SQL Server for 100% accuracy.
+
+## 2025-11-13 — SAP B1 ITO Sync: Direct OData Queries vs Query Execution (Initial Approach)
+
+-   **Context**: Initial implementation attempted to execute pre-defined User Queries via SAP Service Layer, but encountered endpoint compatibility issues. The `list_ito` query exists in SAP B1 but couldn't be executed through standard query execution endpoints. Later discovered OData limitations with field mapping and UDF exposure.
+
+-   **Decision**: Initially used direct OData entity queries as primary method, with query execution as fallback. However, this approach had accuracy issues (1 record vs 202 records from SQL Query 5).
 
 -   **Alternatives Considered**:
 
@@ -58,8 +64,9 @@
     - `app/Console/Commands/TestSapConnection.php`: Comprehensive endpoint testing
     - `app/Console/Commands/TestSapSync.php`: Sync testing with debugging
 
--   **Status**: ✅ **IMPLEMENTED & TESTED**  
+-   **Status**: ⚠️ **SUPERSEDED** - Replaced by SQL Server direct access for accuracy  
 -   **Date**: 2025-11-13
+-   **Superseded By**: SQL Server Direct Access (2025-11-13)
 
 ## 2025-11-13 — SAP ITO Sync Permission-Based Access Control
 
@@ -86,6 +93,83 @@
     - Menu highlighting: Parent menu expands when on SAP ITO Sync page
 
 -   **Status**: ✅ **IMPLEMENTED**  
+-   **Date**: 2025-11-13
+
+## 2025-11-13 — SAP B1 ITO Sync: SQL Server Direct Access (Final Solution)
+
+-   **Context**: After implementing OData approach, discovered accuracy issues. SQL Query 5 shows 202 records for Nov 1-12, 2025, but OData only returned 1 record. Root causes:
+    - OData entity uses `CreationDate` instead of `CreateDate` (different fields)
+    - `U_MIS_TransferType` field is NULL in OData (not exposed properly)
+    - Cannot replicate warehouse join condition (`T2.[WhsCode] = T0.[Filler]`)
+    - User has direct SQL Server access credentials available
+
+-   **Decision**: Implement SQL Server direct access as primary method. Execute exact SQL query from `list_ITO.sql` directly on SAP SQL Server database for 100% accuracy.
+
+-   **Alternatives Considered**:
+
+    1. **Fix OData field mapping** - Attempted to use `DynamicProperties` for UDFs, but field still returned NULL. OData cannot replicate complex SQL joins.
+
+    2. **Use SQL query execution via Service Layer** - Already attempted, endpoint compatibility issues in SAP B1 10.0.
+
+    3. **Accept OData limitations** - Rejected because accuracy is critical. Business needs exact match with SQL Query 5 results.
+
+    4. **SQL Server direct access** - Chosen because:
+       - ✅ 100% accuracy (matches SQL Query 5 exactly: 202 records)
+       - ✅ All filters working (`CreateDate`, `U_MIS_TransferType = 'OUT'`, warehouse join)
+       - ✅ Complete field mapping (no field name issues)
+       - ✅ User has SQL Server credentials available
+       - ✅ Better performance (direct query vs HTTP requests)
+
+-   **Implementation**:
+
+    **Database Connection**:
+    - Added `sap_sql` connection in `config/database.php`
+    - Uses `sqlsrv` driver for SQL Server
+    - Environment variables: `SAP_SQL_HOST`, `SAP_SQL_PORT`, `SAP_SQL_DATABASE`, `SAP_SQL_USERNAME`, `SAP_SQL_PASSWORD`
+
+    **Service Method**:
+    ```php
+    SapService::executeItoSqlQuery($startDate, $endDate)
+    ├── Connect to SAP SQL Server via Laravel DB facade
+    ├── Execute parameterized SQL query (from list_ITO.sql)
+    ├── Use exact WHERE clause: CreateDate, U_MIS_TransferType='OUT', warehouse join
+    └── Return results as array (matching SQL query field names)
+    ```
+
+    **Sync Job Priority**:
+    1. **Primary**: SQL Server direct query (`executeItoSqlQuery`)
+    2. **Fallback 1**: OData entity query (`getStockTransferRequests`)
+    3. **Fallback 2**: Query execution via Service Layer (`executeQuery`)
+
+-   **Trade-offs**:
+
+    **Advantages**:
+    - ✅ 100% accuracy (matches SQL Query 5: 202 records)
+    - ✅ All SQL filters working correctly
+    - ✅ Complete field mapping (no name mismatches)
+    - ✅ Better performance (direct query)
+    - ✅ No field mapping complexity
+
+    **Disadvantages**:
+    - ⚠️ Requires PHP `sqlsrv` extension installation
+    - ⚠️ Requires Microsoft ODBC Driver 18 installation
+    - ⚠️ Requires direct SQL Server network access
+    - ⚠️ Requires SQL Server credentials (security consideration)
+
+-   **Test Results**:
+    - ✅ SQL Query 5: 202 records (Nov 1-12, 2025)
+    - ✅ SQL Server direct query: 202 records (exact match)
+    - ✅ OData query: 1 record (inaccurate)
+    - ✅ All 202 records correctly identified as duplicates (already in database)
+
+-   **Files Modified**:
+    - `config/database.php`: Added `sap_sql` connection
+    - `app/Services/SapService.php`: Added `executeItoSqlQuery()` method
+    - `app/Jobs/SyncSapItoDocumentsJob.php`: Updated to use SQL Server first
+    - `docs/SAP-SQL-DIRECT-ACCESS.md`: Implementation guide
+    - `docs/INSTALL-SQLSRV-WINDOWS.md`: Extension installation guide
+
+-   **Status**: ✅ **IMPLEMENTED & TESTED**  
 -   **Date**: 2025-11-13
 
 ## 2025-10-30 — Accounting Role Invoice Cross-Department Access

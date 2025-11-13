@@ -112,6 +112,21 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        'sap_sql' => [
+            'driver' => 'sqlsrv',
+            'host' => env('SAP_SQL_HOST'), // e.g., arkasrv2 or IP address
+            'port' => env('SAP_SQL_PORT', '1433'),
+            'database' => env('SAP_SQL_DATABASE', env('SAP_DB_NAME')),
+            'username' => env('SAP_SQL_USERNAME', env('SAP_USER')),
+            'password' => env('SAP_SQL_PASSWORD', env('SAP_PASSWORD')),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'options' => [
+                'TrustServerCertificate' => true, // For development
+            ],
+        ],
+
     ],
 
     /*

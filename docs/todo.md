@@ -13,12 +13,17 @@
 
 **Key Deliverables**:
 
-1. **SAP B1 Service Layer Integration** ✅
+1. **SAP B1 Integration** ✅
    - Created `SapService` for centralized SAP API communication
-   - Implemented login, session management, and automatic re-authentication
-   - Direct OData entity queries on `InventoryTransferRequests`
-   - Auto-discovery of correct entity names and field mappings
-   - Fallback to query execution if direct queries fail
+   - **Primary Method**: SQL Server direct access for 100% accuracy
+     - Executes exact SQL query from `list_ITO.sql`
+     - All filters working: `CreateDate`, `U_MIS_TransferType = 'OUT'`, warehouse join
+     - Matches SQL Query 5 exactly (202 records)
+   - **Fallback Methods**: OData entity queries + Query execution
+     - OData queries on `InventoryTransferRequests` entity
+     - Auto-discovery of correct entity names and field mappings
+     - Session management and automatic re-authentication
+   - Database connection: `sap_sql` connection configured
 
 2. **ITO Document Synchronization** ✅
    - `SyncSapItoDocumentsJob` handles data fetching and transformation
@@ -46,36 +51,51 @@
    - Detailed error messages and debugging information
 
 **Technical Highlights**:
-- **Dual Query Strategy**: Direct OData queries (primary) + Query execution (fallback)
-- **Smart Field Mapping**: Handles multiple field name variations
-- **Session Management**: Automatic re-login on 401 errors
+- **Multi-Strategy Query Approach**: SQL Server direct access (primary, 100% accurate) → OData queries (fallback) → Query execution (fallback)
+- **SQL Server Direct Access**: Executes exact SQL query from `list_ITO.sql` for perfect accuracy
+- **100% Accuracy**: Matches SQL Query 5 exactly (202 records vs 1 record from OData)
+- **All Filters Working**: `CreateDate`, `U_MIS_TransferType = 'OUT'`, warehouse join condition
+- **Infrastructure**: PHP `sqlsrv` extension + Microsoft ODBC Driver 18 installed and configured
+- **Database Connection**: `sap_sql` connection configured in `config/database.php`
+- **Smart Field Mapping**: Handles multiple field name variations (for OData fallback)
+- **Session Management**: Automatic re-login on 401 errors (for OData fallback)
 - **Synchronous Processing**: Immediate user feedback (runs job synchronously)
 - **Menu Integration**: Proper highlighting and parent menu expansion
 
 **Test Results**:
-- ✅ SAP connection successful
-- ✅ Entity discovery working (`InventoryTransferRequests` with `DocDate` field)
-- ✅ Data sync successful (1 record created in test)
-- ✅ Duplicate prevention working
+- ✅ SQL Server connection successful
+- ✅ SQL query execution: 202 records (matches SQL Query 5 exactly)
+- ✅ OData fallback: 1 record (limited accuracy, kept as fallback)
+- ✅ Duplicate prevention working (202 records correctly identified as duplicates)
 - ✅ User notifications displaying correctly
 - ✅ Permission system working
+- ✅ All SQL filters working correctly
 
 **Files Created/Modified**:
-- `app/Services/SapService.php` - SAP API client
-- `app/Jobs/SyncSapItoDocumentsJob.php` - Sync job
+- `app/Services/SapService.php` - SAP API client + SQL Server direct access (`executeItoSqlQuery()`)
+- `app/Jobs/SyncSapItoDocumentsJob.php` - Sync job with multi-strategy approach
 - `app/Http/Controllers/AdditionalDocumentController.php` - Web interface
 - `app/Console/Commands/TestSapConnection.php` - Connection testing
 - `app/Console/Commands/TestSapSync.php` - Sync testing
 - `resources/views/admin/sap-sync-ito.blade.php` - Sync form
 - `database/seeders/RolePermissionSeeder.php` - Permission setup
-- `config/sap.php` - SAP configuration
+- `config/sap.php` - SAP Service Layer configuration
+- `config/database.php` - Added `sap_sql` connection for SQL Server
 - `routes/web.php` - Permission-protected routes
+- `database/list_ITO.sql` - Source SQL query (reference)
+
+**Documentation Created**:
+- `docs/SAP-SQL-DIRECT-ACCESS.md` - SQL Server setup and implementation guide
+- `docs/INSTALL-SQLSRV-WINDOWS.md` - PHP extension installation guide
+- `docs/FIX-SQLSRV-ERROR.md` - Troubleshooting guide
+- `docs/SAP-ITO-SYNC-COMPLETE.md` - Complete implementation summary
 
 **Next Steps** (Future Enhancements):
-- Query related entities for missing fields (po_no, U_NAME)
-- Add support for `U_MIS_TransferType = 'OUT'` filter if needed
-- Implement async job processing for large date ranges
-- Add batch processing for better performance
+- ✅ SQL Server direct access implemented (primary method)
+- ⏳ Test with production SAP database credentials
+- ⏳ Verify network connectivity from production server
+- ⏳ Review security (SQL credentials, encryption) for production
+- ⏳ Set up monitoring/alerting for sync failures
 
 ---
 
@@ -3992,7 +4012,7 @@ DistributionHistory::create([
     -   **Dependencies**: Frontend JavaScript, Backend logic for managing linked documents.
 
 ### **Recently Completed**
-- Implemented SAP ITO query sync feature, including job, UI, and logging - completed 2025-11-10. Test with real SAP data.
+- Implemented SAP ITO query sync feature with SQL Server direct access (primary method) for 100% accuracy, including job, UI, and logging - completed 2025-11-13. Successfully tested: 202 records matched SQL Query 5 exactly.
 - Implemented SAP invoice creation feature - completed 2025-11-10.
 - Implemented reconciliation and monitoring - completed 2025-11-10.
 

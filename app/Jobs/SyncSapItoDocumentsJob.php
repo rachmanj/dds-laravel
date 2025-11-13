@@ -33,29 +33,39 @@ class SyncSapItoDocumentsJob implements ShouldQueue
             $results = [];
             $method = 'unknown';
             
-            // Try direct entity query first (preferred method)
+            // Try SQL Server direct query first (most accurate, matches SQL Query 5)
             try {
-                Log::channel('sap')->info('Attempting direct entity query for ITO data...');
-                $entityResults = $sapService->getStockTransferRequests($this->startDate, $this->endDate);
-                
-                // Transform entity results to match expected format
-                $results = $this->transformEntityResults($entityResults);
-                $method = 'direct_entity_query';
-                Log::channel('sap')->info("Direct entity query successful, found " . count($results) . " records");
+                Log::channel('sap')->info('Attempting direct SQL Server query for ITO data...');
+                $results = $sapService->executeItoSqlQuery($this->startDate, $this->endDate);
+                $method = 'sql_server_direct';
+                Log::channel('sap')->info("SQL Server direct query successful, found " . count($results) . " records");
             } catch (\Exception $e) {
-                Log::channel('sap')->warning('Direct entity query failed, falling back to query execution: ' . $e->getMessage());
+                Log::channel('sap')->warning('SQL Server direct query failed, falling back to OData: ' . $e->getMessage());
                 
-                // Fallback to query execution method
+                // Fallback to OData entity query
                 try {
-                    $results = $sapService->executeQuery(config('sap.query_ids.list_ito'), [
-                        'start_date' => $this->startDate,
-                        'end_date' => $this->endDate,
-                    ]);
-                    $method = 'query_execution';
-                    Log::channel('sap')->info("Query execution successful, found " . count($results) . " records");
+                    Log::channel('sap')->info('Attempting direct entity query for ITO data...');
+                    $entityResults = $sapService->getStockTransferRequests($this->startDate, $this->endDate);
+                    
+                    // Transform entity results to match expected format
+                    $results = $this->transformEntityResults($entityResults);
+                    $method = 'direct_entity_query';
+                    Log::channel('sap')->info("Direct entity query successful, found " . count($results) . " records");
                 } catch (\Exception $e2) {
-                    Log::channel('sap')->error('Both methods failed. Direct query: ' . $e->getMessage() . ' | Query execution: ' . $e2->getMessage());
-                    throw new \Exception('Failed to fetch ITO data: Direct query error - ' . $e->getMessage() . ' | Query execution error - ' . $e2->getMessage());
+                    Log::channel('sap')->warning('Direct entity query failed, falling back to query execution: ' . $e2->getMessage());
+                    
+                    // Fallback to query execution method
+                    try {
+                        $results = $sapService->executeQuery(config('sap.query_ids.list_ito'), [
+                            'start_date' => $this->startDate,
+                            'end_date' => $this->endDate,
+                        ]);
+                        $method = 'query_execution';
+                        Log::channel('sap')->info("Query execution successful, found " . count($results) . " records");
+                    } catch (\Exception $e3) {
+                        Log::channel('sap')->error('All methods failed. SQL: ' . $e->getMessage() . ' | OData: ' . $e2->getMessage() . ' | Query execution: ' . $e3->getMessage());
+                        throw new \Exception('Failed to fetch ITO data: SQL error - ' . $e->getMessage() . ' | OData error - ' . $e2->getMessage() . ' | Query execution error - ' . $e3->getMessage());
+                    }
                 }
             }
 
@@ -67,7 +77,7 @@ class SyncSapItoDocumentsJob implements ShouldQueue
             DB::beginTransaction();
 
             foreach ($results as $row) {
-                // Handle both formats: direct entity query and query execution
+                // Handle different formats: SQL query, OData entity query, and query execution
                 $itoNo = $row['ito_no'] ?? $row['DocNum'] ?? null;
                 if (!$itoNo) {
                     Log::channel('sap')->warning('Skipping row without ito_no/DocNum: ' . json_encode($row));
@@ -79,6 +89,8 @@ class SyncSapItoDocumentsJob implements ShouldQueue
                     continue;
                 }
 
+                // SQL query returns fields with exact names from SQL (ito_no, ito_date, etc.)
+                // OData returns different field names (DocNum, DocDate, etc.)
                 $document = new AdditionalDocument([
                     'type_id' => $itoTypeId,
                     'document_number' => $itoNo,
@@ -91,8 +103,8 @@ class SyncSapItoDocumentsJob implements ShouldQueue
                     'cur_loc' => '000HLOG',
                     'ito_creator' => $row['U_NAME'] ?? $row['ito_created_by'] ?? null,
                     'grpo_no' => $row['grpo_no'] ?? $row['U_MIS_GRPONo'] ?? null,
-                    'origin_wh' => $row['origin_whs'] ?? $row['Filler'] ?? null,
-                    'destination_wh' => $row['destination_whs'] ?? $row['U_MIS_ToWarehouse'] ?? null,
+                    'origin_wh' => $row['origin_whs'] ?? $row['Filler'] ?? $row['FromWarehouse'] ?? null,
+                    'destination_wh' => $row['destination_whs'] ?? $row['U_MIS_ToWarehouse'] ?? $row['ToWarehouse'] ?? null,
                     'batch_no' => $batchNo,
                 ]);
                 $document->save();
@@ -139,13 +151,36 @@ class SyncSapItoDocumentsJob implements ShouldQueue
         $transformed = [];
         
         foreach ($entityResults as $record) {
+            // Helper function to get field value (checks both direct and DynamicProperties)
+            $getField = function($fieldName) use ($record) {
+                // Try direct access first
+                if (isset($record[$fieldName])) {
+                    return $record[$fieldName];
+                }
+                
+                // Try DynamicProperties
+                if (isset($record['DynamicProperties'])) {
+                    if (is_array($record['DynamicProperties']) && isset($record['DynamicProperties'][$fieldName])) {
+                        return $record['DynamicProperties'][$fieldName];
+                    }
+                    // Case-insensitive search in DynamicProperties
+                    foreach ($record['DynamicProperties'] as $key => $value) {
+                        if (strtoupper($key) === strtoupper($fieldName)) {
+                            return $value;
+                        }
+                    }
+                }
+                
+                return null;
+            };
+            
             // DocNum might be in DocNum field or Reference1 field
             $docNum = $record['DocNum'] ?? $record['Reference1'] ?? null;
             
             // FromWarehouse maps to origin_whs (Filler in SQL)
             // ToWarehouse maps to destination_whs (U_MIS_ToWarehouse in SQL)
             $originWh = $record['FromWarehouse'] ?? $record['Filler'] ?? null;
-            $destWh = $record['ToWarehouse'] ?? $record['U_MIS_ToWarehouse'] ?? null;
+            $destWh = $record['ToWarehouse'] ?? $getField('U_MIS_ToWarehouse') ?? null;
             
             $transformed[] = [
                 'ito_no' => $docNum,
@@ -153,15 +188,15 @@ class SyncSapItoDocumentsJob implements ShouldQueue
                 'ito_created_date' => $record['CreationDate'] ?? $record['CreateDate'] ?? null,
                 'ito_created_by' => $record['UserSign'] ?? null,
                 'U_NAME' => null, // Will need to be fetched separately if needed
-                'grpo_no' => $record['U_MIS_GRPONo'] ?? null,
+                'grpo_no' => $getField('U_MIS_GRPONo') ?? null,
                 'po_no' => null, // Not directly available, would need to query related entities
                 'origin_whs' => $originWh,
                 'destination_whs' => $destWh,
                 'ito_remarks' => $record['Comments'] ?? $record['JrnlMemo'] ?? null,
                 // Additional fields from SQL query
                 'iti_no' => null, // Would need to query related OWTR records
-                'delivery_status' => $record['U_ARK_DelivStat'] ?? null,
-                'delivery_time' => $record['U_MIS_DeliveryTime'] ?? null,
+                'delivery_status' => $getField('U_ARK_DelivStat') ?? null,
+                'delivery_time' => $getField('U_MIS_DeliveryTime') ?? null,
             ];
         }
         
