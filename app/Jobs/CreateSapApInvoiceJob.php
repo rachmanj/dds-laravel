@@ -2,8 +2,6 @@
 
 namespace App\Jobs;
 
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 use App\Services\SapService;
 use App\Models\Invoice;
 use Illuminate\Bus\Queueable;
@@ -13,6 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use GuzzleHttp\Exception\RequestException;
 
 class CreateSapApInvoiceJob implements ShouldQueue
 {
@@ -30,62 +29,73 @@ class CreateSapApInvoiceJob implements ShouldQueue
 
     public function handle(SapService $sapService)
     {
+        $invoice = $this->invoice->fresh(['supplier']);
+        if (!$invoice) {
+            Log::channel('sap')->error('CreateSapApInvoiceJob: Invoice reference could not be reloaded.');
+            return;
+        }
+
+        $cardCode = optional($invoice->supplier)->sap_code;
+        $payload = null;
+
         try {
-            // Validate vendor
-            $vendor = $sapService->getBusinessPartner($this->invoice->supplier->sap_code ?? $this->invoice->supplier->code);
-            if (!$vendor || $vendor['CardType'] !== 'S') {
-                throw new \Exception('Invalid vendor CardCode');
+            if (!$cardCode) {
+                throw new \Exception('Supplier ' . ($invoice->supplier->name ?? ('#' . $invoice->supplier_id)) . ' does not have a SAP CardCode mapping.');
             }
+
+            $vendor = $this->resolveVendor($sapService, $cardCode);
 
             // Build payload (map from invoice data)
             $payload = [
                 'CardCode' => $vendor['CardCode'],
-                'DocDate' => $this->invoice->invoice_date->format('Y-m-d'),
-                'DocDueDate' => $this->invoice->payment_date ? $this->invoice->payment_date->format('Y-m-d') : now()->addDays(30)->format('Y-m-d'),
-                'Comments' => $this->invoice->remarks ?? 'Imported from DDS - Invoice #' . $this->invoice->id,
-                'DocumentLines' => [ // Assume single line for simplicity; expand if needed
+                'DocDate' => $invoice->invoice_date->format('Y-m-d'),
+                'DocDueDate' => $invoice->payment_date ? $invoice->payment_date->format('Y-m-d') : now()->addDays(30)->format('Y-m-d'),
+                'Comments' => $invoice->remarks ?? 'Imported from DDS - Invoice #' . $invoice->id,
+                'DocumentLines' => [
                     [
                         'Quantity' => 1,
-                        'UnitPrice' => $this->invoice->amount,
-                        'TaxCode' => 'EXEMPT', // Configure in config if needed
+                        'UnitPrice' => $invoice->amount,
+                        'TaxCode' => 'EXEMPT',
                     ]
                 ],
-                // Add more fields as per your mapping (e.g., PO reference, project codes)
             ];
 
             $response = $sapService->createApInvoice($payload);
 
-            DB::transaction(function () use ($response) {
-                $this->invoice->update([
+            DB::transaction(function () use ($invoice, $response, $payload) {
+                $invoice->update([
                     'sap_status' => 'posted',
-                    'sap_doc_num' => $response['DocNum'],
+                    'sap_doc_num' => $response['DocNum'] ?? null,
+                    'sap_error_message' => null,
                     'sap_last_attempted_at' => now(),
                 ]);
 
                 DB::table('sap_logs')->insert([
-                    'invoice_id' => $this->invoice->id,
+                    'invoice_id' => $invoice->id,
                     'action' => 'create_invoice',
                     'status' => 'success',
                     'request_payload' => json_encode($payload),
                     'response_payload' => json_encode($response),
-                    'attempt_count' => $this->attemptCount(),
+                    'attempt_count' => $this->attempts(),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
             });
         } catch (\Exception $e) {
-            $this->invoice->update([
+            $invoice->update([
                 'sap_status' => 'failed',
                 'sap_error_message' => $e->getMessage(),
                 'sap_last_attempted_at' => now(),
             ]);
 
             DB::table('sap_logs')->insert([
-                'invoice_id' => $this->invoice->id,
+                'invoice_id' => $invoice->id,
                 'action' => 'create_invoice',
                 'status' => 'failed',
+                'request_payload' => json_encode($payload ?? ['card_code' => $cardCode]),
+                'response_payload' => null,
                 'error_message' => $e->getMessage(),
-                'attempt_count' => $this->attemptCount(),
+                'attempt_count' => $this->attempts(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -93,8 +103,48 @@ class CreateSapApInvoiceJob implements ShouldQueue
             if ($this->attempts() < $this->tries) {
                 $this->release($this->backoff[$this->attempts() - 1]);
             } else {
-                Log::channel('sap')->error('Max retries exceeded for invoice ' . $this->invoice->id);
+                Log::channel('sap')->error('Max retries exceeded for invoice ' . $invoice->id);
             }
         }
+    }
+
+    protected function resolveVendor(SapService $sapService, string $cardCode): array
+    {
+        try {
+            $vendor = $sapService->getBusinessPartner($cardCode);
+        } catch (RequestException $exception) {
+            $parsedMessage = $this->parseSapErrorMessage($exception);
+            throw new \Exception("SAP vendor {$cardCode} not found. {$parsedMessage}");
+        }
+
+        if (!$vendor || empty($vendor['CardCode'])) {
+            throw new \Exception("SAP vendor {$cardCode} not found.");
+        }
+
+        $cardType = strtolower($vendor['CardType'] ?? '');
+        if (!in_array($cardType, ['s', 'csupplier'], true)) {
+            $cardTypeLabel = $vendor['CardType'] ?? 'unknown';
+            throw new \Exception("SAP Business Partner {$cardCode} has CardType '{$cardTypeLabel}'. Expected supplier.");
+        }
+
+        return $vendor;
+    }
+
+    protected function parseSapErrorMessage(RequestException $exception): string
+    {
+        $response = $exception->getResponse();
+
+        if (!$response) {
+            return $exception->getMessage();
+        }
+
+        $body = (string) $response->getBody();
+        $decoded = json_decode($body, true);
+
+        if (isset($decoded['error']['message']['value'])) {
+            return $decoded['error']['message']['value'];
+        }
+
+        return $body ?: $exception->getMessage();
     }
 }

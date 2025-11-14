@@ -1470,3 +1470,23 @@ Documents by type:
 ✅ Documentation complete
 
 ---
+
+### 2025-11-13 — SAP B1 A/P Invoice Vendor Validation & Logging
+
+**Key Learning**: Queue jobs must verify SAP Business Partner availability before attempting invoice creation to provide actionable errors and prevent silent retries.
+
+**Problem Solved**:
+- Finance users only saw generic "Invalid vendor CardCode" errors with no context.
+- `sap_logs` stored null request payloads, making production troubleshooting difficult.
+- Jobs retried without highlighting missing supplier mappings.
+
+**Solution**:
+- Refresh invoice+supplier context inside `CreateSapApInvoiceJob`, fail fast when `sap_code` mapping is missing.
+- Wrap `SapService::getBusinessPartner` to surface Service Layer error payloads and accept `CardType` values `S`/`cSupplier`.
+- Log structured request payloads (including card code) for both success and failure attempts.
+- Update invoice controller guard to require status `sap` before dispatch and expose descriptive `sap_status_badge` messaging in UI.
+
+**Impact**:
+- Finance sees precise failure reasons on invoice detail page and can retry after correcting mappings.
+- `sap_logs` now carries enough context for support escalation.
+- Prevents wasted retries when supplier data is incomplete.

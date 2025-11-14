@@ -101,6 +101,40 @@
 
 ## 🎯 **Current Sprint**
 
+### **SAP B1 A/P Invoice Integration – Queue Job Hardening** 🚧 **IN PROGRESS**
+
+**Status**: 🚧 Phase 2 – Vendor validation & logging in place (2025-11-13)
+
+**Progress**:
+
+1. **Controller Safeguards** ✅
+   - Route gate now requires invoice status `sap` before dispatching sync job (prevents premature submissions).
+   - Finance/Superadmin roles remain the only actors allowed to trigger sync.
+
+2. **Job Hardening** ✅
+   - Refresh invoice + supplier context per job run; fail fast if supplier lacks `sap_code`.
+   - Wrapped SAP Business Partner lookup with descriptive error propagation (captures SAP payloads when available).
+   - Normalized CardType handling (`S` or `cSupplier`) and clarified mismatch messaging.
+   - Structured logging for both success and failure (`sap_logs.request_payload` now records card code context).
+   - Invoice updates reset `sap_error_message` on success and persist attempt timestamps.
+
+3. **UI Feedback Loop** ✅
+   - `sap_status_badge` surfaces precise failure messaging on invoice detail view.
+   - "Retry SAP Sync" button available when status resolves to `failed`.
+
+**Pending / Follow-up**:
+
+- 🔁 Run `php artisan queue:work` (or Horizon) in production to process pending jobs.
+- 🧾 Verify supplier mappings — e.g. supplier `66 (ANDY JAYA MOTOR)` should have SAP CardCode `VANJMIDR01`; confirm against SAP master data.
+- 📦 Extend payload mapping to include PO reference, tax code, and line-level detail once finance provides mapping spec.
+- 🔔 Hook sap failure notifications into finance Slack/email once error taxonomy is finalised.
+
+**Risks / Dependencies**:
+
+- Accurate SAP CardCodes must exist on suppliers; integration will fail fast otherwise.
+- Queue worker uptime is required; without it invoices remain `sap_status = pending`.
+- SAP Service Layer credentials/config (`config/sap.php`) must be kept in sync between environments.
+
 ### **Accounting Role Edit Permissions Enhancement** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED & PRODUCTION READY**  

@@ -1884,7 +1884,7 @@
 -   Review date: 2025-10-20
 
 -   Context: Invoices can get new additional documents after a distribution is created (still draft). Users expected those new links to appear in the draft distribution without manual re-attach.
--   Decision: Add a draft-only “Sync linked documents” action to pull any currently linked additional documents for invoices already attached to the distribution.
+-   Decision: Add a draft-only "Sync linked documents" action to pull any currently linked additional documents for invoices already attached to the distribution.
 -   Implementation:
     -   Route: `POST /distributions/{distribution}/sync-linked-documents`
     -   Controller: `DistributionController@syncLinkedDocuments` uses `attachInvoiceAdditionalDocuments`
@@ -1902,7 +1902,7 @@
 -   Decision: Accept a single `login` input; detect if it is an email (using filter validation). If email → authenticate with `email`; otherwise → authenticate with `username`. Require `is_active = true` during authentication.
 -   Implementation:
     -   `app/Http/Controllers/Auth/LoginController@login`: switched validation to `login` + `password`; dynamic field resolution; added `is_active` in credentials.
-    -   `resources/views/auth/login.blade.php`: replaced email field with unified `login` field labeled “Email or Username”; added Remember Me checkbox.
+    -   `resources/views/auth/login.blade.php`: replaced email field with unified `login` field labeled "Email or Username"; added Remember Me checkbox.
     -   Tests added for email path, username path, and inactive user rejection.
 -   Alternatives considered:
     -   Two separate inputs or toggle (more UI complexity, same outcome).
@@ -5580,5 +5580,29 @@ After implementing the comprehensive external invoice API system with multiple e
     -   Filtered Send/Receive status and location updates to ignore skipped docs
 -   Implications: Clearer audit trail, avoids false movement; maintains visibility of out-of-origin docs
 -   Review Date: 2025-10-05
+
+---
+
+## 2025-11-13 — SAP B1 A/P Invoice Vendor Validation & Logging
+
+-   **Context**: Initial A/P invoice sync attempts surfaced "Invalid vendor CardCode" with little context. Root causes included missing supplier `sap_code` mappings and SAP returning 404/invalid CardType responses. Troubleshooting required clearer diagnostics for finance + engineering teams.
+-
+-   **Decision**: Harden `CreateSapApInvoiceJob` to (1) refresh invoice + supplier context, (2) fail fast if `sap_code` is absent, (3) wrap SAP Business Partner lookups to surface Service Layer error payloads, (4) accept both `S` and `cSupplier` CardType responses, and (5) persist structured request metadata (card code/payload) in `sap_logs` even on failure.
+-
+-   **Alternatives Considered**:
+-
+-   1. **Silent Retry Without Validation** – Rejected; would keep requeuing jobs without highlighting misconfiguration, delaying resolution.
+-   2. **Auto-create Vendors in SAP** – Rejected for now; requires business approval and additional data (addresses, tax info) that DDS does not own.
+-   3. **Manual Log Review Only** – Rejected; finance needs immediate UI feedback and actionable error messaging without SSH/log access.
+-
+-   **Implications**:
+-
+-   - ✅ Finance users immediately see descriptive failure reasons on invoice detail pages (`sap_status_badge`).
+-   - ✅ `sap_logs` retains card code and payload context for cross-team debugging.
+-   - ⚠️ Integration now depends on accurate supplier `sap_code` values; data stewardship processes must ensure mappings are maintained.
+-   - ⚠️ Queue worker uptime is critical — invoices stay `pending` until processed.
+-
+-   **Status**: ✅ **IMPLEMENTED**  
+-   **Review Date**: 2025-12-15
 
 ---

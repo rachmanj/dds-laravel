@@ -2343,234 +2343,97 @@ return response()->json(['success' => false, 'message' => 'Unauthorized']);
 
 ### Architecture Overview
 
-**Pattern**: SQL Server direct access (primary) with OData fallback, synchronous processing for immediate user feedback
+**Pattern**: Asynchronous queue-based integration with SAP B1 Service Layer API for A/P Invoice creation, with direct SQL access fallback if needed.
 
-**Implementation Date**: 2025-11-13  
-**Status**: ✅ **PRODUCTION READY**
+**Implementation Date**: Starting 2025-11-13  
+**Status**: **IN PROGRESS** (Phase 2: Vendor validation & telemetry in queue job)
 
 **Key Components**:
-- `SapService`: Centralized SAP B1 Service Layer API client + SQL Server direct access
-- `SyncSapItoDocumentsJob`: Handles ITO document synchronization with multi-strategy approach
-- `AdditionalDocumentController`: Web interface for sync operations
-- `sap_logs` table: Comprehensive logging of all SAP operations
-- `sap_sql` database connection: Direct SQL Server connection for accurate queries
 
-### Query Sync for ITO Documents
+-   `config/sap.php`: Connection details and data mappings.
+-   Migrations: Added SAP fields to `invoices` table and created `sap_logs` table for auditing.
+-   `SapLog` model: Eloquent model for logging.
+-   `CreateSapApInvoiceJob`: Queue job for asynchronous invoice posting with vendor validation, contextual error handling, and structured logging (2025-11-13).
 
-**Feature**: On-demand synchronization of Inventory Transfer Orders (ITO) from SAP B1 to Laravel database
+### Vendor Validation & Logging (2025-11-13)
 
-**Access Control**:
-- Permission: `sync-sap-ito`
-- Roles with access: `superadmin`, `admin`, `accounting`
-- Route: `/admin/sap-sync-ito` (GET/POST)
+-   Refresh invoice & supplier context when the job runs to guarantee fresh data.
+-   Require supplier `sap_code` mapping before contacting SAP; fail fast with actionable messaging when missing.
+-   Wrap SAP Business Partner lookup to surface SAP error payloads (e.g., 404) in `sap_error_message` and `sap_logs` entries.
+-   Accept SAP `CardType` values of `S` or `cSupplier`; treat mismatches as configuration issues with guidance.
+-   Persist request context for both success and failure (card code at minimum) to simplify production troubleshooting.
 
-**Technical Implementation**:
+### Database Adjustments
 
-1. **Multi-Strategy Query Approach** (in priority order):
-   - **Primary Method**: SQL Server direct query execution (100% accurate, matches SQL Query 5)
-     - Executes exact SQL from `list_ITO.sql`
-     - Uses parameterized queries for safety
-     - All filters working: `CreateDate`, `U_MIS_TransferType = 'OUT'`, warehouse join
-   - **Fallback 1**: Direct OData queries on `InventoryTransferRequests` entity
-     - Auto-detection of correct entity and date field names
-     - Limited accuracy due to OData field mapping issues
-   - **Fallback 2**: User query execution via Service Layer (if available)
-     - Endpoint compatibility issues in SAP B1 10.0
+-   **Invoices Table**:
 
-2. **Data Flow**:
+    -   `sap_status`: string (nullable) - e.g., 'pending', 'posted', 'failed'
+    -   `sap_doc_num`: string (nullable) - SAP DocNum
+    -   `sap_error_message`: text (nullable)
+    -   `sap_last_attempted_at`: timestamp (nullable)
+
+-   **SAP Logs Table** (`sap_logs`):
+    -   `id`: primary
+    -   `invoice_id`: foreign key to invoices
+    -   `action`: string
+    -   `request_payload`: json (nullable)
+    -   `response_payload`: json (nullable)
+    -   `status`: string
+    -   `error_message`: text (nullable)
+    -   `attempt_count`: integer (default 0)
+    -   timestamps
+
+### Workflow
+
+1. Trigger: Finance user clicks "Send to SAP" on approved invoice.
+2. Validation: Check data mappings, ensure supplier has SAP CardCode, and capture context for auditing.
+3. Queue: Dispatch `CreateSapApInvoiceJob`.
+4. Processing: Resolve SAP vendor, build payload, POST to /Invoices, handle response.
+5. Update: Set `sap_status` (`pending` → `posted` / `failed`), persist structured log entry in `sap_logs`.
+6. Reconciliation: Scheduled command queries SAP for updates.
+
+### Sequence Diagram for Invoice Creation
+
 ```mermaid
 sequenceDiagram
-    User->>UI: Submit date range in form
-    UI->>Controller: POST /admin/sap-sync-ito
-    Controller->>Job: Execute SyncSapItoDocumentsJob (synchronous)
-    
-    alt SQL Server Direct (Primary)
-        Job->>SapService: executeItoSqlQuery(startDate, endDate)
-        SapService->>SQLServer: Execute SQL query (list_ITO.sql)
-        SQLServer-->>SapService: Results (202 records, exact match)
-        Note over SapService,SQLServer: Uses CreateDate, U_MIS_TransferType='OUT',<br/>warehouse join - 100% accurate
-    else OData Fallback
-        Job->>SapService: getStockTransferRequests(startDate, endDate)
-        SapService->>SAP: POST /Login
-        SAP-->>SapService: Session cookie
-        SapService->>SAP: GET /InventoryTransferRequests?$filter=...
-        SAP-->>SapService: OData results (limited accuracy)
-        Job->>Job: transformEntityResults() - Map SAP fields
+    participant User as Finance User
+    participant LaravelUI as Laravel UI
+    participant LaravelApp as Laravel App
+    participant Queue as Laravel Queue
+    participant SAP as SAP B1 Service Layer
+
+    User->>LaravelUI: Click "Send to SAP" on Invoice
+    LaravelUI->>LaravelApp: POST /invoices/{id}/sap-sync
+    LaravelApp->>LaravelApp: Validate Invoice Data
+    alt Validation Fails
+        LaravelApp-->>LaravelUI: Return Error Message
+    else Validation Passes
+        LaravelApp->>Queue: Dispatch CreateSapApInvoiceJob
+        LaravelApp-->>LaravelUI: Return "Queued" Status
     end
-    
-    Job->>Database: Check duplicates by document_number (ito_no)
-    Job->>Database: Insert AdditionalDocument records
-    Job->>sap_logs: Log success with counts and method used
-    Controller->>UI: Redirect with success message and counts
-    UI->>User: Toastr notification + results display
+
+    Queue->>LaravelApp: Process Job
+    LaravelApp->>SAP: POST /Invoices (Payload)
+    alt SAP Success
+        SAP-->>LaravelApp: 201 Created (with DocNum)
+        LaravelApp->>LaravelApp: Update Invoice (sap_status='posted', sap_doc_num)
+        LaravelApp->>User: Notify Success (e.g., Email/Toast)
+    else SAP Failure (e.g., Transient)
+        SAP-->>LaravelApp: Error Response
+        LaravelApp->>LaravelApp: Log Error, Increment Attempts
+        alt Attempts < 3
+            LaravelApp->>Queue: Re-dispatch Job (with Delay)
+        else Max Attempts
+            LaravelApp->>LaravelApp: Update Invoice (sap_status='failed')
+            LaravelApp->>User: Notify Failure for Manual Review
+        end
+    end
+
+    Note over LaravelApp,SAP: Scheduled Reconciliation: Query SAP for Docs, Sync Back to Laravel
 ```
 
-3. **Field Mapping**:
-   - **SQL Query** (Primary): Direct field names from SQL query
-     - `ito_no` → `document_number`
-     - `ito_date` → `document_date`, `receive_date`
-     - `origin_whs` → `origin_wh`
-     - `destination_whs` → `destination_wh`
-     - `ito_remarks` → `remarks`
-     - `grpo_no` → `grpo_no`
-     - `po_no` → `po_no`
-     - `ito_created_by` / `U_NAME` → `ito_creator`
-   - **OData Query** (Fallback): Field name variations
-     - `DocNum` / `Reference1` → `document_number`
-     - `DocDate` → `document_date`, `receive_date`
-     - `FromWarehouse` / `Filler` → `origin_wh`
-     - `ToWarehouse` / `U_MIS_ToWarehouse` → `destination_wh`
-     - `Comments` / `JrnlMemo` → `remarks`
-     - `U_MIS_GRPONo` → `grpo_no`
+### Upcoming: Phase 3 - End-to-End Reconciliation
 
-4. **Key Features**:
-   - **100% Accuracy**: SQL Server direct query matches SQL Query 5 exactly (202 records)
-   - **All Filters Working**: `CreateDate`, `U_MIS_TransferType = 'OUT'`, warehouse join condition
-   - **Multi-Strategy Fallback**: SQL → OData → Query execution
-   - **Duplicate prevention**: Checks `document_number` before inserting
-   - **Comprehensive logging**: All operations logged to `sap_logs` table with method used
-   - **User feedback**: Real-time notifications with success/error counts
-   - **Session management**: Automatic re-login on 401 errors (for OData fallback)
-
-**Database Schema**:
-```sql
--- SAP integration tracking
-invoices
-├── sap_status (nullable)
-├── sap_doc_num (nullable)
-├── sap_error_message (nullable)
-└── sap_last_attempted_at (nullable)
-
--- SAP operation logs
-sap_logs
-├── id
-├── invoice_id (nullable, foreign key)
-├── action (query_sync, invoice_create, etc.)
-├── request_payload (json)
-├── response_payload (json)
-├── status (success, failed)
-├── error_message (nullable)
-├── attempt_count
-└── timestamps
-```
-
-**Configuration**:
-
-`config/sap.php`:
-```php
-'server_url' => env('SAP_SERVER_URL'),      // https://arkasrv2:50000/b1s/v1
-'db_name' => env('SAP_DB_NAME'),
-'user' => env('SAP_USER'),
-'password' => env('SAP_PASSWORD'),
-'query_ids' => [
-    'list_ito' => 'list_ito',
-],
-```
-
-`config/database.php` - `sap_sql` connection:
-```php
-'sap_sql' => [
-    'driver' => 'sqlsrv',
-    'host' => env('SAP_SQL_HOST'),          // arkasrv2
-    'port' => env('SAP_SQL_PORT', '1433'),
-    'database' => env('SAP_SQL_DATABASE', env('SAP_DB_NAME')),
-    'username' => env('SAP_SQL_USERNAME', env('SAP_USER')),
-    'password' => env('SAP_SQL_PASSWORD', env('SAP_PASSWORD')),
-    'charset' => 'utf8',
-    'options' => [
-        'TrustServerCertificate' => true,
-    ],
-],
-```
-
-**Environment Variables**:
-```env
-# SAP Service Layer (for OData fallback)
-SAP_SERVER_URL=https://arkasrv2:50000/b1s/v1
-SAP_DB_NAME=your_database
-SAP_USER=your_user
-SAP_PASSWORD=your_password
-
-# SAP SQL Server Direct Access (primary method)
-SAP_SQL_HOST=arkasrv2
-SAP_SQL_PORT=1433
-SAP_SQL_DATABASE=your_database
-SAP_SQL_USERNAME=your_sql_user
-SAP_SQL_PASSWORD=your_sql_password
-```
-
-**Files Structure**:
-```
-app/
-├── Services/
-│   └── SapService.php                    # SAP B1 API client + SQL Server access
-│       ├── login()                       # Service Layer authentication
-│       ├── executeQuery()                # User query execution (fallback)
-│       ├── getStockTransferRequests()    # OData entity queries (fallback)
-│       └── executeItoSqlQuery()          # SQL Server direct query (primary)
-├── Jobs/
-│   └── SyncSapItoDocumentsJob.php        # ITO sync job with multi-strategy
-├── Http/Controllers/
-│   └── AdditionalDocumentController.php  # Web interface
-└── Console/Commands/
-    ├── TestSapConnection.php             # Connection testing
-    └── TestSapSync.php                   # Sync testing
-
-config/
-├── sap.php                               # Service Layer configuration
-└── database.php                          # Database connections (includes sap_sql)
-
-database/
-└── list_ITO.sql                          # Source SQL query
-
-resources/views/
-└── admin/
-    └── sap-sync-ito.blade.php            # Sync form with notifications
-
-routes/
-└── web.php                               # Permission-protected routes
-```
-
-**Performance & Accuracy**:
-- **SQL Server Direct**: ~1-2 seconds for 202 records, 100% accuracy
-- **OData Fallback**: ~3-5 seconds, limited accuracy (field mapping issues)
-- **Record Count**: SQL matches Query 5 exactly (202 records), OData returns fewer records
-
-### Upcoming: Invoice Creation
-- Async job for POST /Invoices.
-- Validation and logging.
-
-```
-
-### Invoice Creation
-- On-demand via button on invoice show page dispatches CreateSapApInvoiceJob if approved.
-- Job validates vendor, builds payload, POST /Invoices, updates status.
-- Retries 3x for transient errors.
-
-```mermaid
-sequenceDiagram
-    FinanceUser->>UI: Click "Send to SAP"
-    UI->>Controller: POST /invoices/{id}/sap-sync
-    Controller->>Job: Dispatch CreateSapApInvoiceJob
-    Job->>SapService: getBusinessPartner
-    SapService->>SAP: GET /BusinessPartners
-    Job->>SapService: createApInvoice
-    SapService->>SAP: POST /Invoices
-    SAP-->>SapService: DocNum
-    Job->>Database: Update invoice sap_status/posted
-    Job->>sap_logs: Log success
-```
-
-### Reconciliation
-- Hourly command SapReconcile queries recent SAP invoices.
-- Matches and updates local pending invoices.
-
-```mermaid
-sequenceDiagram
-    Scheduler->>Command: sap:reconcile
-    Command->>SapService: getRecentInvoices
-    SapService->>SAP: GET /Invoices?$filter=DocDate ge ...
-    SAP-->>SapService: Invoices list
-    Command->>Database: Update matching local invoices to posted
-    Command->>sap_logs: Log results
-```
+-   Implement targeted validation helpers (e.g., tax code, PO reference lookups).
+-   Surface `sap_error_message` in finance dashboards and notifications.
+-   Add reconciliation worker to pull SAP statuses back into DDS nightly.

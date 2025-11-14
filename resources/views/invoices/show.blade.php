@@ -90,6 +90,16 @@
                                             <td><strong>SAP Status:</strong></td>
                                             <td>{!! $invoice->sap_status_badge !!}</td>
                                         </tr>
+                                        @if (($invoice->sap_status === null || $invoice->sap_status === 'failed') && $invoice->status === 'sap' && (auth()->user()->can('send-to-sap') || auth()->user()->hasRole('superadmin')))
+                                            <tr>
+                                                <td colspan="2">
+                                                    <form action="{{ route('invoices.sap-sync', $invoice) }}" method="POST">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-primary btn-sm">Send to SAP</button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        @endif
                                         @if ($invoice->sap_status === 'failed' && (auth()->user()->can('edit-invoices') || auth()->user()->can('update-invoice') || auth()->user()->hasRole('superadmin')))
                                             <tr>
                                                 <td colspan="2">

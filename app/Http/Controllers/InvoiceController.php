@@ -694,8 +694,8 @@ class InvoiceController extends Controller
 
     public function sapSync(Invoice $invoice)
     {
-        if ($invoice->status !== 'approved') {
-            return back()->with('error', 'Invoice must be approved before sending to SAP.');
+        if ($invoice->status !== 'sap') {
+            return back()->with('error', 'Invoice must be in SAP status before sending to SAP.');
         }
 
         if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
