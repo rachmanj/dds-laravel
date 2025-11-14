@@ -83,7 +83,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     });
 });
 
-Route::group(['middleware' => ['auth', 'role:finance|superadmin']], function () {
+Route::group(['middleware' => ['auth', 'role:accounting|admin|superadmin']], function () {
     Route::get('/admin/sap-sync-ito', [AdditionalDocumentController::class, 'sapSyncItoForm'])->name('admin.sap-sync-ito');
     Route::post('/admin/sap-sync-ito', [AdditionalDocumentController::class, 'sapSyncIto']);
 });
