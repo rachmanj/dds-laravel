@@ -20,7 +20,33 @@
                     <div class="card-body">
                         <form method="POST" action="{{ route('admin.sap-sync-ito') }}" id="sync-form">
                             @csrf
-                            <div class="row">
+                            <div class="form-group">
+                                <label>Date Range <span class="text-danger">*</span></label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="date_range" id="date_range_today" value="today" {{ old('date_range', 'today') === 'today' ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="date_range_today">
+                                        TODAY
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="date_range" id="date_range_yesterday" value="yesterday" {{ old('date_range') === 'yesterday' ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="date_range_yesterday">
+                                        YESTERDAY
+                                    </label>
+                                </div>
+                                @if (auth()->user()->hasAnyRole(['admin', 'superadmin', 'accounting']))
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="date_range" id="date_range_custom" value="custom" {{ old('date_range') === 'custom' ? 'checked' : '' }}>
+                                        <label class="form-check-label" for="date_range_custom">
+                                            CUSTOM
+                                        </label>
+                                    </div>
+                                @endif
+                                @error('date_range')
+                                    <span class="invalid-feedback d-block">{{ $message }}</span>
+                                @enderror
+                            </div>
+                            <div class="row" id="custom-date-range" style="display: {{ old('date_range') === 'custom' ? 'block' : 'none' }};">
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label for="start_date">Start Date <span class="text-danger">*</span></label>
@@ -28,8 +54,7 @@
                                                class="form-control @error('start_date') is-invalid @enderror" 
                                                id="start_date" 
                                                name="start_date" 
-                                               value="{{ old('start_date') }}"
-                                               required>
+                                               value="{{ old('start_date') }}">
                                         @error('start_date')
                                             <span class="invalid-feedback">{{ $message }}</span>
                                         @enderror
@@ -42,8 +67,7 @@
                                                class="form-control @error('end_date') is-invalid @enderror" 
                                                id="end_date" 
                                                name="end_date" 
-                                               value="{{ old('end_date') }}"
-                                               required>
+                                               value="{{ old('end_date') }}">
                                         @error('end_date')
                                             <span class="invalid-feedback">{{ $message }}</span>
                                         @enderror
@@ -121,10 +145,60 @@
                 toastr.info('{{ session('info') }}', 'Info');
             @endif
 
+            // Helper function to set dates
+            function setDatesForRange(range) {
+                const today = new Date();
+                let dateToSet;
+                
+                if (range === 'today') {
+                    dateToSet = today;
+                } else if (range === 'yesterday') {
+                    dateToSet = new Date(today);
+                    dateToSet.setDate(dateToSet.getDate() - 1);
+                }
+                
+                if (dateToSet) {
+                    const dateStr = dateToSet.toISOString().split('T')[0];
+                    $('#start_date').val(dateStr);
+                    $('#end_date').val(dateStr);
+                }
+            }
+            
+            // Handle date range selection
+            $('input[name="date_range"]').on('change', function() {
+                const selectedValue = $(this).val();
+                const $customDateRange = $('#custom-date-range');
+                const $startDate = $('#start_date');
+                const $endDate = $('#end_date');
+                
+                if (selectedValue === 'custom') {
+                    $customDateRange.slideDown();
+                    $startDate.prop('required', true);
+                    $endDate.prop('required', true);
+                } else {
+                    $customDateRange.slideUp();
+                    $startDate.prop('required', false);
+                    $endDate.prop('required', false);
+                    setDatesForRange(selectedValue);
+                }
+            });
+            
+            // Initialize dates on page load
+            const initialDateRange = $('input[name="date_range"]:checked').val();
+            if (initialDateRange && initialDateRange !== 'custom') {
+                setDatesForRange(initialDateRange);
+            }
+            
             // Handle form submission
             $('#sync-form').on('submit', function(e) {
                 const $btn = $('#sync-btn');
                 const $status = $('#sync-status');
+                const selectedRange = $('input[name="date_range"]:checked').val();
+                
+                // If not custom, ensure dates are set
+                if (selectedRange !== 'custom') {
+                    setDatesForRange(selectedRange);
+                }
                 
                 // Disable button and show loading
                 $btn.prop('disabled', true);

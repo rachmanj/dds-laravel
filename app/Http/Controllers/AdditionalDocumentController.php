@@ -1099,14 +1099,31 @@ class AdditionalDocumentController extends Controller
     public function sapSyncIto(Request $request)
     {
         $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'date_range' => 'required|in:today,yesterday,custom',
+            'start_date' => 'required_if:date_range,custom|date',
+            'end_date' => 'required_if:date_range,custom|date|after_or_equal:start_date',
         ]);
+
+        // Determine dates based on date_range selection
+        $startDate = null;
+        $endDate = null;
+        
+        if ($request->date_range === 'today') {
+            $startDate = now()->format('Y-m-d');
+            $endDate = now()->format('Y-m-d');
+        } elseif ($request->date_range === 'yesterday') {
+            $startDate = now()->subDay()->format('Y-m-d');
+            $endDate = now()->subDay()->format('Y-m-d');
+        } else {
+            // custom
+            $startDate = $request->start_date;
+            $endDate = $request->end_date;
+        }
 
         try {
             // Run job synchronously to get immediate results
             $sapService = app(\App\Services\SapService::class);
-            $job = new \App\Jobs\SyncSapItoDocumentsJob($request->start_date, $request->end_date);
+            $job = new \App\Jobs\SyncSapItoDocumentsJob($startDate, $endDate);
             
             // Execute the job and capture results
             $job->handle($sapService);

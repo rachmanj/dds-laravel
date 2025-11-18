@@ -2432,6 +2432,232 @@ sequenceDiagram
     Note over LaravelApp,SAP: Scheduled Reconciliation: Query SAP for Docs, Sync Back to Laravel
 ```
 
+### SAP ITO Sync Integration ✅ **IMPLEMENTED** (2025-11-13)
+
+**Pattern**: Multi-tier fallback integration for syncing Inventory Transfer Orders (ITO) from SAP B1 to Laravel, prioritizing direct SQL Server access for 100% accuracy.
+
+**Implementation Date**: 2025-11-13  
+**Status**: **COMPLETE** - Production ready
+
+**Business Context**: The system needs to sync ITO documents from SAP B1 to create `additional_documents` records in Laravel. Initial attempts using OData queries via SAP Service Layer API had accuracy issues (returned 1 record vs 202 records from SQL Query 5). Direct SQL Server access was implemented to execute the exact SQL query for 100% accuracy.
+
+**Architecture**:
+
+```
+SAP ITO Sync System
+├── Primary Method: SQL Server Direct Access
+│   ├── Connection: Laravel DB facade with 'sap_sql' connection
+│   ├── Query: Executes exact SQL from list_ITO.sql
+│   ├── Filters: CreateDate, U_MIS_TransferType='OUT', warehouse join
+│   ├── Accuracy: 100% (matches SQL Query 5 exactly)
+│   └── Performance: ~1-2 seconds for 202 records
+│
+├── Fallback Method 1: OData Entity Query
+│   ├── Service: SapService::getStockTransferRequests()
+│   ├── Entity: InventoryTransferRequests / StockTransfers
+│   ├── Auto-detection: Date fields, entity names
+│   └── Limitation: Field mapping issues, UDFs not exposed
+│
+├── Fallback Method 2: Query Execution via Service Layer
+│   ├── Service: SapService::executeQuery()
+│   ├── Query ID: 'list_ito' (user-defined query in SAP)
+│   └── Limitation: Endpoint compatibility issues in SAP B1 10.0
+│
+└── Sync Job: SyncSapItoDocumentsJob
+    ├── Tries methods in priority order (SQL → OData → Query)
+    ├── Duplicate detection: Checks document_number (ito_no)
+    ├── Batch processing: Creates additional_documents records
+    └── Logging: Records sync results in sap_logs table
+```
+
+**Key Components**:
+
+-   **Database Connection** (`config/database.php`):
+    -   `sap_sql` connection using `sqlsrv` driver
+    -   Environment variables: `SAP_SQL_HOST`, `SAP_SQL_PORT`, `SAP_SQL_DATABASE`, `SAP_SQL_USERNAME`, `SAP_SQL_PASSWORD`
+    -   Falls back to existing `SAP_*` env vars if SQL-specific ones not set
+
+-   **Service Method** (`app/Services/SapService.php`):
+    -   `executeItoSqlQuery($startDate, $endDate)`: Executes exact SQL query from `list_ITO.sql`
+    -   Uses parameterized queries for safety
+    -   Returns results matching SQL query structure exactly
+    -   Includes all filters: `CreateDate`, `U_MIS_TransferType = 'OUT'`, warehouse join condition
+
+-   **Sync Job** (`app/Jobs/SyncSapItoDocumentsJob.php`):
+    -   Tries methods in priority order: SQL Server → OData → Query execution
+    -   Handles different result formats (SQL query, OData entity, query execution)
+    -   Duplicate detection by `document_number` (mapped from `ito_no` or `DocNum`)
+    -   Creates `additional_documents` records with proper field mapping
+    -   Logs sync results (success/skipped counts) to `sap_logs`
+
+-   **UI Integration** (`resources/views/admin/sap-sync-ito.blade.php`):
+    -   Date range input form
+    -   On-demand sync via button click
+    -   Toastr notifications for success/failure
+    -   Displays sync results (created/skipped counts)
+
+**Data Flow**:
+
+```mermaid
+sequenceDiagram
+    participant User as Admin/Accounting User
+    participant UI as Laravel UI
+    participant Controller as AdditionalDocumentController
+    participant Job as SyncSapItoDocumentsJob
+    participant SapService as SapService
+    participant SQLServer as SAP SQL Server
+    participant OData as SAP Service Layer (OData)
+    participant DB as Laravel Database
+
+    User->>UI: Navigate to /admin/sap-sync-ito
+    User->>UI: Enter date range and click "Sync from SAP"
+    UI->>Controller: POST /admin/sap-sync-ito
+    Controller->>Job: Run synchronously (for immediate results)
+    
+    Job->>SapService: executeItoSqlQuery(startDate, endDate)
+    alt SQL Server Direct Access (Primary)
+        SapService->>SQLServer: Execute parameterized SQL query
+        SQLServer-->>SapService: Return results (202 records)
+        SapService-->>Job: Return results array
+    else SQL Server Fails, Try OData (Fallback 1)
+        Job->>SapService: getStockTransferRequests(startDate, endDate)
+        SapService->>OData: GET /InventoryTransferRequests?$filter=...
+        OData-->>SapService: Return entity results
+        SapService->>Job: transformEntityResults() → Map to SQL format
+    else OData Fails, Try Query Execution (Fallback 2)
+        Job->>SapService: executeQuery('list_ito', params)
+        SapService->>OData: GET /Queries('list_ito')?@A=...&@B=...
+        OData-->>SapService: Return query results
+        SapService-->>Job: Return results array
+    end
+    
+    Job->>Job: For each result: Check duplicate by document_number
+    alt New Record
+        Job->>DB: Create additional_documents record
+        Job->>DB: Increment successCount
+    else Duplicate
+        Job->>Job: Increment skippedCount
+    end
+    
+    Job->>DB: Insert sap_logs entry (action='query_sync', status='success')
+    Job-->>Controller: Return results (successCount, skippedCount)
+    Controller->>UI: Redirect with flash messages
+    UI->>User: Display Toastr notification + results summary
+```
+
+**Configuration Requirements**:
+
+**Environment Variables** (`.env`):
+
+```env
+# SAP SQL Server Direct Access (Primary Method)
+SAP_SQL_HOST=arkasrv2
+SAP_SQL_PORT=1433
+SAP_SQL_DATABASE=your_sap_database_name
+SAP_SQL_USERNAME=your_sql_username
+SAP_SQL_PASSWORD=your_sql_password
+
+# Falls back to these if SQL-specific vars not set:
+SAP_SERVER_URL=https://arkasrv2:50000/b1s/v1
+SAP_DB_NAME=your_sap_database_name
+SAP_USER=your_sap_user
+SAP_PASSWORD=your_sap_password
+```
+
+**PHP Requirements**:
+
+-   PHP `sqlsrv` extension installed
+-   Microsoft ODBC Driver 18 installed
+-   Network access to SAP SQL Server
+
+**Database Connection** (`config/database.php`):
+
+```php
+'sap_sql' => [
+    'driver' => 'sqlsrv',
+    'host' => env('SAP_SQL_HOST', env('SAP_SERVER_URL')),
+    'port' => env('SAP_SQL_PORT', '1433'),
+    'database' => env('SAP_SQL_DATABASE', env('SAP_DB_NAME')),
+    'username' => env('SAP_SQL_USERNAME', env('SAP_USER')),
+    'password' => env('SAP_SQL_PASSWORD', env('SAP_PASSWORD')),
+    'charset' => 'utf8',
+    'options' => [
+        'TrustServerCertificate' => true, // For development
+    ],
+],
+```
+
+**Field Mapping**:
+
+The sync job handles different result formats and maps fields accordingly:
+
+| SQL Query Field | OData Field | Additional Document Field |
+|----------------|-------------|---------------------------|
+| `ito_no` | `DocNum` | `document_number` |
+| `ito_date` | `DocDate` | `document_date`, `receive_date` |
+| `po_no` | (from related entity) | `po_no` |
+| `grpo_no` | `U_MIS_GRPONo` | `grpo_no` |
+| `origin_whs` | `FromWarehouse` / `Filler` | `origin_wh` |
+| `destination_whs` | `U_MIS_ToWarehouse` / `ToWarehouse` | `destination_wh` |
+| `ito_remarks` | `Comments` | `remarks` |
+| `U_NAME` | (from related entity) | `ito_creator` |
+
+**Test Results**:
+
+-   **SQL Query 5** (SAP B1): 202 records (Nov 1-12, 2025)
+-   **SQL Server Direct Query**: 202 records ✅ (exact match)
+-   **OData Query**: 1 record ❌ (inaccurate due to field mapping issues)
+
+**Performance Metrics**:
+
+-   **Query Execution**: ~1-2 seconds for 202 records
+-   **Sync Speed**: Depends on number of new records to insert
+-   **Network**: Direct SQL connection (faster than OData HTTP requests)
+
+**Comparison: SQL vs OData**:
+
+| Feature | SQL Server Direct | OData |
+|---------|------------------|-------|
+| Accuracy | ✅ 100% (matches Query 5) | ❌ Limited (1 record) |
+| All Filters | ✅ Yes | ❌ No (U_MIS_TransferType NULL) |
+| Field Names | ✅ Exact SQL names | ⚠️ Different names |
+| Setup Complexity | ⚠️ Medium (extension + driver) | ✅ Low (just HTTP) |
+| Performance | ✅ Fast (direct query) | ⚠️ Slower (HTTP + pagination) |
+| Reliability | ✅ High | ⚠️ Medium (field mapping issues) |
+
+**Access Control**:
+
+-   **Permission**: `sync-sap-ito`
+-   **Roles**: `superadmin`, `admin`, `accounting`
+-   **Route**: `/admin/sap-sync-ito` (middleware: `permission:sync-sap-ito`)
+-   **Menu**: Visible in "Additional Documents" menu (collapsed, highlighted when active)
+
+**Error Handling**:
+
+-   **SQL Connection Failure**: Falls back to OData entity query
+-   **OData Failure**: Falls back to query execution via Service Layer
+-   **All Methods Fail**: Logs error to `sap_logs`, throws exception
+-   **Duplicate Detection**: Skips existing records by `document_number`
+-   **Transaction Safety**: Uses database transactions for data consistency
+
+**Logging**:
+
+All sync operations are logged to `sap_logs` table:
+
+-   **Action**: `query_sync`
+-   **Status**: `success` or `failed`
+-   **Request Payload**: Date range, method used
+-   **Response Payload**: Success/skipped counts
+-   **Error Message**: Detailed error if failed
+
+**Related Documentation**:
+
+-   `docs/SAP-SQL-DIRECT-ACCESS.md` - Detailed SQL Server setup guide
+-   `docs/SAP-ITO-SYNC-COMPLETE.md` - Complete implementation summary
+-   `docs/SAP-B1-SESSION-MANAGEMENT.md` - Session management details
+-   `docs/decisions.md` - Decision record for SQL Server approach
+-   `database/list_ITO.sql` - Source SQL query
+
 ### Upcoming: Phase 3 - End-to-End Reconciliation
 
 -   Implement targeted validation helpers (e.g., tax code, PO reference lookups).
