@@ -146,8 +146,8 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        // Accounting, admin, and superadmin users see all records by default
-        $isPrivilegedUser = $user->hasAnyRole(['admin', 'superadmin', 'accounting']);
+        // Accounting, finance, admin, and superadmin users see all records by default
+        $isPrivilegedUser = $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance']);
         
         // Apply location-based filtering unless user is privileged or show_all is requested
         if (!$isPrivilegedUser && (!$showAllRecords || !$user->can('see-all-record-switch'))) {
@@ -276,7 +276,7 @@ class AdditionalDocumentController extends Controller
         $data['created_by'] = $user->id;
 
         // Handle location based on user role
-        if ($user->hasAnyRole(['superadmin', 'admin', 'accounting']) && $request->filled('cur_loc')) {
+        if ($user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance']) && $request->filled('cur_loc')) {
             // Privileged users can select any location
             $data['cur_loc'] = $request->cur_loc;
         } else {
@@ -309,7 +309,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
+        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -439,7 +439,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
+        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -472,7 +472,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
+        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -1074,8 +1074,8 @@ class AdditionalDocumentController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        // Accounting users see all records by default
-        if ($user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
+        // Accounting and finance users see all records by default
+        if ($user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             // Privileged users see all records - no filtering needed
             return;
         }

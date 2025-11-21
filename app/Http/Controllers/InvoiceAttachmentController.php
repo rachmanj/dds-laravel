@@ -35,7 +35,7 @@ class InvoiceAttachmentController extends Controller
 
         // Check if user can edit this attachment
         $user = auth()->user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $attachment->invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only edit attachments from invoices in your department location.');
@@ -72,7 +72,7 @@ class InvoiceAttachmentController extends Controller
 
         // Check if user can upload attachments to this invoice
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only upload attachments to invoices from your department location.');
@@ -157,7 +157,7 @@ class InvoiceAttachmentController extends Controller
 
         // Check if user can download this attachment
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $attachment->invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only download attachments from invoices in your department location.');
@@ -180,7 +180,7 @@ class InvoiceAttachmentController extends Controller
 
         // Check if user can delete this attachment
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $attachment->invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only delete attachments from invoices in your department location.');
@@ -217,7 +217,7 @@ class InvoiceAttachmentController extends Controller
 
         // Check if user can view this attachment
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $attachment->invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only view attachments from invoices in your department location.');
@@ -246,7 +246,7 @@ class InvoiceAttachmentController extends Controller
 
         // Check if user can view this invoice's attachments
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only view attachments from invoices in your department location.');
@@ -274,8 +274,8 @@ class InvoiceAttachmentController extends Controller
         $user = auth()->user();
         $query = Invoice::with(['attachments.uploader', 'supplier', 'department']);
 
-        // Filter by user's department location if not admin/superadmin/accounting
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting']) && !$request->boolean('show_all', false)) {
+        // Filter by user's department location if not admin/superadmin/accounting/finance
+        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance']) && !$request->boolean('show_all', false)) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
                 $query->where('cur_loc', $locationCode);
@@ -290,7 +290,7 @@ class InvoiceAttachmentController extends Controller
         // Caution: Non-privileged users cannot override to different location
         if ($request->filled('cur_loc')) {
             $requestedLoc = $request->string('cur_loc')->toString();
-            if ($user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+            if ($user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
                 $query->where('cur_loc', $requestedLoc);
             } else {
                 $locationCode = $user->department_location_code;

@@ -99,8 +99,8 @@ class AdditionalDocument extends Model
             return true;
         }
 
-        // Accounting users can edit ANY document (not just in their department)
-        if ($user->hasRole('accounting')) {
+        // Accounting and finance users can edit ANY document (not just in their department)
+        if ($user->hasAnyRole(['accounting', 'finance'])) {
             return true;
         }
 
@@ -119,8 +119,8 @@ class AdditionalDocument extends Model
      */
     public function canBeDeletedBy(User $user): bool
     {
-        // Admin, superadmin, and accounting can delete any document
-        if ($user->hasAnyRole(['admin', 'superadmin', 'accounting'])) {
+        // Admin, superadmin, accounting, and finance can delete any document
+        if ($user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             return true;
         }
 
