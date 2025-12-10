@@ -16,6 +16,10 @@ class DashboardController extends Controller
     public function index()
     {
         $user = Auth::user();
+        
+        // Load relationships with null safety
+        $user->loadMissing(['roles', 'department']);
+        
         $userDepartment = $user->department;
         $userLocationCode = $user->department_location_code;
 
@@ -52,7 +56,8 @@ class DashboardController extends Controller
 
     private function getWorkflowMetrics($user, $userLocationCode)
     {
-        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+        $userRoles = $user->roles ?? collect();
+        $isAdmin = array_intersect($userRoles->pluck('name')->toArray(), ['admin', 'superadmin']);
 
         // Pending distributions (sent but not received)
         $pendingDistributionsQuery = Distribution::where('status', 'sent');
@@ -122,7 +127,8 @@ class DashboardController extends Controller
 
     private function getDocumentAgeBreakdown($user, $userLocationCode)
     {
-        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+        $userRoles = $user->roles ?? collect();
+        $isAdmin = array_intersect($userRoles->pluck('name')->toArray(), ['admin', 'superadmin']);
 
         // Get documents in user's department - include all statuses for comprehensive view
         $invoicesQuery = Invoice::query();
@@ -196,7 +202,8 @@ class DashboardController extends Controller
      */
     private function getDepartmentSpecificAgingAlerts($user, $userLocationCode)
     {
-        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+        $userRoles = $user->roles ?? collect();
+        $isAdmin = array_intersect($userRoles->pluck('name')->toArray(), ['admin', 'superadmin']);
 
         // Get all documents in user's department
         $invoicesQuery = Invoice::query();
@@ -244,7 +251,8 @@ class DashboardController extends Controller
 
     private function getPendingDistributions($user, $userLocationCode)
     {
-        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+        $userRoles = $user->roles ?? collect();
+        $isAdmin = array_intersect($userRoles->pluck('name')->toArray(), ['admin', 'superadmin']);
 
         $query = Distribution::with(['originDepartment', 'destinationDepartment', 'type'])
             ->where('status', 'sent')
@@ -260,7 +268,8 @@ class DashboardController extends Controller
 
     private function getRecentActivity($user, $userLocationCode)
     {
-        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+        $userRoles = $user->roles ?? collect();
+        $isAdmin = array_intersect($userRoles->pluck('name')->toArray(), ['admin', 'superadmin']);
 
         $query = DistributionHistory::with(['distribution', 'user'])
             ->orderBy('action_performed_at', 'desc')
@@ -278,7 +287,8 @@ class DashboardController extends Controller
 
     private function getSapDocumentMetrics($user, $userLocationCode)
     {
-        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+        $userRoles = $user->roles ?? collect();
+        $isAdmin = array_intersect($userRoles->pluck('name')->toArray(), ['admin', 'superadmin']);
 
         // Get all departments that have invoices
         $departmentsQuery = Department::whereHas('invoices');
