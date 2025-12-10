@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Models\Invoice;
 use App\Models\InvoiceType;
 use App\Models\Supplier;
@@ -14,41 +15,56 @@ class InvoiceDashboardController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
-        $userDepartment = $user->department;
-        $userLocationCode = $user->department_location_code;
-        $isAdmin = array_intersect($user->roles->pluck('name')->toArray(), ['admin', 'superadmin']);
+        try {
+            $user = Auth::user();
+            
+            // Load relationships with null safety
+            $user->loadMissing(['roles', 'department']);
+            
+            $userDepartment = $user->department;
+            $userLocationCode = $user->department_location_code;
+            $userRoles = $user->roles ?? collect();
+            $isAdmin = array_intersect($userRoles->pluck('name')->toArray(), ['admin', 'superadmin']);
 
-        // Get invoice status overview
-        $statusOverview = $this->getInvoiceStatusOverview($user, $userLocationCode, $isAdmin);
+            // Get invoice status overview
+            $statusOverview = $this->getInvoiceStatusOverview($user, $userLocationCode, $isAdmin);
 
-        // Get financial metrics
-        $financialMetrics = $this->getFinancialMetrics($user, $userLocationCode, $isAdmin);
+            // Get financial metrics
+            $financialMetrics = $this->getFinancialMetrics($user, $userLocationCode, $isAdmin);
 
-        // Get processing metrics
-        $processingMetrics = $this->getProcessingMetrics($user, $userLocationCode, $isAdmin);
+            // Get processing metrics
+            $processingMetrics = $this->getProcessingMetrics($user, $userLocationCode, $isAdmin);
 
-        // Get distribution status
-        $distributionStatus = $this->getDistributionStatus($user, $userLocationCode, $isAdmin);
+            // Get distribution status
+            $distributionStatus = $this->getDistributionStatus($user, $userLocationCode, $isAdmin);
 
-        // Get supplier analysis
-        $supplierAnalysis = $this->getSupplierAnalysis($user, $userLocationCode, $isAdmin);
+            // Get supplier analysis
+            $supplierAnalysis = $this->getSupplierAnalysis($user, $userLocationCode, $isAdmin);
 
-        // Get invoice types breakdown
-        $typeBreakdown = $this->getInvoiceTypeBreakdown($user, $userLocationCode, $isAdmin);
+            // Get invoice types breakdown
+            $typeBreakdown = $this->getInvoiceTypeBreakdown($user, $userLocationCode, $isAdmin);
 
-        // Get invoice age and status metrics (department-specific aging)
-        $invoiceAgeAndStatus = $this->getInvoiceAgeAndStatusMetrics($user, $userLocationCode, $isAdmin);
+            // Get invoice age and status metrics (department-specific aging)
+            $invoiceAgeAndStatus = $this->getInvoiceAgeAndStatusMetrics($user, $userLocationCode, $isAdmin);
 
-        return view('invoices.dashboard', compact(
-            'statusOverview',
-            'financialMetrics',
-            'processingMetrics',
-            'distributionStatus',
-            'supplierAnalysis',
-            'typeBreakdown',
-            'invoiceAgeAndStatus'
-        ));
+            return view('invoices.dashboard', compact(
+                'statusOverview',
+                'financialMetrics',
+                'processingMetrics',
+                'distributionStatus',
+                'supplierAnalysis',
+                'typeBreakdown',
+                'invoiceAgeAndStatus'
+            ));
+        } catch (\Exception $e) {
+            Log::error('InvoiceDashboardController@index error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'user_id' => Auth::id()
+            ]);
+            
+            // Return a safe fallback view or redirect
+            return redirect()->route('invoices.index')->with('error', 'An error occurred while loading the dashboard. Please try again.');
+        }
     }
 
     private function getInvoiceStatusOverview($user, $userLocationCode, $isAdmin)
@@ -342,40 +358,81 @@ class InvoiceDashboardController extends Controller
      */
     private function getInvoiceAgeAndStatusMetrics($user, $userLocationCode, $isAdmin)
     {
-        $query = Invoice::query();
+        try {
+            $query = Invoice::query();
 
-        if (!$isAdmin && $userLocationCode) {
-            $query->where('cur_loc', $userLocationCode);
+            if (!$isAdmin && $userLocationCode) {
+                $query->where('cur_loc', $userLocationCode);
+            }
+
+            $invoices = (clone $query)->get();
+
+            $ageBreakdown = [
+                '0-7_days' => 0,
+                '8-14_days' => 0,
+                '15-30_days' => 0,
+                '30_plus_days' => 0
+            ];
+
+            $statusByAge = [
+                '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0]
+            ];
+
+            foreach ($invoices as $invoice) {
+                try {
+                    // Use the department-specific aging calculation
+                    $ageCategory = $invoice->current_location_age_category;
+                    $status = $invoice->distribution_status ?? 'available';
+
+                    // Validate age category exists in breakdown
+                    if (!isset($ageBreakdown[$ageCategory])) {
+                        $ageCategory = '0-7_days'; // Safe fallback
+                    }
+
+                    $ageBreakdown[$ageCategory]++;
+                    
+                    // Validate status exists in statusByAge
+                    if (isset($statusByAge[$ageCategory][$status])) {
+                        $statusByAge[$ageCategory][$status]++;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Error calculating age category for invoice', [
+                        'invoice_id' => $invoice->id ?? 'unknown',
+                        'error' => $e->getMessage()
+                    ]);
+                    // Continue processing other invoices
+                    $ageBreakdown['0-7_days']++; // Safe fallback
+                }
+            }
+
+            return [
+                'age_breakdown' => $ageBreakdown,
+                'status_by_age' => $statusByAge
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error in getInvoiceAgeAndStatusMetrics', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // Return safe defaults
+            return [
+                'age_breakdown' => [
+                    '0-7_days' => 0,
+                    '8-14_days' => 0,
+                    '15-30_days' => 0,
+                    '30_plus_days' => 0
+                ],
+                'status_by_age' => [
+                    '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                    '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                    '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                    '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0]
+                ]
+            ];
         }
-
-        $invoices = (clone $query)->get();
-
-        $ageBreakdown = [
-            '0-7_days' => 0,
-            '8-14_days' => 0,
-            '15-30_days' => 0,
-            '30_plus_days' => 0
-        ];
-
-        $statusByAge = [
-            '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-            '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-            '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-            '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0]
-        ];
-
-        foreach ($invoices as $invoice) {
-            // Use the department-specific aging calculation
-            $ageCategory = $invoice->current_location_age_category;
-            $status = $invoice->distribution_status;
-
-            $ageBreakdown[$ageCategory]++;
-            $statusByAge[$ageCategory][$status]++;
-        }
-
-        return [
-            'age_breakdown' => $ageBreakdown,
-            'status_by_age' => $statusByAge
-        ];
     }
 }
