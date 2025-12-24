@@ -48,6 +48,7 @@ class ReconcileDetail extends Model
     /**
      * Get the first matching invoice using LIKE pattern matching.
      * This method provides more flexible matching than the relationship above.
+     * Loads distributions relationship to ensure distribution numbers are available.
      */
     public function getMatchingInvoiceAttribute()
     {
@@ -57,6 +58,9 @@ class ReconcileDetail extends Model
 
         return Invoice::where('invoice_number', 'LIKE', '%' . $this->invoice_no . '%')
             ->orWhere('faktur_no', 'LIKE', '%' . $this->invoice_no . '%')
+            ->with(['distributions' => function ($query) {
+                $query->orderBy('created_at', 'desc');
+            }])
             ->first();
     }
 

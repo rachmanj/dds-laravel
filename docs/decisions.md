@@ -1,3 +1,61 @@
+## 2025-01-XX — Reconcile Feature: Match Rate Calculation & UI Improvements
+
+-   **Context**: The reconcile feature's match rate calculation was inaccurate, and users requested improvements to display more comprehensive data (distribution numbers, invoice dates) and streamline the workflow. The system was using scope-based counting (`withMatchingInvoices()`) instead of actual reconciliation status, and the frontend was calculating unmatched records incorrectly.
+
+-   **Decision**: Use actual `reconciliation_status` for match rate calculation instead of scope-based counting. Include partial matches in match rate. Enhance UI/UX with additional columns and remove unnecessary supplier selection.
+
+-   **Alternatives Considered**:
+
+    1. **Keep scope-based counting** - Rejected because it doesn't reflect actual reconciliation status (matched vs partial_match vs no_match)
+    2. **Exclude partial matches from match rate** - Rejected because partial matches still found a matching invoice, just with date discrepancies
+    3. **Keep supplier selection** - Rejected because system can auto-determine supplier from matched invoices
+
+-   **Implementation**:
+
+    **Match Rate Calculation**:
+    ```php
+    // Get all processed records (without flag)
+    $reconciles = ReconcileDetail::forUser($userId)->withoutFlag()->get();
+    
+    // Count by actual reconciliation status
+    $matchedRecords = $reconciles->filter(fn($r) => $r->reconciliation_status === 'matched')->count();
+    $partialMatchRecords = $reconciles->filter(fn($r) => $r->reconciliation_status === 'partial_match')->count();
+    $unmatchedRecords = $reconciles->filter(fn($r) => $r->reconciliation_status === 'no_match')->count();
+    
+    // Match rate: (matched + partial_match) / total * 100
+    $matchRate = round((($matchedRecords + $partialMatchRecords) / $totalRecords) * 100, 2);
+    ```
+
+    **UI Improvements**:
+    - Removed supplier selection dropdown from upload modal
+    - Added "Distribution Number" column (comma-separated for multiple distributions)
+    - Added "Invoice Date" column
+    - Changed label to "Matched/Partial Match Records" with combined count
+    - Formatted dates consistently (`dd-mmm-yyyy hh:mm`)
+
+    **Export Enhancements**:
+    - Pre-load invoices with distributions and supplier relationships
+    - Use direct JOIN queries for distributions (polymorphic relationship reliability)
+    - Add new columns: Invoice Date, Distribution Number, Supplier Name
+
+-   **Trade-offs**:
+
+    **Advantages**:
+    - Accurate match rate reflects actual reconciliation status
+    - More comprehensive data display (distribution numbers, invoice dates)
+    - Streamlined workflow (no manual supplier selection)
+    - Better performance with optimized queries
+
+    **Disadvantages**:
+    - Slightly more complex calculation logic
+    - Additional columns may make table wider (acceptable trade-off)
+
+-   **Rationale**: Match rate should reflect business reality - if a record found a matching invoice (even with partial match), it's a successful match. Users need distribution numbers and invoice dates for reconciliation purposes. Auto-determining supplier reduces user effort and potential errors.
+
+-   **Review Date**: 2025-04-XX (3 months)
+
+---
+
 ## 2025-11-13 — SAP B1 ITO Sync: SQL Server Direct Access (Final Solution)
 
 -   **Context**: Implementing SAP B1 integration to sync Inventory Transfer Orders (ITO) from SAP to Laravel. Initial approaches (OData queries, query execution) had accuracy issues. OData couldn't replicate SQL Query 5 results (202 records) due to field name mismatches and UDFs not being exposed. User has direct SQL Server access credentials.

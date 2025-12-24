@@ -1,3 +1,62 @@
+### 2025-01-XX — Reconcile Feature Enhancements: UI/UX Improvements & Match Rate Accuracy
+
+**Key Learning**: Match rate calculations must use actual reconciliation status rather than simple existence checks. UI improvements should reflect business logic accurately.
+
+**Problem Solved**:
+- Match rate calculation was inaccurate - used `withMatchingInvoices()` scope instead of actual `reconciliation_status`
+- Missing `withoutFlag()` filter counted temporary records during upload
+- Frontend calculated unmatched incorrectly (`total - matched` instead of actual `no_match` count)
+- Missing `match_rate` in backend response but frontend expected it
+- Supplier selection was unnecessary since system can auto-determine supplier from matched invoices
+- Distribution numbers and invoice dates missing from both DataTable and export
+
+**Solution**: Comprehensive improvements to reconcile feature including accurate statistics, enhanced data display, and streamlined workflow.
+
+**Implementation Details**:
+
+1. **Match Rate Calculation Accuracy**:
+   - Changed from scope-based counting (`withMatchingInvoices()`) to status-based counting (`reconciliation_status`)
+   - Added `withoutFlag()` filter to exclude temporary upload records
+   - Match rate formula: `(matched + partial_match) / total * 100`
+   - Returns separate counts: `matched_records`, `partial_match_records`, `unmatched_records`, `match_rate`
+
+2. **UI Improvements**:
+   - Removed supplier selection requirement from upload modal (auto-determined from matched invoices)
+   - Added "Distribution Number" column to DataTable (comma-separated for multiple distributions)
+   - Added "Invoice Date" column to DataTable
+   - Changed "Matched Records" label to "Matched/Partial Match Records" with combined count
+   - Formatted "Uploaded at" column as `dd-mmm-yyyy hh:mm`
+
+3. **Export Enhancements**:
+   - Added "Invoice Date" column (from matching invoice or reconcile detail)
+   - Added "Distribution Number" column (comma-separated, shows even for partial matches)
+   - Added "Supplier Name" column (from matching invoice's supplier relationship)
+   - Improved matching logic with pre-loaded invoice map for performance
+   - Direct JOIN queries for distributions to handle polymorphic relationships reliably
+
+4. **Performance Optimizations**:
+   - Pre-loading invoices with distributions and supplier relationships in export
+   - Direct JOIN queries for distributions bypassing potential `morphedByMany` loading issues
+   - Eager loading in `getMatchingInvoiceAttribute()` accessor
+
+**Technical Decisions**:
+- **Match Rate Includes Partial Matches**: Both `matched` and `partial_match` count as successful matches since both found a matching invoice
+- **Direct JOIN for Distributions**: Used JOIN queries instead of relationship loading to ensure reliability with polymorphic `distribution_documents` pivot table
+- **Combined Display**: "Matched/Partial Match Records" shows combined count for clarity while backend still provides separate counts
+
+**Files Modified**:
+- `app/Http/Controllers/ReportsReconcileController.php` - Updated `getStats()` and `data()` methods
+- `app/Exports/ReconcileExport.php` - Enhanced export with new columns and improved matching
+- `app/Models/ReconcileDetail.php` - Updated `getMatchingInvoiceAttribute()` to eager load distributions
+- `resources/views/reports/reconcile/index.blade.php` - UI improvements and label updates
+
+**Impact**:
+- ✅ Accurate match rate calculation based on actual reconciliation status
+- ✅ Enhanced data visibility with distribution numbers and invoice dates
+- ✅ Streamlined workflow (no manual supplier selection needed)
+- ✅ Better performance with optimized queries and pre-loading
+- ✅ Consistent data display between DataTable and export file
+
 ### 2025-11-13 — SAP B1 ITO Sync: SQL Server Direct Access (Final Solution)
 
 **Key Learning**: OData queries cannot accurately replicate complex SQL queries with UDFs and joins. Direct SQL Server access provides 100% accuracy by executing the exact SQL query.

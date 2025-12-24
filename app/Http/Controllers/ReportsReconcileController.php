@@ -36,7 +36,6 @@ class ReportsReconcileController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'file_upload' => 'required|mimes:xls,xlsx|max:10240', // 10MB max
-            'vendor_id' => 'required|exists:suppliers,id',
         ]);
 
         if ($validator->fails()) {
@@ -57,15 +56,22 @@ class ReportsReconcileController extends Controller
             // Import data with temporary flag
             Excel::import(new ReconcileDetailImport, storage_path('app/public/file_upload/' . $fileName));
 
-            // Update flag and assign vendor_id
+            // Update flag - vendor_id will be set automatically from matched invoices
             $tempFlag = 'TEMP' . Auth::id();
             $importedCount = ReconcileDetail::where('flag', $tempFlag)->count();
 
-            ReconcileDetail::where('flag', $tempFlag)
-                ->update([
-                    'vendor_id' => $request->vendor_id,
-                    'flag' => null
-                ]);
+            // Set vendor_id from matched invoices if available
+            ReconcileDetail::where('flag', $tempFlag)->get()->each(function ($reconcile) {
+                $matchingInvoice = $reconcile->matching_invoice;
+                if ($matchingInvoice && $matchingInvoice->supplier_id) {
+                    $reconcile->update([
+                        'vendor_id' => $matchingInvoice->supplier_id,
+                        'flag' => null
+                    ]);
+                } else {
+                    $reconcile->update(['flag' => null]);
+                }
+            });
 
             // Clean up uploaded file
             Storage::disk('public')->delete('file_upload/' . $fileName);
@@ -149,6 +155,11 @@ class ReportsReconcileController extends Controller
                 return $reconcile->reconciliation_data;
             })
             ->addColumn('supplier_name', function ($reconcile) {
+                // Show supplier from matched invoice if available, otherwise from reconcile detail
+                $matchingInvoice = $reconcile->matching_invoice;
+                if ($matchingInvoice && $matchingInvoice->supplier) {
+                    return $matchingInvoice->supplier->name;
+                }
                 return $reconcile->supplier ? $reconcile->supplier->name : 'N/A';
             })
             ->addColumn('user_name', function ($reconcile) {
@@ -160,6 +171,38 @@ class ReportsReconcileController extends Controller
             ->addColumn('matching_invoice', function ($reconcile) {
                 $matchingInvoice = $reconcile->matching_invoice;
                 return $matchingInvoice ? $matchingInvoice->invoice_number : 'No Match';
+            })
+            ->addColumn('invoice_date', function ($reconcile) {
+                // Show invoice date from matched invoice if available, otherwise from reconcile detail
+                $matchingInvoice = $reconcile->matching_invoice;
+                if ($matchingInvoice && $matchingInvoice->invoice_date) {
+                    return $matchingInvoice->invoice_date->format('d-M-Y');
+                }
+                return $reconcile->invoice_date ? $reconcile->invoice_date->format('d-M-Y') : 'N/A';
+            })
+            ->addColumn('distribution_number', function ($reconcile) {
+                $matchingInvoice = $reconcile->matching_invoice;
+                if ($matchingInvoice) {
+                    // Use direct query through distribution_documents pivot table to ensure we get all distributions
+                    // This is more reliable than relying on the morphedByMany relationship loading
+                    $directDistributions = \App\Models\Distribution::join('distribution_documents', 'distributions.id', '=', 'distribution_documents.distribution_id')
+                        ->where('distribution_documents.document_type', \App\Models\Invoice::class)
+                        ->where('distribution_documents.document_id', $matchingInvoice->id)
+                        ->orderBy('distributions.created_at', 'desc')
+                        ->select('distributions.*')
+                        ->get();
+                    
+                    if ($directDistributions->isNotEmpty()) {
+                        return $directDistributions
+                            ->pluck('distribution_number')
+                            ->filter()
+                            ->implode(', ');
+                    }
+                }
+                return 'N/A';
+            })
+            ->addColumn('created_at_formatted', function ($reconcile) {
+                return $reconcile->created_at->format('d-M-Y H:i');
             })
             ->addColumn('status_badge', function ($reconcile) {
                 $status = $reconcile->reconciliation_status;
@@ -265,11 +308,37 @@ class ReportsReconcileController extends Controller
     {
         $userId = Auth::id();
 
+        // Get all processed records (without flag)
+        $reconciles = ReconcileDetail::forUser($userId)
+            ->withoutFlag()
+            ->get();
+
+        // Calculate statistics based on reconciliation status
+        $totalRecords = $reconciles->count();
+        $matchedRecords = $reconciles->filter(function ($reconcile) {
+            return $reconcile->reconciliation_status === 'matched';
+        })->count();
+        $partialMatchRecords = $reconciles->filter(function ($reconcile) {
+            return $reconcile->reconciliation_status === 'partial_match';
+        })->count();
+        $unmatchedRecords = $reconciles->filter(function ($reconcile) {
+            return $reconcile->reconciliation_status === 'no_match';
+        })->count();
+
+        // Match rate: (matched + partial_match) / total * 100
+        // This considers both fully matched and partially matched as successful matches
+        $matchRate = $totalRecords > 0 
+            ? round((($matchedRecords + $partialMatchRecords) / $totalRecords) * 100, 2)
+            : 0;
+
         $stats = [
-            'total_records' => ReconcileDetail::forUser($userId)->count(),
-            'matched_records' => ReconcileDetail::forUser($userId)->withMatchingInvoices()->count(),
-            'unmatched_records' => ReconcileDetail::forUser($userId)->withoutMatchingInvoices()->count(),
+            'total_records' => $totalRecords,
+            'matched_records' => $matchedRecords + $partialMatchRecords, // Combined matched and partial match
+            'partial_match_records' => $partialMatchRecords,
+            'unmatched_records' => $unmatchedRecords,
+            'match_rate' => $matchRate,
             'recent_uploads' => ReconcileDetail::forUser($userId)
+                ->withoutFlag()
                 ->where('created_at', '>=', now()->subDays(7))
                 ->count(),
         ];

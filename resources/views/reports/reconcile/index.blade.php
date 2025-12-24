@@ -46,7 +46,7 @@
                                 <div class="info-box">
                                     <span class="info-box-icon bg-success"><i class="fas fa-check"></i></span>
                                     <div class="info-box-content">
-                                        <span class="info-box-text">Matched Records</span>
+                                        <span class="info-box-text">Matched/Partial Match Records</span>
                                         <span class="info-box-number" id="matched-records">0</span>
                                     </div>
                                 </div>
@@ -79,6 +79,7 @@
                                     <th>Supplier</th>
                                     <th>Invoice Date</th>
                                     <th>Matching Status</th>
+                                    <th>Distribution Number</th>
                                     <th>Uploaded By</th>
                                     <th>Uploaded At</th>
                                     <th>Actions</th>
@@ -111,23 +112,6 @@
                     @csrf
                     <div class="modal-body">
                         <div class="form-group">
-                            <label for="vendor_id">Supplier <span class="text-danger">*</span></label>
-                            <select class="form-control" id="vendor_id" name="vendor_id" required>
-                                <option value="">Select Supplier</option>
-                                @php
-                                    $suppliers = \App\Models\Supplier::active()
-                                        ->orderBy('name')
-                                        ->get(['id', 'name']);
-                                @endphp
-                                @foreach ($suppliers as $supplier)
-                                    <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
-                                @endforeach
-                            </select>
-                            @error('vendor_id')
-                                <span class="text-danger">{{ $message }}</span>
-                            @enderror
-                        </div>
-                        <div class="form-group">
                             <label for="file_upload">Excel File <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <input type="file" class="form-control" id="file_upload" name="file_upload"
@@ -136,6 +120,8 @@
                             <small class="form-text text-muted">
                                 Supported formats: .xls, .xlsx (Max: 10MB)<br>
                                 Required columns: invoice_no (or invoice_number), invoice_date (optional)<br>
+                                <strong>Note:</strong> Supplier information will be automatically determined from matched
+                                invoices.<br>
                                 <a href="{{ route('reconcile.template') }}" class="text-info" target="_blank">
                                     <i class="fas fa-download"></i> Download Excel Template
                                 </a>
@@ -270,39 +256,14 @@
                 var fileName = $(this).val().split('\\').pop();
             });
 
-            // Load suppliers for dropdown
-            function loadSuppliers() {
-                $.get("{{ route('reconcile.suppliers') }}", function(data) {
-
-                    if (Array.isArray(data) && data.length > 0) {
-                        var options = '<option value="">Select Supplier</option>';
-                        $.each(data, function(index, supplier) {
-                            if (supplier.id && supplier.name) {
-                                options += '<option value="' + supplier.id + '">' + supplier.name +
-                                    '</option>';
-                            }
-                        });
-                        $('#vendor_id').html(options);
-                    } else {
-                        console.warn('No suppliers data received or empty array');
-                        $('#vendor_id').html('<option value="">No suppliers available</option>');
-                    }
-                }).fail(function(xhr, status, error) {
-
-                    // Fallback: show error message in dropdown
-                    $('#vendor_id').html(
-                        '<option value="">Error loading suppliers - Please refresh</option>');
-                    toastr.error('Error loading suppliers. Please refresh the page.');
-                });
-            }
 
             // Load statistics
             function loadStats() {
                 $.get("{{ route('reconcile.stats') }}", function(data) {
-                    $('#total-records').text(data.total_records);
-                    $('#matched-records').text(data.matched_records);
-                    $('#unmatched-records').text(data.total_records - data.matched_records);
-                    $('#match-rate').text(data.match_rate + '%');
+                    $('#total-records').text(data.total_records || 0);
+                    $('#matched-records').text(data.matched_records || 0);
+                    $('#unmatched-records').text(data.unmatched_records || 0);
+                    $('#match-rate').text((data.match_rate || 0) + '%');
                 });
             }
 
@@ -331,11 +292,16 @@
                         name: 'reconciliation_status'
                     },
                     {
+                        data: 'distribution_number',
+                        name: 'distribution_number',
+                        orderable: false
+                    },
+                    {
                         data: 'user_name',
                         name: 'user_name'
                     },
                     {
-                        data: 'created_at',
+                        data: 'created_at_formatted',
                         name: 'created_at'
                     },
                     {
@@ -346,7 +312,7 @@
                     }
                 ],
                 order: [
-                    [5, 'desc']
+                    [6, 'desc']
                 ],
                 responsive: true,
                 lengthChange: true,
@@ -359,7 +325,6 @@
             });
 
             // Load initial data
-            loadSuppliers();
             loadStats();
 
             // Handle form submission
@@ -371,12 +336,6 @@
 
                 // Validate form
                 var fileInput = $('#file_upload')[0];
-                var vendorId = $('#vendor_id').val();
-
-                if (!vendorId) {
-                    toastr.error('Please select a supplier');
-                    return;
-                }
 
                 if (!fileInput.files || fileInput.files.length === 0) {
                     toastr.error('Please select a file to upload');
