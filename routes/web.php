@@ -58,6 +58,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     // Include Reconcile Routes
     require __DIR__ . '/reconcile.php';
 
+    // Include Accounting Fulfillment Routes
+    require __DIR__ . '/accounting-fulfillment.php';
+
     // Message Routes
     Route::prefix('messages')->name('messages.')->group(function () {
         Route::get('/', [\App\Http\Controllers\MessageController::class, 'index'])->name('index');
