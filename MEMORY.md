@@ -1,3 +1,51 @@
+### 2025-01-XX — Dashboard Performance Analysis: Critical N+1 Query Issues Identified
+
+**Key Learning**: Accessor methods (`days_in_current_location`, `current_location_arrival_date`) trigger database queries for each document when called in loops, causing severe N+1 query problems. Dashboard loads 3000+ queries taking 20-90 seconds.
+
+**Problem Identified**:
+- Dashboard route `/dashboard` experiencing timeouts (20-90s load time)
+- N+1 queries: Accessors trigger DB queries for each document in loops
+- Loading entire tables: Multiple `get()` calls loading all invoices/documents into memory
+- No caching: All calculations performed on every page load
+- Inefficient queries: PHP loops instead of database aggregations
+
+**Root Causes**:
+1. **N+1 Query Problem**: `getDaysInCurrentLocationAttribute()` → `getCurrentLocationArrivalDateAttribute()` → `distributions()->whereHas()` query per document
+2. **Memory Issues**: Loading entire tables with `get()` instead of using database aggregations
+3. **Multiple Separate Queries**: Invoice and AdditionalDocument queries not combined
+4. **SAP Metrics Loop**: 66+ queries for 22 departments (3 queries per department)
+
+**Performance Impact**:
+- Current: 3000+ queries, 20-90s load time, 150-500MB memory
+- Target: 10-20 queries, <2s load time, <20MB memory
+- Improvement: 99% query reduction, 95%+ faster load time
+
+**Recommended Solutions**:
+1. **Immediate**: Replace accessor loops with database-level calculations (use SQL subqueries)
+2. **Short-term**: Implement caching (5-minute cache for metrics) + Create welcome page for post-login redirect
+3. **Medium-term**: Add database indexes + Implement AJAX lazy loading for dashboard sections
+
+**Implementation Priority**:
+- **Phase 1** (Week 1): Optimize database queries - replace N+1 with single aggregated queries
+- **Phase 2** (Week 1-2): Add caching layer + Create lightweight welcome page
+- **Phase 3** (Week 2-3): Database indexes + AJAX lazy loading
+
+**Files to Modify**:
+- `app/Http/Controllers/DashboardController.php` - Replace all accessor loops with database queries
+- `app/Services/DashboardMetricsService.php` - New service class for optimized queries
+- `app/Http/Controllers/WelcomeController.php` - New welcome page controller
+- `app/Http/Controllers/Auth/LoginController.php` - Redirect to welcome instead of dashboard
+
+**Expected Results**:
+- ✅ 99% reduction in database queries (3000+ → 10-20)
+- ✅ 95%+ faster load time (20-90s → <2s)
+- ✅ 96% reduction in memory usage (150-500MB → <20MB)
+- ✅ Instant post-login response (<500ms with welcome page)
+
+**Documentation**: See `docs/DASHBOARD-PERFORMANCE-ANALYSIS.md` for detailed analysis and implementation plan.
+
+---
+
 ### 2025-01-XX — Reconcile Feature Enhancements: UI/UX Improvements & Match Rate Accuracy
 
 **Key Learning**: Match rate calculations must use actual reconciliation status rather than simple existence checks. UI improvements should reflect business logic accurately.

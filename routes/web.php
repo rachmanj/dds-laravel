@@ -22,16 +22,17 @@ Route::middleware('guest')->group(function () {
 // Logout Route
 Route::post('/logout', [LogoutController::class, 'logout'])->name('logout')->middleware('auth');
 
-// Redirect root to dashboard if authenticated, otherwise to login
+// Redirect root to welcome if authenticated, otherwise to login
 Route::get('/', function () {
     if (\Illuminate\Support\Facades\Auth::check()) {
-        return redirect('/dashboard');
+        return redirect('/welcome');
     }
     return redirect('/login');
 });
 
 // Protected Routes
 Route::middleware(['auth', 'active.user'])->group(function () {
+    Route::get('/welcome', [\App\Http\Controllers\WelcomeController::class, 'index'])->name('welcome');
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
     // Processing Analytics Routes
