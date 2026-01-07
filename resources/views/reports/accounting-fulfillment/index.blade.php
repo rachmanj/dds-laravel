@@ -93,7 +93,7 @@
             const year = $('#yearSelect').val();
             
             $.ajax({
-                url: '/reports/accounting-fulfillment/data',
+                url: '{{ route('accounting-fulfillment.data') }}',
                 method: 'GET',
                 data: { year: year },
                 success: function(response) {

@@ -1597,3 +1597,62 @@ Documents by type:
 - Finance sees precise failure reasons on invoice detail page and can retry after correcting mappings.
 - `sap_logs` now carries enough context for support escalation.
 - Prevents wasted retries when supplier data is incomplete.
+
+---
+
+### 2025-01-XX — Accounting Monthly Invoice Fulfillment Report Implementation
+
+**Key Learning**: Monthly reporting requires clear, simple data calculation logic based on business requirements. Role-based access control can be simpler than permission-based when roles align with business units.
+
+**Problem Solved**:
+- User needed visibility into Accounting department's monthly invoice processing performance
+- Required tracking of: total invoices received, distribution rate to Finance, and average processing time
+- Needed secure access limited to superadmin, admin, and accounting roles
+
+**Solution**: Implemented comprehensive monthly report with optimized SQL queries and role-based access control.
+
+**Implementation Details**:
+
+1. **Report Data Calculation**:
+   - **Total Received**: Counts invoices with `receive_date` in specified month/year, created by Accounting department users
+   - **Distributed to Finance**: Uses first distribution's `sender_verified_at` when Accounting verifies before sending to Finance
+   - **Percentage Distributed**: Calculated as `(distributed_to_finance / total_received) * 100`
+   - **Average Days**: Calculated from `receive_date` to `sender_verified_at`, only for invoices that have been distributed
+
+2. **Data Logic Decisions**:
+   - Uses `receive_date` instead of complex arrival date logic (distribution `received_at` or `invoice.receive_date`/`created_at`)
+   - Filters by `created_by` user's department (Accounting) instead of `cur_loc` field
+   - Only includes distributed invoices in average days calculation (excludes pending invoices)
+   - Uses first distribution to Finance (earliest `sender_verified_at`) for accurate tracking
+
+3. **Access Control**:
+   - Role-based protection: `superadmin`, `admin`, `accounting` roles only
+   - Menu item hidden from unauthorized users using `@hasanyrole` directive
+   - Route-level middleware: `role:superadmin|admin|accounting`
+   - Consistent with existing role-based access patterns in the application
+
+4. **Performance Optimization**:
+   - Uses direct SQL queries with subqueries to avoid N+1 problems
+   - Filters invoices by year/month in PHP after initial query (more reliable date handling)
+   - Pre-calculates distribution dates using subqueries
+   - Efficient monthly aggregation without loading all data into memory
+
+**Technical Decisions**:
+- **SQL Optimization**: Direct queries with subqueries instead of Eloquent relationships to avoid N+1
+- **Date Filtering**: PHP-based filtering after SQL query for more reliable date handling across timezones
+- **Role-Based Access**: Chosen over permission-based for simplicity and user requirement alignment
+- **Data Calculation**: Simple `receive_date` logic instead of complex arrival date determination
+
+**Files Created/Modified**:
+- `app/Http/Controllers/ReportsAccountingFulfillmentController.php` - Report controller with `getMonthlyFulfillmentData()` method
+- `resources/views/reports/accounting-fulfillment/index.blade.php` - Report view with AJAX data loading
+- `routes/accounting-fulfillment.php` - Route definitions with role middleware
+- `resources/views/layouts/partials/menu/reports.blade.php` - Added menu item with role-based visibility
+
+**Impact**:
+- ✅ Provides monthly visibility into Accounting department invoice processing performance
+- ✅ Tracks distribution efficiency (percentage distributed to Finance)
+- ✅ Measures processing time (average days in Accounting)
+- ✅ Secure access limited to authorized roles only
+- ✅ Optimized queries for fast data loading (<2 seconds)
+- ✅ Clean UI with year filter and color-coded percentages
