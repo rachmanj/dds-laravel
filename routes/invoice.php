@@ -1,12 +1,12 @@
 <?php
 
-use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceAttachmentController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceDashboardController;
+use App\Http\Controllers\InvoiceImportController;
 use App\Http\Controllers\InvoicePaymentController;
 use App\Http\Controllers\SapUpdateController;
 use Illuminate\Support\Facades\Route;
-
 
 Route::prefix('invoices')->name('invoices.')->group(function () {
     // Invoices data endpoint (define before resource to avoid shadowing by {invoice})
@@ -68,6 +68,18 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
 
     // Get recent invoices for quick fill (AJAX)
     Route::get('/recent-for-autofill', [InvoiceController::class, 'getRecentInvoices'])->name('recent-for-autofill');
+
+    Route::post('/import-extract', [InvoiceImportController::class, 'extract'])
+        ->middleware('throttle:10,1')
+        ->name('import-extract');
+    Route::get('/import-status/{uuid}', [InvoiceImportController::class, 'status'])
+        ->middleware('throttle:60,1')
+        ->whereUuid('uuid')
+        ->name('import-status');
+    Route::get('/import-draft/{uuid}', [InvoiceImportController::class, 'draft'])
+        ->middleware('throttle:60,1')
+        ->whereUuid('uuid')
+        ->name('import-draft');
 
     // Invoice attachment routes
     Route::prefix('attachments')->group(function () {

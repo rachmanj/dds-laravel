@@ -134,6 +134,13 @@ return [
             'days' => 14,
         ],
 
+        'invoice_import' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/invoice-import.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 14,
+        ],
+
     ],
 
 ];

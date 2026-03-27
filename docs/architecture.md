@@ -2663,3 +2663,40 @@ All sync operations are logged to `sap_logs` table:
 -   Implement targeted validation helpers (e.g., tax code, PO reference lookups).
 -   Surface `sap_error_message` in finance dashboards and notifications.
 -   Add reconciliation worker to pull SAP statuses back into DDS nightly.
+
+### Invoice creation from PDF/image (AI-assisted import)
+
+**Status**: Implemented (v1) — see [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), sample extraction notes in [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md).
+
+**High-level flow**: upload → `POST /invoices/import-extract` → `ExtractInvoiceFromDocumentJob` + OpenRouter (images: vision; PDF: embedded text via `smalot/pdfparser` if enough text, else PDF file + `file-parser` / OCR) → `InvoiceImportSupplierResolver` + `InvoiceImportDraftBuilder` → cache (`invoice_import:{uuid}`) → poll `GET /invoices/import-status/{uuid}` → `GET /invoices/import-draft/{uuid}` → prefill `invoices.create` → user submits `InvoiceController::store` with hidden `import_uuid` → `InvoiceImportAttachmentService::attachFromImport` copies temp file to permanent storage and `InvoiceAttachment` (“Invoice Copy”, description “Imported from document”). Optional JSON snapshot on the invoice row: `invoices.import_extraction` (draft metadata, confidence, original filename). SAP AP posting is unchanged (manual / existing flow).
+
+**Key files**
+
+| Area | Path |
+|------|------|
+| Routes | `routes/invoice.php` — `import-extract`, `import-status`, `import-draft` (before resource routes) |
+| Controller | `app/Http/Controllers/InvoiceImportController.php` |
+| Job | `app/Jobs/ExtractInvoiceFromDocumentJob.php` |
+| Extraction | `app/Services/OpenRouterInvoiceExtractionService.php`, `app/Services/PdfInvoiceFirstPageService.php` (multi-page PDF → page 1 for OCR path when enabled) |
+| Draft / attach | `app/Services/InvoiceImportDraftBuilder.php`, `app/Services/InvoiceImportAttachmentService.php` |
+| Create + store | `resources/views/invoices/create.blade.php`, `app/Http/Controllers/InvoiceController.php` (`store` attaches when `import_uuid` present) |
+| Model | `app/Models/Invoice.php` — `import_extraction` cast |
+| Config | `config/services.php` → `openrouter.*` |
+| Logging | `config/logging.php` channel `invoice_import` |
+
+**Configuration (env)**
+
+- `OPEN_ROUTER_API_KEY` / `OPENROUTER_API_KEY`, `OPEN_ROUTER_MODEL`, optional `OPEN_ROUTER_BASE_URL`, `OPEN_ROUTER_TIMEOUT`, `OPEN_ROUTER_PDF_TIMEOUT`, `OPEN_ROUTER_PDF_ENGINE`, `OPEN_ROUTER_PDF_FIRST_PAGE_ONLY`.
+- `INVOICE_IMPORT_ENABLED` — gate feature.
+- `INVOICE_IMPORT_EXTRACT_SYNC` — if `true`, runs `dispatchSync()` on extract so the upload HTTP request blocks until extraction finishes (dev / no worker); **false in production** unless long-lived requests are acceptable.
+- Queue: with `QUEUE_CONNECTION=database` or `redis`, a **queue worker** must run (`php artisan queue:work`) or extraction never completes.
+
+**UX on create invoice**
+
+- Collapsible import card: file input, **Preview** (modal: image or PDF iframe), **Extract data**, status text; optional alert when queue driver is `database` / `redis`.
+- After successful save, AJAX response may include `import_attachment_saved`; UI can toast when the imported file was attached.
+
+**PDF behaviour (v1)**
+
+- Text-heavy PDFs: full-document text from `smalot/pdfparser` (subject to length limits in code).
+- Scanned / low-text PDFs: OpenRouter PDF path; if `pdf_first_page_only` is true, multi-page files are trimmed to **page 1** server-side before OCR (see `PdfInvoiceFirstPageService`).

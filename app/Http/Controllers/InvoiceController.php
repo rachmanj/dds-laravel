@@ -2,20 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\CreateSapApInvoiceJob;
+use App\Models\AdditionalDocument;
 use App\Models\Invoice;
 use App\Models\InvoiceType;
-use App\Models\Supplier;
 use App\Models\Project;
-use App\Models\AdditionalDocument;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Rules\UniqueInvoicePerSupplier;
+use App\Services\InvoiceImportAttachmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Yajra\DataTables\Facades\DataTables;
-use Carbon\Carbon;
-use App\Jobs\CreateSapApInvoiceJob;
 
 class InvoiceController extends Controller
 {
@@ -37,7 +37,7 @@ class InvoiceController extends Controller
     {
         /** @var User $user */
         $user = Auth::user();
-        
+
         // Main query with optimized database-level arrival date calculation
         // This avoids N+1 queries by calculating arrival_date and days_in_location in SQL
         $query = Invoice::query()
@@ -65,7 +65,7 @@ class InvoiceController extends Controller
             ->with(['supplier', 'type', 'creator', 'attachments']);
 
         // Apply location-based filtering unless user is admin/superadmin/accounting
-        if (!$request->show_all && !$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
+        if (! $request->show_all && ! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
                 $query->where('cur_loc', $locationCode);
@@ -74,15 +74,15 @@ class InvoiceController extends Controller
 
         // Apply search filters
         if ($request->filled('search_invoice_number')) {
-            $query->where('invoice_number', 'like', '%' . $request->search_invoice_number . '%');
+            $query->where('invoice_number', 'like', '%'.$request->search_invoice_number.'%');
         }
 
         if ($request->filled('search_faktur_no')) {
-            $query->where('faktur_no', 'like', '%' . $request->search_faktur_no . '%');
+            $query->where('faktur_no', 'like', '%'.$request->search_faktur_no.'%');
         }
 
         if ($request->filled('search_po_no')) {
-            $query->where('po_no', 'like', '%' . $request->search_po_no . '%');
+            $query->where('po_no', 'like', '%'.$request->search_po_no.'%');
         }
 
         if ($request->filled('search_type')) {
@@ -97,7 +97,7 @@ class InvoiceController extends Controller
 
         if ($request->filled('search_supplier')) {
             $query->whereHas('supplier', function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search_supplier . '%');
+                $q->where('name', 'like', '%'.$request->search_supplier.'%');
             });
         }
 
@@ -143,19 +143,20 @@ class InvoiceController extends Controller
                 $roundedDays = round($daysInCurrentLocation, 1);
 
                 if ($roundedDays <= 7) {
-                    return '<span class="badge badge-success">' . $roundedDays . '</span>';
+                    return '<span class="badge badge-success">'.$roundedDays.'</span>';
                 } elseif ($roundedDays <= 14) {
-                    return '<span class="badge badge-warning">' . $roundedDays . '</span>';
+                    return '<span class="badge badge-warning">'.$roundedDays.'</span>';
                 } else {
-                    return '<span class="badge badge-danger">' . $roundedDays . '</span>';
+                    return '<span class="badge badge-danger">'.$roundedDays.'</span>';
                 }
             })
             ->addColumn('actions', function ($invoice) {
                 $actions = '<div class="btn-group" style="gap:2px;">';
-                $actions .= '<a href="' . route('invoices.show', $invoice) . '" class="btn btn-info btn-xs" title="View Invoice"><i class="fas fa-eye"></i></a>';
-                $actions .= '<a href="' . route('invoices.edit', $invoice) . '" class="btn btn-warning btn-xs" title="Edit Invoice"><i class="fas fa-edit"></i></a>';
-                $actions .= '<button type="button" class="btn btn-danger btn-xs delete-invoice" data-id="' . $invoice->id . '" data-number="' . $invoice->invoice_number . '" data-delete-url="' . route('invoices.destroy', $invoice) . '" title="Delete Invoice"><i class="fas fa-trash"></i></button>';
+                $actions .= '<a href="'.route('invoices.show', $invoice).'" class="btn btn-info btn-xs" title="View Invoice"><i class="fas fa-eye"></i></a>';
+                $actions .= '<a href="'.route('invoices.edit', $invoice).'" class="btn btn-warning btn-xs" title="Edit Invoice"><i class="fas fa-edit"></i></a>';
+                $actions .= '<button type="button" class="btn btn-danger btn-xs delete-invoice" data-id="'.$invoice->id.'" data-number="'.$invoice->invoice_number.'" data-delete-url="'.route('invoices.destroy', $invoice).'" title="Delete Invoice"><i class="fas fa-trash"></i></button>';
                 $actions .= '</div>';
+
                 return $actions;
             })
             ->rawColumns(['status_badge', 'days_difference', 'actions'])
@@ -169,14 +170,17 @@ class InvoiceController extends Controller
         $projects = Project::active()->orderBy('code')->get();
         $departments = \App\Models\Department::active()->orderBy('project')->get();
         $additionalDocumentTypes = \App\Models\AdditionalDocumentType::orderByName()->get();
+        $invoiceImportEnabled = config('services.openrouter.enabled', true)
+            && filled(config('services.openrouter.key'));
+        $invoiceImportQueueDriver = config('queue.default');
 
-        return view('invoices.create', compact('invoiceTypes', 'suppliers', 'projects', 'departments', 'additionalDocumentTypes'));
+        return view('invoices.create', compact('invoiceTypes', 'suppliers', 'projects', 'departments', 'additionalDocumentTypes', 'invoiceImportEnabled', 'invoiceImportQueueDriver'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'invoice_number' => ['required', 'string', 'max:255', new UniqueInvoicePerSupplier()],
+            'invoice_number' => ['required', 'string', 'max:255', new UniqueInvoicePerSupplier],
             'faktur_no' => ['nullable', 'string', 'max:255'],
             'invoice_date' => ['required', 'date'],
             'receive_date' => ['required', 'date'],
@@ -192,19 +196,20 @@ class InvoiceController extends Controller
             'remarks' => ['nullable', 'string'],
             'cur_loc' => ['required', 'string', 'max:30'],
             'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc'],
+            'import_uuid' => ['nullable', 'uuid'],
         ]);
 
         // Auto-populate receive_project from user's project if not provided
         $receiveProject = $request->receive_project;
         /** @var User|null $authUser */
         $authUser = Auth::user();
-        if (!$receiveProject && $authUser && $authUser->project) {
+        if (! $receiveProject && $authUser && $authUser->project) {
             $receiveProject = $authUser->project;
         }
 
         // Ensure we have a valid user ID
         $userId = Auth::id();
-        if (!$userId) {
+        if (! $userId) {
             // Log the error for debugging
             Log::error('Auth::id() returned null when creating invoice', [
                 'invoice_number' => $request->invoice_number,
@@ -215,6 +220,14 @@ class InvoiceController extends Controller
                 'success' => false,
                 'message' => 'Authentication error. Please refresh the page and try again.',
             ], 401);
+        }
+
+        $importExtraction = null;
+        if ($request->filled('import_uuid')) {
+            $importExtraction = app(InvoiceImportAttachmentService::class)->getImportExtractionPayload(
+                $request->string('import_uuid')->toString(),
+                $userId
+            );
         }
 
         $invoice = Invoice::create([
@@ -236,19 +249,36 @@ class InvoiceController extends Controller
             'sap_doc' => $request->sap_doc,
             'status' => 'open', // Always set to 'open' for new invoices
             'created_by' => $userId,
+            'import_extraction' => $importExtraction,
         ]);
 
         // Link additional documents if provided
         $additionalDocumentIds = $request->input('additional_document_ids', []);
-        if (!empty($additionalDocumentIds)) {
+        if (! empty($additionalDocumentIds)) {
             $invoice->additionalDocuments()->sync(array_unique($additionalDocumentIds));
+        }
+
+        $importAttachmentSaved = false;
+        if ($request->filled('import_uuid')) {
+            $importAttachmentSaved = app(InvoiceImportAttachmentService::class)->attachFromImport(
+                $invoice,
+                $request->string('import_uuid')->toString(),
+                $userId
+            );
+            if (! $importAttachmentSaved) {
+                Log::warning('Invoice import file could not be attached after create', [
+                    'invoice_id' => $invoice->id,
+                    'import_uuid' => $request->string('import_uuid')->toString(),
+                ]);
+            }
         }
 
         if ($request->ajax()) {
             return response()->json([
                 'success' => true,
                 'message' => 'Invoice created successfully.',
-                'invoice_id' => $invoice->id
+                'invoice_id' => $invoice->id,
+                'import_attachment_saved' => $importAttachmentSaved,
             ]);
         }
 
@@ -261,7 +291,7 @@ class InvoiceController extends Controller
         // Check if user can view this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
+        if (! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only view invoices from your department location.');
@@ -278,7 +308,7 @@ class InvoiceController extends Controller
         // Check if user can edit this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
+        if (! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only edit invoices from your department location.');
@@ -299,7 +329,7 @@ class InvoiceController extends Controller
         // Check if user can edit this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
+        if (! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only edit invoices from your department location.');
@@ -308,10 +338,10 @@ class InvoiceController extends Controller
 
         // Check if location change is being attempted
         if ($request->has('cur_loc') && $request->cur_loc !== $invoice->cur_loc) {
-            if (!$invoice->canChangeLocationManually()) {
+            if (! $invoice->canChangeLocationManually()) {
                 return redirect()->back()
                     ->withErrors([
-                        'cur_loc' => 'Cannot change location manually. This invoice has distribution history. Location can only be changed through the distribution process.'
+                        'cur_loc' => 'Cannot change location manually. This invoice has distribution history. Location can only be changed through the distribution process.',
                     ])
                     ->withInput();
             }
@@ -334,7 +364,7 @@ class InvoiceController extends Controller
             'remarks' => ['nullable', 'string'],
             'cur_loc' => ['required', 'string', 'max:30'],
             'status' => ['required', 'string', 'in:open,verify,return,sap,close,cancel'],
-            'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc,' . $invoice->id],
+            'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc,'.$invoice->id],
         ]);
 
         $invoice->update([
@@ -364,7 +394,7 @@ class InvoiceController extends Controller
         if ($request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Invoice updated successfully.'
+                'message' => 'Invoice updated successfully.',
             ]);
         }
 
@@ -377,7 +407,7 @@ class InvoiceController extends Controller
         // Check if user can delete this invoice
         /** @var User $user */
         $user = Auth::user();
-        if (!$user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
+        if (! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only delete invoices from your department location.');
@@ -396,7 +426,7 @@ class InvoiceController extends Controller
         if (request()->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Invoice deleted successfully.'
+                'message' => 'Invoice deleted successfully.',
             ]);
         }
 
@@ -438,10 +468,10 @@ class InvoiceController extends Controller
             return redirect()->back()
                 ->with('error', 'Import functionality will be implemented soon. Please use manual entry for now.');
         } catch (\Exception $e) {
-            Log::error('Invoice import error: ' . $e->getMessage());
+            Log::error('Invoice import error: '.$e->getMessage());
 
             return redirect()->back()
-                ->with('error', 'Import failed: ' . $e->getMessage())
+                ->with('error', 'Import failed: '.$e->getMessage())
                 ->withInput();
         }
     }
@@ -450,7 +480,7 @@ class InvoiceController extends Controller
     {
         $filePath = storage_path('app/templates/invoice_import_template.xlsx');
 
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             abort(404, 'Template file not found.');
         }
 
@@ -479,7 +509,7 @@ class InvoiceController extends Controller
 
         return response()->json([
             'is_duplicate' => $isDuplicate,
-            'message' => $isDuplicate ? 'Invoice number already exists for this supplier.' : 'Invoice number is available.'
+            'message' => $isDuplicate ? 'Invoice number already exists for this supplier.' : 'Invoice number is available.',
         ]);
     }
 
@@ -490,7 +520,7 @@ class InvoiceController extends Controller
     {
         $request->validate([
             'sap_doc' => 'required|string|max:20',
-            'invoice_id' => 'nullable|exists:invoices,id'
+            'invoice_id' => 'nullable|exists:invoices,id',
         ]);
 
         $query = Invoice::where('sap_doc', $request->sap_doc);
@@ -502,8 +532,8 @@ class InvoiceController extends Controller
         $exists = $query->exists();
 
         return response()->json([
-            'valid' => !$exists,
-            'message' => $exists ? 'SAP document number already exists.' : 'SAP document number is available.'
+            'valid' => ! $exists,
+            'message' => $exists ? 'SAP document number already exists.' : 'SAP document number is available.',
         ]);
     }
 
@@ -516,7 +546,7 @@ class InvoiceController extends Controller
         // (due to auth middleware in constructor)
         return response()->json([
             'status' => 'authenticated',
-            'user' => Auth::user()->name
+            'user' => Auth::user()->name,
         ]);
     }
 
@@ -535,7 +565,7 @@ class InvoiceController extends Controller
         $query = AdditionalDocument::query()
             ->with(['type', 'invoices'])
             ->whereNotNull('po_no')
-            ->where('po_no', 'like', '%' . $request->po_no . '%')
+            ->where('po_no', 'like', '%'.$request->po_no.'%')
             ->orderByDesc('document_date')
             ->limit(50);
 
@@ -694,14 +724,28 @@ class InvoiceController extends Controller
 
     public function sapSync(Invoice $invoice)
     {
-        if ($invoice->status !== 'sap') {
-            return back()->with('error', 'Invoice must be in SAP status before sending to SAP.');
+        // Check if user can sync this invoice
+        /** @var User $user */
+        $user = Auth::user();
+        if (! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
+            $locationCode = $user->department_location_code;
+            if ($locationCode && $invoice->cur_loc !== $locationCode) {
+                abort(403, 'You can only sync invoices from your department location.');
+            }
         }
 
+        // Validate invoice can be synced
+        $validationErrors = $invoice->canSyncToSap();
+        if (! empty($validationErrors)) {
+            return back()->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
+        }
+
+        // Check if already synced
         if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
             return back()->with('error', 'Invoice is already sent or pending in SAP.');
         }
 
+        // Update status and queue job
         $invoice->update(['sap_status' => 'pending']);
         CreateSapApInvoiceJob::dispatch($invoice);
 

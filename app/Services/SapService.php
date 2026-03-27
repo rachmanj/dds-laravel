@@ -10,16 +10,18 @@ use Illuminate\Support\Facades\Log;
 class SapService
 {
     protected $client;
+
     protected $config;
+
     protected $cookieJar;
 
     public function __construct()
     {
         $this->config = config('sap');
-        $this->cookieJar = new CookieJar();
+        $this->cookieJar = new CookieJar;
         // Ensure base_uri ends with /v1/ for SAP Service Layer
         $baseUri = rtrim($this->config['server_url'], '/');
-        if (!str_ends_with($baseUri, '/v1')) {
+        if (! str_ends_with($baseUri, '/v1')) {
             $baseUri .= '/v1';
         }
         $baseUri .= '/';
@@ -34,6 +36,53 @@ class SapService
     public function getClient()
     {
         return $this->client;
+    }
+
+    /**
+     * Ensure valid SAP session exists
+     */
+    public function ensureSession(): void
+    {
+        if ($this->cookieJar->count() === 0) {
+            $this->login();
+        }
+    }
+
+    /**
+     * Generic GET method for SAP API calls with automatic session handling
+     */
+    public function get(string $endpoint, array $options = []): array
+    {
+        $this->ensureSession();
+
+        try {
+            $response = $this->client->get($endpoint, $options);
+            $result = json_decode($response->getBody()->getContents(), true);
+
+            // Handle 401 by re-logging in and retrying once
+            if ($response->getStatusCode() === 401) {
+                $this->login();
+                $response = $this->client->get($endpoint, $options);
+                $result = json_decode($response->getBody()->getContents(), true);
+            }
+
+            return $result;
+        } catch (RequestException $e) {
+            // Auto re-login on 401
+            if ($e->getResponse() && $e->getResponse()->getStatusCode() === 401) {
+                $this->login();
+                $response = $this->client->get($endpoint, $options);
+
+                return json_decode($response->getBody()->getContents(), true);
+            }
+
+            Log::channel('sap')->error('SAP GET request failed: '.$e->getMessage());
+            if ($e->getResponse()) {
+                $errorBody = $e->getResponse()->getBody()->getContents();
+                Log::channel('sap')->error('SAP Error Response: '.$errorBody);
+            }
+            throw $e;
+        }
     }
 
     public function login()
@@ -53,14 +102,14 @@ class SapService
 
             throw new \Exception('Login failed');
         } catch (RequestException $e) {
-            Log::channel('sap')->error('SAP Login failed: ' . $e->getMessage());
+            Log::channel('sap')->error('SAP Login failed: '.$e->getMessage());
             throw $e;
         }
     }
 
     public function executeQuery(string $queryId, array $params)
     {
-        if (!$this->cookieJar->count()) {
+        if (! $this->cookieJar->count()) {
             $this->login();
         }
 
@@ -87,13 +136,14 @@ class SapService
         } catch (RequestException $e) {
             if ($e->getResponse() && $e->getResponse()->getStatusCode() === 401) {
                 $this->login(); // Retry once with fresh login
+
                 return $this->executeQuery($queryId, $params);
             }
 
-            Log::channel('sap')->error('SAP Query failed: ' . $e->getMessage());
+            Log::channel('sap')->error('SAP Query failed: '.$e->getMessage());
             if ($e->getResponse()) {
                 $errorBody = $e->getResponse()->getBody()->getContents();
-                Log::channel('sap')->error('SAP Error Response: ' . $errorBody);
+                Log::channel('sap')->error('SAP Error Response: '.$errorBody);
             }
             throw $e;
         }
@@ -101,43 +151,43 @@ class SapService
 
     public function getBusinessPartner($cardCode)
     {
-        if (!$this->cookieJar->count()) {
+        if (! $this->cookieJar->count()) {
             $this->login();
         }
 
         try {
             $response = $this->client->get("BusinessPartners('$cardCode')", [
-                'query' => ['$select' => 'CardCode,CardName,CardType']
+                'query' => ['$select' => 'CardCode,CardName,CardType'],
             ]);
 
             return json_decode($response->getBody()->getContents(), true);
         } catch (RequestException $e) {
-            Log::channel('sap')->error('SAP BusinessPartner query failed: ' . $e->getMessage());
+            Log::channel('sap')->error('SAP BusinessPartner query failed: '.$e->getMessage());
             throw $e;
         }
     }
 
     public function createApInvoice(array $payload)
     {
-        if (!$this->cookieJar->count()) {
+        if (! $this->cookieJar->count()) {
             $this->login();
         }
 
         try {
             $response = $this->client->post('Invoices', [
-                'json' => $payload
+                'json' => $payload,
             ]);
 
             return json_decode($response->getBody()->getContents(), true);
         } catch (RequestException $e) {
-            Log::channel('sap')->error('SAP Invoice creation failed: ' . $e->getMessage());
+            Log::channel('sap')->error('SAP Invoice creation failed: '.$e->getMessage());
             throw $e;
         }
     }
 
     public function getRecentInvoices($fromDate)
     {
-        if (!$this->cookieJar->count()) {
+        if (! $this->cookieJar->count()) {
             $this->login();
         }
 
@@ -147,12 +197,12 @@ class SapService
                     '$filter' => "DocDate ge '$fromDate'",
                     '$select' => 'DocEntry,DocNum,Comments',
                     '$top' => 1000, // Adjust based on volume
-                ]
+                ],
             ]);
 
             return json_decode($response->getBody()->getContents(), true)['value'];
         } catch (RequestException $e) {
-            Log::channel('sap')->error('SAP recent invoices query failed: ' . $e->getMessage());
+            Log::channel('sap')->error('SAP recent invoices query failed: '.$e->getMessage());
             throw $e;
         }
     }
@@ -160,26 +210,26 @@ class SapService
     /**
      * Query Stock Transfer Requests (OWTR table) directly using OData
      * This is an alternative to executing user queries
-     * 
-     * @param string $startDate Y-m-d format
-     * @param string $endDate Y-m-d format
-     * @param string|null $entityName Entity name (null = auto-detect)
+     *
+     * @param  string  $startDate  Y-m-d format
+     * @param  string  $endDate  Y-m-d format
+     * @param  string|null  $entityName  Entity name (null = auto-detect)
      * @return array
      */
     public function getStockTransferRequests($startDate, $endDate, $entityName = null)
     {
-        if (!$this->cookieJar->count()) {
+        if (! $this->cookieJar->count()) {
             $this->login();
         }
 
         try {
             // Auto-detect entity if not provided - prioritize actual transfers over drafts
-            if (!$entityName) {
+            if (! $entityName) {
                 $entitiesToTry = ['InventoryTransferRequests', 'StockTransfers', 'StockTransferDrafts'];
                 foreach ($entitiesToTry as $entity) {
                     try {
                         // Ensure we have a valid session
-                        if (!$this->cookieJar->count()) {
+                        if (! $this->cookieJar->count()) {
                             $this->login();
                         }
 
@@ -206,20 +256,21 @@ class SapService
                                 continue;
                             }
                         }
+
                         continue;
                     } catch (\Exception $e) {
                         continue;
                     }
                 }
 
-                if (!$entityName) {
-                    throw new \Exception("Could not find a working entity. Tried: " . implode(', ', $entitiesToTry));
+                if (! $entityName) {
+                    throw new \Exception('Could not find a working entity. Tried: '.implode(', ', $entitiesToTry));
                 }
             }
 
             // Format dates for OData datetime filter
-            $startDateTime = $startDate . 'T00:00:00';
-            $endDateTime = $endDate . 'T23:59:59';
+            $startDateTime = $startDate.'T00:00:00';
+            $endDateTime = $endDate.'T23:59:59';
 
             // Try different date field names (SAP B1 Service Layer uses different names)
             // Prioritize CreateDate to match the SQL query WHERE clause: T0.[CreateDate] >= @A AND T0.[CreateDate] <= @B
@@ -236,8 +287,8 @@ class SapService
                     $testResponse = $this->client->get($entityName, [
                         'query' => [
                             '$filter' => $testFilter,
-                            '$top' => 1
-                        ]
+                            '$top' => 1,
+                        ],
                     ]);
                     $testResult = json_decode($testResponse->getBody()->getContents(), true);
                     if (isset($testResult['value']) && count($testResult['value']) > 0) {
@@ -247,12 +298,13 @@ class SapService
                     }
                 } catch (\Exception $e) {
                     // Try next field
-                    Log::channel('sap')->debug("Date field {$dateField} test failed: " . $e->getMessage());
+                    Log::channel('sap')->debug("Date field {$dateField} test failed: ".$e->getMessage());
+
                     continue;
                 }
             }
 
-            if (!$workingDateField) {
+            if (! $workingDateField) {
                 // Fallback: try without $select to see all fields, then use first date-like field
                 $testResponse = $this->client->get($entityName, ['query' => ['$top' => 1]]);
                 $testResult = json_decode($testResponse->getBody()->getContents(), true);
@@ -268,11 +320,11 @@ class SapService
                 }
             }
 
-            if (!$workingDateField) {
+            if (! $workingDateField) {
                 throw new \Exception("Could not determine date field for entity: {$entityName}");
             }
 
-            // Based on SQL: WHERE T0.[CreateDate] >= @A AND T0.[CreateDate] <= @B 
+            // Based on SQL: WHERE T0.[CreateDate] >= @A AND T0.[CreateDate] <= @B
             // AND T0.[U_MIS_TransferType] = 'OUT'
             $filter = "{$workingDateField} ge datetime'{$startDateTime}' and {$workingDateField} le datetime'{$endDateTime}'";
 
@@ -286,8 +338,8 @@ class SapService
                     'query' => [
                         '$filter' => $filter,
                         '$top' => 20,
-                        '$select' => 'DocNum,DynamicProperties'
-                    ]
+                        '$select' => 'DocNum,DynamicProperties',
+                    ],
                 ]);
                 $sampleResult = json_decode($sampleResponse->getBody()->getContents(), true);
 
@@ -298,8 +350,8 @@ class SapService
                         'query' => [
                             '$filter' => $filter,
                             '$top' => 20,
-                            '$select' => 'DocNum,U_MIS_TransferType'
-                        ]
+                            '$select' => 'DocNum,U_MIS_TransferType',
+                        ],
                     ]);
                 } catch (\Exception $e) {
                     // Direct access might not work, that's okay
@@ -336,12 +388,12 @@ class SapService
                         }
 
                         $type = $type ?? 'NULL';
-                        if (!isset($transferTypes[$type])) {
+                        if (! isset($transferTypes[$type])) {
                             $transferTypes[$type] = 0;
                         }
                         $transferTypes[$type]++;
                     }
-                    Log::channel('sap')->info("U_MIS_TransferType values found in sample: " . json_encode($transferTypes));
+                    Log::channel('sap')->info('U_MIS_TransferType values found in sample: '.json_encode($transferTypes));
 
                     // Check if 'OUT' value exists (case-insensitive)
                     $hasOut = false;
@@ -362,49 +414,50 @@ class SapService
 
                         $filterApplied = false;
                         foreach ($filterVariations as $filterVar) {
-                            $testFilterWithType = $filter . " and " . $filterVar;
+                            $testFilterWithType = $filter.' and '.$filterVar;
                             try {
                                 $testResponse2 = $this->client->get($entityName, [
                                     'query' => [
                                         '$filter' => $testFilterWithType,
                                         '$top' => 10,
-                                        '$count' => 'true'
-                                    ]
+                                        '$count' => 'true',
+                                    ],
                                 ]);
                                 $testResult2 = json_decode($testResponse2->getBody()->getContents(), true);
                                 $count = isset($testResult2['value']) ? count($testResult2['value']) : 0;
                                 $totalCount = $testResult2['@odata.count'] ?? $count;
 
                                 if ($count > 0 || $totalCount > 0) {
-                                    $filter .= " and " . $filterVar;
+                                    $filter .= ' and '.$filterVar;
                                     Log::channel('sap')->info("Added U_MIS_TransferType filter: OUT (using '{$filterVar}', found {$count} records, total: {$totalCount})");
                                     $filterApplied = true;
                                     break;
                                 }
                             } catch (\Exception $e) {
-                                Log::channel('sap')->debug("Filter variation '{$filterVar}' failed: " . $e->getMessage());
+                                Log::channel('sap')->debug("Filter variation '{$filterVar}' failed: ".$e->getMessage());
+
                                 continue;
                             }
                         }
 
-                        if (!$filterApplied) {
+                        if (! $filterApplied) {
                             Log::channel('sap')->warning("U_MIS_TransferType='OUT' filter returned 0 records even though 'OUT' values exist in sample. Tried both direct and DynamicProperties syntax.");
                         }
                     } else {
-                        Log::channel('sap')->warning("No 'OUT' values found in U_MIS_TransferType field. Values: " . implode(', ', array_keys($transferTypes)));
-                        Log::channel('sap')->warning("NOTE: OData entity may not expose U_MIS_TransferType field properly. SQL Query 5 shows 202 records with this filter, but OData cannot replicate it. Consider using SQL query execution method if available.");
+                        Log::channel('sap')->warning("No 'OUT' values found in U_MIS_TransferType field. Values: ".implode(', ', array_keys($transferTypes)));
+                        Log::channel('sap')->warning('NOTE: OData entity may not expose U_MIS_TransferType field properly. SQL Query 5 shows 202 records with this filter, but OData cannot replicate it. Consider using SQL query execution method if available.');
                     }
                 } else {
                     // Field might not exist, check if it's in the entity at all
                     $testResponse = $this->client->get($entityName, ['query' => ['$top' => 1]]);
                     $testResult = json_decode($testResponse->getBody()->getContents(), true);
-                    if (isset($testResult['value'][0]) && !array_key_exists('U_MIS_TransferType', $testResult['value'][0])) {
-                        Log::channel('sap')->info("U_MIS_TransferType field not found in entity, filtering without it");
+                    if (isset($testResult['value'][0]) && ! array_key_exists('U_MIS_TransferType', $testResult['value'][0])) {
+                        Log::channel('sap')->info('U_MIS_TransferType field not found in entity, filtering without it');
                     }
                 }
             } catch (\Exception $e) {
                 // Field might not exist or be accessible, skip it
-                Log::channel('sap')->warning("Could not check U_MIS_TransferType field, filtering without it: " . $e->getMessage());
+                Log::channel('sap')->warning('Could not check U_MIS_TransferType field, filtering without it: '.$e->getMessage());
             }
 
             Log::channel('sap')->info("Using filter: {$filter}");
@@ -423,7 +476,7 @@ class SapService
                             '$orderby' => 'DocNum asc',
                             '$top' => $top,
                             '$skip' => $skip,
-                        ]
+                        ],
                     ]);
                     $result = json_decode($response->getBody()->getContents(), true);
                     $batch = $result['value'] ?? [];
@@ -432,7 +485,7 @@ class SapService
                         $hasMore = false;
                     } else {
                         $allResults = array_merge($allResults, $batch);
-                        Log::channel('sap')->info("Fetched batch: " . count($batch) . " records (total so far: " . count($allResults) . ")");
+                        Log::channel('sap')->info('Fetched batch: '.count($batch).' records (total so far: '.count($allResults).')');
 
                         // If we got fewer records than requested, we've reached the end
                         if (count($batch) < $top) {
@@ -448,18 +501,19 @@ class SapService
                 $seenDocNums = [];
                 foreach ($allResults as $record) {
                     $docNum = $record['DocNum'] ?? $record['Reference1'] ?? null;
-                    if ($docNum && !in_array($docNum, $seenDocNums)) {
+                    if ($docNum && ! in_array($docNum, $seenDocNums)) {
                         $seenDocNums[] = $docNum;
                         $uniqueResults[] = $record;
                     }
                 }
 
-                Log::channel('sap')->info("Total records fetched: " . count($allResults) . ", Unique DocNums: " . count($uniqueResults));
+                Log::channel('sap')->info('Total records fetched: '.count($allResults).', Unique DocNums: '.count($uniqueResults));
+
                 return $uniqueResults;
             } catch (RequestException $e) {
                 // If 401, re-login and retry once
                 if ($e->getResponse() && $e->getResponse()->getStatusCode() === 401) {
-                    Log::channel('sap')->warning("Session expired during query, re-logging in and retrying...");
+                    Log::channel('sap')->warning('Session expired during query, re-logging in and retrying...');
                     $this->login();
                     // Retry the pagination loop
                     $allResults = [];
@@ -472,7 +526,7 @@ class SapService
                                 '$orderby' => 'DocNum asc',
                                 '$top' => $top,
                                 '$skip' => $skip,
-                            ]
+                            ],
                         ]);
                         $result = json_decode($response->getBody()->getContents(), true);
                         $batch = $result['value'] ?? [];
@@ -494,20 +548,21 @@ class SapService
                     $seenDocNums = [];
                     foreach ($allResults as $record) {
                         $docNum = $record['DocNum'] ?? $record['Reference1'] ?? null;
-                        if ($docNum && !in_array($docNum, $seenDocNums)) {
+                        if ($docNum && ! in_array($docNum, $seenDocNums)) {
                             $seenDocNums[] = $docNum;
                             $uniqueResults[] = $record;
                         }
                     }
+
                     return $uniqueResults;
                 }
                 throw $e;
             }
         } catch (RequestException $e) {
-            Log::channel('sap')->error('SAP StockTransferRequests query failed: ' . $e->getMessage());
+            Log::channel('sap')->error('SAP StockTransferRequests query failed: '.$e->getMessage());
             if ($e->getResponse()) {
                 $errorBody = $e->getResponse()->getBody()->getContents();
-                Log::channel('sap')->error('SAP Error Response: ' . $errorBody);
+                Log::channel('sap')->error('SAP Error Response: '.$errorBody);
             }
             throw $e;
         }
@@ -516,9 +571,9 @@ class SapService
     /**
      * Execute SQL query directly on SAP B1 SQL Server
      * This method executes the exact SQL query from list_ITO.sql
-     * 
-     * @param string $startDate Y-m-d format
-     * @param string $endDate Y-m-d format
+     *
+     * @param  string  $startDate  Y-m-d format
+     * @param  string  $endDate  Y-m-d format
      * @return array
      */
     public function executeItoSqlQuery($startDate, $endDate)
@@ -528,8 +583,8 @@ class SapService
             $connection = \Illuminate\Support\Facades\DB::connection('sap_sql');
 
             // Convert dates to SQL Server datetime format
-            $startDateTime = $startDate . ' 00:00:00';
-            $endDateTime = $endDate . ' 23:59:59';
+            $startDateTime = $startDate.' 00:00:00';
+            $endDateTime = $endDate.' 23:59:59';
 
             // Execute the SQL query from list_ITO.sql
             // Note: We're using the exact query structure but with parameterized queries for safety
@@ -585,11 +640,11 @@ class SapService
                 return (array) $row;
             }, $results);
 
-            Log::channel('sap')->info("SQL query executed successfully, found " . count($resultsArray) . " records");
+            Log::channel('sap')->info('SQL query executed successfully, found '.count($resultsArray).' records');
 
             return $resultsArray;
         } catch (\Exception $e) {
-            Log::channel('sap')->error('SAP SQL query failed: ' . $e->getMessage());
+            Log::channel('sap')->error('SAP SQL query failed: '.$e->getMessage());
             throw $e;
         }
     }

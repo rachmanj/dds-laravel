@@ -193,6 +193,79 @@
                 </div>
             </div>
 
+            @if (!empty($invoiceImportEnabled))
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card card-outline card-secondary collapsed-card">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="fas fa-file-import"></i> Import from PDF or image</h3>
+                                <div class="card-tools">
+                                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body" style="display: none;">
+                                <p class="text-muted small mb-2">Upload a supplier invoice (PDF or image). Fields below will be filled for you to review before saving.</p>
+                                @if (in_array($invoiceImportQueueDriver ?? 'sync', ['database', 'redis'], true))
+                                    <div class="alert alert-info small py-2 mb-2">
+                                        <i class="fas fa-info-circle"></i> Extraction runs in a queue. If it never completes, ensure a worker is running (<code>php artisan queue:work</code>) or use <code>QUEUE_CONNECTION=sync</code> for local testing.
+                                    </div>
+                                @endif
+                                <div class="form-row align-items-end">
+                                    <div class="col-md-8 mb-2">
+                                        <input type="file" class="form-control-file" id="invoice_import_file"
+                                            accept=".pdf,image/jpeg,image/png,image/webp,image/gif">
+                                    </div>
+                                    <div class="col-md-4 mb-2 d-flex flex-wrap align-items-center">
+                                        <div class="btn-group mr-2 mb-1" role="group" aria-label="Import actions">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                id="invoice_import_preview_btn" disabled
+                                                title="Open the selected file in a large preview">
+                                                <i class="fas fa-eye"></i> Preview
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" id="invoice_import_btn" disabled>
+                                                <i class="fas fa-magic"></i> Extract data
+                                            </button>
+                                        </div>
+                                        <span id="invoice_import_status" class="small text-muted"></span>
+                                    </div>
+                                </div>
+                                <div id="invoice_import_preview_wrap" class="mt-2 d-none">
+                                    <img id="invoice_import_preview" alt="Preview" class="img-thumbnail" style="max-height: 200px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="invoice_import_preview_modal" tabindex="-1" role="dialog"
+                    aria-labelledby="invoice_import_preview_modal_title" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header py-2">
+                                <h5 class="modal-title" id="invoice_import_preview_modal_title">Document preview</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body p-0 bg-light" style="min-height: 50vh;">
+                                <div id="invoice_import_modal_image_wrap" class="d-none text-center p-3" style="max-height: 80vh; overflow: auto;">
+                                    <img id="invoice_import_modal_image" src="" alt="Invoice image preview" class="img-fluid rounded shadow-sm" style="max-width: 100%;">
+                                </div>
+                                <div id="invoice_import_modal_pdf_wrap" class="d-none" style="height: 80vh;">
+                                    <iframe id="invoice_import_modal_pdf" class="w-100 h-100 border-0" title="PDF preview"></iframe>
+                                </div>
+                            </div>
+                            <div class="modal-footer py-2">
+                                <small class="text-muted mr-auto">Compare with the extracted fields below before saving.</small>
+                                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="row">
                 <div class="col-12">
                     <div class="card">
@@ -204,6 +277,7 @@
                         </div>
                         <form action="{{ route('invoices.store') }}" method="POST">
                             @csrf
+                            <input type="hidden" name="import_uuid" id="import_uuid" value="">
                             <div class="card-body">
                                 <!-- Basic Invoice Information -->
                                 <div class="row">
@@ -924,6 +998,245 @@
                 console.error('Error initializing Select2:', error);
             }
 
+            @if (!empty($invoiceImportEnabled))
+            (function invoiceDocumentImport() {
+                const importRoutes = {
+                    extract: @json(route('invoices.import-extract')),
+                    statusBase: @json(rtrim(url('/invoices/import-status'), '/')),
+                    draftBase: @json(rtrim(url('/invoices/import-draft'), '/')),
+                };
+                const statusUrl = (uuid) => importRoutes.statusBase + '/' + uuid;
+                const draftUrl = (uuid) => importRoutes.draftBase + '/' + uuid;
+                let pollTimer = null;
+                let importThumbObjectUrl = null;
+                let importModalObjectUrl = null;
+
+                function revokeImportThumbUrl() {
+                    if (importThumbObjectUrl) {
+                        URL.revokeObjectURL(importThumbObjectUrl);
+                        importThumbObjectUrl = null;
+                    }
+                }
+
+                function revokeImportModalUrl() {
+                    if (importModalObjectUrl) {
+                        URL.revokeObjectURL(importModalObjectUrl);
+                        importModalObjectUrl = null;
+                    }
+                }
+
+                function isImportPdfFile(file) {
+                    if (!file) return false;
+                    if (file.type === 'application/pdf') return true;
+                    return /\.pdf$/i.test(file.name || '');
+                }
+
+                function setImportStatus(msg, isError) {
+                    const el = $('#invoice_import_status');
+                    el.text(msg || '');
+                    el.toggleClass('text-danger', !!isError);
+                }
+
+                function normalizeDraft(raw) {
+                    if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
+                        return {};
+                    }
+                    return raw;
+                }
+
+                function applyDraft(rawDraft) {
+                    const draft = normalizeDraft(rawDraft);
+                    try {
+                        $('.import-low-confidence').removeClass('border-warning');
+                        if (draft.supplier_id) {
+                            $('#supplier_id').val(String(draft.supplier_id)).trigger('change');
+                        }
+                        if (draft.invoice_number) $('#invoice_number').val(draft.invoice_number);
+                        if (draft.faktur_no) $('#faktur_no').val(draft.faktur_no);
+                        if (draft.invoice_date) $('#invoice_date').val(draft.invoice_date);
+                        if (draft.receive_date) $('#receive_date').val(draft.receive_date);
+                        if (draft.po_no) $('#po_no').val(draft.po_no);
+                        if (draft.currency) $('#currency').val(draft.currency).trigger('change');
+                        if (draft.amount) {
+                            $('#amount').val(draft.amount);
+                            $('#amount_display').val(draft.amount);
+                            const ad = document.getElementById('amount_display');
+                            if (ad && typeof formatNumber === 'function') {
+                                formatNumber(ad);
+                            }
+                        }
+                        if (draft.receive_project) $('#receive_project').val(draft.receive_project);
+                        if (draft.invoice_project) $('#invoice_project').val(draft.invoice_project).trigger('change');
+                        if (draft.payment_project) $('#payment_project').val(draft.payment_project).trigger('change');
+                        if (draft.cur_loc && !$('#cur_loc').prop('disabled')) {
+                            $('#cur_loc').val(draft.cur_loc).trigger('change');
+                        }
+                        if (draft.remarks) {
+                            const cur = $('#remarks').val() || '';
+                            $('#remarks').val(cur ? (cur + '\n' + draft.remarks) : draft.remarks);
+                        }
+                        (draft.low_confidence_fields || []).forEach(function (name) {
+                            const map = {
+                                amount: '#amount_display',
+                                invoice_number: '#invoice_number',
+                                supplier_name: '#supplier_id',
+                                currency: '#currency',
+                                faktur_no: '#faktur_no'
+                            };
+                            const sel = map[name] || ('[name="' + name + '"]');
+                            $(sel).addClass('border-warning import-low-confidence');
+                        });
+                        if (draft.warnings && draft.warnings.length && typeof toastr !== 'undefined') {
+                            draft.warnings.forEach(function (w) { toastr.warning(w, 'Import'); });
+                        }
+                    } catch (e) {
+                        console.error('applyDraft', e);
+                        setImportStatus('Import data could not be applied to the form. Check the console.', true);
+                    }
+                }
+
+                function fetchDraft(uuid) {
+                    $.getJSON(draftUrl(uuid))
+                        .done(function (res) {
+                            if (!res.success) {
+                                setImportStatus(res.message || 'Could not load import draft.', true);
+                                return;
+                            }
+                            const d = normalizeDraft(res.draft);
+                            if (Object.keys(d).length === 0) {
+                                setImportStatus('Import draft was empty. Try again or enter fields manually.', true);
+                                return;
+                            }
+                            setTimeout(function () {
+                                applyDraft(d);
+                                setImportStatus('Review highlighted fields and complete the form.');
+                                if (typeof toastr !== 'undefined') toastr.success('Invoice data imported — please verify before saving.');
+                            }, 0);
+                        })
+                        .fail(function (xhr) {
+                            if (xhr.status === 409) return;
+                            setImportStatus('Could not load import draft.', true);
+                        });
+                }
+
+                function poll(uuid) {
+                    if (pollTimer) clearInterval(pollTimer);
+                    let tries = 0;
+                    const tick = function () {
+                        tries++;
+                        if (tries > 120) {
+                            clearInterval(pollTimer);
+                            setImportStatus('Timed out waiting for extraction.', true);
+                            return;
+                        }
+                        $.getJSON(statusUrl(uuid))
+                            .done(function (res) {
+                                if (!res.success) return;
+                                if (res.status === 'completed') {
+                                    clearInterval(pollTimer);
+                                    setImportStatus('Done.');
+                                    fetchDraft(uuid);
+                                } else if (res.status === 'failed') {
+                                    clearInterval(pollTimer);
+                                    setImportStatus(res.error || 'Extraction failed.', true);
+                                    if (typeof toastr !== 'undefined') toastr.error(res.error || 'Extraction failed.');
+                                } else {
+                                    setImportStatus('Extracting…');
+                                }
+                            });
+                    };
+                    tick();
+                    pollTimer = setInterval(tick, 1500);
+                }
+
+                $('#invoice_import_file').on('change', function () {
+                    const hasFile = !!(this.files && this.files.length);
+                    $('#invoice_import_btn, #invoice_import_preview_btn').prop('disabled', !hasFile);
+                    revokeImportThumbUrl();
+                    const f = this.files && this.files[0];
+                    if (f && f.type && f.type.indexOf('image/') === 0) {
+                        importThumbObjectUrl = URL.createObjectURL(f);
+                        $('#invoice_import_preview_wrap').removeClass('d-none');
+                        $('#invoice_import_preview').attr('src', importThumbObjectUrl);
+                    } else {
+                        $('#invoice_import_preview_wrap').addClass('d-none');
+                        $('#invoice_import_preview').attr('src', '');
+                    }
+                });
+
+                $('#invoice_import_preview_btn').on('click', function () {
+                    const input = document.getElementById('invoice_import_file');
+                    if (!input.files || !input.files.length) return;
+                    const f = input.files[0];
+                    revokeImportModalUrl();
+                    importModalObjectUrl = URL.createObjectURL(f);
+                    if (isImportPdfFile(f)) {
+                        $('#invoice_import_modal_image_wrap').addClass('d-none');
+                        $('#invoice_import_modal_pdf_wrap').removeClass('d-none');
+                        $('#invoice_import_modal_pdf').attr('src', importModalObjectUrl);
+                    } else {
+                        $('#invoice_import_modal_pdf_wrap').addClass('d-none');
+                        $('#invoice_import_modal_pdf').attr('src', 'about:blank');
+                        $('#invoice_import_modal_image_wrap').removeClass('d-none');
+                        $('#invoice_import_modal_image').attr('src', importModalObjectUrl);
+                    }
+                    $('#invoice_import_preview_modal').modal('show');
+                });
+
+                $('#invoice_import_preview_modal').on('hidden.bs.modal', function () {
+                    $('#invoice_import_modal_pdf').attr('src', 'about:blank');
+                    $('#invoice_import_modal_image').attr('src', '');
+                    $('#invoice_import_modal_image_wrap, #invoice_import_modal_pdf_wrap').addClass('d-none');
+                    revokeImportModalUrl();
+                });
+
+                $('#invoice_import_btn').on('click', function () {
+                    const input = document.getElementById('invoice_import_file');
+                    if (!input.files || !input.files.length) return;
+                    const fd = new FormData();
+                    fd.append('file', input.files[0]);
+                    setImportStatus('Uploading…');
+                    $('#import_uuid').val('');
+                    $.ajax({
+                        url: importRoutes.extract,
+                        method: 'POST',
+                        data: fd,
+                        processData: false,
+                        contentType: false,
+                        headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
+                    }).done(function (res) {
+                        if (!res.success || !res.uuid) {
+                            setImportStatus(res.message || 'Upload failed.', true);
+                            return;
+                        }
+                        $('#import_uuid').val(res.uuid);
+                        if (res.status === 'failed') {
+                            setImportStatus(res.error || 'Extraction failed.', true);
+                            if (typeof toastr !== 'undefined') toastr.error(res.error || 'Extraction failed.');
+                            return;
+                        }
+                        if (res.status === 'completed') {
+                            setImportStatus('Done.');
+                            fetchDraft(res.uuid);
+                            return;
+                        }
+                        setImportStatus('Queued…');
+                        poll(res.uuid);
+                    }).fail(function (xhr) {
+                        const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Upload failed.';
+                        setImportStatus(msg, true);
+                    });
+                });
+
+                const qp = new URLSearchParams(window.location.search).get('import');
+                if (qp) {
+                    $('#import_uuid').val(qp);
+                    setImportStatus('Resuming import…');
+                    poll(qp);
+                }
+            })();
+            @endif
+
             // Check if session is still valid before form submission
             window.checkSessionAndSubmitForm = function(form) {
                 // First check if session is still valid
@@ -991,6 +1304,10 @@
 
                 // Prepare form data
                 var formData = new FormData(form);
+                var importUuidEl = document.getElementById('import_uuid');
+                if (importUuidEl && importUuidEl.value) {
+                    formData.set('import_uuid', importUuidEl.value);
+                }
                 var url = $(form).attr('action');
                 var method = $(form).attr('method');
 
@@ -1001,6 +1318,7 @@
                     data: formData,
                     processData: false,
                     contentType: false,
+                    dataType: 'json',
                     timeout: 30000,
                     success: function(response) {
 
@@ -1012,6 +1330,9 @@
                                 // Save and Close: Redirect to index
                                 if (typeof toastr !== 'undefined') {
                                     toastr.success('Invoice created successfully. Redirecting...');
+                                    if (response.import_attachment_saved) {
+                                        toastr.info('The imported PDF/image was saved as an invoice attachment.', 'Attachment');
+                                    }
                                 }
                                 setTimeout(function() {
                                     window.location.href = '{{ route('invoices.index') }}';
@@ -1020,6 +1341,9 @@
                                 // Save and New: Reset form
                                 if (typeof toastr !== 'undefined') {
                                     toastr.success('Invoice created successfully. Preparing new form...');
+                                    if (response.import_attachment_saved) {
+                                        toastr.info('The imported PDF/image was saved as an invoice attachment.', 'Attachment');
+                                    }
                                 }
                                 setTimeout(function() {
                                     resetFormForNewInvoice();
@@ -2246,6 +2570,11 @@
 
                 // 9. Reset save action to default
                 window.saveAction = 'close';
+
+                // Clear import session (attachment already saved on server; cache key is one-time)
+                $('#import_uuid').val('');
+                $('#invoice_import_file').val('').trigger('change');
+                $('#invoice_import_status').text('').removeClass('text-danger');
 
                 // 10. Update form progress indicator
                 updateFormProgress();

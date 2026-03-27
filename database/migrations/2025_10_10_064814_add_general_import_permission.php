@@ -1,8 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -12,8 +10,8 @@ return new class extends Migration
     {
         $permission = Permission::create(['name' => 'import-general-documents']);
 
-        $logisticRole = Role::findByName('logistic');
-        $accountingRole = Role::findByName('accounting');
+        $logisticRole = Role::where('name', 'logistic')->where('guard_name', 'web')->first();
+        $accountingRole = Role::where('name', 'accounting')->where('guard_name', 'web')->first();
 
         if ($logisticRole) {
             $logisticRole->givePermissionTo($permission);
@@ -26,7 +24,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $permission = Permission::findByName('import-general-documents');
+        $permission = Permission::where('name', 'import-general-documents')->where('guard_name', 'web')->first();
 
         if ($permission) {
             $permission->delete();

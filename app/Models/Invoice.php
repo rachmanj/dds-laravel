@@ -4,9 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
@@ -40,6 +39,7 @@ class Invoice extends Model
         'sap_doc_num',
         'sap_error_message',
         'sap_last_attempted_at',
+        'import_extraction',
     ];
 
     protected $casts = [
@@ -48,6 +48,7 @@ class Invoice extends Model
         'payment_date' => 'date',
         'paid_at' => 'datetime',
         'amount' => 'decimal:2',
+        'import_extraction' => 'array',
     ];
 
     /**
@@ -124,11 +125,11 @@ class Invoice extends Model
 
     /**
      * Scope a query to only include invoices available for distribution.
-     * 
+     *
      * Documents are NOT available if they are:
      * - 'in_transit' (currently being distributed to another department)
      * - 'unaccounted_for' (missing or damaged in previous distribution)
-     * 
+     *
      * Note: 'distributed' invoices are now included to allow re-distribution
      */
     public function scopeAvailableForDistribution($query)
@@ -156,8 +157,6 @@ class Invoice extends Model
     {
         return $query->where('distribution_status', 'unaccounted_for');
     }
-
-
 
     /**
      * Get the receive project information.
@@ -285,7 +284,7 @@ class Invoice extends Model
      */
     public function getFormattedAmountAttribute()
     {
-        return $this->currency . ' ' . number_format($this->amount, 2);
+        return $this->currency.' '.number_format($this->amount, 2);
     }
 
     /**
@@ -304,12 +303,13 @@ class Invoice extends Model
         // If no receive_date, try to use created_at as fallback
         $dateToUse = $this->receive_date ?: $this->created_at;
 
-        if (!$dateToUse) {
+        if (! $dateToUse) {
             return null;
         }
 
         // Calculate days and ensure it's a whole number
         $days = $dateToUse->diffInDays(now());
+
         return (int) round($days);
     }
 
@@ -319,6 +319,7 @@ class Invoice extends Model
     public function getIsOverdueAttribute()
     {
         $configDays = config('invoice.payment_overdue_days', 30);
+
         return $this->payment_status === 'pending' && $this->days_since_received > $configDays;
     }
 
@@ -333,19 +334,19 @@ class Invoice extends Model
         ];
 
         $color = $statusColors[$this->payment_status] ?? 'badge-secondary';
-        return '<span class="badge ' . $color . '">' . ucfirst($this->payment_status) . '</span>';
+
+        return '<span class="badge '.$color.'">'.ucfirst($this->payment_status).'</span>';
     }
 
     public function getSapStatusBadgeAttribute()
     {
-        return match($this->sap_status) {
+        return match ($this->sap_status) {
             'pending' => '<span class="badge bg-warning">SAP Pending</span>',
-            'posted' => '<span class="badge bg-success">SAP Posted: ' . $this->sap_doc_num . '</span>',
-            'failed' => '<span class="badge bg-danger">SAP Failed: ' . ($this->sap_error_message ?? 'Unknown error') . '</span>',
+            'posted' => '<span class="badge bg-success">SAP Posted: '.($this->sap_doc_num ?? 'N/A').'</span>',
+            'failed' => '<span class="badge bg-danger">SAP Failed: '.($this->sap_error_message ?? 'Unknown error').'</span>',
             default => '<span class="badge bg-secondary">Not Sent to SAP</span>',
         };
     }
-
 
     /**
      * Check if invoice number is unique for the given supplier.
@@ -359,7 +360,7 @@ class Invoice extends Model
             $query->where('id', '!=', $excludeId);
         }
 
-        return !$query->exists();
+        return ! $query->exists();
     }
 
     /**
@@ -399,7 +400,8 @@ class Invoice extends Model
         ];
 
         $color = $statusColors[$this->status] ?? 'badge-secondary';
-        return '<span class="badge ' . $color . '">' . ucfirst($this->status) . '</span>';
+
+        return '<span class="badge '.$color.'">'.ucfirst($this->status).'</span>';
     }
 
     /**
@@ -425,7 +427,7 @@ class Invoice extends Model
     public function getCurrentLocationArrivalDateAttribute()
     {
         // If invoice has never been distributed, use original receive_date
-        if ($this->distribution_status === 'available' && !$this->hasBeenDistributed()) {
+        if ($this->distribution_status === 'available' && ! $this->hasBeenDistributed()) {
             return $this->receive_date ?: $this->created_at;
         }
 
@@ -454,6 +456,7 @@ class Invoice extends Model
     public function getDaysInCurrentLocationAttribute()
     {
         $arrivalDate = $this->current_location_arrival_date;
+
         return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
     }
 
@@ -489,6 +492,53 @@ class Invoice extends Model
      */
     public function canChangeLocationManually(): bool
     {
-        return !$this->hasBeenDistributed();
+        return ! $this->hasBeenDistributed();
+    }
+
+    /**
+     * Check if invoice can be synced to SAP
+     * Returns array of error messages (empty if valid)
+     */
+    public function canSyncToSap(): array
+    {
+        $errors = [];
+
+        // Check status
+        if ($this->status !== 'sap') {
+            $errors[] = 'Invoice status must be "sap" before syncing to SAP';
+        }
+
+        // Check SAP status
+        if ($this->sap_status === 'pending') {
+            $errors[] = 'Invoice is already pending SAP sync';
+        }
+
+        if ($this->sap_status === 'posted') {
+            $errors[] = 'Invoice is already posted to SAP';
+        }
+
+        // Check supplier
+        if (! $this->supplier) {
+            $errors[] = 'Invoice must have a supplier';
+        } elseif (! $this->supplier->sap_code) {
+            $errors[] = 'Supplier does not have SAP code';
+        }
+
+        // Check amount
+        if ($this->amount <= 0) {
+            $errors[] = 'Invoice amount must be greater than 0';
+        }
+
+        // Check dates
+        if (! $this->invoice_date) {
+            $errors[] = 'Invoice date is required';
+        }
+
+        // Check currency
+        if (! $this->currency) {
+            $errors[] = 'Currency is required';
+        }
+
+        return $errors;
     }
 }

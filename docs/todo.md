@@ -2,6 +2,29 @@
 
 ## ✅ **Recently Completed**
 
+### **Invoice document import (PDF / image, AI-assisted)** ✅ **COMPLETED (v1)**
+
+**Status**: ✅ Shipped — Create Invoice import card, OpenRouter extraction, draft prefill, post-save attachment, extraction metadata on invoice  
+**Implementation / doc refresh**: 2026-03-27  
+**Priority**: HIGH — Reduces manual entry for supplier invoices
+
+**Feature overview**: Authenticated users upload a PDF or image on **Invoices → Create**; the app queues `ExtractInvoiceFromDocumentJob`, resolves supplier (fuzzy match), caches a draft, prefills the form, and on successful save attaches the file as **Invoice Copy** and stores optional JSON in **`invoices.import_extraction`**.
+
+**Delivered (v1)**:
+
+1. **API** — `POST /invoices/import-extract`, `GET /invoices/import-status/{uuid}`, `GET /invoices/import-draft/{uuid}` (throttled); extract response returns actual job `status` after dispatch.
+2. **Extraction** — `OpenRouterInvoiceExtractionService`, PDF text branch vs OCR branch; `PdfInvoiceFirstPageService` for first-page-only OCR when configured.
+3. **UI** — Collapsible import card, **Preview** modal (image / PDF), **Extract data**, queue hint for `database`/`redis`, `import_uuid` hidden field + explicit `FormData` on submit; toasts when `import_attachment_saved`.
+4. **Persistence** — Migration `import_extraction` on `invoices`; `InvoiceController@store` saves snapshot and calls `attachFromImport`; logs warning if attach fails.
+5. **Config / ops** — `config/services.php` `openrouter.*`, `INVOICE_IMPORT_ENABLED`, `INVOICE_IMPORT_EXTRACT_SYNC`, `.env.example`; `invoice_import` log channel; cleanup command `invoice-import:cleanup`.
+6. **Tests** — `InvoiceImportExtractTest`, `InvoiceImportSupplierResolverTest`.
+
+**Key files**: `routes/invoice.php`, `InvoiceImportController.php`, `ExtractInvoiceFromDocumentJob.php`, `InvoiceImportAttachmentService.php`, `InvoiceImportDraftBuilder.php`, `resources/views/invoices/create.blade.php`, `InvoiceController.php`, `Invoice.php`.
+
+**Docs**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-03-27 entry), [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md).
+
+---
+
 ### **Accounting Monthly Invoice Fulfillment Report** ✅ **COMPLETED**
 
 **Status**: ✅ **COMPLETED** - Accounting Monthly Invoice Fulfillment Report with role-based access control  
@@ -4052,6 +4075,14 @@ DistributionHistory::create([
 ---
 
 ## 📋 **Backlog (Future Development)**
+
+### **Invoice from PDF/Image (AI-assisted import)**
+
+-   **Status**: 📝 PLANNED — specification ready  
+-   **Doc**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md)  
+-   **Summary**: Upload PDF/image → OpenRouter (vision/text) extraction → supplier/project resolution → prefill existing invoice create form → save as `Invoice` + `InvoiceAttachment` (“Invoice Copy”). Queue-based extraction; user review mandatory before SAP posting.  
+-   **Estimated effort**: ~12–21 developer days (see plan phases)  
+-   **Dependencies**: `OPENROUTER_API_KEY`, queue workers, optional Imagick/Ghostscript for scanned PDFs  
 
 ### **Dashboard Enhancements**
 

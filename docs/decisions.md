@@ -1,3 +1,26 @@
+## 2026-03-27 — Invoice document import (AI-assisted, v1)
+
+-   **Context**: Users need to create supplier invoices faster from PDF or image uploads without building in-house OCR. The app already has invoice create, attachments, and SAP AP flows.
+
+-   **Decision**: Use **OpenRouter** (configurable model) for extraction: images via vision JSON; PDFs via `smalot/pdfparser` text when sufficient, otherwise PDF upload + `file-parser` plugin (e.g. `mistral-ocr`). Store temp files under `temp/invoice-imports/{uuid}`, run **`ExtractInvoiceFromDocumentJob`** on the queue by default. Persist a snapshot of extraction on successful create in **`invoices.import_extraction`** (nullable JSON). After create, **`InvoiceImportAttachmentService`** moves the temp file to permanent storage as **`InvoiceAttachment`** (“Invoice Copy”). Multi-page scanned PDFs: **first page only** for the OCR API path when `OPEN_ROUTER_PDF_FIRST_PAGE_ONLY` / `pdf_first_page_only` is true (server-side trim via FPDI). Optional **`INVOICE_IMPORT_EXTRACT_SYNC`**: run `dispatchSync()` so extraction runs inside the upload request (dev / no worker); **false in production** under normal queue + worker deployment.
+
+-   **Alternatives considered**:
+    1. **Self-hosted OCR / Tesseract only** — Rejected for v1 due to maintenance and layout variability; may revisit for cost or privacy.
+    2. **Synchronous extraction for all users** — Rejected: long blocking HTTP and timeout risk on IIS/reverse proxies.
+    3. **Separate microservice** — Deferred; Laravel queue + job is sufficient for v1.
+
+-   **Trade-offs**:
+    -   **Pros**: Fast delivery, reuses existing create/validation/attachments; users review all fields before save.
+    -   **Cons**: Data leaves the app to OpenRouter; extraction accuracy varies by scan quality; queue worker required for async path.
+
+-   **Rationale**: OpenRouter matches the project’s need for multimodal PDF + image without hosting GPU OCR. First-page-only reduces token cost and latency for multi-page scans. `import_extraction` supports audit and debugging without blocking core invoice fields.
+
+-   **Review date**: 2026-09-27 (6 months)
+
+-   **References**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md).
+
+---
+
 ## 2025-01-XX — Reconcile Feature: Match Rate Calculation & UI Improvements
 
 -   **Context**: The reconcile feature's match rate calculation was inaccurate, and users requested improvements to display more comprehensive data (distribution numbers, invoice dates) and streamline the workflow. The system was using scope-based counting (`withMatchingInvoices()`) instead of actual reconciliation status, and the frontend was calculating unmatched records incorrectly.

@@ -2,22 +2,24 @@
 
 namespace App\Jobs;
 
-use App\Services\SapService;
 use App\Models\Invoice;
+use App\Services\SapApInvoicePayloadBuilder;
+use App\Services\SapService;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-use GuzzleHttp\Exception\RequestException;
+use Illuminate\Support\Facades\Log;
 
 class CreateSapApInvoiceJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
+
     public $backoff = [60, 300, 900]; // Exponential backoff in seconds
 
     protected $invoice;
@@ -29,37 +31,29 @@ class CreateSapApInvoiceJob implements ShouldQueue
 
     public function handle(SapService $sapService)
     {
-        $invoice = $this->invoice->fresh(['supplier']);
-        if (!$invoice) {
+        $invoice = $this->invoice->fresh(['supplier', 'type']);
+        if (! $invoice) {
             Log::channel('sap')->error('CreateSapApInvoiceJob: Invoice reference could not be reloaded.');
+
             return;
         }
 
-        $cardCode = optional($invoice->supplier)->sap_code;
         $payload = null;
 
         try {
-            if (!$cardCode) {
-                throw new \Exception('Supplier ' . ($invoice->supplier->name ?? ('#' . $invoice->supplier_id)) . ' does not have a SAP CardCode mapping.');
+            // Validate supplier has SAP code
+            if (! $invoice->supplier || ! $invoice->supplier->sap_code) {
+                throw new \Exception('Supplier '.($invoice->supplier->name ?? ('#'.$invoice->supplier_id)).' does not have a SAP CardCode mapping.');
             }
 
-            $vendor = $this->resolveVendor($sapService, $cardCode);
+            // Validate supplier exists in SAP
+            $vendor = $this->resolveVendor($sapService, $invoice->supplier->sap_code);
 
-            // Build payload (map from invoice data)
-            $payload = [
-                'CardCode' => $vendor['CardCode'],
-                'DocDate' => $invoice->invoice_date->format('Y-m-d'),
-                'DocDueDate' => $invoice->payment_date ? $invoice->payment_date->format('Y-m-d') : now()->addDays(30)->format('Y-m-d'),
-                'Comments' => $invoice->remarks ?? 'Imported from DDS - Invoice #' . $invoice->id,
-                'DocumentLines' => [
-                    [
-                        'Quantity' => 1,
-                        'UnitPrice' => $invoice->amount,
-                        'TaxCode' => 'EXEMPT',
-                    ]
-                ],
-            ];
+            // Build payload using builder
+            $payloadBuilder = new SapApInvoicePayloadBuilder($invoice);
+            $payload = $payloadBuilder->build();
 
+            // Create AP Invoice in SAP
             $response = $sapService->createApInvoice($payload);
 
             DB::transaction(function () use ($invoice, $response, $payload) {
@@ -81,6 +75,11 @@ class CreateSapApInvoiceJob implements ShouldQueue
                     'updated_at' => now(),
                 ]);
             });
+
+            Log::channel('sap')->info('AP Invoice created successfully', [
+                'invoice_id' => $invoice->id,
+                'sap_doc_num' => $response['DocNum'] ?? null,
+            ]);
         } catch (\Exception $e) {
             $invoice->update([
                 'sap_status' => 'failed',
@@ -92,7 +91,7 @@ class CreateSapApInvoiceJob implements ShouldQueue
                 'invoice_id' => $invoice->id,
                 'action' => 'create_invoice',
                 'status' => 'failed',
-                'request_payload' => json_encode($payload ?? ['card_code' => $cardCode]),
+                'request_payload' => json_encode($payload ?? []),
                 'response_payload' => null,
                 'error_message' => $e->getMessage(),
                 'attempt_count' => $this->attempts(),
@@ -100,11 +99,20 @@ class CreateSapApInvoiceJob implements ShouldQueue
                 'updated_at' => now(),
             ]);
 
+            Log::channel('sap')->error('AP Invoice creation failed', [
+                'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+                'attempt' => $this->attempts(),
+            ]);
+
+            // Retry if not max attempts
             if ($this->attempts() < $this->tries) {
                 $this->release($this->backoff[$this->attempts() - 1]);
             } else {
-                Log::channel('sap')->error('Max retries exceeded for invoice ' . $invoice->id);
+                Log::channel('sap')->error('Max retries exceeded for invoice '.$invoice->id);
             }
+
+            throw $e;
         }
     }
 
@@ -117,12 +125,12 @@ class CreateSapApInvoiceJob implements ShouldQueue
             throw new \Exception("SAP vendor {$cardCode} not found. {$parsedMessage}");
         }
 
-        if (!$vendor || empty($vendor['CardCode'])) {
+        if (! $vendor || empty($vendor['CardCode'])) {
             throw new \Exception("SAP vendor {$cardCode} not found.");
         }
 
         $cardType = strtolower($vendor['CardType'] ?? '');
-        if (!in_array($cardType, ['s', 'csupplier'], true)) {
+        if (! in_array($cardType, ['s', 'csupplier'], true)) {
             $cardTypeLabel = $vendor['CardType'] ?? 'unknown';
             throw new \Exception("SAP Business Partner {$cardCode} has CardType '{$cardTypeLabel}'. Expected supplier.");
         }
@@ -134,7 +142,7 @@ class CreateSapApInvoiceJob implements ShouldQueue
     {
         $response = $exception->getResponse();
 
-        if (!$response) {
+        if (! $response) {
             return $exception->getMessage();
         }
 

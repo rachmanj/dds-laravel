@@ -1,3 +1,9 @@
+### 2026-03-27 — Invoice document import (AI-assisted, v1)
+
+See `docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`, `docs/architecture.md` (Invoice creation from PDF/image), and `docs/decisions.md` (2026-03-27). Ops: `OPEN_ROUTER_API_KEY`, queue worker when using database/redis queue; `INVOICE_IMPORT_EXTRACT_SYNC` typically false in production. `invoices.import_extraction` stores extraction snapshot on successful create with import.
+
+---
+
 ### 2025-01-XX — Dashboard Performance Analysis: Critical N+1 Query Issues Identified
 
 **Key Learning**: Accessor methods (`days_in_current_location`, `current_location_arrival_date`) trigger database queries for each document when called in loops, causing severe N+1 query problems. Dashboard loads 3000+ queries taking 20-90 seconds.
