@@ -48,6 +48,8 @@ return [
         ),
         'enabled' => filter_var(env('INVOICE_IMPORT_ENABLED', true), FILTER_VALIDATE_BOOL),
         'extract_sync' => filter_var(env('INVOICE_IMPORT_EXTRACT_SYNC', false), FILTER_VALIDATE_BOOL),
+        // Path to cacert.pem — fixes cURL error 60 on Windows when php.ini has no CA bundle (see OPEN_ROUTER_CAINFO in .env.example).
+        'ca_bundle' => env('OPEN_ROUTER_CAINFO', env('OPENROUTER_CAINFO')),
     ],
 
     'sap' => [

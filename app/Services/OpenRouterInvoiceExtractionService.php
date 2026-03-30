@@ -163,14 +163,25 @@ class OpenRouterInvoiceExtractionService
 
         $timeout = $timeoutSeconds ?? (int) config('services.openrouter.timeout', 120);
 
-        $response = Http::timeout($timeout)
+        $pending = Http::timeout($timeout)
             ->withHeaders([
                 'Authorization' => 'Bearer '.config('services.openrouter.key'),
                 'HTTP-Referer' => config('app.url'),
                 'X-Title' => config('app.name', 'DDS'),
-            ])
-            ->acceptJson()
-            ->post($url, $payload);
+            ]);
+
+        $caBundle = config('services.openrouter.ca_bundle');
+        if (filled($caBundle)) {
+            if (! is_string($caBundle) || ! is_file($caBundle)) {
+                Log::channel('invoice_import')->warning('OpenRouter CA bundle path is missing or not readable', [
+                    'path' => $caBundle,
+                ]);
+            } else {
+                $pending = $pending->withOptions(['verify' => $caBundle]);
+            }
+        }
+
+        $response = $pending->acceptJson()->post($url, $payload);
 
         if (! $response->successful()) {
             Log::channel('invoice_import')->warning('OpenRouter HTTP error', [
