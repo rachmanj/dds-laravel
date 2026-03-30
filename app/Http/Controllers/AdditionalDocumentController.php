@@ -2,22 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Exports\AdditionalDocumentTemplate;
+use App\Exports\GeneralDocumentTemplate;
+use App\Imports\AdditionalDocumentImport;
+use App\Imports\GeneralDocumentImport;
+use App\Jobs\SyncSapItoDocumentsJob;
 use App\Models\AdditionalDocument;
 use App\Models\AdditionalDocumentType;
 use App\Models\Department;
-use App\Imports\AdditionalDocumentImport;
-use App\Imports\GeneralDocumentImport;
-use App\Exports\AdditionalDocumentTemplate;
-use App\Exports\GeneralDocumentTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Yajra\DataTables\Facades\DataTables;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Jobs\SyncSapItoDocumentsJob;
+use Yajra\DataTables\Facades\DataTables;
 
 class AdditionalDocumentController extends Controller
 {
@@ -73,21 +72,21 @@ class AdditionalDocumentController extends Controller
 
         // Apply search filters
         if ($request->filled('search_number')) {
-            $query->where('document_number', 'like', '%' . $request->search_number . '%');
+            $query->where('document_number', 'like', '%'.$request->search_number.'%');
         }
 
         if ($request->filled('search_po_no')) {
-            $query->where('po_no', 'like', '%' . $request->search_po_no . '%');
+            $query->where('po_no', 'like', '%'.$request->search_po_no.'%');
         }
 
         if ($request->filled('search_vendor_code')) {
-            $query->where('vendor_code', 'like', '%' . $request->search_vendor_code . '%');
+            $query->where('vendor_code', 'like', '%'.$request->search_vendor_code.'%');
         }
 
         if ($request->filled('search_content')) {
             $query->where(function ($q) use ($request) {
-                $q->where('remarks', 'like', '%' . $request->search_content . '%')
-                    ->orWhere('attachment', 'like', '%' . $request->search_content . '%');
+                $q->where('remarks', 'like', '%'.$request->search_content.'%')
+                    ->orWhere('attachment', 'like', '%'.$request->search_content.'%');
             });
         }
 
@@ -148,9 +147,9 @@ class AdditionalDocumentController extends Controller
 
         // Accounting, finance, admin, and superadmin users see all records by default
         $isPrivilegedUser = $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance']);
-        
+
         // Apply location-based filtering unless user is privileged or show_all is requested
-        if (!$isPrivilegedUser && (!$showAllRecords || !$user->can('see-all-record-switch'))) {
+        if (! $isPrivilegedUser && (! $showAllRecords || ! $user->can('see-all-record-switch'))) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
                 $query->where('cur_loc', $locationCode);
@@ -159,7 +158,7 @@ class AdditionalDocumentController extends Controller
 
         // Apply distribution status filtering for non-privileged users when show_all is false
         // Include 'in_transit' when age_filter is provided to show all aging documents
-        if (!$isPrivilegedUser && (!$showAllRecords || !$user->can('see-all-record-switch'))) {
+        if (! $isPrivilegedUser && (! $showAllRecords || ! $user->can('see-all-record-switch'))) {
             $statuses = ['available', 'distributed'];
             if ($request->filled('age_filter')) {
                 $statuses[] = 'in_transit';
@@ -171,7 +170,7 @@ class AdditionalDocumentController extends Controller
         if ($request->filled('age_filter')) {
             $ageFilter = $request->get('age_filter');
             $query->havingRaw('days_in_location >= 0'); // Ensure days_in_location is calculated
-            
+
             switch ($ageFilter) {
                 case '0-7_days':
                     $query->havingRaw('days_in_location <= 7');
@@ -202,33 +201,36 @@ class AdditionalDocumentController extends Controller
                 $roundedDays = round($daysInCurrentLocation, 1);
 
                 if ($roundedDays <= 7) {
-                    return '<span class="badge badge-success">' . $roundedDays . '</span>';
+                    return '<span class="badge badge-success">'.$roundedDays.'</span>';
                 } elseif ($roundedDays <= 14) {
-                    return '<span class="badge badge-warning">' . $roundedDays . '</span>';
+                    return '<span class="badge badge-warning">'.$roundedDays.'</span>';
                 } else {
-                    return '<span class="badge badge-danger">' . $roundedDays . '</span>';
+                    return '<span class="badge badge-danger">'.$roundedDays.'</span>';
                 }
             })
             ->addColumn('invoice_numbers', function ($document) {
                 if ($document->invoices && $document->invoices->count() > 0) {
                     $invoiceNumbers = $document->invoices->pluck('invoice_number')->toArray();
-                    return '<small class="text-muted">' . implode(', ', $invoiceNumbers) . '</small>';
+
+                    return '<small class="text-muted">'.implode(', ', $invoiceNumbers).'</small>';
                 }
+
                 return '<span class="text-muted">-</span>';
             })
             ->addColumn('actions', function ($document) use ($user) {
                 $actions = '<div class="btn-group" style="gap:2px;">';
-                $actions .= '<button type="button" class="btn btn-info btn-xs show-document" data-id="' . $document->id . '" title="View Document"><i class="fas fa-eye"></i></button>';
+                $actions .= '<button type="button" class="btn btn-info btn-xs show-document" data-id="'.$document->id.'" title="View Document"><i class="fas fa-eye"></i></button>';
 
                 if ($document->canBeEditedBy($user)) {
-                    $actions .= '<a href="' . route('additional-documents.edit', $document) . '" class="btn btn-warning btn-xs" title="Edit Document"><i class="fas fa-edit"></i></a>';
+                    $actions .= '<a href="'.route('additional-documents.edit', $document).'" class="btn btn-warning btn-xs" title="Edit Document"><i class="fas fa-edit"></i></a>';
                 }
 
                 if ($document->canBeDeletedBy($user)) {
-                    $actions .= '<button type="button" class="btn btn-danger btn-xs delete-document" data-id="' . $document->id . '" data-number="' . $document->document_number . '" title="Delete Document"><i class="fas fa-trash"></i></button>';
+                    $actions .= '<button type="button" class="btn btn-danger btn-xs delete-document" data-id="'.$document->id.'" data-number="'.$document->document_number.'" title="Delete Document"><i class="fas fa-trash"></i></button>';
                 }
 
                 $actions .= '</div>';
+
                 return $actions;
             })
             ->rawColumns(['invoice_numbers', 'days_difference', 'actions'])
@@ -270,7 +272,7 @@ class AdditionalDocumentController extends Controller
             'vendor_code',
             'project',
             'receive_date',
-            'remarks'
+            'remarks',
         ]);
 
         $data['created_by'] = $user->id;
@@ -293,7 +295,7 @@ class AdditionalDocumentController extends Controller
         // Handle file upload
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
-            $fileName = time() . '_' . $file->getClientOriginalName();
+            $fileName = time().'_'.$file->getClientOriginalName();
             $filePath = $file->storeAs('attachments', $fileName, 'public');
             $data['attachment'] = $filePath;
         }
@@ -309,7 +311,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
+        if (! $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -334,7 +336,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can edit this document
-        if (!$additionalDocument->canBeEditedBy($user)) {
+        if (! $additionalDocument->canBeEditedBy($user)) {
             abort(403, 'You do not have permission to edit this document.');
         }
 
@@ -351,16 +353,16 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can edit this document
-        if (!$additionalDocument->canBeEditedBy($user)) {
+        if (! $additionalDocument->canBeEditedBy($user)) {
             abort(403, 'You do not have permission to edit this document.');
         }
 
         // Check if location change is being attempted
         if ($request->has('cur_loc') && $request->cur_loc !== $additionalDocument->cur_loc) {
-            if (!$additionalDocument->canChangeLocationManually()) {
+            if (! $additionalDocument->canChangeLocationManually()) {
                 return redirect()->back()
                     ->withErrors([
-                        'cur_loc' => 'Cannot change location manually. This document has distribution history. Location can only be changed through the distribution process.'
+                        'cur_loc' => 'Cannot change location manually. This document has distribution history. Location can only be changed through the distribution process.',
                     ])
                     ->withInput();
             }
@@ -387,7 +389,7 @@ class AdditionalDocumentController extends Controller
             'project',
             'receive_date',
             'cur_loc',
-            'remarks'
+            'remarks',
         ]);
 
         // Handle file upload
@@ -398,7 +400,7 @@ class AdditionalDocumentController extends Controller
             }
 
             $file = $request->file('attachment');
-            $fileName = time() . '_' . $file->getClientOriginalName();
+            $fileName = time().'_'.$file->getClientOriginalName();
             $filePath = $file->storeAs('attachments', $fileName, 'public');
             $data['attachment'] = $filePath;
         }
@@ -414,10 +416,10 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can delete this document
-        if (!$additionalDocument->canBeDeletedBy($user)) {
+        if (! $additionalDocument->canBeDeletedBy($user)) {
             return response()->json([
                 'success' => false,
-                'message' => 'You do not have permission to delete this document.'
+                'message' => 'You do not have permission to delete this document.',
             ], 403);
         }
 
@@ -430,7 +432,7 @@ class AdditionalDocumentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Additional Document deleted successfully.'
+            'message' => 'Additional Document deleted successfully.',
         ]);
     }
 
@@ -439,7 +441,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
+        if (! $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -454,13 +456,13 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        if (!$additionalDocument->attachment) {
+        if (! $additionalDocument->attachment) {
             abort(404, 'No attachment found for this document.');
         }
 
-        $filePath = storage_path('app/public/' . $additionalDocument->attachment);
+        $filePath = storage_path('app/public/'.$additionalDocument->attachment);
 
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             abort(404, 'Attachment file not found.');
         }
 
@@ -472,7 +474,7 @@ class AdditionalDocumentController extends Controller
         $user = Auth::user();
 
         // Check if user can view this document
-        if (!$user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
+        if (! $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             $userLocationCode = $user->department_location_code;
             if ($userLocationCode) {
                 // User has department, check if document location matches
@@ -487,13 +489,13 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        if (!$additionalDocument->attachment) {
+        if (! $additionalDocument->attachment) {
             abort(404, 'No attachment found for this document.');
         }
 
-        $filePath = storage_path('app/public/' . $additionalDocument->attachment);
+        $filePath = storage_path('app/public/'.$additionalDocument->attachment);
 
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             abort(404, 'Attachment file not found.');
         }
 
@@ -502,7 +504,7 @@ class AdditionalDocumentController extends Controller
 
         return response()->file($filePath, [
             'Content-Type' => $mimeType,
-            'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+            'Content-Disposition' => 'inline; filename="'.$fileName.'"',
         ]);
     }
 
@@ -539,7 +541,7 @@ class AdditionalDocumentController extends Controller
 
             // Validate file before processing
             $file = $request->file('file');
-            if (!$file->isValid()) {
+            if (! $file->isValid()) {
                 throw new \Exception('Invalid file uploaded');
             }
 
@@ -550,13 +552,14 @@ class AdditionalDocumentController extends Controller
 
             // Validate Excel file format
             $extension = strtolower($file->getClientOriginalExtension());
-            if (!in_array($extension, ['xlsx', 'xls'])) {
+            if (! in_array($extension, ['xlsx', 'xls'])) {
                 throw new \Exception('Invalid file format. Only .xlsx and .xls files are supported.');
             }
 
             // Try to read a small portion of the file to validate it's a valid Excel file
             try {
-                $testData = Excel::toArray(new class implements \Maatwebsite\Excel\Concerns\ToArray {
+                $testData = Excel::toArray(new class implements \Maatwebsite\Excel\Concerns\ToArray
+                {
                     public function array(array $array)
                     {
                         return $array;
@@ -567,7 +570,7 @@ class AdditionalDocumentController extends Controller
                     throw new \Exception('Excel file appears to be empty or cannot be read');
                 }
             } catch (\Exception $e) {
-                throw new \Exception('Invalid Excel file format or corrupted file: ' . $e->getMessage());
+                throw new \Exception('Invalid Excel file format or corrupted file: '.$e->getMessage());
             }
 
             // Prepare import options
@@ -584,7 +587,7 @@ class AdditionalDocumentController extends Controller
                 'file_name' => $file->getClientOriginalName(),
                 'file_size' => $file->getSize(),
                 'document_type_id' => $documentTypeId,
-                'default_values' => $defaultValues
+                'default_values' => $defaultValues,
             ]);
 
             // Create import instance
@@ -602,15 +605,15 @@ class AdditionalDocumentController extends Controller
             $errors = $import->getErrors();
 
             // Prepare success message for Toastr
-            $toastrMessage = "Import completed successfully!";
+            $toastrMessage = 'Import completed successfully!';
             if ($successCount > 0) {
                 $toastrMessage .= " {$successCount} records imported.";
             }
             if ($skippedCount > 0) {
                 $toastrMessage .= " {$skippedCount} records skipped.";
             }
-            if (!empty($errors)) {
-                $toastrMessage .= " " . count($errors) . " errors found.";
+            if (! empty($errors)) {
+                $toastrMessage .= ' '.count($errors).' errors found.';
             }
 
             // Prepare summary data for the view
@@ -631,11 +634,11 @@ class AdditionalDocumentController extends Controller
                 ->with('import_success', $toastrMessage)
                 ->with('import_summary', $importSummary);
         } catch (\Exception $e) {
-            Log::error('Import error: ' . $e->getMessage());
-            Log::error('Import error trace: ' . $e->getTraceAsString());
+            Log::error('Import error: '.$e->getMessage());
+            Log::error('Import error trace: '.$e->getTraceAsString());
 
             // Provide more specific error messages for common issues
-            $errorMessage = 'Import failed: ' . $e->getMessage();
+            $errorMessage = 'Import failed: '.$e->getMessage();
 
             if (str_contains($e->getMessage(), 'Column count doesn\'t match value count')) {
                 $errorMessage = 'Import failed: Excel column structure mismatch. Please use the provided template format.';
@@ -651,7 +654,7 @@ class AdditionalDocumentController extends Controller
 
     public function downloadTemplate()
     {
-        return Excel::download(new AdditionalDocumentTemplate(), 'ito_documents_template.xlsx');
+        return Excel::download(new AdditionalDocumentTemplate, 'ito_documents_template.xlsx');
     }
 
     public function processGeneralImport(Request $request)
@@ -667,7 +670,7 @@ class AdditionalDocumentController extends Controller
 
             // Validate file before processing
             $file = $request->file('file');
-            if (!$file->isValid()) {
+            if (! $file->isValid()) {
                 throw new \Exception('Invalid file uploaded');
             }
 
@@ -678,13 +681,14 @@ class AdditionalDocumentController extends Controller
 
             // Validate Excel file format
             $extension = strtolower($file->getClientOriginalExtension());
-            if (!in_array($extension, ['xlsx', 'xls'])) {
+            if (! in_array($extension, ['xlsx', 'xls'])) {
                 throw new \Exception('Invalid file format. Only .xlsx and .xls files are supported.');
             }
 
             // Try to read a small portion of the file to validate it's a valid Excel file
             try {
-                $testData = Excel::toArray(new class implements \Maatwebsite\Excel\Concerns\ToArray {
+                $testData = Excel::toArray(new class implements \Maatwebsite\Excel\Concerns\ToArray
+                {
                     public function array(array $array)
                     {
                         return $array;
@@ -695,7 +699,7 @@ class AdditionalDocumentController extends Controller
                     throw new \Exception('Excel file appears to be empty or cannot be read');
                 }
             } catch (\Exception $e) {
-                throw new \Exception('Invalid Excel file format or corrupted file: ' . $e->getMessage());
+                throw new \Exception('Invalid Excel file format or corrupted file: '.$e->getMessage());
             }
 
             // Default values based on user's department
@@ -708,7 +712,7 @@ class AdditionalDocumentController extends Controller
             Log::info('Starting General Excel import:', [
                 'file_name' => $file->getClientOriginalName(),
                 'file_size' => $file->getSize(),
-                'default_values' => $defaultValues
+                'default_values' => $defaultValues,
             ]);
 
             // Create import instance
@@ -724,15 +728,15 @@ class AdditionalDocumentController extends Controller
             $documentTypeCounts = $import->getDocumentTypeCounts();
 
             // Prepare success message for Toastr
-            $toastrMessage = "General documents import completed successfully!";
+            $toastrMessage = 'General documents import completed successfully!';
             if ($successCount > 0) {
                 $toastrMessage .= " {$successCount} documents imported.";
             }
             if ($skippedCount > 0) {
                 $toastrMessage .= " {$skippedCount} rows skipped.";
             }
-            if (!empty($errors)) {
-                $toastrMessage .= " " . count($errors) . " errors found.";
+            if (! empty($errors)) {
+                $toastrMessage .= ' '.count($errors).' errors found.';
             }
 
             // Prepare summary data for the view
@@ -754,11 +758,11 @@ class AdditionalDocumentController extends Controller
                 ->with('general_import_success', $toastrMessage)
                 ->with('general_import_summary', $importSummary);
         } catch (\Exception $e) {
-            Log::error('General import error: ' . $e->getMessage());
-            Log::error('General import error trace: ' . $e->getTraceAsString());
+            Log::error('General import error: '.$e->getMessage());
+            Log::error('General import error trace: '.$e->getTraceAsString());
 
             // Provide more specific error messages for common issues
-            $errorMessage = 'General import failed: ' . $e->getMessage();
+            $errorMessage = 'General import failed: '.$e->getMessage();
 
             if (str_contains($e->getMessage(), 'Column count doesn\'t match value count')) {
                 $errorMessage = 'General import failed: Excel column structure mismatch. Please use the provided general template format.';
@@ -776,7 +780,7 @@ class AdditionalDocumentController extends Controller
     {
         $this->authorize('import-general-documents');
 
-        return Excel::download(new GeneralDocumentTemplate(), 'general_documents_template.xlsx');
+        return Excel::download(new GeneralDocumentTemplate, 'general_documents_template.xlsx');
     }
 
     /**
@@ -787,10 +791,10 @@ class AdditionalDocumentController extends Controller
         // Check permission using the specific permission
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (!$user->can('on-the-fly-addoc-feature')) {
+        if (! $user->can('on-the-fly-addoc-feature')) {
             return response()->json([
                 'success' => false,
-                'message' => 'You do not have permission to create additional documents on-the-fly.'
+                'message' => 'You do not have permission to create additional documents on-the-fly.',
             ], 403);
         }
 
@@ -839,14 +843,14 @@ class AdditionalDocumentController extends Controller
                     'status' => $additionalDocument->status,
                     'distribution_status' => $additionalDocument->distribution_status,
                     'is_in_user_department' => $additionalDocument->cur_loc === $user->department_location_code,
-                ]
+                ],
             ]);
         } catch (\Exception $e) {
-            Log::error('On-the-fly additional document creation failed: ' . $e->getMessage());
+            Log::error('On-the-fly additional document creation failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create additional document: ' . $e->getMessage()
+                'message' => 'Failed to create additional document: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -867,6 +871,7 @@ class AdditionalDocumentController extends Controller
             // Sort by days in current location (oldest first - highest days first) for consistency with main table
             $documents = $query->get()->sortByDesc(function ($document) {
                 $arrivalDate = $document->current_location_arrival_date;
+
                 return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
             })->values();
 
@@ -890,11 +895,12 @@ class AdditionalDocumentController extends Controller
 
             return \Maatwebsite\Excel\Facades\Excel::download(
                 new \App\Exports\AdditionalDocumentExport($exportData),
-                'additional_documents_' . now()->format('Y-m-d_H-i-s') . '.xlsx'
+                'additional_documents_'.now()->format('Y-m-d_H-i-s').'.xlsx'
             );
         } catch (\Exception $e) {
-            Log::error('Additional documents export failed: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Export failed: ' . $e->getMessage());
+            Log::error('Additional documents export failed: '.$e->getMessage());
+
+            return redirect()->back()->with('error', 'Export failed: '.$e->getMessage());
         }
     }
 
@@ -912,12 +918,12 @@ class AdditionalDocumentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $presets
+                'data' => $presets,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to load search presets'
+                'message' => 'Failed to load search presets',
             ], 500);
         }
     }
@@ -930,7 +936,7 @@ class AdditionalDocumentController extends Controller
         try {
             $request->validate([
                 'name' => 'required|string|max:255',
-                'filters' => 'required|string'
+                'filters' => 'required|string',
             ]);
 
             $user = Auth::user();
@@ -945,12 +951,12 @@ class AdditionalDocumentController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $preset,
-                'message' => 'Search preset saved successfully'
+                'message' => 'Search preset saved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to save search preset'
+                'message' => 'Failed to save search preset',
             ], 500);
         }
     }
@@ -967,21 +973,21 @@ class AdditionalDocumentController extends Controller
                 ->where('model_type', 'additional_documents')
                 ->first();
 
-            if (!$preset) {
+            if (! $preset) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Search preset not found'
+                    'message' => 'Search preset not found',
                 ], 404);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => $preset
+                'data' => $preset,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to load search preset'
+                'message' => 'Failed to load search preset',
             ], 500);
         }
     }
@@ -998,10 +1004,10 @@ class AdditionalDocumentController extends Controller
                 ->where('model_type', 'additional_documents')
                 ->first();
 
-            if (!$preset) {
+            if (! $preset) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Search preset not found'
+                    'message' => 'Search preset not found',
                 ], 404);
             }
 
@@ -1009,12 +1015,12 @@ class AdditionalDocumentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Search preset deleted successfully'
+                'message' => 'Search preset deleted successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete search preset'
+                'message' => 'Failed to delete search preset',
             ], 500);
         }
     }
@@ -1026,23 +1032,23 @@ class AdditionalDocumentController extends Controller
     {
         // Apply search filters
         if ($request->filled('search_number')) {
-            $query->where('document_number', 'like', '%' . $request->search_number . '%');
+            $query->where('document_number', 'like', '%'.$request->search_number.'%');
         }
 
         if ($request->filled('search_po_no')) {
-            $query->where('po_no', 'like', '%' . $request->search_po_no . '%');
+            $query->where('po_no', 'like', '%'.$request->search_po_no.'%');
         }
 
         if ($request->filled('search_vendor_code')) {
-            $query->where('vendor_code', 'like', '%' . $request->search_vendor_code . '%');
+            $query->where('vendor_code', 'like', '%'.$request->search_vendor_code.'%');
         }
 
         if ($request->filled('search_project')) {
-            $query->where('project', 'like', '%' . $request->search_project . '%');
+            $query->where('project', 'like', '%'.$request->search_project.'%');
         }
 
         if ($request->filled('search_remarks')) {
-            $query->where('remarks', 'like', '%' . $request->search_remarks . '%');
+            $query->where('remarks', 'like', '%'.$request->search_remarks.'%');
         }
 
         if ($request->filled('filter_type')) {
@@ -1081,7 +1087,7 @@ class AdditionalDocumentController extends Controller
         }
 
         if ($request->filled('show_all_records') && $request->show_all_records === 'on') {
-            if (!$user->can('see-all-record-switch')) {
+            if (! $user->can('see-all-record-switch')) {
                 // Fallback to user's department only
                 $query->where('cur_loc', $user->department_location_code);
             }
@@ -1093,7 +1099,13 @@ class AdditionalDocumentController extends Controller
 
     public function sapSyncItoForm()
     {
-        return view('admin.sap-sync-ito');
+        $itoSyncLogs = DB::table('sap_logs')
+            ->where('action', 'query_sync')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        return view('admin.sap-sync-ito', compact('itoSyncLogs'));
     }
 
     public function sapSyncIto(Request $request)
@@ -1107,7 +1119,7 @@ class AdditionalDocumentController extends Controller
         // Determine dates based on date_range selection
         $startDate = null;
         $endDate = null;
-        
+
         if ($request->date_range === 'today') {
             $startDate = now()->format('Y-m-d');
             $endDate = now()->format('Y-m-d');
@@ -1123,26 +1135,27 @@ class AdditionalDocumentController extends Controller
         try {
             // Run job synchronously to get immediate results
             $sapService = app(\App\Services\SapService::class);
-            $job = new \App\Jobs\SyncSapItoDocumentsJob($startDate, $endDate);
-            
-            // Execute the job and capture results
+            $job = new SyncSapItoDocumentsJob($startDate, $endDate, [
+                'trigger' => 'web',
+                'triggered_by_user_id' => Auth::id() ?? 1,
+            ]);
+
             $job->handle($sapService);
-            
-            // Get the latest log entry to show results
+
             $logEntry = DB::table('sap_logs')
                 ->where('action', 'query_sync')
-                ->latest()
+                ->latest('id')
                 ->first();
-            
+
             if ($logEntry && $logEntry->status === 'success') {
                 $response = json_decode($logEntry->response_payload, true);
                 $successCount = $response['success'] ?? 0;
                 $skippedCount = $response['skipped'] ?? 0;
-                
-                $message = "Sync completed successfully! ";
+
+                $message = 'Sync completed successfully! ';
                 $message .= "Created: {$successCount} record(s), ";
                 $message .= "Skipped: {$skippedCount} record(s)";
-                
+
                 return redirect()->route('admin.sap-sync-ito')
                     ->with('success', $message)
                     ->with('sync_results', [
@@ -1151,12 +1164,13 @@ class AdditionalDocumentController extends Controller
                     ]);
             } else {
                 $errorMessage = $logEntry->error_message ?? 'Unknown error occurred';
+
                 return redirect()->route('admin.sap-sync-ito')
-                    ->with('error', 'Sync failed: ' . substr($errorMessage, 0, 200));
+                    ->with('error', 'Sync failed: '.substr($errorMessage, 0, 200));
             }
         } catch (\Exception $e) {
             return redirect()->route('admin.sap-sync-ito')
-                ->with('error', 'Sync failed: ' . $e->getMessage());
+                ->with('error', 'Sync failed: '.$e->getMessage());
         }
     }
 }

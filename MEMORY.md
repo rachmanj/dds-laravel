@@ -1,3 +1,9 @@
+### 2026-03-30 — SAP ITO sync: CLI + audit + UI history
+
+Production ITO sync can run via **`php artisan sap:sync-ito`** (`--today` / `--yesterday` / `--start` + `--end`; **`--user` defaults to 1**). **`SyncSapItoDocumentsJob`** accepts audit context; **`sap_logs`** `request_payload` for `query_sync` includes **`trigger`**, **`triggered_by_user_id`**, **`synced_at`**, plus SAP date range and **`method`**. **`/admin/sap-sync-ito`** shows the last **10** sync rows with synced date/time. See `docs/architecture.md`, `docs/decisions.md` (2026-03-30), `docs/SAP-ITO-SYNC-COMPLETE.md`.
+
+---
+
 ### 2026-03-27 — Invoice document import (AI-assisted, v1)
 
 See `docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`, `docs/architecture.md` (Invoice creation from PDF/image), and `docs/decisions.md` (2026-03-27). Ops: `OPEN_ROUTER_API_KEY`, queue worker when using database/redis queue; `INVOICE_IMPORT_EXTRACT_SYNC` typically false in production. `invoices.import_extraction` stores extraction snapshot on successful create with import.

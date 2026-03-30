@@ -92,6 +92,15 @@ Test the sync:
 php artisan sap:test-sync 2025-11-01 2025-11-12 --sync
 ```
 
+For **production-style / scheduled** runs (same job as the web UI, with audit in `sap_logs`), use:
+
+```bash
+php artisan sap:sync-ito --today
+php artisan sap:sync-ito --start=2026-03-01 --end=2026-03-31
+```
+
+See **`docs/SAP-ITO-SYNC-COMPLETE.md`** (2026-03-30 update) and **`docs/architecture.md`** (SAP ITO Sync Integration) for `trigger` / `triggered_by_user_id` / `synced_at` in `sap_logs.request_payload`.
+
 ## Security Considerations
 
 - Use read-only SQL user if possible

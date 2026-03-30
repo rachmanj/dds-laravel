@@ -2432,9 +2432,9 @@ sequenceDiagram
     Note over LaravelApp,SAP: Scheduled Reconciliation: Query SAP for Docs, Sync Back to Laravel
 ```
 
-### SAP ITO Sync Integration ✅ **IMPLEMENTED** (2025-11-13)
+### SAP ITO Sync Integration ✅ **IMPLEMENTED** (2025-11-13, ops/audit refresh 2026-03-30)
 
-**Pattern**: Multi-tier fallback integration for syncing Inventory Transfer Orders (ITO) from SAP B1 to Laravel, prioritizing direct SQL Server access for 100% accuracy.
+**Pattern**: Multi-tier fallback integration for syncing Inventory Transfer Orders (ITO) from SAP B1 to Laravel, prioritizing direct SQL Server access for 100% accuracy. **CLI and audit enrichment** (2026-03-30): first-class Artisan command for scheduled/manual runs; `sap_logs.request_payload` records trigger source and acting user; admin page shows the last 10 sync runs.
 
 **Implementation Date**: 2025-11-13  
 **Status**: **COMPLETE** - Production ready
@@ -2467,7 +2467,8 @@ SAP ITO Sync System
     ├── Tries methods in priority order (SQL → OData → Query)
     ├── Duplicate detection: Checks document_number (ito_no)
     ├── Batch processing: Creates additional_documents records
-    └── Logging: Records sync results in sap_logs table
+    ├── Actor: created_by = triggered user (CLI default user id 1; web = Auth::id() ?? 1)
+    └── Logging: Records sync results + audit fields in sap_logs (action query_sync)
 ```
 
 **Key Components**:
@@ -2485,16 +2486,23 @@ SAP ITO Sync System
 
 -   **Sync Job** (`app/Jobs/SyncSapItoDocumentsJob.php`):
     -   Tries methods in priority order: SQL Server → OData → Query execution
+    -   Optional third constructor argument: audit context `['trigger' => 'web'|'cli', 'triggered_by_user_id' => int]`
     -   Handles different result formats (SQL query, OData entity, query execution)
     -   Duplicate detection by `document_number` (mapped from `ito_no` or `DocNum`)
-    -   Creates `additional_documents` records with proper field mapping
-    -   Logs sync results (success/skipped counts) to `sap_logs`
+    -   Creates `additional_documents` records with proper field mapping; `created_by` uses context user or `Auth::id() ?? 1`
+    -   Logs sync results (success/skipped counts) and audit metadata to `sap_logs`; failures include `request_payload` when possible
+
+-   **Artisan** (`app/Console/Commands/SapSyncItoCommand.php`):
+    -   Command: `php artisan sap:sync-ito` with `--today`, `--yesterday`, or `--start` / `--end` (mutually exclusive modes)
+    -   `--user=` (default **1**): `Auth::loginUsingId` before sync so new documents and audit match the same user
+    -   Same job as the UI; suitable for Task Scheduler / cron
 
 -   **UI Integration** (`resources/views/admin/sap-sync-ito.blade.php`):
     -   Date range input form
     -   On-demand sync via button click
     -   Toastr notifications for success/failure
     -   Displays sync results (created/skipped counts)
+    -   **Recent sync activity**: table of the last **10** `sap_logs` rows (`action = query_sync`) with synced date/time, status, SAP date range, method, counts, trigger, user id
 
 **Data Flow**:
 
@@ -2512,7 +2520,8 @@ sequenceDiagram
     User->>UI: Navigate to /admin/sap-sync-ito
     User->>UI: Enter date range and click "Sync from SAP"
     UI->>Controller: POST /admin/sap-sync-ito
-    Controller->>Job: Run synchronously (for immediate results)
+    Controller->>Job: Run synchronously (audit: trigger=web, user=Auth::id()??1)
+    Note over Job: CLI: sap:sync-ito (trigger=cli, user default 1)
     
     Job->>SapService: executeItoSqlQuery(startDate, endDate)
     alt SQL Server Direct Access (Primary)
@@ -2539,7 +2548,7 @@ sequenceDiagram
         Job->>Job: Increment skippedCount
     end
     
-    Job->>DB: Insert sap_logs entry (action='query_sync', status='success')
+    Job->>DB: Insert sap_logs (query_sync + request_payload: dates, method, trigger, triggered_by_user_id, synced_at)
     Job-->>Controller: Return results (successCount, skippedCount)
     Controller->>UI: Redirect with flash messages
     UI->>User: Display Toastr notification + results summary
@@ -2646,9 +2655,9 @@ All sync operations are logged to `sap_logs` table:
 
 -   **Action**: `query_sync`
 -   **Status**: `success` or `failed`
--   **Request Payload**: Date range, method used
--   **Response Payload**: Success/skipped counts
--   **Error Message**: Detailed error if failed
+-   **Request Payload** (JSON): `start_date`, `end_date`, `method` (`sql_server_direct`, `direct_entity_query`, `query_execution`), `trigger` (`web`, `cli`), `triggered_by_user_id`, `synced_at` (ISO-8601). Older rows may omit new keys.
+-   **Response Payload**: `success` / `skipped` counts (success path)
+-   **Error Message**: Detailed error if failed; failed runs also persist `request_payload` when the failure is caught in the job handler
 
 **Related Documentation**:
 

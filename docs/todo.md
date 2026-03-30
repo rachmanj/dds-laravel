@@ -2,6 +2,20 @@
 
 ## ✅ **Recently Completed**
 
+### **SAP ITO sync — Artisan command, audit log, UI activity table** ✅ **COMPLETED**
+
+**Status**: ✅ Shipped — `sap:sync-ito` command, enriched `sap_logs` audit payload, last-10 sync history on admin page  
+**Implementation / doc refresh**: 2026-03-30  
+**Priority**: MEDIUM — Ops automation and traceability for ITO sync
+
+**Summary**: **`php artisan sap:sync-ito`** mirrors the admin UI (`--today` / `--yesterday` / `--start` + `--end`; **`--user` default 1**). **`SyncSapItoDocumentsJob`** writes **`trigger`**, **`triggered_by_user_id`**, **`synced_at`** into `sap_logs.request_payload` alongside SAP date range and fetch **`method`**. **`AdditionalDocumentController@sapSyncItoForm`** passes the last **10** `query_sync` rows to **`resources/views/admin/sap-sync-ito.blade.php`** (synced date/time, status, range, counts, trigger, user).
+
+**Key files**: `app/Console/Commands/SapSyncItoCommand.php`, `app/Jobs/SyncSapItoDocumentsJob.php`, `app/Http/Controllers/AdditionalDocumentController.php` (`sapSyncIto*` methods), `resources/views/admin/sap-sync-ito.blade.php`.
+
+**Docs**: [`docs/architecture.md`](architecture.md) (SAP ITO Sync Integration), [`docs/decisions.md`](decisions.md) (2026-03-30), [`docs/SAP-ITO-SYNC-COMPLETE.md`](SAP-ITO-SYNC-COMPLETE.md), `MEMORY.md`.
+
+---
+
 ### **Invoice document import (PDF / image, AI-assisted)** ✅ **COMPLETED (v1)**
 
 **Status**: ✅ Shipped — Create Invoice import card, OpenRouter extraction, draft prefill, post-save attachment, extraction metadata on invoice  
@@ -138,6 +152,8 @@
 **Requested By**: User  
 **Priority**: HIGH - Critical business requirement for SAP integration
 
+**2026-03-30 follow-up** (CLI + audit + UI history): See **Recently Completed** entry *SAP ITO sync — Artisan command, audit log, UI activity table* and `docs/decisions.md` (2026-03-30).
+
 **Feature**: On-demand synchronization of Inventory Transfer Orders (ITO) from SAP B1 to Laravel database via web interface.
 
 **Key Deliverables**:
@@ -175,7 +191,8 @@
 
 5. **Testing & Debugging Tools** ✅
    - `php artisan sap:test-connection` - Test SAP connectivity and discover entities
-   - `php artisan sap:test-sync` - Test sync with date ranges
+   - `php artisan sap:test-sync` - Test sync with date ranges (diagnostic)
+   - `php artisan sap:sync-ito` - Production-style ITO sync (2026-03-30); same job as web UI
    - Comprehensive logging to `sap_logs` table
    - Detailed error messages and debugging information
 

@@ -2,6 +2,16 @@
 
 ## Date: 2025-11-13
 
+## Update: 2026-03-30 — CLI, audit payload, recent activity on admin page
+
+- **Artisan**: `php artisan sap:sync-ito` — same sync as the UI. Options: `--today`, `--yesterday`, `--start` / `--end`, `--user` (default **1** for `created_by` and audit).
+- **Audit**: `sap_logs` rows with `action = query_sync` store JSON in `request_payload`: SAP `start_date` / `end_date`, fetch `method`, `trigger` (`web` | `cli`), `triggered_by_user_id`, `synced_at` (ISO-8601). Success rows keep `response_payload` with `success` / `skipped` counts.
+- **UI**: `/admin/sap-sync-ito` includes a **Recent sync activity** table (last **10** runs); **Synced at** uses `sap_logs.created_at` in the app timezone.
+
+See **`docs/architecture.md`** (SAP ITO Sync Integration) and **`docs/decisions.md`** (2026-03-30).
+
+---
+
 ## Summary
 
 Successfully implemented SAP B1 ITO (Inventory Transfer Order) sync using **direct SQL Server access**. The solution accurately matches SQL Query 5 results (202 records for Nov 1-12, 2025).
@@ -48,6 +58,17 @@ php artisan sap:test-sync 2025-11-01 2025-11-12 --sync
 - ✅ Method: `sql_server_direct`
 - ✅ Found: 202 records (matches Query 5)
 - ✅ Status: All 202 skipped (already exist in database)
+
+### Production-style CLI (2026-03-30)
+
+```bash
+php artisan sap:sync-ito --today
+php artisan sap:sync-ito --yesterday
+php artisan sap:sync-ito --start=2026-03-01 --end=2026-03-30
+php artisan sap:sync-ito --today --user=1
+```
+
+Use **`sap:sync-ito`** for scheduled or manual runs; use **`sap:test-sync`** for OData diagnostics and optional `--sync`.
 
 ## Next Steps
 
@@ -127,10 +148,13 @@ Defined in `config/database.php` as `sap_sql` connection.
 
 1. **`config/database.php`** - Added `sap_sql` connection
 2. **`app/Services/SapService.php`** - Added `executeItoSqlQuery()` method
-3. **`app/Jobs/SyncSapItoDocumentsJob.php`** - Updated to use SQL Server first
-4. **`docs/SAP-SQL-DIRECT-ACCESS.md`** - Implementation guide
-5. **`docs/INSTALL-SQLSRV-WINDOWS.md`** - Installation guide
-6. **`docs/FIX-SQLSRV-ERROR.md`** - Troubleshooting guide
+3. **`app/Jobs/SyncSapItoDocumentsJob.php`** - Updated to use SQL Server first; audit context and `sap_logs` payload (2026-03-30)
+4. **`app/Console/Commands/SapSyncItoCommand.php`** - `sap:sync-ito` (2026-03-30)
+5. **`app/Http/Controllers/AdditionalDocumentController.php`** - `sapSyncItoForm` / `sapSyncIto` audit + last-10 logs (2026-03-30)
+6. **`resources/views/admin/sap-sync-ito.blade.php`** - Recent sync activity table (2026-03-30)
+7. **`docs/SAP-SQL-DIRECT-ACCESS.md`** - Implementation guide
+8. **`docs/INSTALL-SQLSRV-WINDOWS.md`** - Installation guide
+9. **`docs/FIX-SQLSRV-ERROR.md`** - Troubleshooting guide
 
 ## Performance
 

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 class TestSapSync extends Command
 {
     protected $signature = 'sap:test-sync {start_date} {end_date} {--sync}';
-    
+
     protected $description = 'Test SAP ITO sync - fetch data and optionally sync to database';
 
     public function handle()
@@ -18,110 +18,111 @@ class TestSapSync extends Command
         $startDate = $this->argument('start_date');
         $endDate = $this->argument('end_date');
         $shouldSync = $this->option('sync');
-        
-        $this->info("Testing SAP ITO Sync");
+
+        $this->info('Testing SAP ITO Sync');
         $this->info("Date Range: {$startDate} to {$endDate}");
         $this->newLine();
-        
+
         try {
             $sapService = app(SapService::class);
-            
+
             // Ensure we're logged in first
-            $this->info("0. Logging in to SAP...");
+            $this->info('0. Logging in to SAP...');
             try {
                 $sapService->login();
-                $this->info("   ✓ Login successful!");
+                $this->info('   ✓ Login successful!');
             } catch (\Exception $e) {
-                $this->error("   ✗ Login failed: " . $e->getMessage());
+                $this->error('   ✗ Login failed: '.$e->getMessage());
+
                 return 1;
             }
             $this->newLine();
-            
+
             // Test direct entity query
-            $this->info("1. Testing direct entity query...");
-            
+            $this->info('1. Testing direct entity query...');
+
             // First, try to see what date range has data
-            $this->info("   Checking for available data (no date filter)...");
+            $this->info('   Checking for available data (no date filter)...');
             try {
                 $client = $sapService->getClient();
                 $allDataResponse = $client->get('InventoryTransferRequests', [
                     'query' => [
                         '$top' => 5,
-                        '$orderby' => 'CreationDate desc'
-                    ]
+                        '$orderby' => 'CreationDate desc',
+                    ],
                 ]);
                 $allData = json_decode($allDataResponse->getBody()->getContents(), true);
                 if (isset($allData['value']) && count($allData['value']) > 0) {
-                    $this->info("   Found " . count($allData['value']) . " recent records (any date)");
-                    $this->info("   Most recent record dates:");
+                    $this->info('   Found '.count($allData['value']).' recent records (any date)');
+                    $this->info('   Most recent record dates:');
                     foreach (array_slice($allData['value'], 0, 3) as $rec) {
                         $date = $rec['CreationDate'] ?? $rec['DocDate'] ?? 'N/A';
                         $docNum = $rec['DocNum'] ?? 'N/A';
                         $this->line("     - DocNum: {$docNum}, Date: {$date}");
                     }
                 } else {
-                    $this->warn("   No records found in InventoryTransferRequests");
+                    $this->warn('   No records found in InventoryTransferRequests');
                 }
             } catch (\Exception $e) {
-                $this->warn("   Could not check available data: " . $e->getMessage());
+                $this->warn('   Could not check available data: '.$e->getMessage());
             }
             $this->newLine();
-            
+
             $this->info("   Querying with date filter: {$startDate} to {$endDate}...");
-            
+
             // Try querying with different date fields and filters to see which one works
             // Prioritize CreateDate to match SQL query
-            $this->info("   Testing different date fields and filters...");
+            $this->info('   Testing different date fields and filters...');
             $dateFieldsToTest = ['CreateDate', 'CreationDate', 'DocDate'];
             $workingField = null;
             $workingFilter = null;
-            
+
             foreach ($dateFieldsToTest as $dateField) {
                 try {
                     $client = $sapService->getClient();
-                    $startDateTime = $startDate . 'T00:00:00';
-                    $endDateTime = $endDate . 'T23:59:59';
-                    
+                    $startDateTime = $startDate.'T00:00:00';
+                    $endDateTime = $endDate.'T23:59:59';
+
                     // Test 1: Without TransferType filter
                     $testFilter = "{$dateField} ge datetime'{$startDateTime}' and {$dateField} le datetime'{$endDateTime}'";
                     $this->line("     Testing with {$dateField} (no TransferType filter)...");
                     $testResponse = $client->get('InventoryTransferRequests', [
                         'query' => [
                             '$filter' => $testFilter,
-                            '$top' => 5
-                        ]
+                            '$top' => 5,
+                        ],
                     ]);
                     $testResult = json_decode($testResponse->getBody()->getContents(), true);
                     $count = isset($testResult['value']) ? count($testResult['value']) : 0;
                     $this->line("       Found {$count} records");
-                    
+
                     if ($count > 0) {
                         $workingField = $dateField;
                         $workingFilter = $testFilter;
                         $this->info("     ✓ {$dateField} works without TransferType filter!");
-                        
+
                         // Test 2: Check what TransferType values exist in the records
                         // Try both direct access and DynamicProperties
-                        $this->line("     Checking U_MIS_TransferType field values in sample records...");
+                        $this->line('     Checking U_MIS_TransferType field values in sample records...');
                         try {
                             // Try with DynamicProperties first (for UDFs)
                             $sampleResponse = $client->get('InventoryTransferRequests', [
                                 'query' => [
                                     '$filter' => $testFilter,
                                     '$top' => 10,
-                                    '$select' => 'DocNum,DocDate,CreationDate,DynamicProperties'
-                                ]
+                                    '$select' => 'DocNum,DocDate,CreationDate,DynamicProperties',
+                                ],
                             ]);
                             $sampleResult = json_decode($sampleResponse->getBody()->getContents(), true);
-                            
+
                             // Also try direct access
                             try {
                                 $sampleResponseDirect = $client->get('InventoryTransferRequests', [
                                     'query' => [
                                         '$filter' => $testFilter,
                                         '$top' => 10,
-                                        '$select' => 'DocNum,DocDate,CreationDate,U_MIS_TransferType'
-                                    ]
+                                        '$select' => 'DocNum,DocDate,CreationDate,U_MIS_TransferType',
+                                    ],
                                 ]);
                                 $sampleResultDirect = json_decode($sampleResponseDirect->getBody()->getContents(), true);
                                 if (isset($sampleResultDirect['value']) && count($sampleResultDirect['value']) > 0) {
@@ -130,13 +131,13 @@ class TestSapSync extends Command
                             } catch (\Exception $e) {
                                 // Direct access might not work, use DynamicProperties
                             }
-                            
+
                             if (isset($sampleResult['value']) && count($sampleResult['value']) > 0) {
                                 $transferTypes = [];
                                 foreach ($sampleResult['value'] as $rec) {
                                     // Try direct access first
                                     $type = $rec['U_MIS_TransferType'] ?? null;
-                                    
+
                                     // Try DynamicProperties
                                     if ($type === null && isset($rec['DynamicProperties'])) {
                                         if (is_array($rec['DynamicProperties'])) {
@@ -152,31 +153,31 @@ class TestSapSync extends Command
                                             }
                                         }
                                     }
-                                    
+
                                     $type = $type ?? 'NULL';
-                                    if (!isset($transferTypes[$type])) {
+                                    if (! isset($transferTypes[$type])) {
                                         $transferTypes[$type] = 0;
                                     }
                                     $transferTypes[$type]++;
                                 }
-                                $this->line("       TransferType values found: " . json_encode($transferTypes));
-                                
+                                $this->line('       TransferType values found: '.json_encode($transferTypes));
+
                                 // Now test with OUT filter - try both direct and DynamicProperties syntax
                                 $filterVariations = [
                                     "U_MIS_TransferType eq 'OUT'",
                                     "DynamicProperties/U_MIS_TransferType eq 'OUT'",
                                 ];
-                                
+
                                 $filterWorked = false;
                                 foreach ($filterVariations as $filterVar) {
-                                    $testFilterWithType = $testFilter . " and " . $filterVar;
+                                    $testFilterWithType = $testFilter.' and '.$filterVar;
                                     $this->line("     Testing with {$dateField} + {$filterVar}...");
                                     try {
                                         $testResponse2 = $client->get('InventoryTransferRequests', [
                                             'query' => [
                                                 '$filter' => $testFilterWithType,
-                                                '$top' => 10
-                                            ]
+                                                '$top' => 10,
+                                            ],
                                         ]);
                                         $testResult2 = json_decode($testResponse2->getBody()->getContents(), true);
                                         $count2 = isset($testResult2['value']) ? count($testResult2['value']) : 0;
@@ -188,73 +189,77 @@ class TestSapSync extends Command
                                             break;
                                         }
                                     } catch (\Exception $e) {
-                                        $this->line("       Error: " . substr($e->getMessage(), 0, 60));
+                                        $this->line('       Error: '.substr($e->getMessage(), 0, 60));
                                     }
                                 }
-                                
-                                if (!$filterWorked) {
+
+                                if (! $filterWorked) {
                                     $this->warn("     ⚠ No records found with U_MIS_TransferType='OUT' using any filter syntax");
                                 }
                             }
                         } catch (\Exception $e) {
-                            $this->warn("     ⚠ Could not check TransferType values: " . substr($e->getMessage(), 0, 50));
+                            $this->warn('     ⚠ Could not check TransferType values: '.substr($e->getMessage(), 0, 50));
                         }
                         break;
                     }
                 } catch (\Exception $e) {
-                    $this->line("       Error: " . substr($e->getMessage(), 0, 60));
+                    $this->line('       Error: '.substr($e->getMessage(), 0, 60));
                 }
             }
             $this->newLine();
-            
+
             $results = $sapService->getStockTransferRequests($startDate, $endDate);
-            $this->info("   ✓ Found " . count($results) . " records");
-            
+            $this->info('   ✓ Found '.count($results).' records');
+
             if (count($results) > 0) {
-                $this->info("   Sample record fields:");
+                $this->info('   Sample record fields:');
                 $sample = $results[0];
                 foreach (array_slice(array_keys($sample), 0, 15) as $key) {
                     $value = is_array($sample[$key]) ? '[array]' : (is_object($sample[$key]) ? '[object]' : $sample[$key]);
-                    $this->line("     - {$key}: " . substr((string)$value, 0, 50));
+                    $this->line("     - {$key}: ".substr((string) $value, 0, 50));
                 }
             } else {
-                $this->warn("   ⚠ No records found for this date range. Try a wider date range or check if data exists.");
+                $this->warn('   ⚠ No records found for this date range. Try a wider date range or check if data exists.');
             }
             $this->newLine();
-            
+
             if ($shouldSync) {
-                $this->info("2. Dispatching sync job...");
-                
+                $this->info('2. Dispatching sync job...');
+
                 // Set a default user for the job (if needed)
-                if (!Auth::check()) {
+                if (! Auth::check()) {
                     // Try to get first admin user
-                    $admin = \App\Models\User::whereHas('roles', function($q) {
+                    $admin = \App\Models\User::whereHas('roles', function ($q) {
                         $q->whereIn('name', ['admin', 'superadmin']);
                     })->first();
-                    
+
                     if ($admin) {
                         Auth::login($admin);
                         $this->info("   Using user: {$admin->name}");
                     }
                 }
-                
+
                 // For testing, run synchronously to see immediate results
                 // In production, use dispatch() to queue it
-                $job = new SyncSapItoDocumentsJob($startDate, $endDate);
+                $job = new SyncSapItoDocumentsJob($startDate, $endDate, [
+                    'trigger' => 'cli',
+                    'triggered_by_user_id' => Auth::id() ?? 1,
+                ]);
                 $job->handle(app(SapService::class));
-                
-                $this->info("   ✓ Sync completed!");
-                $this->info("   Check logs at: storage/logs/sap-" . date('Y-m-d') . ".log");
-                $this->info("   Check sap_logs table for sync results");
+
+                $this->info('   ✓ Sync completed!');
+                $this->info('   Check logs at: storage/logs/sap-'.date('Y-m-d').'.log');
+                $this->info('   Check sap_logs table for sync results');
             } else {
-                $this->info("2. Skipping sync (use --sync flag to actually sync)");
+                $this->info('2. Skipping sync (use --sync flag to actually sync)');
                 $this->info("   To sync, run: php artisan sap:test-sync {$startDate} {$endDate} --sync");
             }
-            
+
             return 0;
         } catch (\Exception $e) {
-            $this->error("Error: " . $e->getMessage());
-            $this->error("Stack trace: " . $e->getTraceAsString());
+            $this->error('Error: '.$e->getMessage());
+            $this->error('Stack trace: '.$e->getTraceAsString());
+
             return 1;
         }
     }

@@ -1,3 +1,24 @@
+## 2026-03-30 — SAP ITO sync: Artisan command, audit payload, admin activity table
+
+-   **Context**: ITO sync was only exposed as a web form and `sap:test-sync` (diagnostic). Operators need a stable CLI for cron; compliance needs to know **who** triggered a run and **when**; the UI should surface recent runs without querying the DB manually.
+
+-   **Decision**:
+    1. Add **`php artisan sap:sync-ito`** with `--today` / `--yesterday` / `--start`+`--end`, and **`--user`** defaulting to **1** (`Auth::loginUsingId` before the job so `created_by` and audit align).
+    2. Extend **`SyncSapItoDocumentsJob`** with optional audit context: `trigger` (`web`|`cli`), `triggered_by_user_id`; enrich **`sap_logs.request_payload`** with `trigger`, `triggered_by_user_id`, `synced_at` (plus existing date range and `method`). Web controller passes `trigger=web` and `Auth::id() ?? 1`.
+    3. **Admin page** `/admin/sap-sync-ito`: load and display the **last 10** `query_sync` rows; **Synced at** = `sap_logs.created_at` in app timezone.
+
+-   **Alternatives considered**:
+    1. **New `sap_sync_audit` table** — Rejected for v1; JSON in `sap_logs` matches existing pattern and avoids migration.
+    2. **Spatie activity log** — Rejected; SAP integration already centralizes on `sap_logs`.
+
+-   **Trade-offs**: Latest-row read after sync remains a simple pattern (controller/command use `latest('id')`); concurrent syncs could theoretically interleave—acceptable for current single-operator usage.
+
+-   **Review date**: 2026-09-30 (6 months)
+
+-   **References**: [`docs/architecture.md`](architecture.md) (SAP ITO Sync Integration), [`docs/SAP-ITO-SYNC-COMPLETE.md`](SAP-ITO-SYNC-COMPLETE.md), [`app/Console/Commands/SapSyncItoCommand.php`](../app/Console/Commands/SapSyncItoCommand.php), [`app/Jobs/SyncSapItoDocumentsJob.php`](../app/Jobs/SyncSapItoDocumentsJob.php).
+
+---
+
 ## 2026-03-27 — Invoice document import (AI-assisted, v1)
 
 -   **Context**: Users need to create supplier invoices faster from PDF or image uploads without building in-house OCR. The app already has invoice create, attachments, and SAP AP flows.
