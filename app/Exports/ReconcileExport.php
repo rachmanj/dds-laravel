@@ -5,17 +5,18 @@ namespace App\Exports;
 use App\Models\ReconcileDetail;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
-use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class ReconcileExport implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithEvents
+class ReconcileExport implements FromCollection, WithColumnWidths, WithEvents, WithHeadings, WithMapping, WithStyles
 {
     protected $reconciles;
+
     protected $invoiceMap = [];
 
     public function __construct(Collection $reconciles)
@@ -26,11 +27,11 @@ class ReconcileExport implements FromCollection, WithHeadings, WithMapping, With
         // to prevent N+1 queries in the map() method
         $invoiceNumbers = $reconciles->pluck('invoice_no')->filter()->unique()->toArray();
 
-        if (!empty($invoiceNumbers)) {
+        if (! empty($invoiceNumbers)) {
             $invoices = \App\Models\Invoice::where(function ($query) use ($invoiceNumbers) {
                 foreach ($invoiceNumbers as $invoiceNo) {
-                    $query->orWhere('invoice_number', 'LIKE', '%' . $invoiceNo . '%')
-                        ->orWhere('faktur_no', 'LIKE', '%' . $invoiceNo . '%');
+                    $query->orWhere('invoice_number', 'LIKE', '%'.$invoiceNo.'%')
+                        ->orWhere('faktur_no', 'LIKE', '%'.$invoiceNo.'%');
                 }
             })
                 ->with(['distributions' => function ($query) {
@@ -56,9 +57,6 @@ class ReconcileExport implements FromCollection, WithHeadings, WithMapping, With
         return $this->reconciles;
     }
 
-    /**
-     * @return array
-     */
     public function headings(): array
     {
         return [
@@ -71,14 +69,14 @@ class ReconcileExport implements FromCollection, WithHeadings, WithMapping, With
             'SPI No',
             'SPI Date',
             'Distribution Number',
+            'Distribution Sent Date',
             'Status',
             'Uploaded Date',
         ];
     }
 
     /**
-     * @param ReconcileDetail $reconcile
-     * @return array
+     * @param  ReconcileDetail  $reconcile
      */
     public function map($reconcile): array
     {
@@ -107,28 +105,25 @@ class ReconcileExport implements FromCollection, WithHeadings, WithMapping, With
             }
 
             // Fallback: if not found in map, use accessor (shouldn't happen but safety check)
-            if (!$matchingInvoice) {
+            if (! $matchingInvoice) {
                 $matchingInvoice = $reconcile->matching_invoice;
             }
         }
 
-        // Get all distribution numbers (comma-separated)
-        // Show distribution numbers for both matched and partial_match statuses
         $distributionNumbers = 'N/A';
+        $distributionDates = 'N/A';
         if ($matchingInvoice) {
-            // Use direct query through distribution_documents pivot table to ensure we get all distributions
-            // This is more reliable than relying on the morphedByMany relationship loading
-            $directDistributions = \App\Models\Distribution::join('distribution_documents', 'distributions.id', '=', 'distribution_documents.distribution_id')
-                ->where('distribution_documents.document_type', \App\Models\Invoice::class)
-                ->where('distribution_documents.document_id', $matchingInvoice->id)
-                ->orderBy('distributions.created_at', 'desc')
-                ->select('distributions.*')
-                ->get();
+            $directDistributions = \App\Models\Distribution::forInvoiceDocument($matchingInvoice->id);
 
             if ($directDistributions->isNotEmpty()) {
                 $distributionNumbers = $directDistributions
                     ->pluck('distribution_number')
                     ->filter()
+                    ->implode(', ');
+                $distributionDates = $directDistributions
+                    ->map(fn ($d) => $d->local_sent_at
+                        ? $d->local_sent_at->format('d-M-Y')
+                        : 'N/A')
                     ->implode(', ');
             }
         }
@@ -151,13 +146,13 @@ class ReconcileExport implements FromCollection, WithHeadings, WithMapping, With
             $matchingInvoice ? $matchingInvoice->sap_doc : 'N/A',
             $matchingInvoice && $matchingInvoice->payment_date ? $matchingInvoice->payment_date->format('d-M-Y') : 'N/A',
             $distributionNumbers,
+            $distributionDates,
             ucfirst(str_replace('_', ' ', $reconcile->reconciliation_status)),
             $reconcile->created_at->format('d-M-Y H:i'),
         ];
     }
 
     /**
-     * @param Worksheet $sheet
      * @return array
      */
     public function styles(Worksheet $sheet)
@@ -179,9 +174,6 @@ class ReconcileExport implements FromCollection, WithHeadings, WithMapping, With
         ];
     }
 
-    /**
-     * @return array
-     */
     public function columnWidths(): array
     {
         return [
@@ -194,20 +186,18 @@ class ReconcileExport implements FromCollection, WithHeadings, WithMapping, With
             'G' => 20, // SPI No
             'H' => 15, // SPI Date
             'I' => 30, // Distribution Number
-            'J' => 15, // Status
-            'K' => 20, // Uploaded Date
+            'J' => 22, // Distribution Date
+            'K' => 15, // Status
+            'L' => 20, // Uploaded Date
         ];
     }
 
-    /**
-     * @return array
-     */
     public function registerEvents(): array
     {
         return [
             AfterSheet::class => function (AfterSheet $event) {
                 // Auto-filter for the first row
-                $event->sheet->getDelegate()->setAutoFilter('A1:K1');
+                $event->sheet->getDelegate()->setAutoFilter('A1:L1');
 
                 // Add summary information
                 $rowCount = $this->reconciles->count();
@@ -218,11 +208,11 @@ class ReconcileExport implements FromCollection, WithHeadings, WithMapping, With
                     return $reconcile->reconciliation_status === 'no_match';
                 })->count();
 
-                $event->sheet->getDelegate()->setCellValue('A' . ($rowCount + 3), 'Summary:');
-                $event->sheet->getDelegate()->setCellValue('A' . ($rowCount + 4), 'Total Records: ' . $rowCount);
-                $event->sheet->getDelegate()->setCellValue('A' . ($rowCount + 5), 'Matched: ' . $matchedCount);
-                $event->sheet->getDelegate()->setCellValue('A' . ($rowCount + 6), 'Unmatched: ' . $unmatchedCount);
-                $event->sheet->getDelegate()->setCellValue('A' . ($rowCount + 7), 'Generated: ' . now()->format('Y-m-d H:i:s'));
+                $event->sheet->getDelegate()->setCellValue('A'.($rowCount + 3), 'Summary:');
+                $event->sheet->getDelegate()->setCellValue('A'.($rowCount + 4), 'Total Records: '.$rowCount);
+                $event->sheet->getDelegate()->setCellValue('A'.($rowCount + 5), 'Matched: '.$matchedCount);
+                $event->sheet->getDelegate()->setCellValue('A'.($rowCount + 6), 'Unmatched: '.$unmatchedCount);
+                $event->sheet->getDelegate()->setCellValue('A'.($rowCount + 7), 'Generated: '.now()->format('Y-m-d H:i:s'));
             },
         ];
     }

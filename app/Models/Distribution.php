@@ -3,13 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class Distribution extends Model
 {
@@ -34,7 +33,7 @@ class Distribution extends Model
         'has_discrepancies',
         'notes',
         'year',
-        'sequence'
+        'sequence',
     ];
 
     protected $casts = [
@@ -44,7 +43,7 @@ class Distribution extends Model
         'receiver_verified_at' => 'datetime',
         'has_discrepancies' => 'boolean',
         'year' => 'integer',
-        'sequence' => 'integer'
+        'sequence' => 'integer',
     ];
 
     // Relationships
@@ -92,6 +91,20 @@ class Distribution extends Model
     public function invoices(): MorphToMany
     {
         return $this->morphedByMany(Invoice::class, 'document', 'distribution_documents', 'distribution_id', 'document_id');
+    }
+
+    /**
+     * Distributions that include the given invoice via distribution_documents.
+     */
+    public static function forInvoiceDocument(int $invoiceId): \Illuminate\Database\Eloquent\Collection
+    {
+        return static::query()
+            ->join('distribution_documents', 'distributions.id', '=', 'distribution_documents.distribution_id')
+            ->where('distribution_documents.document_type', Invoice::class)
+            ->where('distribution_documents.document_id', $invoiceId)
+            ->orderBy('distributions.created_at', 'desc')
+            ->select('distributions.*')
+            ->get();
     }
 
     public function additionalDocuments(): MorphToMany
@@ -167,12 +180,12 @@ class Distribution extends Model
     public static function getNextSequenceAtomic(int $year, int $departmentId): int
     {
         // Get all sequences (including soft-deleted ones) to find gaps
-        $allSequences = DB::select("
+        $allSequences = DB::select('
             SELECT sequence
             FROM distributions 
             WHERE year = ? AND origin_department_id = ?
             ORDER BY sequence
-        ", [$year, $departmentId]);
+        ', [$year, $departmentId]);
 
         if (empty($allSequences)) {
             return 1; // First sequence
@@ -190,6 +203,7 @@ class Distribution extends Model
 
         // No gaps found, use the next number after the highest
         $maxSequence = max(array_column($allSequences, 'sequence'));
+
         return $maxSequence + 1;
     }
 
@@ -236,6 +250,7 @@ class Distribution extends Model
     {
         // Format: YY/LOCATION/DDS/0001
         $pattern = '/^\d{2}\/[A-Z0-9]+\/DDS\/\d{4}$/';
+
         return preg_match($pattern, $distributionNumber) === 1;
     }
 
@@ -281,7 +296,7 @@ class Distribution extends Model
 
         // Check if current user belongs to destination department
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -310,9 +325,9 @@ class Distribution extends Model
     }
 
     // Status transition methods
-    public function markAsVerifiedBySender(User $user, string $notes = null): bool
+    public function markAsVerifiedBySender(User $user, ?string $notes = null): bool
     {
-        if (!$this->canVerifyBySender()) {
+        if (! $this->canVerifyBySender()) {
             return false;
         }
 
@@ -320,7 +335,7 @@ class Distribution extends Model
             'status' => 'verified_by_sender',
             'sender_verified_at' => now(),
             'sender_verified_by' => $user->id,
-            'sender_verification_notes' => $notes
+            'sender_verification_notes' => $notes,
         ]);
 
         return true;
@@ -328,13 +343,13 @@ class Distribution extends Model
 
     public function markAsSent(): bool
     {
-        if (!$this->canSend()) {
+        if (! $this->canSend()) {
             return false;
         }
 
         $this->update([
             'status' => 'sent',
-            'sent_at' => now()
+            'sent_at' => now(),
         ]);
 
         return true;
@@ -342,21 +357,21 @@ class Distribution extends Model
 
     public function markAsReceived(): bool
     {
-        if (!$this->canReceive()) {
+        if (! $this->canReceive()) {
             return false;
         }
 
         $this->update([
             'status' => 'received',
-            'received_at' => now()
+            'received_at' => now(),
         ]);
 
         return true;
     }
 
-    public function markAsVerifiedByReceiver(User $user, string $notes = null, bool $hasDiscrepancies = false): bool
+    public function markAsVerifiedByReceiver(User $user, ?string $notes = null, bool $hasDiscrepancies = false): bool
     {
-        if (!$this->canVerifyByReceiver()) {
+        if (! $this->canVerifyByReceiver()) {
             return false;
         }
 
@@ -365,7 +380,7 @@ class Distribution extends Model
             'receiver_verified_at' => now(),
             'receiver_verified_by' => $user->id,
             'receiver_verification_notes' => $notes,
-            'has_discrepancies' => $hasDiscrepancies
+            'has_discrepancies' => $hasDiscrepancies,
         ]);
 
         return true;
@@ -373,12 +388,12 @@ class Distribution extends Model
 
     public function markAsCompleted(): bool
     {
-        if (!$this->canComplete()) {
+        if (! $this->canComplete()) {
             return false;
         }
 
         $this->update([
-            'status' => 'completed'
+            'status' => 'completed',
         ]);
 
         return true;

@@ -2,25 +2,43 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ReconcileDetail;
-use App\Models\Invoice;
-use App\Models\Supplier;
-use App\Imports\ReconcileDetailImport;
 use App\Exports\ReconcileExport;
 use App\Exports\ReconcileTemplateExport;
-use Illuminate\Http\Request;
+use App\Imports\ReconcileDetailImport;
+use App\Models\Distribution;
+use App\Models\Invoice;
+use App\Models\ReconcileDetail;
+use App\Models\Supplier;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
-use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\Facades\DataTables;
 
 class ReportsReconcileController extends Controller
 {
+    /**
+     * @var array<int, \Illuminate\Database\Eloquent\Collection<int, Distribution>>
+     */
+    private array $distributionsByInvoiceId = [];
+
+    private function distributionsForInvoice(?Invoice $matchingInvoice): \Illuminate\Support\Collection
+    {
+        if (! $matchingInvoice) {
+            return collect();
+        }
+
+        if (! isset($this->distributionsByInvoiceId[$matchingInvoice->id])) {
+            $this->distributionsByInvoiceId[$matchingInvoice->id] = Distribution::forInvoiceDocument($matchingInvoice->id);
+        }
+
+        return $this->distributionsByInvoiceId[$matchingInvoice->id];
+    }
+
     /**
      * Display the reconcile data page.
      */
@@ -42,22 +60,22 @@ class ReportsReconcileController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         try {
             $file = $request->file('file_upload');
-            $fileName = time() . '_' . $file->getClientOriginalName();
+            $fileName = time().'_'.$file->getClientOriginalName();
 
             // Store file temporarily
             $file->storeAs('file_upload', $fileName, 'public');
 
             // Import data with temporary flag
-            Excel::import(new ReconcileDetailImport, storage_path('app/public/file_upload/' . $fileName));
+            Excel::import(new ReconcileDetailImport, storage_path('app/public/file_upload/'.$fileName));
 
             // Update flag - vendor_id will be set automatically from matched invoices
-            $tempFlag = 'TEMP' . Auth::id();
+            $tempFlag = 'TEMP'.Auth::id();
             $importedCount = ReconcileDetail::where('flag', $tempFlag)->count();
 
             // Set vendor_id from matched invoices if available
@@ -66,7 +84,7 @@ class ReportsReconcileController extends Controller
                 if ($matchingInvoice && $matchingInvoice->supplier_id) {
                     $reconcile->update([
                         'vendor_id' => $matchingInvoice->supplier_id,
-                        'flag' => null
+                        'flag' => null,
                     ]);
                 } else {
                     $reconcile->update(['flag' => null]);
@@ -74,18 +92,19 @@ class ReportsReconcileController extends Controller
             });
 
             // Clean up uploaded file
-            Storage::disk('public')->delete('file_upload/' . $fileName);
+            Storage::disk('public')->delete('file_upload/'.$fileName);
 
             return response()->json([
                 'success' => true,
                 'message' => 'File uploaded and processed successfully!',
-                'imported_count' => $importedCount
+                'imported_count' => $importedCount,
             ]);
         } catch (\Exception $e) {
-            Log::error('Upload error: ' . $e->getMessage());
+            Log::error('Upload error: '.$e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error processing file: ' . $e->getMessage()
+                'message' => 'Error processing file: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -102,7 +121,7 @@ class ReportsReconcileController extends Controller
             if (request()->ajax()) {
                 return response()->json([
                     'success' => true,
-                    'message' => "Deleted {$deletedCount} reconcile records successfully!"
+                    'message' => "Deleted {$deletedCount} reconcile records successfully!",
                 ]);
             }
 
@@ -110,19 +129,19 @@ class ReportsReconcileController extends Controller
             return redirect()->route('reconcile.index')
                 ->with('success', "Deleted {$deletedCount} reconcile records successfully!");
         } catch (\Exception $e) {
-            Log::error('Error deleting reconcile data: ' . $e->getMessage());
+            Log::error('Error deleting reconcile data: '.$e->getMessage());
 
             // If it's an AJAX request, return JSON error
             if (request()->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Error deleting data: ' . $e->getMessage()
+                    'message' => 'Error deleting data: '.$e->getMessage(),
                 ], 500);
             }
 
             // Otherwise, redirect with error message
             return redirect()->back()
-                ->with('error', 'Error deleting data: ' . $e->getMessage());
+                ->with('error', 'Error deleting data: '.$e->getMessage());
         }
     }
 
@@ -137,7 +156,7 @@ class ReportsReconcileController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return Excel::download(new ReconcileExport($reconciles), 'reconcile_data_' . date('Y-m-d_H-i-s') . '.xlsx');
+        return Excel::download(new ReconcileExport($reconciles), 'reconcile_data_'.date('Y-m-d_H-i-s').'.xlsx');
     }
 
     /**
@@ -160,6 +179,7 @@ class ReportsReconcileController extends Controller
                 if ($matchingInvoice && $matchingInvoice->supplier) {
                     return $matchingInvoice->supplier->name;
                 }
+
                 return $reconcile->supplier ? $reconcile->supplier->name : 'N/A';
             })
             ->addColumn('user_name', function ($reconcile) {
@@ -170,6 +190,7 @@ class ReportsReconcileController extends Controller
             })
             ->addColumn('matching_invoice', function ($reconcile) {
                 $matchingInvoice = $reconcile->matching_invoice;
+
                 return $matchingInvoice ? $matchingInvoice->invoice_number : 'No Match';
             })
             ->addColumn('invoice_date', function ($reconcile) {
@@ -178,27 +199,30 @@ class ReportsReconcileController extends Controller
                 if ($matchingInvoice && $matchingInvoice->invoice_date) {
                     return $matchingInvoice->invoice_date->format('d-M-Y');
                 }
+
                 return $reconcile->invoice_date ? $reconcile->invoice_date->format('d-M-Y') : 'N/A';
             })
             ->addColumn('distribution_number', function ($reconcile) {
-                $matchingInvoice = $reconcile->matching_invoice;
-                if ($matchingInvoice) {
-                    // Use direct query through distribution_documents pivot table to ensure we get all distributions
-                    // This is more reliable than relying on the morphedByMany relationship loading
-                    $directDistributions = \App\Models\Distribution::join('distribution_documents', 'distributions.id', '=', 'distribution_documents.distribution_id')
-                        ->where('distribution_documents.document_type', \App\Models\Invoice::class)
-                        ->where('distribution_documents.document_id', $matchingInvoice->id)
-                        ->orderBy('distributions.created_at', 'desc')
-                        ->select('distributions.*')
-                        ->get();
-                    
-                    if ($directDistributions->isNotEmpty()) {
-                        return $directDistributions
-                            ->pluck('distribution_number')
-                            ->filter()
-                            ->implode(', ');
-                    }
+                $directDistributions = $this->distributionsForInvoice($reconcile->matching_invoice);
+                if ($directDistributions->isNotEmpty()) {
+                    return $directDistributions
+                        ->pluck('distribution_number')
+                        ->filter()
+                        ->implode(', ');
                 }
+
+                return 'N/A';
+            })
+            ->addColumn('distribution_date', function ($reconcile) {
+                $directDistributions = $this->distributionsForInvoice($reconcile->matching_invoice);
+                if ($directDistributions->isNotEmpty()) {
+                    return $directDistributions
+                        ->map(fn (Distribution $d) => $d->local_sent_at
+                            ? $d->local_sent_at->format('d-M-Y')
+                            : 'N/A')
+                        ->implode(', ');
+                }
+
                 return 'N/A';
             })
             ->addColumn('created_at_formatted', function ($reconcile) {
@@ -213,10 +237,10 @@ class ReportsReconcileController extends Controller
                     default => 'badge-secondary'
                 };
 
-                return '<span class="badge ' . $badgeClass . '">' . ucfirst(str_replace('_', ' ', $status)) . '</span>';
+                return '<span class="badge '.$badgeClass.'">'.ucfirst(str_replace('_', ' ', $status)).'</span>';
             })
             ->addColumn('actions', function ($reconcile) {
-                return '<button class="btn btn-sm btn-info" onclick="viewDetails(' . $reconcile->id . ')">
+                return '<button class="btn btn-sm btn-info" onclick="viewDetails('.$reconcile->id.')">
                     <i class="fas fa-eye"></i> View
                 </button>';
             })
@@ -229,12 +253,12 @@ class ReportsReconcileController extends Controller
      */
     public function getInvoiceIrr(string $invoiceNo): JsonResponse
     {
-        $invoice = Invoice::where('invoice_number', 'LIKE', '%' . $invoiceNo . '%')
-            ->orWhere('faktur_no', 'LIKE', '%' . $invoiceNo . '%')
+        $invoice = Invoice::where('invoice_number', 'LIKE', '%'.$invoiceNo.'%')
+            ->orWhere('faktur_no', 'LIKE', '%'.$invoiceNo.'%')
             ->with(['supplier', 'type'])
             ->first();
 
-        if (!$invoice) {
+        if (! $invoice) {
             return response()->json(['message' => 'No matching invoice found'], 404);
         }
 
@@ -250,7 +274,7 @@ class ReportsReconcileController extends Controller
                 'payment_date' => $invoice->payment_date ? $invoice->payment_date->format('Y-m-d') : null,
                 'status' => $invoice->status,
                 'payment_status' => $invoice->payment_status,
-            ]
+            ],
         ]);
     }
 
@@ -296,7 +320,8 @@ class ReportsReconcileController extends Controller
 
             return response()->json($suppliers);
         } catch (\Exception $e) {
-            Log::error('Error loading suppliers: ' . $e->getMessage());
+            Log::error('Error loading suppliers: '.$e->getMessage());
+
             return response()->json(['error' => 'Failed to load suppliers'], 500);
         }
     }
@@ -327,7 +352,7 @@ class ReportsReconcileController extends Controller
 
         // Match rate: (matched + partial_match) / total * 100
         // This considers both fully matched and partially matched as successful matches
-        $matchRate = $totalRecords > 0 
+        $matchRate = $totalRecords > 0
             ? round((($matchedRecords + $partialMatchRecords) / $totalRecords) * 100, 2)
             : 0;
 
@@ -351,7 +376,7 @@ class ReportsReconcileController extends Controller
      */
     public function downloadTemplate()
     {
-        return Excel::download(new ReconcileTemplateExport, 'reconcile_template_' . date('Y-m-d') . '.xlsx');
+        return Excel::download(new ReconcileTemplateExport, 'reconcile_template_'.date('Y-m-d').'.xlsx');
     }
 
     /**

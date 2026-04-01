@@ -80,6 +80,7 @@
                                     <th>Invoice Date</th>
                                     <th>Matching Status</th>
                                     <th>Distribution Number</th>
+                                    <th>Distribution Sent Date</th>
                                     <th>Uploaded By</th>
                                     <th>Uploaded At</th>
                                     <th>Actions</th>
@@ -297,6 +298,11 @@
                         orderable: false
                     },
                     {
+                        data: 'distribution_date',
+                        name: 'distribution_date',
+                        orderable: false
+                    },
+                    {
                         data: 'user_name',
                         name: 'user_name'
                     },
@@ -312,7 +318,7 @@
                     }
                 ],
                 order: [
-                    [6, 'desc']
+                    [7, 'desc']
                 ],
                 responsive: true,
                 lengthChange: true,
