@@ -35,9 +35,19 @@ return [
         ],
     ],
 
+    'domain_assistant' => [
+        'enabled' => filter_var(env('DOMAIN_ASSISTANT_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'tools_enabled' => filter_var(env('DOMAIN_ASSISTANT_TOOLS_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'streaming_enabled' => filter_var(env('DOMAIN_ASSISTANT_STREAMING_ENABLED', true), FILTER_VALIDATE_BOOL),
+        // Max user messages per calendar day (0 = unlimited). Counts assistant chat user turns only.
+        'daily_user_message_limit' => (int) env('DOMAIN_ASSISTANT_DAILY_USER_LIMIT', 0),
+    ],
+
     'openrouter' => [
         'key' => env('OPEN_ROUTER_API_KEY', env('OPENROUTER_API_KEY')),
         'model' => env('OPEN_ROUTER_MODEL', env('OPENROUTER_MODEL', 'openai/gpt-4o')),
+        'chat_model' => env('OPEN_ROUTER_CHAT_MODEL', env('OPENROUTER_CHAT_MODEL')),
+        'chat_timeout' => (int) env('OPEN_ROUTER_CHAT_TIMEOUT', env('OPENROUTER_CHAT_TIMEOUT', 120)),
         'base_url' => rtrim(env('OPEN_ROUTER_BASE_URL', env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')), '/'),
         'timeout' => (int) env('OPEN_ROUTER_TIMEOUT', env('OPENROUTER_TIMEOUT', 120)),
         'pdf_timeout' => (int) env('OPEN_ROUTER_PDF_TIMEOUT', env('OPENROUTER_PDF_TIMEOUT', 240)),

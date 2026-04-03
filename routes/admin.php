@@ -36,4 +36,6 @@ Route::prefix('admin')->name('admin.')->middleware(['role:superadmin|admin'])->g
     Route::get('document-status/additional-documents', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'additionalDocuments'])->name('document-status.additional-documents');
     Route::post('document-status/reset', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'resetStatus'])->name('document-status.reset');
     Route::post('document-status/bulk-reset', [\App\Http\Controllers\Admin\DocumentStatusController::class, 'bulkResetStatus'])->name('document-status.bulk-reset');
+
+    Route::get('assistant-report', [\App\Http\Controllers\Admin\AssistantReportController::class, 'index'])->name('assistant-report.index');
 });

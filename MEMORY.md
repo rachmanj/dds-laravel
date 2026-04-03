@@ -1,3 +1,9 @@
+### 2026-04-02 — Domain Assistant: threads, admin log, `supplier_query` on invoices
+
+**Domain Assistant** (`access-domain-assistant`): multi-thread conversations via `/assistant/conversations/*` + session; **`conversation_id`** on chat; admin **`/admin/assistant-report`** for **`assistant_request_logs`** with filters. **`search_invoices`** now supports **`supplier_query`** (supplier `name` / `sap_code` substring) so vendor-specific questions do not return unrelated “latest” invoices. Portable write-up: **`docs/DOMAIN-ASSISTANT-REFERENCE.md`**. Architecture: **`docs/architecture.md`** (Domain Assistant section); decision: **`docs/decisions.md`** (2026-04-02).
+
+---
+
 ### 2026-03-30 — SAP ITO sync: CLI + audit + UI history
 
 Production ITO sync can run via **`php artisan sap:sync-ito`** (`--today` / `--yesterday` / `--start` + `--end`; **`--user` defaults to 1**). **`SyncSapItoDocumentsJob`** accepts audit context; **`sap_logs`** `request_payload` for `query_sync` includes **`trigger`**, **`triggered_by_user_id`**, **`synced_at`**, plus SAP date range and **`method`**. **`/admin/sap-sync-ito`** shows the last **10** sync rows with synced date/time. See `docs/architecture.md`, `docs/decisions.md` (2026-03-30), `docs/SAP-ITO-SYNC-COMPLETE.md`.

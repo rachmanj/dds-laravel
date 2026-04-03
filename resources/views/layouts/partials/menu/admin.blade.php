@@ -1,6 +1,15 @@
 <!-- Divider -->
 <li class="nav-header">ADMIN</li>
 
+<!-- Domain Assistant log -->
+<li class="nav-item">
+    <a href="{{ route('admin.assistant-report.index') }}"
+        class="nav-link {{ request()->routeIs('admin.assistant-report.*') ? 'active' : '' }}">
+        <i class="nav-icon fas fa-robot"></i>
+        <p>Assistant request log</p>
+    </a>
+</li>
+
 <!-- Users -->
 <li class="nav-item">
     <a href="{{ route('admin.users.index') }}" class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">

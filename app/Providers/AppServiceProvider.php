@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
+use App\Models\AssistantConversation;
 use Illuminate\Pagination\Paginator;
-use Laravel\Pennant\Pennant;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
+use Laravel\Pennant\Pennant;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,6 +25,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Route::bind('conversation', function (string $value) {
+            $userId = Auth::id();
+            if ($userId === null) {
+                abort(404);
+            }
+
+            return AssistantConversation::query()
+                ->whereKey($value)
+                ->where('user_id', $userId)
+                ->firstOrFail();
+        });
+
         // Use custom pagination view with FontAwesome icons
         Paginator::defaultView('vendor.pagination.bootstrap-4-custom');
 

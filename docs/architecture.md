@@ -2709,3 +2709,72 @@ All sync operations are logged to `sap_logs` table:
 
 - Text-heavy PDFs: full-document text from `smalot/pdfparser` (subject to length limits in code).
 - Scanned / low-text PDFs: OpenRouter PDF path; if `pdf_first_page_only` is true, multi-page files are trimmed to **page 1** server-side before OCR (see `PdfInvoiceFirstPageService`).
+
+---
+
+### Domain Assistant (AI chat, OpenRouter)
+
+**Status**: Implemented — permission-gated chat with **tool-calling** over DDS data (no ad-hoc SQL from the model), optional **SSE streaming** when tools are disabled, **multi-thread conversations**, **request logging**, and an **admin report** for `assistant_request_logs`.
+
+**Doc deep-dive / porting guide**: [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md)
+
+**Purpose**: Users with `access-domain-assistant` ask natural-language questions (including Indonesian); the app calls **structured tools** (`DomainAssistantDataService`) that enforce the same list/location visibility rules as UI lists, plus optional **“show all records”** when the user has `see-all-record-switch` and enables the toggle.
+
+**High-level flow**
+
+```mermaid
+sequenceDiagram
+    participant U as Browser
+    participant C as DomainAssistantController
+    participant M as AssistantConversationManager
+    participant S as DomainAssistantService
+    participant OR as OpenRouter API
+    participant D as DomainAssistantDataService
+    participant DB as Database
+
+    U->>C: POST /assistant/chat (message, optional conversation_id, show_all_records)
+    C->>M: resolveConversation (session + optional id)
+    C->>S: appendUserMessageAndComplete (history, tools)
+    loop Tool rounds
+        S->>OR: chat completions + tool_calls
+        OR-->>S: tool name + arguments
+        S->>D: execute tool (scoped queries)
+        D->>DB: Eloquent (permission-scoped)
+        DB-->>D: rows / counts
+        D-->>S: JSON tool result
+        S->>OR: submit tool results
+    end
+    OR-->>S: assistant message
+    S-->>C: reply + tools_invoked
+    C->>M: appendExchange (persist messages)
+    C->>DB: AssistantRequestLog (optional)
+    C-->>U: JSON or SSE stream
+```
+
+**Key components**
+
+| Area | Path / artifact |
+|------|-----------------|
+| Config | `config/services.php` → `domain_assistant`, `openrouter`; env `DOMAIN_ASSISTANT_*`, `OPEN_ROUTER_*` |
+| Chat UI | `resources/views/assistant/index.blade.php` — terminal-style chat, thread sidebar, suggested prompts |
+| Controller | `app/Http/Controllers/DomainAssistantController.php` — `chat`, `clear`, conversation CRUD JSON, SSE stream |
+| Orchestration | `app/Services/DomainAssistantService.php` — OpenRouter loop, **tool definitions**, `executeTool` |
+| Data access | `app/Services/DomainAssistantDataService.php` — `invoicesVisibleQuery`, `search_invoices` (incl. **`supplier_query`**), suppliers, distributions, reconcile, summary |
+| Sessions / threads | `app/Services/AssistantConversationManager.php` — session key `domain_assistant.conversation_id`, titles from first user message |
+| Models | `AssistantConversation`, `AssistantMessage`, `AssistantRequestLog` |
+| Route binding | `AppServiceProvider` — `{conversation}` scoped to `auth()->id()` |
+| Routes | `routes/web.php` — prefix `assistant`, middleware `can:access-domain-assistant` |
+| Admin report | `routes/admin.php` — `admin/assistant-report` → `AssistantReportController@index`; menu in `resources/views/layouts/partials/menu/admin.blade.php` |
+| i18n | `lang/en/assistant.php` |
+
+**Persistence**
+
+- `assistant_conversations` — `user_id`, optional `title`
+- `assistant_messages` — `assistant_conversation_id`, `role`, `content`
+- `assistant_request_logs` — `user_id`, `assistant_conversation_id`, `status`, `tools_invoked`, `show_all_records`, `duration_ms`, `error_summary`, `ip_address`, `user_agent`, etc.
+
+**Tool behaviour note (invoices by supplier)**
+
+- `search_invoices` accepts optional **`supplier_query`**: filters invoices via `whereHas('supplier', …)` on supplier **name** and **SAP code** (substring), so requests like “10 invoice terakhir dari [nama vendor]” return that vendor’s rows instead of globally latest invoices.
+
+**References**: [`docs/decisions.md`](decisions.md) (Domain Assistant, 2026-04-02), [`docs/todo.md`](todo.md), [`MEMORY.md`](../MEMORY.md), [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md).

@@ -47,6 +47,18 @@
                 <!-- Divider -->
                 <li class="nav-header">MAIN</li>
 
+                @if (config('services.domain_assistant.enabled'))
+                    @can('access-domain-assistant')
+                        <li class="nav-item">
+                            <a href="{{ route('assistant.index') }}"
+                                class="nav-link {{ request()->is('assistant*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-robot"></i>
+                                <p>Domain Assistant</p>
+                            </a>
+                        </li>
+                    @endcan
+                @endif
+
                 <!-- Additional Documents Section -->
                 @can('view-additional-documents')
                     @include('layouts.partials.menu.additional-documents')

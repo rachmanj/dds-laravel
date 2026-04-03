@@ -1,14 +1,14 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Models\User;
-use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\Auth\RegisterController;
-use App\Http\Controllers\Auth\LogoutController;
-use App\Http\Controllers\ProcessingAnalyticsController;
 use App\Http\Controllers\AdditionalDocumentController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\DomainAssistantController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\ProcessingAnalyticsController;
 use App\Http\Controllers\SapController;
+use Illuminate\Support\Facades\Route;
 
 // Authentication Routes
 Route::middleware('guest')->group(function () {
@@ -27,6 +27,7 @@ Route::get('/', function () {
     if (\Illuminate\Support\Facades\Auth::check()) {
         return redirect('/welcome');
     }
+
     return redirect('/login');
 });
 
@@ -44,22 +45,33 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::post('/profile/update-password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.update-password');
 
     // Include Additional Documents Routes
-    require __DIR__ . '/additional-docs.php';
+    require __DIR__.'/additional-docs.php';
 
     // Include Invoice Routes
-    require __DIR__ . '/invoice.php';
+    require __DIR__.'/invoice.php';
 
     // Include Distribution Routes
-    require __DIR__ . '/distributions.php';
+    require __DIR__.'/distributions.php';
 
     // Include Admin Routes
-    require __DIR__ . '/admin.php';
+    require __DIR__.'/admin.php';
 
     // Include Reconcile Routes
-    require __DIR__ . '/reconcile.php';
+    require __DIR__.'/reconcile.php';
 
     // Include Accounting Fulfillment Routes
-    require __DIR__ . '/accounting-fulfillment.php';
+    require __DIR__.'/accounting-fulfillment.php';
+
+    Route::middleware(['can:access-domain-assistant'])->prefix('assistant')->name('assistant.')->group(function () {
+        Route::get('/conversations', [DomainAssistantController::class, 'conversationsIndex'])->name('conversations.index');
+        Route::post('/conversations', [DomainAssistantController::class, 'conversationsStore'])->name('conversations.store');
+        Route::get('/conversations/{conversation}/messages', [DomainAssistantController::class, 'conversationMessages'])->name('conversations.messages');
+        Route::patch('/conversations/{conversation}/select', [DomainAssistantController::class, 'selectConversation'])->name('conversations.select');
+        Route::delete('/conversations/{conversation}', [DomainAssistantController::class, 'destroyConversation'])->name('conversations.destroy');
+        Route::get('/', [DomainAssistantController::class, 'index'])->name('index');
+        Route::post('/chat', [DomainAssistantController::class, 'chat'])->middleware('throttle:30,1')->name('chat');
+        Route::post('/clear', [DomainAssistantController::class, 'clear'])->name('clear');
+    });
 
     // Message Routes
     Route::prefix('messages')->name('messages.')->group(function () {

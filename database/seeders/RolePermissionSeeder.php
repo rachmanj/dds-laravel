@@ -2,10 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -72,7 +71,7 @@ class RolePermissionSeeder extends Seeder
             'edit-suppliers',
             'delete-suppliers',
 
-            //Master
+            // Master
             'view-admin',
             'view-master',
 
@@ -93,6 +92,9 @@ class RolePermissionSeeder extends Seeder
             'upload-reconcile',
             'export-reconcile',
             'delete-reconcile',
+
+            // Domain assistant (AI chat, product domain)
+            'access-domain-assistant',
         ];
 
         foreach ($permissions as $permission) {
@@ -147,6 +149,7 @@ class RolePermissionSeeder extends Seeder
             'delete-reconcile',
             'view-master',
             'view-admin',
+            'access-domain-assistant',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);

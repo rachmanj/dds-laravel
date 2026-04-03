@@ -1,3 +1,25 @@
+## 2026-04-02 — Domain Assistant: multi-thread UI, admin request log, invoice search by supplier
+
+-   **Context**: The assistant exposed only a single implicit conversation; operators needed visibility into `assistant_request_logs`; users reported **irrelevant invoice lists** when asking for “latest invoices from [vendor]” because `search_invoices` had no supplier filter and returned globally newest rows.
+
+-   **Decision**:
+    1. **Threads** — REST-style JSON under `/assistant/conversations` (list, create, messages, select, delete) plus optional `conversation_id` on `POST /assistant/chat`; **`Route::bind('conversation', …)`** scopes `{conversation}` to the current user’s `assistant_conversations` rows.
+    2. **Admin report** — `AssistantReportController@index` at **`/admin/assistant-report`** with filters (user, status, date range), pagination, same **admin|superadmin** middleware as other admin routes; sidebar link in admin menu.
+    3. **Supplier-scoped invoices** — extend **`search_invoices`** with optional **`supplier_query`**: `whereHas('supplier', …)` on name and `sap_code` (LIKE, escaped `%`/`_`); update OpenRouter **tool schema** and **system prompt** so the model passes `supplier_query` when the user names a vendor (any language).
+
+-   **Alternatives considered**:
+    1. **Only prompt engineering (no `supplier_query`)** — Rejected; the tool could not express the filter.
+    2. **Require two-step: `search_suppliers` then invoice by id** — Possible but heavier; single-parameter filter is simpler for the model and fewer round trips.
+    3. **Separate microservice for assistant** — Rejected; keeps deployment aligned with Laravel app.
+
+-   **Trade-offs**: Substring match may miss if the spoken name differs from master data; users can shorten the query or confirm via `search_suppliers`. Admin report can grow large; filters + pagination mitigate.
+
+-   **Review date**: 2026-10-02 (6 months)
+
+-   **References**: [`docs/architecture.md`](architecture.md) (Domain Assistant), [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md), [`app/Services/DomainAssistantDataService.php`](../app/Services/DomainAssistantDataService.php) (`searchInvoices`), [`app/Services/DomainAssistantService.php`](../app/Services/DomainAssistantService.php).
+
+---
+
 ## 2026-03-30 — SAP ITO sync: Artisan command, audit payload, admin activity table
 
 -   **Context**: ITO sync was only exposed as a web form and `sap:test-sync` (diagnostic). Operators need a stable CLI for cron; compliance needs to know **who** triggered a run and **when**; the UI should surface recent runs without querying the DB manually.

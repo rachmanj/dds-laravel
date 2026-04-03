@@ -72,4 +72,12 @@
     }
 </script>
 
+@if (session('error'))
+    <script>
+        if (typeof toastr !== 'undefined') {
+            toastr.error(@json(session('error')));
+        }
+    </script>
+@endif
+
 @yield('scripts')

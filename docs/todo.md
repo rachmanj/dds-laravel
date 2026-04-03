@@ -2,6 +2,26 @@
 
 ## ✅ **Recently Completed**
 
+### **Domain Assistant — threads, admin log report, invoice supplier filter** ✅ **COMPLETED**
+
+**Status**: ✅ Shipped — multi-conversation API + UI, admin `assistant_request_logs` report, `search_invoices.supplier_query` for vendor-scoped lists  
+**Implementation / doc refresh**: 2026-04-02  
+**Priority**: MEDIUM — AI assistant accuracy and operability
+
+**Summary**:
+
+1. **Threads** — `GET/POST/PATCH/DELETE` under `/assistant/conversations/*`; session-backed active conversation; Blade sidebar (“New chat”, switch, delete); `conversation_id` on chat/stream; route model binding for `{conversation}` in `AppServiceProvider`.
+2. **Admin report** — `GET /admin/assistant-report` (role `superadmin|admin`): filters (user, status, date range), paginated `assistant_request_logs` with user context; nav link in admin menu.
+3. **Invoice tool fix** — `search_invoices` optional **`supplier_query`** (supplier name / SAP code substring) so “latest invoices from [vendor]” does not return unrelated global rows; system prompt + tool schema updated.
+
+**Key files**: `app/Services/DomainAssistantService.php`, `DomainAssistantDataService.php`, `AssistantConversationManager.php`, `DomainAssistantController.php`, `routes/web.php`, `routes/admin.php`, `app/Http/Controllers/Admin/AssistantReportController.php`, `resources/views/assistant/index.blade.php`, `resources/views/admin/assistant-report/index.blade.php`, `app/Providers/AppServiceProvider.php`.
+
+**Docs**: [`docs/architecture.md`](architecture.md) (Domain Assistant section), [`docs/decisions.md`](decisions.md) (2026-04-02), [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md), [`MEMORY.md`](../MEMORY.md).
+
+**Tests**: `tests/Feature/AssistantThreadsAndReportTest.php`, `tests/Feature/DomainAssistantInvoiceSupplierFilterTest.php`, existing `DomainAssistantTest`.
+
+---
+
 ### **SAP ITO sync — Artisan command, audit log, UI activity table** ✅ **COMPLETED**
 
 **Status**: ✅ Shipped — `sap:sync-ito` command, enriched `sap_logs` audit payload, last-10 sync history on admin page  
