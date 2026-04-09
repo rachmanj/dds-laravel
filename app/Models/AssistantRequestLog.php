@@ -18,10 +18,12 @@ class AssistantRequestLog extends Model
         'tools_invoked',
         'show_all_records',
         'user_message_length',
+        'user_message',
         'duration_ms',
         'error_summary',
         'ip_address',
         'user_agent',
+        'telegram_chat_id',
     ];
 
     protected function casts(): array

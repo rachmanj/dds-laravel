@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
@@ -31,8 +32,9 @@ class UserController extends Controller
             ->addColumn('roles', function ($user) {
                 $roles = '';
                 foreach ($user->roles as $role) {
-                    $roles .= '<span class="badge badge-primary mr-1">' . $role->name . '</span>';
+                    $roles .= '<span class="badge badge-primary mr-1">'.$role->name.'</span>';
                 }
+
                 return $roles;
             })
             ->addColumn('status', function ($user) {
@@ -44,8 +46,9 @@ class UserController extends Controller
             })
             ->addColumn('project_info', function ($user) {
                 if ($user->projectInfo) {
-                    return $user->projectInfo->code . ' - ' . $user->projectInfo->owner;
+                    return $user->projectInfo->code.' - '.$user->projectInfo->owner;
                 }
+
                 return $user->project ?: '-';
             })
             ->addColumn('department_location', function ($user) {
@@ -53,26 +56,25 @@ class UserController extends Controller
             })
             ->addColumn('actions', function ($user) {
                 $actions = '<div class="btn-group" style="gap:2px;">';
-                $actions .= '<a href="' . route('admin.users.show', $user) . '" class="btn btn-info btn-xs" title="View User"><i class="fas fa-eye"></i></a>';
-                $actions .= '<a href="' . route('admin.users.edit', $user) . '" class="btn btn-warning btn-xs" title="Edit User"><i class="fas fa-edit"></i></a>';
+                $actions .= '<a href="'.route('admin.users.show', $user).'" class="btn btn-info btn-xs" title="View User"><i class="fas fa-eye"></i></a>';
+                $actions .= '<a href="'.route('admin.users.edit', $user).'" class="btn btn-warning btn-xs" title="Edit User"><i class="fas fa-edit"></i></a>';
 
                 // Toggle status button
                 $statusBtnClass = $user->is_active ? 'btn-secondary' : 'btn-success';
                 $statusBtnTitle = $user->is_active ? 'Deactivate User' : 'Activate User';
                 $statusBtnIcon = $user->is_active ? 'fa-user-slash' : 'fa-user-check';
-                $actions .= '<button type="button" class="btn ' . $statusBtnClass . ' btn-xs toggle-status" data-id="' . $user->id . '" data-name="' . $user->name . '" data-active="' . ($user->is_active ? '1' : '0') . '" title="' . $statusBtnTitle . '"><i class="fas ' . $statusBtnIcon . '"></i></button>';
+                $actions .= '<button type="button" class="btn '.$statusBtnClass.' btn-xs toggle-status" data-id="'.$user->id.'" data-name="'.$user->name.'" data-active="'.($user->is_active ? '1' : '0').'" title="'.$statusBtnTitle.'"><i class="fas '.$statusBtnIcon.'"></i></button>';
 
                 if ($user->id !== \Illuminate\Support\Facades\Auth::id()) {
-                    $actions .= '<button type="button" class="btn btn-danger btn-xs delete-user" data-id="' . $user->id . '" data-name="' . $user->name . '" title="Delete User"><i class="fas fa-trash"></i></button>';
+                    $actions .= '<button type="button" class="btn btn-danger btn-xs delete-user" data-id="'.$user->id.'" data-name="'.$user->name.'" title="Delete User"><i class="fas fa-trash"></i></button>';
                 }
                 $actions .= '</div>';
+
                 return $actions;
             })
             ->rawColumns(['roles', 'status', 'project_info', 'department_location', 'actions'])
             ->make(true);
     }
-
-
 
     public function store(Request $request)
     {
@@ -112,6 +114,7 @@ class UserController extends Controller
     public function show(User $user)
     {
         $user->load('roles', 'permissions');
+
         return view('admin.users.show', compact('user'));
     }
 
@@ -120,6 +123,7 @@ class UserController extends Controller
         $roles = Role::all();
         $departments = \App\Models\Department::orderBy('name', 'asc')->get();
         $projects = \App\Models\Project::active()->get();
+
         return view('admin.users.create', compact('roles', 'departments', 'projects'));
     }
 
@@ -129,23 +133,23 @@ class UserController extends Controller
         $departments = \App\Models\Department::orderBy('name', 'asc')->get();
         $projects = \App\Models\Project::active()->get();
         $user->load('roles');
+
         return view('admin.users.edit', compact('user', 'roles', 'departments', 'projects'));
     }
-
-
 
     public function update(Request $request, User $user)
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'nik' => ['nullable', 'string', 'max:255'],
-            'username' => ['nullable', 'string', 'max:255', 'unique:users,username,' . $user->id],
+            'username' => ['nullable', 'string', 'max:255', 'unique:users,username,'.$user->id],
             'project' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'is_active' => ['boolean'],
             'roles' => ['array'],
+            'telegram_link_input' => ['nullable', 'string', 'max:255'],
         ]);
 
         $user->update([
@@ -171,6 +175,46 @@ class UserController extends Controller
             $user->syncRoles([]);
         }
 
+        if ($request->boolean('telegram_clear')) {
+            $user->forceFill([
+                'telegram_user_id' => null,
+                'telegram_username' => null,
+            ])->save();
+        } elseif ($request->filled('telegram_link_input')) {
+            $telegramService = app(TelegramBotService::class);
+            if (! $telegramService->isConfigured()) {
+                return redirect()->route('admin.users.edit', $user)
+                    ->with('error', 'Telegram bot is not configured (TELEGRAM_BOT_TOKEN). Telegram link was not saved.')
+                    ->withInput();
+            }
+            $resolved = $telegramService->resolveChatIdentifier($request->string('telegram_link_input')->toString());
+            if ($resolved === null) {
+                $detail = $telegramService->lastApiMessage();
+                $message = 'Could not link this Telegram handle.';
+                if (filled($detail)) {
+                    $message .= ' '.$detail;
+                }
+                $message .= ' For a username: the user must open your bot and press Start (or send any message) so Telegram allows lookup — then try again. Or paste their numeric user ID (digits only from their Telegram app or @userinfobot); numeric IDs can be saved without lookup.';
+
+                return redirect()->route('admin.users.edit', $user)
+                    ->with('error', $message)
+                    ->withInput();
+            }
+            $exists = User::query()
+                ->where('telegram_user_id', $resolved['id'])
+                ->where('id', '!=', $user->id)
+                ->exists();
+            if ($exists) {
+                return redirect()->route('admin.users.edit', $user)
+                    ->with('error', 'This Telegram account is already linked to another DDS user.')
+                    ->withInput();
+            }
+            $user->forceFill([
+                'telegram_user_id' => $resolved['id'],
+                'telegram_username' => $resolved['username'],
+            ])->save();
+        }
+
         return redirect()->route('admin.users.index')
             ->with('success', 'User updated successfully.');
     }
@@ -182,9 +226,10 @@ class UserController extends Controller
             if (request()->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You cannot delete your own account.'
+                    'message' => 'You cannot delete your own account.',
                 ]);
             }
+
             return redirect()->route('admin.users.index')
                 ->with('error', 'You cannot delete your own account.');
         }
@@ -194,7 +239,7 @@ class UserController extends Controller
         if (request()->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => 'User deleted successfully.'
+                'message' => 'User deleted successfully.',
             ]);
         }
 
@@ -207,14 +252,14 @@ class UserController extends Controller
      */
     public function toggleStatus(User $user)
     {
-        $user->update(['is_active' => !$user->is_active]);
+        $user->update(['is_active' => ! $user->is_active]);
 
         $status = $user->is_active ? 'activated' : 'deactivated';
 
         if (request()->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "User {$status} successfully."
+                'message' => "User {$status} successfully.",
             ]);
         }
 

@@ -19,7 +19,7 @@
                 <div class="card-body">
                     <form method="get" action="{{ route('admin.assistant-report.index') }}" class="mb-4">
                         <div class="form-row align-items-end">
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-2">
                                 <label for="filter-user">User</label>
                                 <select name="user_id" id="filter-user" class="form-control">
                                     <option value="">All users</option>
@@ -55,7 +55,17 @@
                                 <input type="date" name="date_to" id="filter-to" class="form-control"
                                     value="{{ request('date_to') }}">
                             </div>
-                            <div class="form-group col-md-3">
+                            <div class="form-group col-md-2">
+                                <label for="filter-per-page">Per page</label>
+                                <select name="per_page" id="filter-per-page" class="form-control">
+                                    @foreach ($allowedPerPage as $n)
+                                        <option value="{{ $n }}" {{ (int) $perPage === $n ? 'selected' : '' }}>
+                                            {{ $n }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group col-md-2">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-filter mr-1"></i> Apply
                                 </button>
@@ -71,6 +81,7 @@
                                     <th>ID</th>
                                     <th>Time (UTC)</th>
                                     <th>User</th>
+                                    <th>Question</th>
                                     <th>Status</th>
                                     <th>Duration</th>
                                     <th>Show all</th>
@@ -79,6 +90,7 @@
                                     <th>Tools</th>
                                     <th>Error</th>
                                     <th>IP</th>
+                                    <th>TG chat</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -92,6 +104,15 @@
                                                 <span class="text-muted small">({{ $log->user->username }})</span>
                                             @else
                                                 —
+                                            @endif
+                                        </td>
+                                        <td class="small" style="max-width: 280px;">
+                                            @if ($log->user_message)
+                                                <span class="d-inline-block text-truncate"
+                                                    style="max-width: 260px; vertical-align: bottom;"
+                                                    title="{{ e($log->user_message) }}">{{ \Illuminate\Support\Str::limit($log->user_message, 160) }}</span>
+                                            @else
+                                                <span class="text-muted" title="Logged before full-text storage was enabled">—</span>
                                             @endif
                                         </td>
                                         <td>
@@ -127,18 +148,36 @@
                                             @endif
                                         </td>
                                         <td class="small text-nowrap">{{ $log->ip_address }}</td>
+                                        <td class="small text-nowrap">
+                                            @if ($log->telegram_chat_id)
+                                                {{ $log->telegram_chat_id }}
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="11" class="text-center text-muted">No log rows match the filters.</td>
+                                        <td colspan="13" class="text-center text-muted">No log rows match the filters.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="d-flex justify-content-center">
-                        {{ $logs->links() }}
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mt-3">
+                        <p class="text-muted small mb-2 mb-md-0">
+                            @if ($logs->total() > 0)
+                                Showing <strong>{{ $logs->firstItem() }}</strong>–<strong>{{ $logs->lastItem() }}</strong>
+                                of <strong>{{ $logs->total() }}</strong>
+                                {{ $logs->total() === 1 ? 'entry' : 'entries' }}
+                            @else
+                                No entries match the current filters.
+                            @endif
+                        </p>
+                        <div>
+                            {{ $logs->links() }}
+                        </div>
                     </div>
                 </div>
             </div>

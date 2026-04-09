@@ -53,6 +53,19 @@ class AssistantConversationManager
         return $conversation;
     }
 
+    public function getOrCreateTelegramConversation(User $user, int $telegramChatId): AssistantConversation
+    {
+        return AssistantConversation::query()->firstOrCreate(
+            [
+                'user_id' => $user->id,
+                'telegram_chat_id' => $telegramChatId,
+            ],
+            [
+                'title' => null,
+            ]
+        );
+    }
+
     public function selectConversation(Request $request, User $user, AssistantConversation $conversation): void
     {
         abort_unless($conversation->user_id === $user->id, 404);

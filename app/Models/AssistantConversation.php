@@ -10,6 +10,7 @@ class AssistantConversation extends Model
 {
     protected $fillable = [
         'user_id',
+        'telegram_chat_id',
         'title',
     ];
 

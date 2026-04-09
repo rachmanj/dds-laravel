@@ -34,7 +34,13 @@ class AssistantReportController extends Controller
             $query->whereDate('created_at', '<=', $request->date('date_to'));
         }
 
-        $logs = $query->orderByDesc('id')->paginate(50)->withQueryString();
+        $allowedPerPage = [10, 25, 50, 100];
+        $perPage = (int) $request->input('per_page', 50);
+        if (! in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 50;
+        }
+
+        $logs = $query->orderByDesc('id')->paginate($perPage)->withQueryString();
 
         $users = User::query()
             ->where('is_active', true)
@@ -46,6 +52,8 @@ class AssistantReportController extends Controller
         return view('admin.assistant-report.index', [
             'logs' => $logs,
             'users' => $users,
+            'perPage' => $perPage,
+            'allowedPerPage' => $allowedPerPage,
         ]);
     }
 }

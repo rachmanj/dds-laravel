@@ -156,6 +156,57 @@
                                     @enderror
                                 </div>
 
+                                @if (session('error'))
+                                    <div class="alert alert-danger">{{ session('error') }}</div>
+                                @endif
+
+                                <div class="card card-outline card-secondary mb-3">
+                                    <div class="card-header">
+                                        <h4 class="card-title mb-0">Telegram — Domain Assistant</h4>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="text-muted small">
+                                            Link this DDS user to their Telegram account so they can chat with the Domain Assistant in Telegram.
+                                            Paste <strong>digits only</strong> (numeric Telegram user ID) — this works even if username lookup fails.
+                                            For <strong>@username</strong>, the user should open your bot and press <strong>Start</strong> first; if Telegram still says “chat not found”, use the numeric ID instead.
+                                        </p>
+                                        <p class="text-muted small mb-2"><strong>Where to get the numeric user ID?</strong> Telegram does not show it in normal settings. Ask the user to open a bot such as
+                                            <strong>@userinfobot</strong> or <strong>@getidsbot</strong>, tap <strong>Start</strong>, and copy the <strong>Id</strong> / <strong>User ID</strong> number they receive (e.g. <code>123456789</code>). Paste only that number here. For linking another person, they must send you their ID from their own Telegram.
+                                        </p>
+                                        @if ($user->telegram_user_id)
+                                            <p class="mb-2">
+                                                <strong>Linked:</strong>
+                                                ID {{ $user->telegram_user_id }}
+                                                @if ($user->telegram_username)
+                                                    — {{ '@'.$user->telegram_username }}
+                                                @endif
+                                            </p>
+                                        @else
+                                            <p class="text-muted small mb-2">Not linked.</p>
+                                        @endif
+                                        <div class="form-group">
+                                            <label for="telegram_link_input">Telegram user ID or @username</label>
+                                            <input type="text" class="form-control @error('telegram_link_input') is-invalid @enderror"
+                                                id="telegram_link_input" name="telegram_link_input"
+                                                value="{{ old('telegram_link_input') }}"
+                                                placeholder="e.g. 123456789 or @username"
+                                                autocomplete="off">
+                                            @error('telegram_link_input')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="form-group mb-0">
+                                            <div class="custom-control custom-checkbox">
+                                                <input type="checkbox" class="custom-control-input" id="telegram_clear"
+                                                    name="telegram_clear" value="1"
+                                                    {{ old('telegram_clear') ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="telegram_clear">Clear Telegram
+                                                    link</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="form-group">
                                     <label>Roles</label>
                                     <div class="row">

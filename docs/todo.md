@@ -2,6 +2,26 @@
 
 ## ✅ **Recently Completed**
 
+### **Domain Assistant — Telegram parity, webhook CLI, admin log question text** ✅ **COMPLETED**
+
+**Status**: ✅ Shipped — `DomainAssistantListScope` (web vs Telegram), `telegram:set-webhook`, `user_message` on logs, report pagination  
+**Implementation / doc refresh**: 2026-04-09  
+**Priority**: MEDIUM — Same assistant behaviour across web and Telegram; operability + audit
+
+**Summary**:
+
+1. **`App\Support\DomainAssistantListScope`** — **`fromWebRequest`** / **`forTelegram`** so invoice/additional-document scope matches web unless **`TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS`** is set.
+2. **Telegram** — Default **`dispatchSync`** (`TELEGRAM_ASSISTANT_DISPATCH_SYNC`); Artisan **`telegram:set-webhook`** with **`--url`** for ngrok; HTTPS-only webhook.
+3. **Admin report** — **`user_message`** column, per-page filter, **Question** + **TG chat** columns.
+
+**Key files**: `app/Support/DomainAssistantListScope.php`, `ProcessTelegramDomainAssistantMessage.php`, `TelegramWebhookController.php`, `TelegramSetWebhookCommand.php`, `AssistantReportController.php`, `AssistantRequestLogger.php`, migration `add_user_message_to_assistant_request_logs_table`.
+
+**Docs**: [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-04-09), [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md), [`MEMORY.md`](../MEMORY.md).
+
+**Tests**: `TelegramDomainAssistantWebhookTest`, `AssistantThreadsAndReportTest`, `DomainAssistantInvoiceSupplierFilterTest`.
+
+---
+
 ### **Domain Assistant — threads, admin log report, invoice supplier filter** ✅ **COMPLETED**
 
 **Status**: ✅ Shipped — multi-conversation API + UI, admin `assistant_request_logs` report, `search_invoices.supplier_query` for vendor-scoped lists  

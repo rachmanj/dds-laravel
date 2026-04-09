@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AssistantChatRequest;
 use App\Models\AssistantConversation;
 use App\Models\AssistantMessage;
-use App\Models\AssistantRequestLog;
 use App\Services\AssistantConversationManager;
+use App\Services\AssistantRequestLogger;
 use App\Services\DomainAssistantService;
+use App\Support\DomainAssistantListScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -54,8 +54,7 @@ class DomainAssistantController extends Controller
 
         $validated = $request->validated();
         $conversationId = isset($validated['conversation_id']) ? (int) $validated['conversation_id'] : null;
-        $showAllRecords = $request->boolean('show_all_records')
-            && $user->can('see-all-record-switch');
+        $showAllRecords = DomainAssistantListScope::fromWebRequest($user, $request);
 
         if ($this->assistantWantsStreamResponse($request)) {
             return $this->streamAssistantChat(
@@ -80,27 +79,37 @@ class DomainAssistantController extends Controller
                 $showAllRecords
             );
             $conversations->appendExchange($conversation, $validated['message'], $result['reply']);
-            $this->writeAssistantLog(
-                $request,
+            AssistantRequestLogger::log(
+                $request->user(),
                 $conversation,
                 $result['tools_invoked'],
                 $showAllRecords,
+                mb_strlen((string) $request->input('message', '')),
+                (string) $request->input('message', ''),
                 $started,
                 true,
-                null
+                null,
+                $request->ip(),
+                (string) $request->userAgent(),
+                null,
             );
 
             return response()->json(['message' => $result['reply']]);
         } catch (Throwable $e) {
             report($e);
-            $this->writeAssistantLog(
-                $request,
+            AssistantRequestLogger::log(
+                $request->user(),
                 $conversation,
                 [],
                 $showAllRecords,
+                mb_strlen((string) $request->input('message', '')),
+                (string) $request->input('message', ''),
                 $started,
                 false,
-                $e->getMessage()
+                $e->getMessage(),
+                $request->ip(),
+                (string) $request->userAgent(),
+                null,
             );
 
             return response()->json(['error' => 'The assistant could not complete this request. Please try again.'], 503);
@@ -120,6 +129,7 @@ class DomainAssistantController extends Controller
         $activeId = $request->session()->get(AssistantConversationManager::SESSION_CONVERSATION_ID);
         $rows = AssistantConversation::query()
             ->where('user_id', $user->id)
+            ->whereNull('telegram_chat_id')
             ->orderByDesc('updated_at')
             ->limit(50)
             ->get(['id', 'title', 'updated_at']);
@@ -196,41 +206,6 @@ class DomainAssistantController extends Controller
         return $request->boolean('stream');
     }
 
-    /**
-     * @param  list<string>  $toolsInvoked
-     */
-    private function writeAssistantLog(
-        Request $request,
-        AssistantConversation $conversation,
-        array $toolsInvoked,
-        bool $showAllRecords,
-        int|float $startedHrTime,
-        bool $success,
-        ?string $errorSummary
-    ): void {
-        $durationMs = (int) round((hrtime(true) - $startedHrTime) / 1_000_000);
-
-        try {
-            AssistantRequestLog::query()->create([
-                'user_id' => $request->user()->id,
-                'assistant_conversation_id' => $conversation->id,
-                'status' => $success ? AssistantRequestLog::STATUS_SUCCESS : AssistantRequestLog::STATUS_ERROR,
-                'tools_invoked' => $toolsInvoked !== [] ? $toolsInvoked : null,
-                'show_all_records' => $showAllRecords,
-                'user_message_length' => mb_strlen((string) $request->input('message', '')),
-                'duration_ms' => $durationMs,
-                'error_summary' => $errorSummary !== null ? mb_substr($errorSummary, 0, 500) : null,
-                'ip_address' => $request->ip(),
-                'user_agent' => mb_substr((string) $request->userAgent(), 0, 2000),
-            ]);
-        } catch (Throwable $e) {
-            report($e);
-            Log::warning('assistant_request_log_failed', [
-                'user_id' => $request->user()->id,
-            ]);
-        }
-    }
-
     private function streamAssistantChat(
         Request $request,
         DomainAssistantService $service,
@@ -272,7 +247,20 @@ class DomainAssistantController extends Controller
                 }
                 flush();
                 $conversations->appendExchange($conversation, $userMessage, $full);
-                $this->writeAssistantLog($request, $conversation, [], $showAllRecords, $started, true, null);
+                AssistantRequestLogger::log(
+                    $request->user(),
+                    $conversation,
+                    [],
+                    $showAllRecords,
+                    mb_strlen((string) $request->input('message', '')),
+                    $userMessage,
+                    $started,
+                    true,
+                    null,
+                    $request->ip(),
+                    (string) $request->userAgent(),
+                    null,
+                );
             } catch (Throwable $e) {
                 report($e);
                 echo 'data: '.json_encode(['error' => 'The assistant could not complete this request.'], JSON_UNESCAPED_UNICODE)."\n\n";
@@ -280,7 +268,20 @@ class DomainAssistantController extends Controller
                     ob_flush();
                 }
                 flush();
-                $this->writeAssistantLog($request, $conversation, [], $showAllRecords, $started, false, $e->getMessage());
+                AssistantRequestLogger::log(
+                    $request->user(),
+                    $conversation,
+                    [],
+                    $showAllRecords,
+                    mb_strlen((string) $request->input('message', '')),
+                    $userMessage,
+                    $started,
+                    false,
+                    $e->getMessage(),
+                    $request->ip(),
+                    (string) $request->userAgent(),
+                    null,
+                );
             }
         }, 200, [
             'Content-Type' => 'text/event-stream; charset=UTF-8',

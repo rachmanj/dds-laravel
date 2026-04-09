@@ -8,6 +8,7 @@ use App\Http\Controllers\DomainAssistantController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ProcessingAnalyticsController;
 use App\Http\Controllers\SapController;
+use App\Http\Controllers\TelegramWebhookController;
 use Illuminate\Support\Facades\Route;
 
 // Authentication Routes
@@ -21,6 +22,10 @@ Route::middleware('guest')->group(function () {
 
 // Logout Route
 Route::post('/logout', [LogoutController::class, 'logout'])->name('logout')->middleware('auth');
+
+Route::post('/telegram/webhook/{secret}', [TelegramWebhookController::class, 'webhook'])
+    ->middleware('throttle:120,1')
+    ->name('telegram.webhook');
 
 // Redirect root to welcome if authenticated, otherwise to login
 Route::get('/', function () {

@@ -43,6 +43,16 @@ return [
         'daily_user_message_limit' => (int) env('DOMAIN_ASSISTANT_DAILY_USER_LIMIT', 0),
     ],
 
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        'assistant_enabled' => filter_var(env('TELEGRAM_ASSISTANT_ENABLED', false), FILTER_VALIDATE_BOOL),
+        // When true, process Telegram assistant messages in the webhook request (no queue worker). Set false + run queue:work for scale.
+        'dispatch_sync' => filter_var(env('TELEGRAM_ASSISTANT_DISPATCH_SYNC', true), FILTER_VALIDATE_BOOL),
+        // When true (and user has see-all-record-switch), Telegram uses expanded invoice/additional-document scope — same as web with “Show all records” on. Default false aligns with web default (checkbox off).
+        'expand_all_locations' => filter_var(env('TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS', false), FILTER_VALIDATE_BOOL),
+    ],
+
     'openrouter' => [
         'key' => env('OPEN_ROUTER_API_KEY', env('OPENROUTER_API_KEY')),
         'model' => env('OPEN_ROUTER_MODEL', env('OPENROUTER_MODEL', 'openai/gpt-4o')),

@@ -1,3 +1,25 @@
+## 2026-04-09 — Domain Assistant: Telegram aligned with web list scope, webhook ops, richer admin log
+
+-   **Context**: Telegram DM used the same LLM stack but **`show_all_records`** was hard-coded inconsistently; operators needed **HTTPS webhook registration** documented and automatable; **`assistant_request_logs`** stored only **message length**, not the **question text**; queue-only processing left users with **no reply** when no worker ran.
+
+-   **Decision**:
+    1. **Single list-scope API** — Introduce **`App\Support\DomainAssistantListScope`**: **`fromWebRequest`** wraps `show_all_records` + **`see-all-record-switch`** (web); **`forTelegram`** defaults to the same scope as web with “Show all records” **off**; expanded Telegram scope only when **`TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS=true`** and the user has **`see-all-record-switch`**.
+    2. **Telegram processing** — Default **`TELEGRAM_ASSISTANT_DISPATCH_SYNC=true`** so **`ProcessTelegramDomainAssistantMessage`** runs via **`dispatchSync`** in the webhook request unless ops switch to async + **`queue:work`**.
+    3. **Webhook registration** — Artisan **`telegram:set-webhook`** calls Telegram **`setWebhook`** using **`APP_URL`**; **`--url=`** overrides base URL (e.g. ngrok). Document **HTTPS required** (Telegram rejects `http://localhost`).
+    4. **Audit** — Migration adds **`user_message`** on **`assistant_request_logs`** (truncated snapshot); admin report shows **Question**, **per-page** pagination, **TG chat** column.
+
+-   **Alternatives considered**:
+    1. **Always expand Telegram invoices for all users** — Rejected; breaks parity with web and bypasses location rules without explicit permission + config.
+    2. **Only documentation for `setWebhook`** — Rejected; CLI reduces misconfiguration and supports tunnel URLs.
+
+-   **Trade-offs**: Sync dispatch ties reply latency to OpenRouter/tool round-trips inside the HTTP request (acceptable for typical deployments; async available). Storing question text increases storage and sensitivity — admin-only report, length cap.
+
+-   **Review date**: 2026-10-09 (6 months)
+
+-   **References**: [`docs/architecture.md`](architecture.md) (Domain Assistant), [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md) §14, [`app/Support/DomainAssistantListScope.php`](../app/Support/DomainAssistantListScope.php), [`app/Console/Commands/TelegramSetWebhookCommand.php`](../app/Console/Commands/TelegramSetWebhookCommand.php).
+
+---
+
 ## 2026-04-02 — Domain Assistant: multi-thread UI, admin request log, invoice search by supplier
 
 -   **Context**: The assistant exposed only a single implicit conversation; operators needed visibility into `assistant_request_logs`; users reported **irrelevant invoice lists** when asking for “latest invoices from [vendor]” because `search_invoices` had no supplier filter and returned globally newest rows.

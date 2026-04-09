@@ -4,6 +4,16 @@
 
 ---
 
+### 2026-04-09 — Domain Assistant: Telegram parity + admin question text
+
+**List scope:** **`App\Support\DomainAssistantListScope`** — web uses **`fromWebRequest`**; Telegram uses **`forTelegram`** (default = web with “Show all records” **off**). Expanded Telegram scope: **`TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS=true`** + **`see-all-record-switch`**. **Ops:** **`TELEGRAM_ASSISTANT_DISPATCH_SYNC`** default **true** (no worker required for replies); **`php artisan telegram:set-webhook`** / **`--url=`** for HTTPS tunnels. **Audit:** **`assistant_request_logs.user_message`**, admin report **Question** + pagination. Full detail: **`docs/DOMAIN-ASSISTANT-REFERENCE.md` §14**, **`docs/decisions.md`** (2026-04-09), **`docs/architecture.md`** (Domain Assistant).
+
+### 2026-04-08 — Domain Assistant via Telegram
+
+**Telegram:** webhook `POST /telegram/webhook/{TELEGRAM_WEBHOOK_SECRET}` (CSRF-excluded), **`ProcessTelegramDomainAssistantMessage`**, **`TelegramBotService`**. Users linked in **Admin → Users → Edit**. **`assistant_conversations.telegram_chat_id`** separates TG threads from web. Superseded scope/ops detail: **2026-04-09** entry above.
+
+---
+
 ### 2026-03-30 — SAP ITO sync: CLI + audit + UI history
 
 Production ITO sync can run via **`php artisan sap:sync-ito`** (`--today` / `--yesterday` / `--start` + `--end`; **`--user` defaults to 1**). **`SyncSapItoDocumentsJob`** accepts audit context; **`sap_logs`** `request_payload` for `query_sync` includes **`trigger`**, **`triggered_by_user_id`**, **`synced_at`**, plus SAP date range and **`method`**. **`/admin/sap-sync-ito`** shows the last **10** sync rows with synced date/time. See `docs/architecture.md`, `docs/decisions.md` (2026-03-30), `docs/SAP-ITO-SYNC-COMPLETE.md`.

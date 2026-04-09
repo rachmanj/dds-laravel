@@ -2714,11 +2714,11 @@ All sync operations are logged to `sap_logs` table:
 
 ### Domain Assistant (AI chat, OpenRouter)
 
-**Status**: Implemented — permission-gated chat with **tool-calling** over DDS data (no ad-hoc SQL from the model), optional **SSE streaming** when tools are disabled, **multi-thread conversations**, **request logging**, and an **admin report** for `assistant_request_logs`.
+**Status**: Implemented — permission-gated chat with **tool-calling** over DDS data (no ad-hoc SQL from the model), optional **SSE streaming** when tools are disabled, **multi-thread conversations**, **request logging**, an **admin report** for `assistant_request_logs` (including **question text** and **Telegram** context), and optional **Telegram DM** using the **same** `DomainAssistantService` with **aligned list scope** via **`App\Support\DomainAssistantListScope`**.
 
 **Doc deep-dive / porting guide**: [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md)
 
-**Purpose**: Users with `access-domain-assistant` ask natural-language questions (including Indonesian); the app calls **structured tools** (`DomainAssistantDataService`) that enforce the same list/location visibility rules as UI lists, plus optional **“show all records”** when the user has `see-all-record-switch` and enables the toggle.
+**Purpose**: Users with `access-domain-assistant` ask natural-language questions (including Indonesian); the app calls **structured tools** (`DomainAssistantDataService`) that enforce the same list/location visibility rules as UI lists, plus optional **“show all records”** when the user has `see-all-record-switch`. **Web** resolves this with **`DomainAssistantListScope::fromWebRequest`**; **Telegram** uses **`DomainAssistantListScope::forTelegram`** (default matches web with the toggle **off**; env can mirror “show all” for users with permission — see [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md) §14).
 
 **High-level flow**
 
@@ -2751,6 +2751,8 @@ sequenceDiagram
     C-->>U: JSON or SSE stream
 ```
 
+**Telegram path (same service):** Telegram Bot API → `POST /telegram/webhook/{secret}` → `TelegramWebhookController` → **`ProcessTelegramDomainAssistantMessage`** (typically **`dispatchSync`** when `TELEGRAM_ASSISTANT_DISPATCH_SYNC` is true) → `appendUserMessageAndComplete` → `TelegramBotService::sendMessage`. Register webhook with **`php artisan telegram:set-webhook`** (HTTPS only; optional **`--url=`** for tunnel base URL).
+
 **Key components**
 
 | Area | Path / artifact |
@@ -2764,17 +2766,20 @@ sequenceDiagram
 | Models | `AssistantConversation`, `AssistantMessage`, `AssistantRequestLog` |
 | Route binding | `AppServiceProvider` — `{conversation}` scoped to `auth()->id()` |
 | Routes | `routes/web.php` — prefix `assistant`, middleware `can:access-domain-assistant` |
-| Admin report | `routes/admin.php` — `admin/assistant-report` → `AssistantReportController@index`; menu in `resources/views/layouts/partials/menu/admin.blade.php` |
+| Admin report | `routes/admin.php` — `admin/assistant-report` → `AssistantReportController@index` (filters, pagination per page, **user_message** column); menu in `resources/views/layouts/partials/menu/admin.blade.php` |
 | i18n | `lang/en/assistant.php` |
+| List scope helper | `app/Support/DomainAssistantListScope.php` — **`fromWebRequest`** (web) / **`forTelegram`** (DM); config **`TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS`** |
+| Telegram (optional) | `POST /telegram/webhook/{secret}` → `TelegramWebhookController`; `TelegramBotService`; `ProcessTelegramDomainAssistantMessage`; **`php artisan telegram:set-webhook`**; env **`TELEGRAM_*`**, **`TELEGRAM_ASSISTANT_DISPATCH_SYNC`**, **`TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS`**; users linked via **Admin → Users → Edit** |
 
 **Persistence**
 
-- `assistant_conversations` — `user_id`, optional `title`
+- `users` — optional `telegram_user_id` (unique), `telegram_username` (admin linking for Telegram DM)
+- `assistant_conversations` — `user_id`, optional `title`, optional **`telegram_chat_id`** (non-null = thread used from Telegram; web list shows only rows with null `telegram_chat_id`)
 - `assistant_messages` — `assistant_conversation_id`, `role`, `content`
-- `assistant_request_logs` — `user_id`, `assistant_conversation_id`, `status`, `tools_invoked`, `show_all_records`, `duration_ms`, `error_summary`, `ip_address`, `user_agent`, etc.
+- `assistant_request_logs` — `user_id`, `assistant_conversation_id`, `status`, `tools_invoked`, `show_all_records`, `user_message_length`, **`user_message`** (question snapshot, max 10k chars), `duration_ms`, `error_summary`, `ip_address`, `user_agent`, optional **`telegram_chat_id`**, etc.
 
 **Tool behaviour note (invoices by supplier)**
 
 - `search_invoices` accepts optional **`supplier_query`**: filters invoices via `whereHas('supplier', …)` on supplier **name** and **SAP code** (substring), so requests like “10 invoice terakhir dari [nama vendor]” return that vendor’s rows instead of globally latest invoices.
 
-**References**: [`docs/decisions.md`](decisions.md) (Domain Assistant, 2026-04-02), [`docs/todo.md`](todo.md), [`MEMORY.md`](../MEMORY.md), [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md).
+**References**: [`docs/decisions.md`](decisions.md) (Domain Assistant: 2026-04-02, Telegram parity 2026-04-09), [`docs/todo.md`](todo.md), [`MEMORY.md`](../MEMORY.md), [`docs/DOMAIN-ASSISTANT-REFERENCE.md`](DOMAIN-ASSISTANT-REFERENCE.md).
