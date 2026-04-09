@@ -50,6 +50,31 @@ class TelegramSetWebhookCommand extends Command
             return self::FAILURE;
         }
 
+        $host = parse_url($base, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            $this->error('Could not parse host from base URL: '.$base);
+
+            return self::FAILURE;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            $public = filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+            if ($public === false) {
+                $this->error('Telegram does not accept webhooks on private or reserved IP addresses. Host was: '.$host);
+                $this->newLine();
+                $this->line('Use a public hostname in APP_URL (e.g. https://dds.example.com) that resolves on the internet to your reverse proxy or firewall, not https://192.168.x.x/...');
+                $this->line('Then: php artisan telegram:set-webhook (or --url=https://your-public-host)');
+
+                return self::FAILURE;
+            }
+        } elseif (in_array(strtolower($host), ['localhost'], true) || str_ends_with(strtolower($host), '.local')) {
+            $this->error('Telegram cannot reach localhost / .local hostnames: '.$host);
+            $this->newLine();
+            $this->line('Set APP_URL to your public HTTPS URL, or use ngrok with --url=');
+
+            return self::FAILURE;
+        }
+
         $webhookUrl = $base.'/telegram/webhook/'.$secret;
 
         $this->info('Registering webhook: '.$webhookUrl);
