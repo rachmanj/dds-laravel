@@ -260,14 +260,40 @@ class DomainAssistantDataService
         }
 
         $limit = max(1, min(20, $limit));
-        $q = Supplier::active()->orderBy('name');
+        $q = Supplier::active();
 
         if ($queryText !== null && trim($queryText) !== '') {
             $term = trim($queryText);
-            $q->where(function (Builder $sub) use ($term) {
-                $sub->where('name', 'like', '%'.$term.'%')
-                    ->orWhere('sap_code', 'like', '%'.$term.'%');
-            });
+            $words = array_values(array_filter(
+                preg_split('/\s+/u', preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $term)),
+                fn (string $w) => mb_strlen($w) >= 2
+            ));
+
+            if (count($words) >= 2) {
+                foreach ($words as $w) {
+                    $pw = self::supplierLikePattern($w);
+                    $q->where(function (Builder $sub) use ($pw) {
+                        $sub->where('name', 'like', $pw)
+                            ->orWhere('sap_code', 'like', $pw);
+                    });
+                }
+                $q->orderBy('name');
+            } else {
+                $pattern = self::supplierLikePattern($term);
+                $q->where(function (Builder $sub) use ($pattern, $term) {
+                    $sub->where('name', 'like', $pattern)
+                        ->orWhere('sap_code', 'like', $pattern);
+                    if (self::isLikelySapCodeToken($term)) {
+                        $sub->orWhereRaw('LOWER(TRIM(sap_code)) = LOWER(?)', [$term]);
+                    }
+                });
+                $q->orderByRaw(
+                    'CASE WHEN LOWER(TRIM(sap_code)) = LOWER(?) THEN 0 WHEN LOWER(TRIM(name)) = LOWER(?) THEN 1 ELSE 2 END, name',
+                    [$term, $term]
+                );
+            }
+        } else {
+            $q->orderBy('name');
         }
 
         return $q->limit($limit)
@@ -281,6 +307,20 @@ class DomainAssistantDataService
             ])
             ->values()
             ->all();
+    }
+
+    private static function supplierLikePattern(string $term): string
+    {
+        return '%'.addcslashes($term, '%_\\').'%';
+    }
+
+    private static function isLikelySapCodeToken(string $term): bool
+    {
+        if (str_contains($term, ' ') || mb_strlen($term) < 6 || mb_strlen($term) > 32) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[A-Z0-9][A-Z0-9\-]*$/i', $term);
     }
 
     private function reconcileVisibleQuery(User $user): Builder

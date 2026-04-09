@@ -40,7 +40,7 @@ This document describes how the **Domain Assistant** feature is built in the DDS
 - Each tool maps to a **method** on a dedicated **data service** class that returns **arrays** (serialized to JSON for the model).
 - **Streaming**: optional SSE when tools are **off** and config allows streaming (project-specific safety choice).
 
-**Telegram (optional):** `TelegramWebhookController` receives Bot API updates, validates the path secret, then runs `**ProcessTelegramDomainAssistantMessage`** (sync or queued per config) → same `**DomainAssistantService**` as `**POST /assistant/chat**`.
+**Telegram (optional):** `TelegramWebhookController` receives Bot API updates, validates the path secret, then runs `**ProcessTelegramDomainAssistantMessage`** (sync or queued per config) → same `**DomainAssistantService`** as `**POST /assistant/chat`**.
 
 ---
 
@@ -125,9 +125,9 @@ Implement **one method per tool**, returning **arrays** (or `['error' => '...']`
 **DDS-specific patterns**
 
 - **Invoice list scope**: reuse the same **location / role** rules as invoice index (`invoicesVisibleQuery`).
-- `**search_invoices`**: parameters such as `status`, `limit` (cap e.g. 20), `date_from` / `date_to` (max window, e.g. 90 days), and `**supplier_query**` — filter with `whereHas('supplier', …)` on **name** and **vendor code**, with **LIKE** wildcards escaped for user input where appropriate.
+- `**search_invoices`**: parameters such as `status`, `limit` (cap e.g. 20), `date_from` / `date_to` (max window, e.g. 90 days), and `**supplier_query`** — filter with `whereHas('supplier', …)` on **name** and **vendor code**, with **LIKE** wildcards escaped for user input where appropriate.
 
-**Other tools** (examples): `get_domain_summary`, `search_additional_documents`, `search_distributions`, `search_reconcile_records`, `search_suppliers`.
+**Other tools** (examples): `get_domain_summary`, `search_additional_documents`, `search_distributions`, `search_reconcile_records`, `**search_suppliers`** — substring match on name/SAP code with `**LIKE` metacharacters escaped**; **multi-word queries** require **each** word to match (narrows “Mitra Inti …” style questions); single tokens that look like **SAP codes** also match `**sap_code` exactly** (case-insensitive) and rank first.
 
 ---
 
@@ -148,7 +148,7 @@ Register them in the chat completions payload in the format your provider expect
 - Gate feature: `config('services.domain_assistant.enabled')` and API key present → else redirect or 503.
 - **Daily limit**: count user messages since **start of day** across conversations → 429 if exceeded.
 - `**show_all_records`**: only honour if user **can** `see-all-record-switch` (boolean).
-- **Chat**: validate `message`, optional `conversation_id`, `stream`, `show_all_records`; resolve conversation; call service; persist messages; write `AssistantRequestLog`. `**show_all_records`** is resolved via `**App\Support\DomainAssistantListScope::fromWebRequest**` (must match `see-all-record-switch`).
+- **Chat**: validate `message`, optional `conversation_id`, `stream`, `show_all_records`; resolve conversation; call service; persist messages; write `AssistantRequestLog`. `**show_all_records`** is resolved via `**App\Support\DomainAssistantListScope::fromWebRequest`** (must match `see-all-record-switch`).
 - **Stream**: same validation; stream tokens; on completion append exchange and log (same as non-stream).
 
 ---
@@ -244,8 +244,8 @@ Telegram servers ──HTTPS POST──► /telegram/webhook/{secret}
 | `TELEGRAM_BOT_TOKEN`                      | Bot token from [@BotFather](https://t.me/BotFather).                                                                                                                                                                                                                                                                                  |
 | `TELEGRAM_WEBHOOK_SECRET`                 | Long random string; embedded in the webhook **path** (`/telegram/webhook/{secret}`) so URLs are unguessable.                                                                                                                                                                                                                          |
 | `TELEGRAM_ASSISTANT_ENABLED`              | Master switch: accept webhooks and run the assistant job.                                                                                                                                                                                                                                                                             |
-| `TELEGRAM_ASSISTANT_DISPATCH_SYNC`        | Default `**true`**: run `**ProcessTelegramDomainAssistantMessage**` with `**dispatchSync**` inside the webhook request so replies work **without** a queue worker. Set `**false**` and run `**php artisan queue:work**` if you use `database`/`redis` queue and want async processing.                                                |
-| `TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS` | Default `**false**`: list scope matches the web assistant with **“Show all records” unchecked**. Set `**true**` so users with `**see-all-record-switch**` get expanded invoice/additional-document scope on Telegram (same idea as checking **Show all records** on web). Implemented by `**DomainAssistantListScope::forTelegram**`. |
+| `TELEGRAM_ASSISTANT_DISPATCH_SYNC`        | Default `**true`**: run `**ProcessTelegramDomainAssistantMessage`** with `**dispatchSync**` inside the webhook request so replies work **without** a queue worker. Set `**false`** and run `**php artisan queue:work`** if you use `database`/`redis` queue and want async processing.                                                |
+| `TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS` | Default `**false**`: list scope matches the web assistant with **“Show all records” unchecked**. Set `**true`** so users with `**see-all-record-switch`** get expanded invoice/additional-document scope on Telegram (same idea as checking **Show all records** on web). Implemented by `**DomainAssistantListScope::forTelegram`**. |
 
 
 **Never** commit tokens; document keys in `.env.example`.
@@ -254,16 +254,16 @@ Telegram servers ──HTTPS POST──► /telegram/webhook/{secret}
 
 Telegram **rejects** non-HTTPS webhook URLs. `**http://localhost/...` cannot be registered.**
 
-- **Production:** set `**APP_URL=https://your-domain**`, then run `**php artisan telegram:set-webhook**` (uses `APP_URL` + `TELEGRAM_WEBHOOK_SECRET`).
+- **Production:** set `**APP_URL=https://your-domain`**, then run `**php artisan telegram:set-webhook`** (uses `APP_URL` + `TELEGRAM_WEBHOOK_SECRET`).
 - **Local / dev:** expose the app with an HTTPS tunnel (e.g. ngrok), then:
-  `php artisan telegram:set-webhook --url="https://xxxx.ngrok-free.app"`
-  The `--url` flag overrides `**APP_URL`** for that run (useful when the tunnel URL changes).
+`php artisan telegram:set-webhook --url="https://xxxx.ngrok-free.app"`
+The `--url` flag overrides `**APP_URL`** for that run (useful when the tunnel URL changes).
 
 The Artisan command calls Telegram’s `**setWebhook`** API; on failure it prints the API error (e.g. HTTPS required).
 
 ### 14.4 User linking
 
-**Admin → Users → Edit** — **“Telegram — Domain Assistant”**: enter **numeric user ID** (from [@userinfobot](https://t.me/userinfobot) / [@getidsbot](https://t.me/getidsbot)) or **@username**. The bot resolves `**getChat`** via **POST** (form body) for reliable resolution; the user should **Start** the bot at least once. Stored on `**users.telegram_user_id`** (and optional `**telegram_username**`); webhook matches `**message.from.id**`.
+**Admin → Users → Edit** — **“Telegram — Domain Assistant”**: enter **numeric user ID** (from [@userinfobot](https://t.me/userinfobot) / [@getidsbot](https://t.me/getidsbot)) or **@username**. The bot resolves `**getChat`** via **POST** (form body) for reliable resolution; the user should **Start** the bot at least once. Stored on `**users.telegram_user_id`** (and optional `**telegram_username`**); webhook matches `**message.from.id`**.
 
 ### 14.5 Conversations and threads
 
@@ -273,24 +273,24 @@ The Artisan command calls Telegram’s `**setWebhook`** API; on failure it print
 ### 14.6 Alignment with the web assistant (list scope)
 
 
-| Channel      | How “Show all records” is determined                                                                                                                                                                                 |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Web**      | `**DomainAssistantListScope::fromWebRequest`**: JSON `**show_all_records**` must be true **and** the user `**can('see-all-record-switch')`**.                                                                        |
-| **Telegram** | `**DomainAssistantListScope::forTelegram`**: expanded scope only if `**TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS=true**` **and** `**see-all-record-switch`**. Otherwise same default as web with the checkbox **off**. |
+| Channel      | How “Show all records” is determined                                                                                                                                                                             |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Web**      | `**DomainAssistantListScope::fromWebRequest`**: JSON `**show_all_records`** must be true and the user `**can('see-all-record-switch')**`.                                                                        |
+| **Telegram** | `**DomainAssistantListScope::forTelegram`**: expanded scope only if `**TELEGRAM_ASSISTANT_EXPAND_ALL_LOCATIONS=true`** and `**see-all-record-switch**`. Otherwise same default as web with the checkbox **off**. |
 
 
 This keeps invoice/additional-document **visibility rules** consistent unless operators explicitly enable expanded Telegram scope via env.
 
 ### 14.7 Logging and admin report
 
-- `**AssistantRequestLogger`** records each Telegram turn with `**telegram_chat_id**` and the same `**user_message**` / `**show_all_records**` fields as web.
+- `**AssistantRequestLogger`** records each Telegram turn with `**telegram_chat_id`** and the same `**user_message`** / `**show_all_records**` fields as web.
 - `**/admin/assistant-report**` includes a **TG chat** column and the **Question** text when stored.
 
 ### 14.8 Routes and implementation files
 
 - **Webhook:** `POST /telegram/webhook/{secret}` — **CSRF-excluded** in `bootstrap/app.php`, throttled.
 - **Controller:** `TelegramWebhookController@webhook`.
-- **Job:** `ProcessTelegramDomainAssistantMessage` (implements `**ShouldQueue`**; often executed synchronously via `**dispatchSync**` when `dispatch_sync` is true).
+- **Job:** `ProcessTelegramDomainAssistantMessage` (implements `**ShouldQueue`**; often executed synchronously via `**dispatchSync`** when `dispatch_sync` is true).
 - **Outbound API:** `TelegramBotService` — `sendMessage`, `**getChat`** for admin linking.
 
 ---

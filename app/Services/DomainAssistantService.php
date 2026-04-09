@@ -510,7 +510,7 @@ class DomainAssistantService
                 'type' => 'function',
                 'function' => [
                     'name' => 'search_suppliers',
-                    'description' => 'Search active suppliers by name or SAP code (partial). Omit query for first N alphabetically. No date filter.',
+                    'description' => 'Search active suppliers by name or SAP code. Use multiple words (e.g. company name) to narrow results — all words must match. Single token that looks like an SAP/vendor code matches exact sap_code (case-insensitive) and substring. Omit query for first N alphabetically. No date filter.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
