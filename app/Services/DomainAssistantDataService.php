@@ -77,7 +77,8 @@ class DomainAssistantDataService
         int $limit,
         ?string $dateFrom = null,
         ?string $dateTo = null,
-        ?string $supplierQuery = null
+        ?string $supplierQuery = null,
+        ?string $invoiceNumberQuery = null
     ): array {
         if (! $user->can('view-invoices')) {
             return ['error' => 'You do not have permission to view invoices.'];
@@ -96,6 +97,16 @@ class DomainAssistantDataService
             $query->whereHas('supplier', function (Builder $sub) use ($pattern) {
                 $sub->where('name', 'like', $pattern)
                     ->orWhere('sap_code', 'like', $pattern);
+            });
+        }
+
+        if ($invoiceNumberQuery !== null && trim($invoiceNumberQuery) !== '') {
+            $term = trim($invoiceNumberQuery);
+            $pattern = '%'.addcslashes($term, '%_\\').'%';
+            $query->where(function (Builder $sub) use ($pattern) {
+                $sub->where('invoice_number', 'like', $pattern)
+                    ->orWhere('faktur_no', 'like', $pattern)
+                    ->orWhere('po_no', 'like', $pattern);
             });
         }
 

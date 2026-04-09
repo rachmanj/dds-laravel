@@ -125,7 +125,7 @@ Implement **one method per tool**, returning **arrays** (or `['error' => '...']`
 **DDS-specific patterns**
 
 - **Invoice list scope**: reuse the same **location / role** rules as invoice index (`invoicesVisibleQuery`).
-- `**search_invoices`**: parameters such as `status`, `limit` (cap e.g. 20), `date_from` / `date_to` (max window, e.g. 90 days), and `**supplier_query`** — filter with `whereHas('supplier', …)` on **name** and **vendor code**, with **LIKE** wildcards escaped for user input where appropriate.
+- **`search_invoices`**: `status`, `limit` (cap e.g. 20), `date_from` / `date_to` (max window, e.g. 90 days), **`supplier_query`** (`whereHas('supplier', …)` on name / SAP code), **`invoice_number_query`** (substring on `invoice_number`, `faktur_no`, `po_no`; LIKE metacharacters escaped). Use **`invoice_number_query`** when the user cites an invoice/faktur/PO fragment so results are not unrelated “latest N” rows.
 
 **Other tools** (examples): `get_domain_summary`, `search_additional_documents`, `search_distributions`, `search_reconcile_records`, `**search_suppliers`** — substring match on name/SAP code with `**LIKE` metacharacters escaped**; **multi-word queries** require **each** word to match (narrows “Mitra Inti …” style questions); single tokens that look like **SAP codes** also match `**sap_code` exactly** (case-insensitive) and rank first.
 

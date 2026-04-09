@@ -343,6 +343,7 @@ class DomainAssistantService
                     $dateFrom,
                     $dateTo,
                     isset($args['supplier_query']) && is_string($args['supplier_query']) ? $args['supplier_query'] : null,
+                    isset($args['invoice_number_query']) && is_string($args['invoice_number_query']) ? $args['invoice_number_query'] : null,
                 )),
                 'search_additional_documents' => json_encode($this->data->searchAdditionalDocuments(
                     $user,
@@ -426,10 +427,14 @@ class DomainAssistantService
                 'type' => 'function',
                 'function' => [
                     'name' => 'search_invoices',
-                    'description' => 'Recent invoices the user may see (newest first). When the user names a vendor/supplier/company (any language, e.g. Indonesian “dari …”, “untuk …”), pass supplier_query with that name (or distinctive substring) so results are limited to that supplier’s invoices. Optional workflow status. Optional date_from/date_to on invoice_date (falls back to created_at when invoice_date is null). Max 90-day window.',
+                    'description' => 'Recent invoices the user may see (newest first). When the user gives a specific invoice number, faktur (tax invoice) number, or PO fragment (e.g. 26-03046, SG410-00000129), pass it as invoice_number_query — substring match on invoice_number, faktur_no, and po_no. When the user names a vendor/supplier/company (any language, e.g. Indonesian “dari …”, “untuk …”), pass supplier_query with that name (or distinctive substring). Optional workflow status. Optional date_from/date_to on invoice_date (falls back to created_at when invoice_date is null). Max 90-day window.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => array_merge([
+                            'invoice_number_query' => [
+                                'type' => 'string',
+                                'description' => 'Substring to match against invoice_number, faktur_no, or po_no when the user asks for a specific document reference. Use this (not supplier_query) for numeric or alphanumeric invoice/faktur/PO identifiers.',
+                            ],
                             'supplier_query' => [
                                 'type' => 'string',
                                 'description' => 'Filter by supplier: substring match on supplier name or SAP code (same idea as supplier search). Required when the user asks for invoices from/for a specific vendor.',
@@ -544,7 +549,9 @@ You are the ARKA DDS domain assistant for {$name}. The DDS application covers ad
 
 When the user asks for live or numeric information, call tools. Optional date_from/date_to on search tools must be YYYY-MM-DD and span at most 90 days. Never invent database values.
 
-For invoices tied to a named supplier or vendor, always call search_invoices with supplier_query set to that name (or a distinctive part of it). Do not return unrelated “latest invoices” when the user specified a company name.
+For a specific invoice, faktur, or PO reference, call search_invoices with invoice_number_query set to that fragment. For invoices tied to a named supplier or vendor, call search_invoices with supplier_query set to that name (or a distinctive part of it). Do not return unrelated “latest invoices” when the user specified a company name or document number.
+
+In your reply, copy invoice_number, faktur_no, amounts, and supplier names only from tool results. If search_invoices returns [], say no matching invoice was found for the user’s criteria — do not state a document number that is not present in the tool JSON.
 
 Reconcile tools only return this user’s reconcile rows. Supplier tools search active suppliers only.
 
