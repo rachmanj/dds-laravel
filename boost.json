@@ -2,9 +2,7 @@
     "agents": [
         "cursor"
     ],
-    "editors": [
-        "cursor",
-        "vscode"
-    ],
-    "guidelines": []
+    "herd_mcp": false,
+    "mcp": true,
+    "sail": false
 }

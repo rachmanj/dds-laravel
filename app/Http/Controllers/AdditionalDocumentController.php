@@ -38,14 +38,14 @@ class AdditionalDocumentController extends Controller
         return view('additional_documents.index', compact('documentTypes', 'vendorCodes', 'departments'));
     }
 
-    public function data(Request $request)
+    /**
+     * Base query for the additional-documents list (DataTables + Excel export), including SQL-level
+     * days_in_location for age filters.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\AdditionalDocument>
+     */
+    private function additionalDocumentsFilteredQuery(Request $request, \App\Models\User $user, bool $showAllRecords)
     {
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
-        $showAllRecords = $request->get('show_all', false);
-
-        // Main query with optimized database-level arrival date calculation
-        // This avoids N+1 queries by calculating arrival_date and days_in_location in SQL
         $query = AdditionalDocument::query()
             ->select('additional_documents.*')
             ->selectRaw('COALESCE(
@@ -70,7 +70,18 @@ class AdditionalDocumentController extends Controller
             )) as days_in_location')
             ->with(['type', 'creator', 'invoices']);
 
-        // Apply search filters
+        $this->applyAdditionalDocumentListFilters($query, $request, $user, $showAllRecords);
+
+        return $query;
+    }
+
+    /**
+     * Shared filters for DataTables and export so Excel matches the on-screen grid.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\AdditionalDocument>  $query
+     */
+    private function applyAdditionalDocumentListFilters($query, Request $request, \App\Models\User $user, bool $showAllRecords): void
+    {
         if ($request->filled('search_number')) {
             $query->where('document_number', 'like', '%'.$request->search_number.'%');
         }
@@ -106,7 +117,6 @@ class AdditionalDocumentController extends Controller
             $query->where('cur_loc', $request->filter_location);
         }
 
-        // Enhanced date range filtering
         if ($request->filled('date_range')) {
             $dates = explode(' - ', $request->date_range);
             if (count($dates) == 2) {
@@ -118,7 +128,6 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        // Handle search presets
         if ($request->filled('search_preset')) {
             $preset = $request->search_preset;
             switch ($preset) {
@@ -145,10 +154,8 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        // Accounting, finance, admin, and superadmin users see all records by default
         $isPrivilegedUser = $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance']);
 
-        // Apply location-based filtering unless user is privileged or show_all is requested
         if (! $isPrivilegedUser && (! $showAllRecords || ! $user->can('see-all-record-switch'))) {
             $locationCode = $user->department_location_code;
             if ($locationCode) {
@@ -156,8 +163,6 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        // Apply distribution status filtering for non-privileged users when show_all is false
-        // Include 'in_transit' when age_filter is provided to show all aging documents
         if (! $isPrivilegedUser && (! $showAllRecords || ! $user->can('see-all-record-switch'))) {
             $statuses = ['available', 'distributed'];
             if ($request->filled('age_filter')) {
@@ -166,10 +171,9 @@ class AdditionalDocumentController extends Controller
             $query->whereIn('distribution_status', $statuses);
         }
 
-        // Apply age filter at database level if provided
         if ($request->filled('age_filter')) {
             $ageFilter = $request->get('age_filter');
-            $query->havingRaw('days_in_location >= 0'); // Ensure days_in_location is calculated
+            $query->havingRaw('days_in_location >= 0');
 
             switch ($ageFilter) {
                 case '0-7_days':
@@ -184,6 +188,15 @@ class AdditionalDocumentController extends Controller
                     break;
             }
         }
+    }
+
+    public function data(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $showAllRecords = (bool) $request->get('show_all', false);
+
+        $query = $this->additionalDocumentsFilteredQuery($request, $user, $showAllRecords);
 
         // Use DataTables with database-level sorting and pagination
         return DataTables::of($query)
@@ -863,19 +876,16 @@ class AdditionalDocumentController extends Controller
     public function export(Request $request)
     {
         try {
-            $query = AdditionalDocument::with(['type', 'creator', 'distributions.originDepartment', 'distributions.destinationDepartment']);
+            /** @var \App\Models\User $user */
+            $user = Auth::user();
+            $showAllRecords = (bool) $request->get('show_all', false);
 
-            // Apply the same filters as the data method
-            $this->applySearchFilters($query, $request);
+            $query = $this->additionalDocumentsFilteredQuery($request, $user, $showAllRecords);
 
-            // Sort by days in current location (oldest first - highest days first) for consistency with main table
             $documents = $query->get()->sortByDesc(function ($document) {
-                $arrivalDate = $document->current_location_arrival_date;
-
-                return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
+                return (float) ($document->days_in_location ?? 0);
             })->values();
 
-            // Transform data for export
             $exportData = $documents->map(function ($document) {
                 return [
                     'Document Number' => $document->document_number,
@@ -885,6 +895,7 @@ class AdditionalDocumentController extends Controller
                     'Vendor Code' => $document->vendor_code ?? '',
                     'Receive Date' => $document->receive_date ? \Carbon\Carbon::parse($document->receive_date)->format('d/m/Y') : '',
                     'Current Location' => $document->cur_loc ?? '',
+                    'Days in location' => round((float) ($document->days_in_location ?? 0), 1),
                     'Status' => $document->status ?? '',
                     'Distribution Status' => $document->distribution_status ?? '',
                     'Remarks' => $document->remarks ?? '',
@@ -893,7 +904,7 @@ class AdditionalDocumentController extends Controller
                 ];
             });
 
-            return \Maatwebsite\Excel\Facades\Excel::download(
+            return Excel::download(
                 new \App\Exports\AdditionalDocumentExport($exportData),
                 'additional_documents_'.now()->format('Y-m-d_H-i-s').'.xlsx'
             );
@@ -1022,78 +1033,6 @@ class AdditionalDocumentController extends Controller
                 'success' => false,
                 'message' => 'Failed to delete search preset',
             ], 500);
-        }
-    }
-
-    /**
-     * Apply search filters to query (extracted from data method for reuse)
-     */
-    private function applySearchFilters($query, $request)
-    {
-        // Apply search filters
-        if ($request->filled('search_number')) {
-            $query->where('document_number', 'like', '%'.$request->search_number.'%');
-        }
-
-        if ($request->filled('search_po_no')) {
-            $query->where('po_no', 'like', '%'.$request->search_po_no.'%');
-        }
-
-        if ($request->filled('search_vendor_code')) {
-            $query->where('vendor_code', 'like', '%'.$request->search_vendor_code.'%');
-        }
-
-        if ($request->filled('search_project')) {
-            $query->where('project', 'like', '%'.$request->search_project.'%');
-        }
-
-        if ($request->filled('search_remarks')) {
-            $query->where('remarks', 'like', '%'.$request->search_remarks.'%');
-        }
-
-        if ($request->filled('filter_type')) {
-            $query->where('type_id', $request->filter_type);
-        }
-
-        if ($request->filled('filter_status')) {
-            $query->where('status', $request->filter_status);
-        }
-
-        if ($request->filled('filter_vendor_code')) {
-            $query->where('vendor_code', $request->filter_vendor_code);
-        }
-
-        if ($request->filled('filter_location')) {
-            $query->where('cur_loc', $request->filter_location);
-        }
-
-        if ($request->filled('date_range')) {
-            $dates = explode(' - ', $request->date_range);
-            if (count($dates) == 2) {
-                $startDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[0]))->startOfDay();
-                $endDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($dates[1]))->endOfDay();
-                $query->whereBetween('document_date', [$startDate, $endDate]);
-            }
-        }
-
-        // Show all records permission check
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
-
-        // Accounting and finance users see all records by default
-        if ($user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
-            // Privileged users see all records - no filtering needed
-            return;
-        }
-
-        if ($request->filled('show_all_records') && $request->show_all_records === 'on') {
-            if (! $user->can('see-all-record-switch')) {
-                // Fallback to user's department only
-                $query->where('cur_loc', $user->department_location_code);
-            }
-        } else {
-            // Default: show only user's department records
-            $query->where('cur_loc', $user->department_location_code);
         }
     }
 

@@ -3,12 +3,12 @@
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class AdditionalDocumentExport implements FromCollection, WithHeadings, WithStyles, WithColumnWidths
+class AdditionalDocumentExport implements FromCollection, WithColumnWidths, WithHeadings, WithStyles
 {
     protected $data;
 
@@ -32,6 +32,7 @@ class AdditionalDocumentExport implements FromCollection, WithHeadings, WithStyl
             'Vendor Code',
             'Receive Date',
             'Current Location',
+            'Days in location',
             'Status',
             'Distribution Status',
             'Remarks',
@@ -58,11 +59,12 @@ class AdditionalDocumentExport implements FromCollection, WithHeadings, WithStyl
             'E' => 15, // Vendor Code
             'F' => 15, // Receive Date
             'G' => 15, // Current Location
-            'H' => 15, // Status
-            'I' => 20, // Distribution Status
-            'J' => 30, // Remarks
-            'K' => 20, // Created By
-            'L' => 20, // Created At
+            'H' => 12, // Days in location
+            'I' => 15, // Status
+            'J' => 20, // Distribution Status
+            'K' => 30, // Remarks
+            'L' => 20, // Created By
+            'M' => 20, // Created At
         ];
     }
 }

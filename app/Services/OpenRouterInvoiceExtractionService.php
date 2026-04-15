@@ -29,7 +29,17 @@ class OpenRouterInvoiceExtractionService
     {
         $parser = new Parser;
         $pdf = $parser->parseFile($absolutePath);
-        $text = trim($pdf->getText());
+
+        if (config('services.openrouter.pdf_first_page_only', true)) {
+            $text = '';
+            foreach ($pdf->getPages() as $page) {
+                $text = trim($page->getText());
+                break;
+            }
+        } else {
+            $text = trim($pdf->getText());
+        }
+
         if (mb_strlen($text) >= 80) {
             $text = mb_substr($text, 0, 12000);
 

@@ -542,7 +542,10 @@
                         d.filter_type = $('#filter_type').val();
                         d.filter_status = $('#filter_status').val();
                         d.filter_vendor_code = $('#filter_vendor_code').val();
+                        d.filter_location = $('#filter_location').val();
                         d.date_range = $('#date_range').val();
+                        d.date_type = $('#date_type').val();
+                        d.search_preset = $('#search_preset').val();
                         d.show_all = $('#show_all_records').length > 0 && $('#show_all_records').is(
                             ':checked') ? 1 : 0;
                         // Pass age_filter from URL
@@ -911,21 +914,21 @@
             }
 
             function exportSearchResults() {
-                var formData = $('#search-form').serialize();
-                var exportUrl = '{{ route('additional-documents.export') }}?' + formData;
+                var params = $('#search-form').serialize();
+                params += '&show_all=' + ($('#show_all_records').length > 0 && $('#show_all_records').is(
+                    ':checked') ? 1 : 0);
+                var ageFilter = getUrlParameter('age_filter');
+                if (ageFilter) {
+                    params += '&age_filter=' + encodeURIComponent(ageFilter);
+                }
+                var exportUrl = '{{ route('additional-documents.export') }}?' + params;
 
-                // Show loading state
                 toastr.info('Preparing export...');
-
-                // Create temporary link for download
                 var link = document.createElement('a');
                 link.href = exportUrl;
-                link.download = 'additional_documents_' + moment().format('YYYY-MM-DD_HH-mm-ss') + '.xlsx';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-
-                toastr.success('Export completed!');
             }
 
             // Initialize search presets on page load

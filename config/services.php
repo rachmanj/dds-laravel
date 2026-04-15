@@ -70,6 +70,8 @@ return [
         'extract_sync' => filter_var(env('INVOICE_IMPORT_EXTRACT_SYNC', false), FILTER_VALIDATE_BOOL),
         // Path to cacert.pem — fixes cURL error 60 on Windows when php.ini has no CA bundle (see OPEN_ROUTER_CAINFO in .env.example).
         'ca_bundle' => env('OPEN_ROUTER_CAINFO', env('OPENROUTER_CAINFO')),
+        // Max upload size for invoice import (kilobytes). Laravel validation "max" for files uses KB. Also raise PHP upload_max_filesize / post_max_size and web server limits to match.
+        'max_upload_kb' => max(1, (int) env('INVOICE_IMPORT_MAX_FILE_KB', env('OPENROUTER_MAX_UPLOAD_KB', 51200))),
     ],
 
     'sap' => [

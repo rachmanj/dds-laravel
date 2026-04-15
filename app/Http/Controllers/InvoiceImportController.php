@@ -28,8 +28,10 @@ class InvoiceImportController extends Controller
             ], 503);
         }
 
+        $maxKb = (int) config('services.openrouter.max_upload_kb', 51200);
+
         $request->validate([
-            'file' => ['required', 'file', 'max:15360', 'mimes:pdf,jpg,jpeg,png,webp,gif'],
+            'file' => ['required', 'file', 'max:'.$maxKb, 'mimes:pdf,jpg,jpeg,png,webp,gif'],
         ]);
 
         $uuid = (string) Str::uuid();
