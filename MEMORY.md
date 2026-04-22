@@ -1,3 +1,9 @@
+### 2026-04-22 — Solar price history: `solar:price:sync-from-last-pertamina`, PERTAMINA resolver, half-month schedule
+
+**Command** `solar:price:sync-from-last-pertamina` creates **`solar_price_histories`** from **`PertaminaSolarInvoiceResolver::resolveLast()`** (latest PERTAMINA invoice with a SOLAR line). **Unit price** on the line: use non-null **non-zero** `unit_price`, else **`amount ÷ quantity`** (`bcdiv`, 4 dp). **Period**: current half-month (**1–14** / **15–EOM**) in **`SOLAR_PRICE_SCHEDULER_TIMEZONE`** (default **Asia/Makassar**). **Schedule**: `bootstrap/app.php` **07:30** WITA, `withoutOverlapping`. **Config**: `services.solar_price_scheduler`, optional **`SOLAR_PRICE_SCHEDULER_USER_ID`**. Detail: **`docs/SOLAR-PRICE-HISTORY-PERTAMINA-SYNC.md`**, **`docs/architecture.md`**, **`docs/decisions.md`** (2026-04-22).
+
+---
+
 ### 2026-03-31 — Invoice import: `invoice_line_details`, show warning, edit modal + calculator, polling config
 
 **Lines**: `InvoiceImportLineDetailsPersister` on create from **`draft.line_items`**; **`InvoiceLineDetail`** + show table; **warn** if line sum ≠ header (IDR **1** else **0.01**). **Edit**: `PATCH invoices/{invoice}/line-details/{lineDetail}`, `import` → **`adjusted`**. **Create extract**: tune **`INVOICE_IMPORT_EXTRACT_JOB_TIMEOUT`** vs **`INVOICE_IMPORT_EXTRACT_POLL_*`**; queue worker or **`INVOICE_IMPORT_EXTRACT_SYNC`**. **Bugfix**: AJAX update URL = **`rtrim(base,'/') + '/' + id`** (avoid `line-details2`). See **`docs/architecture.md`**, **`docs/decisions.md`** (2026-03-31), **`docs/todo.md`**.

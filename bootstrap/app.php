@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
             ->dailyAt('00:10')
             ->timezone($wita)
             ->withoutOverlapping();
+
+        $schedule->command('solar:price:sync-from-last-pertamina')
+            ->dailyAt('07:30')
+            ->timezone($wita)
+            ->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: [

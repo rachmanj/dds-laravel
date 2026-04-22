@@ -67,6 +67,28 @@
                 </div>
             @endauth
 
+            @if ($activeSolarPrice)
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="info-box bg-gradient-warning mb-0">
+                            <span class="info-box-icon bg-warning elevation-1">
+                                <i class="fas fa-sun"></i>
+                            </span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Harga Solar Pinjaman periode:
+                                    {{ $activeSolarPrice->period_start?->format('d M Y') }} –
+                                    {{ $activeSolarPrice->period_end?->format('d M Y') }}</span>
+                                <span class="info-box-number d-block font-weight-bold"
+                                    style="font-size: 2.25rem; line-height: 1.2; letter-spacing: 0.02em;">IDR
+                                    {{ number_format((float) $activeSolarPrice->unit_price, 2) }}</span>
+                                <span class="progress-description">Unit price (solar) ·
+                                    <a href="{{ route('solar-price-histories.index') }}">Lihat riwayat harga</a></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Department-Specific Aging Alerts -->
             @if (($departmentAgingAlerts['overdue_critical'] ?? 0) > 0 || ($departmentAgingAlerts['overdue_warning'] ?? 0) > 0)
                 <div class="row mb-4">

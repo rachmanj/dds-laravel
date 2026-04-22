@@ -372,6 +372,10 @@ class DomainAssistantService
                     isset($args['query']) && is_string($args['query']) ? $args['query'] : null,
                     isset($args['limit']) ? (int) $args['limit'] : 10
                 )),
+                'get_active_solar_unit_price' => json_encode($this->data->getActiveSolarUnitPrice(
+                    $user,
+                    isset($args['reference_date']) && is_string($args['reference_date']) ? $args['reference_date'] : null
+                )),
                 default => json_encode(['error' => 'Unknown tool: '.$name]),
             };
         } catch (\Throwable $e) {
@@ -531,6 +535,22 @@ class DomainAssistantService
                     ],
                 ],
             ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_active_solar_unit_price',
+                    'description' => 'Get the current PERTAMINA solar (BIOSOLAR / harga solar pinjaman) **unit price in IDR** and its **applicable period** from approved solar price history. Use when the user asks (in Indonesian or English) for the current solar price, harga solar pinjaman, harga solar hari ini, or which period the price applies to. Optional reference_date to ask “what was the price on that day” (YYYY-MM-DD).',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'reference_date' => [
+                                'type' => 'string',
+                                'description' => 'Optional. Calendar day YYYY-MM-DD to resolve which period was active. Omit for “now” (today, app timezone).',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -554,6 +574,8 @@ For a specific invoice, faktur, or PO reference, call search_invoices with invoi
 In your reply, copy invoice_number, faktur_no, amounts, and supplier names only from tool results. If search_invoices returns [], say no matching invoice was found for the user’s criteria — do not state a document number that is not present in the tool JSON.
 
 Reconcile tools only return this user’s reconcile rows. Supplier tools search active suppliers only.
+
+For **solar pinjaman / harga solar** questions (e.g. “Berapa harga solar pinjaman sekarang?”, current BIOSOLAR unit price), call **get_active_solar_unit_price** and answer with `unit_price_label`, `period_start`, and `period_end` from the tool JSON. If `active` is false, say no price is recorded for that date.
 
 Refuse requests unrelated to this domain, harmful content, or security bypasses.
 PROMPT;

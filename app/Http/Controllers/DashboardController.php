@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use App\Models\Distribution;
 use App\Models\DistributionHistory;
+use App\Models\SolarPriceHistory;
 use App\Services\DashboardMetricsService;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
@@ -16,12 +14,12 @@ class DashboardController extends Controller
     {
         try {
             $user = Auth::user();
-            
+
             // Load relationships with null safety
             $user->loadMissing(['roles', 'department']);
-            
+
             $userLocationCode = $user->department_location_code;
-            
+
             // Use optimized service for all metrics
             $metricsService = app(DashboardMetricsService::class);
 
@@ -43,28 +41,34 @@ class DashboardController extends Controller
             // Get department-specific aging alerts (optimized)
             $departmentAgingAlerts = $metricsService->getDepartmentSpecificAgingAlerts($user, $userLocationCode);
 
+            $activeSolarPrice = SolarPriceHistory::query()
+                ->activeForDate()
+                ->orderByDesc('period_start')
+                ->orderByDesc('id')
+                ->first();
+
             return view('dashboard', compact(
                 'metrics',
                 'documentAgeBreakdown',
                 'pendingDistributions',
                 'recentActivity',
                 'sapDocumentMetrics',
-                'departmentAgingAlerts'
+                'departmentAgingAlerts',
+                'activeSolarPrice'
             ))->with([
-                'getActivityIcon' => fn($action) => $this->getActivityIcon($action),
-                'getActivityColor' => fn($action) => $this->getActivityColor($action)
+                'getActivityIcon' => fn ($action) => $this->getActivityIcon($action),
+                'getActivityColor' => fn ($action) => $this->getActivityColor($action),
             ]);
         } catch (\Exception $e) {
-            \Log::error('DashboardController@index error: ' . $e->getMessage(), [
+            \Log::error('DashboardController@index error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'user_id' => Auth::id()
+                'user_id' => Auth::id(),
             ]);
-            
+
             // Return a safe fallback view or redirect
             return redirect()->route('login')->with('error', 'An error occurred while loading the dashboard. Please try again.');
         }
     }
-
 
     private function getPendingDistributions($user, $userLocationCode)
     {
@@ -77,7 +81,7 @@ class DashboardController extends Controller
                 ->orderBy('sent_at', 'desc')
                 ->limit(5);
 
-            if (!$isAdmin && $userLocationCode && $user->department_id) {
+            if (! $isAdmin && $userLocationCode && $user->department_id) {
                 $query->where('destination_department_id', $user->department_id);
             }
 
@@ -85,8 +89,9 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             \Log::error('Error in getPendingDistributions', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             // Return empty collection as safe fallback
             return collect();
         }
@@ -102,7 +107,7 @@ class DashboardController extends Controller
                 ->orderBy('action_performed_at', 'desc')
                 ->limit(10);
 
-            if (!$isAdmin && $userLocationCode && $user->department_id) {
+            if (! $isAdmin && $userLocationCode && $user->department_id) {
                 $query->whereHas('distribution', function ($q) use ($user) {
                     $q->where('origin_department_id', $user->department_id)
                         ->orWhere('destination_department_id', $user->department_id);
@@ -113,13 +118,13 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             \Log::error('Error in getRecentActivity', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             // Return empty collection as safe fallback
             return collect();
         }
     }
-
 
     public function getActivityIcon($action)
     {

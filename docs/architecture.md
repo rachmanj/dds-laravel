@@ -2667,6 +2667,21 @@ All sync operations are logged to `sap_logs` table:
 -   `docs/decisions.md` - Decision record for SQL Server approach
 -   `database/list_ITO.sql` - Source SQL query
 
+### Solar price history (PERTAMINA auto-sync) ✅ **IMPLEMENTED** (2026-04-22)
+
+**Pattern**: A scheduled Artisan command creates **`solar_price_histories`** rows from the **most recent** invoice for supplier **`PERTAMINA`** that has a line whose **description** contains **SOLAR** (same selection logic as the UI “fetch last PERTAMINA solar” API). **Default period** is the **current half-month** in the scheduler timezone: days **1–14** or **15–end of month**.
+
+**Key components**:
+
+-   **`PertaminaSolarInvoiceResolver::resolveLast()`** ([`app/Services/PertaminaSolarInvoiceResolver.php`](../app/Services/PertaminaSolarInvoiceResolver.php)) — Resolves the invoice and line; **`resolveUnitPrice()`** uses **`invoice_line_details.unit_price`** when set and non-zero, otherwise **`amount ÷ quantity`** ( **`bcdiv`**, 4 decimals) when both amount and quantity are present and quantity ≠ 0.
+-   **`php artisan solar:price:sync-from-last-pertamina`** ([`app/Console/Commands/SolarPriceSyncFromLastPertaminaCommand.php`](../app/Console/Commands/SolarPriceSyncFromLastPertaminaCommand.php)) — Optional **`--force`** to insert despite an existing row for the same invoice, line, and period. Idempotent by default (skip duplicate).
+-   **Schedule** ([`bootstrap/app.php`](../bootstrap/app.php)) — **`dailyAt('07:30')`**, timezone **`Asia/Makassar`**, **`withoutOverlapping()`** (same regional timezone as **`sap:sync-ito`** jobs).
+-   **Config** — [`config/services.php`](../config/services.php) **`solar_price_scheduler`**: optional **`SOLAR_PRICE_SCHEDULER_USER_ID`** for **`created_by`**, **`SOLAR_PRICE_SCHEDULER_TIMEZONE`** (default **`Asia/Makassar`**).
+
+**Operational note**: In production, **`php artisan schedule:run`** must run every minute (cron / Task Scheduler) so **`dailyAt`** fires correctly.
+
+**Full write-up**: [`docs/SOLAR-PRICE-HISTORY-PERTAMINA-SYNC.md`](SOLAR-PRICE-HISTORY-PERTAMINA-SYNC.md). **Decision**: [`docs/decisions.md`](decisions.md) (2026-04-22).
+
 ### Upcoming: Phase 3 - End-to-End Reconciliation
 
 -   Implement targeted validation helpers (e.g., tax code, PO reference lookups).

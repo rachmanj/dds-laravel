@@ -69,6 +69,14 @@
                     @include('layouts.partials.menu.invoices')
                 @endcan
 
+                <li class="nav-item">
+                    <a href="{{ route('solar-price-histories.index') }}"
+                        class="nav-link {{ request()->routeIs('solar-price-histories.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-sun"></i>
+                        <p>Solar Price Histories</p>
+                    </a>
+                </li>
+
                 <!-- Distributions Section -->
                 @can('view-distributions')
                     @include('layouts.partials.menu.distributions')

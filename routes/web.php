@@ -55,6 +55,8 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     // Include Invoice Routes
     require __DIR__.'/invoice.php';
 
+    require __DIR__.'/solar-price-histories.php';
+
     // Include Distribution Routes
     require __DIR__.'/distributions.php';
 

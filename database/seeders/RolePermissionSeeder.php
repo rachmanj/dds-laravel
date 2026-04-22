@@ -95,6 +95,11 @@ class RolePermissionSeeder extends Seeder
 
             // Domain assistant (AI chat, product domain)
             'access-domain-assistant',
+
+            // Solar price histories (read = any logged-in user; CED = explicit)
+            'create-solar-price-histories',
+            'edit-solar-price-histories',
+            'delete-solar-price-histories',
         ];
 
         foreach ($permissions as $permission) {
@@ -150,6 +155,9 @@ class RolePermissionSeeder extends Seeder
             'view-master',
             'view-admin',
             'access-domain-assistant',
+            'create-solar-price-histories',
+            'edit-solar-price-histories',
+            'delete-solar-price-histories',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);
@@ -198,6 +206,9 @@ class RolePermissionSeeder extends Seeder
             'delete-reconcile',
             'view-master',
             'see-all-record-switch',
+            'create-solar-price-histories',
+            'edit-solar-price-histories',
+            'delete-solar-price-histories',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance']);
@@ -233,6 +244,9 @@ class RolePermissionSeeder extends Seeder
             'view-master',
             'view-admin',
             'see-all-record-switch',
+            'create-solar-price-histories',
+            'edit-solar-price-histories',
+            'delete-solar-price-histories',
         ]);
 
         $cashierho = Role::firstOrCreate(['name' => 'cashierho']);

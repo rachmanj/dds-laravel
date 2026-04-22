@@ -6,6 +6,7 @@ use App\Models\AdditionalDocument;
 use App\Models\Distribution;
 use App\Models\Invoice;
 use App\Models\ReconcileDetail;
+use App\Models\SolarPriceHistory;
 use App\Models\Supplier;
 use App\Models\User;
 use Carbon\Carbon;
@@ -65,6 +66,52 @@ class DomainAssistantDataService
         }
 
         return $summary;
+    }
+
+    /**
+     * Current (or historical) PERTAMINA solar / “harga solar pinjaman” unit price from `solar_price_histories` when a period covers the reference day.
+     *
+     * @return array<string, mixed>
+     */
+    public function getActiveSolarUnitPrice(User $user, ?string $referenceDate = null): array
+    {
+        $d = $referenceDate !== null && trim($referenceDate) !== '' ? trim($referenceDate) : null;
+        if ($d !== null) {
+            try {
+                $d = Carbon::parse($d)->toDateString();
+            } catch (\Throwable) {
+                return ['error' => 'Invalid reference_date. Use YYYY-MM-DD.'];
+            }
+        }
+
+        $row = SolarPriceHistory::query()
+            ->with('invoiceLineDetail')
+            ->activeForDate($d)
+            ->orderByDesc('period_start')
+            ->orderByDesc('id')
+            ->first();
+
+        $ref = $d ?? now()->toDateString();
+        if (! $row) {
+            return [
+                'active' => false,
+                'message' => 'No solar price record covers this date.',
+                'reference_date' => $ref,
+            ];
+        }
+
+        $price = (float) $row->unit_price;
+
+        return [
+            'active' => true,
+            'reference_date' => $ref,
+            'currency' => 'IDR',
+            'unit_price' => $price,
+            'unit_price_label' => 'IDR '.number_format($price, 2, '.', ','),
+            'period_start' => $row->period_start?->toDateString(),
+            'period_end' => $row->period_end?->toDateString(),
+            'line_description' => $row->invoiceLineDetail?->description,
+        ];
     }
 
     /**

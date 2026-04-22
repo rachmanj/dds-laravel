@@ -1,3 +1,19 @@
+## 2026-04-22 — Solar price history: PERTAMINA line sync, scheduled command, unit price from amount ÷ quantity
+
+-   **Context**: Finance needed **`solar_price_histories`** to track borrowing-period solar unit prices. Manual entry and UI flows existed; operations wanted an **automated** row tied to the **latest PERTAMINA** invoice with a **SOLAR** line, aligned to a **default period** (half-month). **Invoice lines** often have **`unit_price` unset** in the database until a user corrects the line; the system must still **derive** a price from **`amount ÷ quantity`** when the explicit unit price is null or zero.
+-   **Decision**:
+    1. **Resolver** — Centralize selection in **`PertaminaSolarInvoiceResolver`**: PERTAMINA supplier by name, **newest** qualifying invoice, first SOLAR line (by `line_no`). **Unit price**: use line **`unit_price`** when non-null and not zero; otherwise **`bcdiv(amount, quantity, 4)`** when amount and quantity are present and quantity ≠ 0.
+    2. **Command** — **`solar:price:sync-from-last-pertamina`**: current half-month (`1–14` or `15–EOM`) in **`services.solar_price_scheduler.timezone`** (default `Asia/Makassar`); idempotent on `(invoice_id, invoice_line_detail_id, period_start, period_end)` unless **`--force`**; **`created_by`** from optional env user id, else superadmin, else first user.
+    3. **Schedule** — Register in **`bootstrap/app.php`**: **daily 07:30** `Asia/Makassar`, **`withoutOverlapping`**, next to existing **`sap:sync-ito`** schedule entries.
+-   **Alternatives considered**:
+    1. **Only manual solar price entry** — Rejected; too much operational overhead and stale periods.
+    2. **Use header invoice amount** — Rejected; SOLAR pricing must come from the **line** (description filter), not the invoice total.
+-   **Trade-offs**: A single **daily** run may **lag** a same-day posted invoice until the next run; operators can run the Artisan command manually. **Zero** `unit_price` is treated as “unset” and replaced by derived **amount/quantity** (if a line legitimately has zero price but non-zero amount, derivation still applies—acceptable for this fuel-pricing use case).
+-   **Review date**: 2026-10-22 (6 months)
+-   **References**: [`docs/SOLAR-PRICE-HISTORY-PERTAMINA-SYNC.md`](SOLAR-PRICE-HISTORY-PERTAMINA-SYNC.md), [`app/Services/PertaminaSolarInvoiceResolver.php`](../app/Services/PertaminaSolarInvoiceResolver.php), [`app/Console/Commands/SolarPriceSyncFromLastPertaminaCommand.php`](../app/Console/Commands/SolarPriceSyncFromLastPertaminaCommand.php), [`bootstrap/app.php`](../bootstrap/app.php).
+
+---
+
 ## 2026-04-09 — Domain Assistant: Telegram aligned with web list scope, webhook ops, richer admin log
 
 -   **Context**: Telegram DM used the same LLM stack but **`show_all_records`** was hard-coded inconsistently; operators needed **HTTPS webhook registration** documented and automatable; **`assistant_request_logs`** stored only **message length**, not the **question text**; queue-only processing left users with **no reply** when no worker ran.

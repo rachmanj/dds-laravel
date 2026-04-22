@@ -2,6 +2,25 @@
 
 ## ✅ **Recently Completed**
 
+### **Solar price history — PERTAMINA auto-sync (Artisan + schedule + unit price derivation)** ✅ **COMPLETED**
+
+**Status**: Shipped — `solar:price:sync-from-last-pertamina`, half-month period in scheduler TZ, `PertaminaSolarInvoiceResolver` uses **amount ÷ quantity** when line `unit_price` is null or zero, daily schedule in `bootstrap/app.php`  
+**Implementation / doc refresh**: 2026-04-22  
+**Priority**: MEDIUM — align periodic solar price records with latest PERTAMINA SOLAR line
+
+**Summary**:
+
+1. **Command** — `php artisan solar:price:sync-from-last-pertamina` with `--force`; idempotent for same invoice, line, and period; `created_by` from `SOLAR_PRICE_SCHEDULER_USER_ID` or fallback user resolution.
+2. **Resolver** — `resolveUnitPrice`: explicit non-zero `unit_price` else `bcdiv(amount, quantity, 4)`.
+3. **Schedule** — `dailyAt('07:30')`, `Asia/Makassar`, `withoutOverlapping()`.
+4. **Config** — `config/services.php` `solar_price_scheduler` + `.env.example` keys.
+
+**Key files**: `app/Console/Commands/SolarPriceSyncFromLastPertaminaCommand.php`, `app/Services/PertaminaSolarInvoiceResolver.php`, `bootstrap/app.php`, `config/services.php`.
+
+**Docs**: [`docs/SOLAR-PRICE-HISTORY-PERTAMINA-SYNC.md`](SOLAR-PRICE-HISTORY-PERTAMINA-SYNC.md), [`docs/architecture.md`](architecture.md) (Solar price history section), [`docs/decisions.md`](decisions.md) (2026-04-22), [`MEMORY.md`](../MEMORY.md).
+
+---
+
 ### **Invoice imported line details (persistence, show, edit, calculator, import polling)** ✅ **COMPLETED**
 
 **Status**: Shipped — structured line rows from import; invoice show review + mismatch warning; modal edit with mini calculator; configurable extract job/poll timing; PATCH URL join fix  

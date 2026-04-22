@@ -107,6 +107,11 @@ class Invoice extends Model
         return $this->hasMany(InvoiceLineDetail::class)->orderBy('line_no');
     }
 
+    public function solarPriceHistories(): HasMany
+    {
+        return $this->hasMany(SolarPriceHistory::class);
+    }
+
     /**
      * Additional documents linked to this invoice.
      */

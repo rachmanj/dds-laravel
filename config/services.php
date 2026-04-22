@@ -91,4 +91,9 @@ return [
         ],
     ],
 
+    'solar_price_scheduler' => [
+        'creator_user_id' => env('SOLAR_PRICE_SCHEDULER_USER_ID'),
+        'timezone' => env('SOLAR_PRICE_SCHEDULER_TIMEZONE', 'Asia/Makassar'),
+    ],
+
 ];
