@@ -32,7 +32,20 @@ class InvoiceImportDraftBuilder
             $remarksParts[] = '[Import] Supplier not matched automatically: '.$extraction->supplierNameRaw;
         }
         if ($extraction->lineItems !== []) {
-            $lines = array_map(fn ($r) => ($r['description'] ?? '').($r['amount'] !== null ? ' — '.number_format((float) $r['amount'], 2) : ''), $extraction->lineItems);
+            $lines = array_map(function ($r) {
+                $parts = [trim((string) ($r['description'] ?? ''))];
+                if (($r['quantity'] ?? null) !== null) {
+                    $parts[] = 'qty '.number_format((float) $r['quantity'], 4, '.', '');
+                }
+                if (($r['unit_price'] ?? null) !== null) {
+                    $parts[] = '@ '.number_format((float) $r['unit_price'], 4, '.', '');
+                }
+                if (($r['amount'] ?? null) !== null) {
+                    $parts[] = '= '.number_format((float) $r['amount'], 2, '.', '');
+                }
+
+                return implode(' ', array_filter($parts));
+            }, $extraction->lineItems);
             $remarksParts[] = '[Import lines] '.implode('; ', array_filter($lines));
         }
 
@@ -69,6 +82,14 @@ class InvoiceImportDraftBuilder
             'payment_project' => '001H',
             'cur_loc' => $user->department_location_code ?? '',
             'confidence' => $extraction->confidence,
+            'line_items' => array_values(array_map(static function (array $r): array {
+                return [
+                    'description' => $r['description'] ?? '',
+                    'quantity' => $r['quantity'] ?? null,
+                    'unit_price' => $r['unit_price'] ?? null,
+                    'amount' => $r['amount'] ?? null,
+                ];
+            }, $extraction->lineItems)),
         ];
     }
 

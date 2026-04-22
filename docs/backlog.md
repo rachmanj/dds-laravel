@@ -39,6 +39,11 @@
 
 ### **Invoice System Enhancements**
 
+-   [x] **Imported invoice line items (informational) + show-page corrections** ✅ **COMPLETED** (2026-03-31)
+
+    -   **Description**: Persist **`line_items`** from document import into **`invoice_line_details`**; show table with header-vs-lines warning; modal edit + mini calculator; **`PATCH`** API; extraction poll/job timeout config.
+    -   **Docs**: [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-03-31).
+
 -   [ ] **Invoice Field Synchronization Improvements**
 
     -   **Priority**: Medium

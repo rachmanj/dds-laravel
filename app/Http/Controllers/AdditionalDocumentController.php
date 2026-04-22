@@ -1038,13 +1038,27 @@ class AdditionalDocumentController extends Controller
 
     public function sapSyncItoForm()
     {
-        $itoSyncLogs = DB::table('sap_logs')
+        $todayDate = now()->toDateString();
+        $yesterdayDate = now()->copy()->subDay()->toDateString();
+
+        $itoSyncLogsToday = DB::table('sap_logs')
             ->where('action', 'query_sync')
+            ->whereDate('created_at', $todayDate)
             ->orderByDesc('created_at')
-            ->limit(10)
             ->get();
 
-        return view('admin.sap-sync-ito', compact('itoSyncLogs'));
+        $itoSyncLogsYesterday = DB::table('sap_logs')
+            ->where('action', 'query_sync')
+            ->whereDate('created_at', $yesterdayDate)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('admin.sap-sync-ito', compact(
+            'itoSyncLogsToday',
+            'itoSyncLogsYesterday',
+            'todayDate',
+            'yesterdayDate'
+        ));
     }
 
     public function sapSyncIto(Request $request)

@@ -10,6 +10,22 @@
     <li class="breadcrumb-item active">Details</li>
 @endsection
 
+@section('styles')
+    <style>
+        #line_detail_calc_wrap .line-calc-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+        }
+
+        #line_detail_calc_wrap .line-calc-grid .btn {
+            min-height: 32px;
+            padding: 0.2rem 0.25rem;
+            font-size: 0.875rem;
+        }
+    </style>
+@endsection
+
 @section('content')
     <div class="content">
         <div class="container-fluid">
@@ -166,6 +182,82 @@
                                 </div>
                             @endif
 
+                            @if ($invoice->lineDetails->isNotEmpty())
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <h6><strong>Imported line details</strong> <span class="text-muted small">(informational; SAP posting is header-only)</span></h6>
+                                        @php
+                                            $lineSum = $invoice->lineDetails->sum(fn ($l) => (float) ($l->amount ?? 0));
+                                            $headerAmt = (float) $invoice->amount;
+                                            $lineTolerance = strtoupper((string) $invoice->currency) === 'IDR' ? 1.0 : 0.01;
+                                            $lineMismatch = abs($headerAmt - $lineSum) > $lineTolerance;
+                                        @endphp
+                                        @if ($lineMismatch)
+                                            <div class="alert alert-warning small mb-2">
+                                                Sum of line amounts ({{ number_format($lineSum, 2) }}) differs from invoice header amount ({{ $invoice->formatted_amount }}). Imported lines are for reference only.
+                                            </div>
+                                        @endif
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered mb-0">
+                                                <thead class="thead-light">
+                                                    <tr>
+                                                        @if (!empty($canEditInvoiceLineDetails))
+                                                            <th class="text-center border-right-0" style="width: 2.25rem;" title="Edit line"></th>
+                                                        @endif
+                                                        <th>Description</th>
+                                                        <th class="text-right">Qty</th>
+                                                        <th class="text-right">Unit price</th>
+                                                        <th class="text-right">Amount</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($invoice->lineDetails as $line)
+                                                        <tr>
+                                                            @if (!empty($canEditInvoiceLineDetails))
+                                                                <td class="text-center align-middle border-right-0 py-0">
+                                                                    <button type="button"
+                                                                        class="btn btn-link btn-sm text-secondary p-0 invoice-line-detail-edit"
+                                                                        title="Edit line"
+                                                                        data-line-id="{{ $line->id }}"
+                                                                        data-description="{{ e($line->description) }}"
+                                                                        data-quantity="{{ $line->quantity !== null ? $line->quantity : '' }}"
+                                                                        data-unit-price="{{ $line->unit_price !== null ? $line->unit_price : '' }}"
+                                                                        data-amount="{{ $line->amount !== null ? $line->amount : '' }}">
+                                                                        <i class="fas fa-edit"></i>
+                                                                    </button>
+                                                                </td>
+                                                            @endif
+                                                            <td>{{ $line->description }}</td>
+                                                            <td class="text-right">
+                                                                @if ($line->quantity !== null)
+                                                                    {{ number_format((float) $line->quantity, 4) }}
+                                                                @else
+                                                                    <span class="text-muted">—</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="text-right">
+                                                                @if ($line->unit_price !== null)
+                                                                    {{ number_format((float) $line->unit_price, 2) }}
+                                                                @else
+                                                                    <span class="text-muted">—</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="text-right">
+                                                                @if ($line->amount !== null)
+                                                                    {{ number_format((float) $line->amount, 2) }}
+                                                                @else
+                                                                    <span class="text-muted">—</span>
+                                                                @endif
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
                             <div class="row mt-3">
                                 <div class="col-12">
                                     <h6><strong>Additional Information:</strong></h6>
@@ -290,11 +382,284 @@
     </div>
 
     </div>
+
+    @if (!empty($canEditInvoiceLineDetails) && $invoice->lineDetails->isNotEmpty())
+        <div class="modal fade" id="invoiceLineDetailEditModal" tabindex="-1" role="dialog"
+            aria-labelledby="invoiceLineDetailEditModalTitle" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h5 class="modal-title" id="invoiceLineDetailEditModalTitle">Edit line detail</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <form id="invoiceLineDetailEditForm">
+                        @csrf
+                        <input type="hidden" name="_method" value="PATCH">
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="line_detail_description">Description</label>
+                                <textarea class="form-control" id="line_detail_description" name="description" rows="3" required></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-4">
+                                    <label for="line_detail_quantity">Qty</label>
+                                    <input type="text" class="form-control" id="line_detail_quantity" name="quantity" inputmode="decimal" autocomplete="off">
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label for="line_detail_unit_price">Unit price</label>
+                                    <input type="text" class="form-control" id="line_detail_unit_price" name="unit_price" inputmode="decimal" autocomplete="off">
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label for="line_detail_amount">Amount</label>
+                                    <input type="text" class="form-control" id="line_detail_amount" name="amount" inputmode="decimal" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="border rounded p-2 mb-2 bg-light" id="line_detail_calc_wrap">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <small class="text-muted font-weight-bold mb-0"><i class="fas fa-calculator"></i> Mini calculator</small>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm px-2" id="line_calc_back" title="Backspace">⌫</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm px-2" id="line_calc_clear" title="Clear all">C</button>
+                                    </div>
+                                </div>
+                                <input type="text" class="form-control form-control-sm mb-2 text-right font-weight-bold" id="line_calc_display" readonly value="0" tabindex="-1" aria-live="polite">
+                                <div class="line-calc-grid">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="7">7</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="8">8</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="9">9</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-op" data-op="/">÷</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="4">4</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="5">5</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="6">6</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-op" data-op="*">×</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="1">1</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="2">2</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="3">3</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-op" data-op="-">−</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit="0">0</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-digit" data-digit=".">.</button>
+                                    <button type="button" class="btn btn-primary btn-sm line-calc-eq" id="line_calc_equals">=</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm line-calc-op" data-op="+">+</button>
+                                </div>
+                                <div class="mt-2 pt-2 border-top">
+                                    <small class="text-muted d-block mb-1">Insert result into:</small>
+                                    <div class="btn-group btn-group-sm flex-wrap">
+                                        <button type="button" class="btn btn-outline-primary btn-sm line-calc-insert" data-insert-target="#line_detail_quantity">Qty</button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm line-calc-insert" data-insert-target="#line_detail_unit_price">Unit price</button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm line-calc-insert" data-insert-target="#line_detail_amount">Amount</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-muted small mb-0">Changes are stored for this invoice only (informational lines). SAP posting stays header-only.</p>
+                            <div id="line_detail_edit_error" class="alert alert-danger small py-2 mt-2 d-none"></div>
+                        </div>
+                        <div class="modal-footer py-2">
+                            <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary btn-sm" id="line_detail_save_btn">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection
 
 @section('scripts')
     <script>
         $(document).ready(function() {
+            @if (!empty($canEditInvoiceLineDetails) && $invoice->lineDetails->isNotEmpty())
+            let lineDetailUpdateUrlBase = @json(url('/invoices/'.$invoice->id.'/line-details/'));
+            let currentLineDetailId = null;
+
+            const lineDetailCalc = (function () {
+                function formatResult(n) {
+                    if (!isFinite(n) || isNaN(n)) {
+                        return '0';
+                    }
+                    return String(Math.round(n * 1e12) / 1e12);
+                }
+
+                function compute(a, b, op) {
+                    switch (op) {
+                        case '+':
+                            return a + b;
+                        case '-':
+                            return a - b;
+                        case '*':
+                            return a * b;
+                        case '/':
+                            return b === 0 ? NaN : a / b;
+                        default:
+                            return b;
+                    }
+                }
+
+                const state = {
+                    first: null,
+                    op: null,
+                    waiting: false,
+                    displayValue: '0',
+                };
+
+                function syncDisplay() {
+                    $('#line_calc_display').val(state.displayValue);
+                }
+
+                function reset() {
+                    state.first = null;
+                    state.op = null;
+                    state.waiting = false;
+                    state.displayValue = '0';
+                    syncDisplay();
+                }
+
+                function inputDigit(d) {
+                    if (state.waiting) {
+                        state.displayValue = d === '.' ? '0.' : d;
+                        state.waiting = false;
+                    } else {
+                        if (d === '.' && state.displayValue.includes('.')) {
+                            return;
+                        }
+                        if (state.displayValue === '0' && d !== '.') {
+                            state.displayValue = d;
+                        } else {
+                            state.displayValue += d;
+                        }
+                    }
+                    syncDisplay();
+                }
+
+                function inputOp(nextOp) {
+                    const input = parseFloat(state.displayValue);
+                    if (isNaN(input)) {
+                        return;
+                    }
+                    if (state.first === null) {
+                        state.first = input;
+                    } else if (state.op && !state.waiting) {
+                        const res = compute(state.first, input, state.op);
+                        state.displayValue = formatResult(res);
+                        state.first = res;
+                        syncDisplay();
+                    }
+                    state.waiting = true;
+                    state.op = nextOp;
+                }
+
+                function equals() {
+                    if (state.op === null || state.first === null) {
+                        return;
+                    }
+                    let input = parseFloat(state.displayValue);
+                    if (state.waiting && !isNaN(state.first)) {
+                        input = state.first;
+                    }
+                    if (isNaN(input)) {
+                        return;
+                    }
+                    const res = compute(state.first, input, state.op);
+                    if (!isFinite(res)) {
+                        reset();
+                        return;
+                    }
+                    state.displayValue = formatResult(res);
+                    state.first = null;
+                    state.op = null;
+                    state.waiting = true;
+                    syncDisplay();
+                }
+
+                function backspace() {
+                    if (state.waiting) {
+                        return;
+                    }
+                    if (state.displayValue.length <= 1) {
+                        state.displayValue = '0';
+                    } else {
+                        state.displayValue = state.displayValue.slice(0, -1);
+                    }
+                    syncDisplay();
+                }
+
+                function readResultString() {
+                    return state.displayValue.replace(/,/g, '').trim();
+                }
+
+                return { reset, inputDigit, inputOp, equals, backspace, readResultString };
+            })();
+
+            $(document).on('click', '#invoiceLineDetailEditModal .line-calc-digit', function () {
+                lineDetailCalc.inputDigit($(this).attr('data-digit') || '');
+            });
+            $(document).on('click', '#invoiceLineDetailEditModal .line-calc-op', function () {
+                lineDetailCalc.inputOp($(this).attr('data-op'));
+            });
+            $('#line_calc_equals').on('click', function () {
+                lineDetailCalc.equals();
+            });
+            $('#line_calc_clear').on('click', function () {
+                lineDetailCalc.reset();
+            });
+            $('#line_calc_back').on('click', function () {
+                lineDetailCalc.backspace();
+            });
+            $(document).on('click', '#invoiceLineDetailEditModal .line-calc-insert', function () {
+                const sel = $(this).attr('data-insert-target');
+                const v = lineDetailCalc.readResultString();
+                if (sel) {
+                    $(sel).val(v).trigger('focus');
+                }
+            });
+            $('#invoiceLineDetailEditModal').on('shown.bs.modal', function () {
+                lineDetailCalc.reset();
+            });
+
+            $(document).on('click', '.invoice-line-detail-edit', function () {
+                const btn = $(this);
+                currentLineDetailId = String(btn.attr('data-line-id') || '');
+                $('#line_detail_description').val(btn.attr('data-description') || '');
+                $('#line_detail_quantity').val(btn.attr('data-quantity') || '');
+                $('#line_detail_unit_price').val(btn.attr('data-unit-price') || '');
+                $('#line_detail_amount').val(btn.attr('data-amount') || '');
+                $('#line_detail_edit_error').addClass('d-none').text('');
+                $('#invoiceLineDetailEditModal').modal('show');
+            });
+
+            $('#invoiceLineDetailEditForm').on('submit', function (e) {
+                e.preventDefault();
+                if (!currentLineDetailId) return;
+                const url = String(lineDetailUpdateUrlBase).replace(/\/+$/, '') + '/' + encodeURIComponent(currentLineDetailId);
+                const errEl = $('#line_detail_edit_error');
+                errEl.addClass('d-none').text('');
+                $('#line_detail_save_btn').prop('disabled', true);
+                $.ajax({
+                    url: url,
+                    method: 'POST',
+                    data: $(this).serialize(),
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                }).done(function () {
+                    $('#invoiceLineDetailEditModal').modal('hide');
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success('Line detail saved.');
+                    }
+                    window.location.reload();
+                }).fail(function (xhr) {
+                    let msg = 'Could not save line.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        msg = xhr.responseJSON.message;
+                    } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                        msg = Object.values(xhr.responseJSON.errors).flat().join(' ');
+                    }
+                    errEl.removeClass('d-none').text(msg);
+                }).always(function () {
+                    $('#line_detail_save_btn').prop('disabled', false);
+                });
+            });
+            @endif
+
             // Document Journey Tracking
             $('#loadJourneyBtn').on('click', function() {
                 loadDocumentJourney();

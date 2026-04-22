@@ -844,12 +844,28 @@
                                 const invoiceStats = data.data.invoices || [];
                                 const docStats = data.data.additional_documents || [];
 
-                                const totalInvoices = invoiceStats.reduce((sum, dept) => sum + dept.count, 0);
-                                const totalDocs = docStats.reduce((sum, dept) => sum + dept.count, 0);
-                                const avgInvoiceDays = invoiceStats.length > 0 ? (invoiceStats.reduce((sum, dept) => sum + dept
-                                    .avg_processing_days, 0) / invoiceStats.length).toFixed(2) : 0;
-                                const avgDocDays = docStats.length > 0 ? (docStats.reduce((sum, dept) => sum + dept
-                                    .avg_processing_days, 0) / docStats.length).toFixed(2) : 0;
+                                const safeNum = (v) => {
+                                    const n = Number(v);
+
+                                    return Number.isFinite(n) ? n : 0;
+                                };
+
+                                const totalInvoices = invoiceStats.reduce((sum, dept) => sum + safeNum(dept.count), 0);
+                                const totalDocs = docStats.reduce((sum, dept) => sum + safeNum(dept.count), 0);
+                                const invoiceDayWeighted = invoiceStats.reduce(
+                                    (sum, dept) => sum + safeNum(dept.avg_processing_days) * safeNum(dept.count),
+                                    0
+                                );
+                                const docDayWeighted = docStats.reduce(
+                                    (sum, dept) => sum + safeNum(dept.avg_processing_days) * safeNum(dept.count),
+                                    0
+                                );
+                                const avgInvoiceDays = totalInvoices > 0
+                                    ? (invoiceDayWeighted / totalInvoices).toFixed(2)
+                                    : '0.00';
+                                const avgDocDays = totalDocs > 0
+                                    ? (docDayWeighted / totalDocs).toFixed(2)
+                                    : '0.00';
 
                                 $('#summaryCards').html(`
             <div class="col-lg-3 col-md-6">

@@ -1,3 +1,9 @@
+### 2026-03-31 — Invoice import: `invoice_line_details`, show warning, edit modal + calculator, polling config
+
+**Lines**: `InvoiceImportLineDetailsPersister` on create from **`draft.line_items`**; **`InvoiceLineDetail`** + show table; **warn** if line sum ≠ header (IDR **1** else **0.01**). **Edit**: `PATCH invoices/{invoice}/line-details/{lineDetail}`, `import` → **`adjusted`**. **Create extract**: tune **`INVOICE_IMPORT_EXTRACT_JOB_TIMEOUT`** vs **`INVOICE_IMPORT_EXTRACT_POLL_*`**; queue worker or **`INVOICE_IMPORT_EXTRACT_SYNC`**. **Bugfix**: AJAX update URL = **`rtrim(base,'/') + '/' + id`** (avoid `line-details2`). See **`docs/architecture.md`**, **`docs/decisions.md`** (2026-03-31), **`docs/todo.md`**.
+
+---
+
 ### 2026-04-02 — Domain Assistant: threads, admin log, `supplier_query` on invoices
 
 **Domain Assistant** (`access-domain-assistant`): multi-thread conversations via `/assistant/conversations/*` + session; **`conversation_id`** on chat; admin **`/admin/assistant-report`** for **`assistant_request_logs`** with filters. **`search_invoices`** now supports **`supplier_query`** (supplier `name` / `sap_code` substring) so vendor-specific questions do not return unrelated “latest” invoices. Portable write-up: **`docs/DOMAIN-ASSISTANT-REFERENCE.md`**. Architecture: **`docs/architecture.md`** (Domain Assistant section); decision: **`docs/decisions.md`** (2026-04-02).
@@ -22,7 +28,7 @@ Production ITO sync can run via **`php artisan sap:sync-ito`** (`--today` / `--y
 
 ### 2026-03-27 — Invoice document import (AI-assisted, v1)
 
-See `docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`, `docs/architecture.md` (Invoice creation from PDF/image), and `docs/decisions.md` (2026-03-27). Ops: `OPEN_ROUTER_API_KEY`, queue worker when using database/redis queue; `INVOICE_IMPORT_EXTRACT_SYNC` typically false in production. `invoices.import_extraction` stores extraction snapshot on successful create with import.
+See `docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`, `docs/architecture.md` (Invoice creation from PDF/image), and `docs/decisions.md` (2026-03-27). Ops: `OPEN_ROUTER_API_KEY`, queue worker when using database/redis queue; `INVOICE_IMPORT_EXTRACT_SYNC` typically false in production. `invoices.import_extraction` stores extraction snapshot on successful create with import. **Line rows**: `invoice_line_details` + show/edit flow — **`MEMORY.md`** entry 2026-03-31 and **`docs/decisions.md`** (2026-03-31).
 
 ---
 

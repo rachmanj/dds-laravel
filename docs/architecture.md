@@ -2677,7 +2677,29 @@ All sync operations are logged to `sap_logs` table:
 
 **Status**: Implemented (v1) — see [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), sample extraction notes in [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md).
 
-**High-level flow**: upload → `POST /invoices/import-extract` → `ExtractInvoiceFromDocumentJob` + OpenRouter (images: vision; PDF: embedded text via `smalot/pdfparser` if enough text, else PDF file + `file-parser` / OCR) → `InvoiceImportSupplierResolver` + `InvoiceImportDraftBuilder` → cache (`invoice_import:{uuid}`) → poll `GET /invoices/import-status/{uuid}` → `GET /invoices/import-draft/{uuid}` → prefill `invoices.create` → user submits `InvoiceController::store` with hidden `import_uuid` → `InvoiceImportAttachmentService::attachFromImport` copies temp file to permanent storage and `InvoiceAttachment` (“Invoice Copy”, description “Imported from document”). Optional JSON snapshot on the invoice row: `invoices.import_extraction` (draft metadata, confidence, original filename). SAP AP posting is unchanged (manual / existing flow).
+**High-level flow**: upload → `POST /invoices/import-extract` → `ExtractInvoiceFromDocumentJob` + OpenRouter (images: vision; PDF: embedded text via `smalot/pdfparser` if enough text, else PDF file + `file-parser` / OCR) → `InvoiceImportSupplierResolver` + `InvoiceImportDraftBuilder` (draft may include **`line_items`**: description, quantity/qty, unit_price, amount) → cache (`invoice_import:{uuid}`) → poll `GET /invoices/import-status/{uuid}` → `GET /invoices/import-draft/{uuid}` → prefill `invoices.create` → user submits `InvoiceController::store` with hidden `import_uuid` → `InvoiceImportAttachmentService::attachFromImport` copies temp file to permanent storage and `InvoiceAttachment` (“Invoice Copy”, description “Imported from document”) → **`InvoiceImportLineDetailsPersister`** replaces `invoice_line_details` rows from `import_extraction.draft.line_items` when present. Optional JSON snapshot on the invoice row: `invoices.import_extraction` (draft metadata, confidence, original filename). **SAP AP posting stays header-only**; line rows are informational.
+
+**Imported line rows (show + corrections)**
+
+- **Table** `invoice_line_details` (`InvoiceLineDetail`): `invoice_id`, `line_no`, `description`, `quantity`, `unit_price`, `amount`, `source` (`import` | `adjusted`, …).
+- **Invoice show** (`resources/views/invoices/show.blade.php`): read-only table when lines exist; **warning** if sum of line `amount` differs from header `amount` (tolerance **IDR 1.0**, else **0.01**) — informational only, no blocking validation.
+- **Manual edit**: users who may edit the invoice (same location/role rules as `InvoiceController::edit`) get a per-row control opening a **modal** (description + numeric fields). **Mini calculator** in the modal inserts results into Qty / Unit price / Amount. Save → **`PATCH /invoices/{invoice}/line-details/{lineDetail}`** (`InvoiceController::updateLineDetail`); first user edit after import sets `source` to **`adjusted`**. AJAX URL must join base path and id with an explicit **`/`** (Laravel `url()` may omit a trailing slash; concatenating id produced a broken segment such as `line-details2`).
+- **Tests**: `tests/Feature/InvoiceLineDetailUpdateTest.php`.
+
+```mermaid
+flowchart LR
+  subgraph create [Create invoice with import]
+    ST[InvoiceController store] --> ATT[InvoiceImportAttachmentService attachFromImport]
+    ST --> PER[InvoiceImportLineDetailsPersister]
+    PER --> DB[(invoice_line_details)]
+  end
+  subgraph show [Invoice show]
+    SH[Invoice show view] --> TBL[Line table + mismatch warning]
+    SH --> MOD[Edit modal + mini calculator]
+    MOD --> PATCH[PATCH line-details.update]
+    PATCH --> DB
+  end
+```
 
 **Key files**
 
@@ -2688,9 +2710,11 @@ All sync operations are logged to `sap_logs` table:
 | Job | `app/Jobs/ExtractInvoiceFromDocumentJob.php` |
 | Extraction | `app/Services/OpenRouterInvoiceExtractionService.php`, `app/Services/PdfInvoiceFirstPageService.php` (multi-page PDF → page 1 for OCR path when enabled) |
 | Draft / attach | `app/Services/InvoiceImportDraftBuilder.php`, `app/Services/InvoiceImportAttachmentService.php` |
-| Create + store | `resources/views/invoices/create.blade.php`, `app/Http/Controllers/InvoiceController.php` (`store` attaches when `import_uuid` present) |
+| Create + store | `resources/views/invoices/create.blade.php`, `app/Http/Controllers/InvoiceController.php` (`store` attaches when `import_uuid` present; calls **`InvoiceImportLineDetailsPersister`** after create) |
+| Line details | `database/migrations/*_create_invoice_line_details_table.php`, `app/Models/InvoiceLineDetail.php`, `app/Services/InvoiceImportLineDetailsPersister.php`, `Invoice::lineDetails()` |
+| Show + edit lines | `resources/views/invoices/show.blade.php`; `InvoiceController::show` / **`updateLineDetail`**; route **`invoices.line-details.update`** in `routes/invoice.php` |
 | Model | `app/Models/Invoice.php` — `import_extraction` cast |
-| Config | `config/services.php` → `openrouter.*` |
+| Config | `config/services.php` → `openrouter.*` (includes **`extract_job_timeout`**, **`extract_poll_interval_ms`**, **`extract_poll_max_tries`**) |
 | Logging | `config/logging.php` channel `invoice_import` |
 
 **Configuration (env)**
@@ -2698,11 +2722,13 @@ All sync operations are logged to `sap_logs` table:
 - `OPEN_ROUTER_API_KEY` / `OPENROUTER_API_KEY`, `OPEN_ROUTER_MODEL`, optional `OPEN_ROUTER_BASE_URL`, `OPEN_ROUTER_TIMEOUT`, `OPEN_ROUTER_PDF_TIMEOUT`, `OPEN_ROUTER_PDF_ENGINE`, `OPEN_ROUTER_PDF_FIRST_PAGE_ONLY`.
 - `INVOICE_IMPORT_ENABLED` — gate feature.
 - `INVOICE_IMPORT_EXTRACT_SYNC` — if `true`, runs `dispatchSync()` on extract so the upload HTTP request blocks until extraction finishes (dev / no worker); **false in production** unless long-lived requests are acceptable.
-- Queue: with `QUEUE_CONNECTION=database` or `redis`, a **queue worker** must run (`php artisan queue:work`) or extraction never completes.
+- **`INVOICE_IMPORT_EXTRACT_JOB_TIMEOUT`** (seconds, default 300) — `ExtractInvoiceFromDocumentJob` timeout; set **`extract_poll_*`** so **`(poll_interval_ms / 1000) × poll_max_tries`** exceeds this value (with margin).
+- **`INVOICE_IMPORT_EXTRACT_POLL_INTERVAL_MS`** (default 2000) and **`INVOICE_IMPORT_EXTRACT_POLL_MAX_TRIES`** (default 200) — polling `import-status` on create invoice (wired from `InvoiceController::create` into Blade).
+- Queue: with `QUEUE_CONNECTION` not `sync`, a **queue worker** must run (`php artisan queue:work`) or extraction never completes. UI copy references **`INVOICE_IMPORT_EXTRACT_SYNC`** and **`QUEUE_CONNECTION=sync`** for local dev.
 
 **UX on create invoice**
 
-- Collapsible import card: file input, **Preview** (modal: image or PDF iframe), **Extract data**, status text; optional alert when queue driver is `database` / `redis`.
+- Collapsible import card: file input, **Preview** (modal: image or PDF iframe), **Extract data**, status text; optional alert when queue driver is **not** `sync`.
 - After successful save, AJAX response may include `import_attachment_saved`; UI can toast when the imported file was attached.
 
 **PDF behaviour (v1)**

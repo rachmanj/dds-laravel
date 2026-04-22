@@ -1,8 +1,8 @@
 # Invoice from PDF/Image — Concrete Implementation Plan
 
-**Status**: Phase 1–5 implemented (v1) — queue extraction, draft prefill, post-save attachment, `import_extraction` persistence, first-page PDF for OCR, preview modal, extract response status + optional sync extract, attachment result in JSON + logging  
-**Last updated**: 2026-03-27  
-**Related**: `InvoiceController`, `InvoiceAttachment`, `CreateSapApInvoiceJob`, `SapApInvoicePayloadBuilder`
+**Status**: Phase 1–5 implemented (v1) — queue extraction, draft prefill, post-save attachment, `import_extraction` persistence, first-page PDF for OCR, preview modal, extract response status + optional sync extract, attachment result in JSON + logging; **line items** → **`invoice_line_details`** on save; invoice **show** review + optional line edit (see [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) 2026-03-31)  
+**Last updated**: 2026-03-31  
+**Related**: `InvoiceController`, `InvoiceAttachment`, `InvoiceImportLineDetailsPersister`, `InvoiceLineDetail`, `CreateSapApInvoiceJob`, `SapApInvoicePayloadBuilder`
 
 ## 1. Objective
 
@@ -80,7 +80,7 @@ flowchart LR
    - `invoice_number`, `faktur_no`, `invoice_date`, `receive_date` (often same as invoice date or today — user adjusts)
    - `supplier_name_raw`, `supplier_tax_id` (optional)
    - `po_no`, `currency`, `amount` (numeric string → decimal)
-   - `line_items` (optional array for remarks / future SAP lines)
+   - `line_items` (optional array: description, quantity/qty, unit_price, amount) — persisted to **`invoice_line_details`** on successful create via **`InvoiceImportLineDetailsPersister`**; SAP posting remains header-only (see architecture doc)
    - `confidence` per field or global
    - `raw_notes` / `warnings[]`
 

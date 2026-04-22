@@ -63,6 +63,31 @@
 
 ---
 
+## 2026-03-31 — Invoice import: line-item persistence, show-page review, and extraction polling
+
+-   **Context**: Imported drafts can include **line items** (qty, unit price, amount). Users need to see those lines on the invoice record, reconcile them mentally against the header total, and **correct** OCR or rounding errors without re-import. The create-page poller previously timed out at ~3 minutes while the extraction job allows up to **300s** and PDF API timeouts up to **240s**, causing false “Timed out waiting for extraction.” A bad AJAX URL join (`line-details` + `2` → `line-details2`) broke saves when Laravel **`url()`** omitted a trailing slash.
+
+-   **Decision**:
+    1. **Persistence** — Table **`invoice_line_details`**; on **`InvoiceController::store`**, **`InvoiceImportLineDetailsPersister`** reads **`import_extraction.draft.line_items`**, replaces rows for that invoice, **`source`** default **`import`**.
+    2. **SAP** — Unchanged **header-only** posting; lines are **informational**.
+    3. **Show** — Read-only table + **warning** when sum of line amounts ≠ header amount (tolerance **IDR 1.0**, else **0.01**); no server-side block.
+    4. **Corrections** — **`PATCH /invoices/{invoice}/line-details/{lineDetail}`** (`invoices.line-details.update`) with the same **location/role** rules as invoice edit; **`source`** becomes **`adjusted`** when edited after import. Modal includes a **mini calculator** and **Insert into** Qty / Unit price / Amount.
+    5. **Polling / job** — Config **`extract_job_timeout`**, **`extract_poll_interval_ms`**, **`extract_poll_max_tries`** (env-documented); job timeout read from config in **`ExtractInvoiceFromDocumentJob`**. Create-page queue hint for any driver **not** `sync`.
+    6. **Client URL** — Build PATCH URL as **`rtrim(base, '/') + '/' + id`** (never concatenate id directly onto a path that may lack a trailing slash).
+
+-   **Alternatives considered**:
+    1. **SAP line posting in v1** — Rejected; scope and payload mapping deferred.
+    2. **Hard validation header vs lines** — Rejected; **warn-only** per product choice.
+    3. **Only remarks text for lines** — Rejected; structured columns aid review and edits.
+
+-   **Trade-offs**: Manual line edits do not sync back into **`import_extraction` JSON**; truth is **`invoice_line_details`**. Calculator and extra UI add Blade/JS surface area on **`invoices.show`**.
+
+-   **Review date**: 2026-09-30 (6 months)
+
+-   **References**: [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`app/Services/InvoiceImportLineDetailsPersister.php`](../app/Services/InvoiceImportLineDetailsPersister.php), [`tests/Feature/InvoiceLineDetailUpdateTest.php`](../tests/Feature/InvoiceLineDetailUpdateTest.php).
+
+---
+
 ## 2026-03-27 — Invoice document import (AI-assisted, v1)
 
 -   **Context**: Users need to create supplier invoices faster from PDF or image uploads without building in-house OCR. The app already has invoice create, attachments, and SAP AP flows.
@@ -82,7 +107,7 @@
 
 -   **Review date**: 2026-09-27 (6 months)
 
--   **References**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md).
+-   **References**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md). **Line-item persistence and show-page edits**: [`docs/decisions.md`](decisions.md) (2026-03-31).
 
 ---
 

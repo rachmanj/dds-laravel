@@ -10,15 +10,15 @@ SAP B1 Service Layer uses **cookie-based session management** for authentication
 
 SAP B1 Service Layer does **NOT** use:
 
--   ❌ Session ID in request headers
--   ❌ Session ID in query parameters
--   ❌ Bearer tokens
+- ❌ Session ID in request headers
+- ❌ Session ID in query parameters
+- ❌ Bearer tokens
 
 Instead, it uses:
 
--   ✅ **HTTP Cookies** (standard web session management)
--   ✅ Cookies are set by SAP after login via `Set-Cookie` headers
--   ✅ Cookies must be sent back to SAP in the `Cookie` header for all subsequent requests
+- ✅ **HTTP Cookies** (standard web session management)
+- ✅ Cookies are set by SAP after login via `Set-Cookie` headers
+- ✅ Cookies must be sent back to SAP in the `Cookie` header for all subsequent requests
 
 ### 2. Implementation in Laravel
 
@@ -43,9 +43,9 @@ $this->client = new Client([
 
 **Key Point**: When you pass `'cookies' => $this->cookieJar` to the Guzzle Client, Guzzle will:
 
--   Automatically store cookies from `Set-Cookie` headers in responses
--   Automatically include cookies in the `Cookie` header for all requests
--   Match cookies to the correct domain and path
+- Automatically store cookies from `Set-Cookie` headers in responses
+- Automatically include cookies in the `Cookie` header for all requests
+- Match cookies to the correct domain and path
 
 ### 3. Login Process
 
@@ -68,8 +68,7 @@ public function login()
 **What Happens**:
 
 1. **Request Sent**:
-
-    ```
+  ```
     POST https://arkasrv2:50000/b1s/v1/Login
     Content-Type: application/json
 
@@ -78,19 +77,16 @@ public function login()
       "UserName": "your_user",
       "Password": "your_password"
     }
-    ```
-
+  ```
 2. **SAP Response**:
-
-    ```
+  ```
     HTTP/1.1 200 OK
     Set-Cookie: B1SESSION=abc123def456...; Path=/; HttpOnly
     Set-Cookie: ROUTEID=.node1; Path=/
     Content-Type: application/json
-    ```
-
+  ```
 3. **Guzzle Automatically**:
-    - Extracts cookies from `Set-Cookie` headers
+  - Extracts cookies from `Set-Cookie` headers
     - Stores them in the `CookieJar`
     - Associates them with the domain (`arkasrv2:50000`)
 
@@ -111,10 +107,10 @@ $response = $this->client->get('InventoryTransferRequests', [
 
 1. Checks `CookieJar` for cookies matching the request domain
 2. Adds `Cookie` header to the request:
-    ```
+  ```
     GET https://arkasrv2:50000/b1s/v1/InventoryTransferRequests?$filter=...
     Cookie: B1SESSION=abc123def456...; ROUTEID=.node1
-    ```
+  ```
 3. SAP validates the session from the cookies
 4. Returns data if session is valid
 
@@ -253,11 +249,8 @@ Expires: Session
 ### ⚠️ Important Considerations
 
 1. **CookieJar Scope**: The `CookieJar` is instance-specific. Each `SapService` instance has its own `CookieJar`, so sessions are isolated per instance.
-
 2. **Session Lifetime**: SAP sessions typically expire after a period of inactivity. The code handles this with automatic re-login on 401 errors.
-
 3. **Multiple Requests**: Once logged in, you can make multiple requests without re-logging in, as long as the session hasn't expired.
-
 4. **Thread Safety**: If using the same `SapService` instance across multiple requests, the `CookieJar` is shared, so the session is maintained.
 
 ## Code Reference
@@ -266,9 +259,9 @@ Expires: Session
 
 **Key Methods**:
 
--   `__construct()`: Sets up Guzzle client with CookieJar
--   `login()`: Authenticates and receives session cookies
--   All other methods: Automatically use cookies from CookieJar
+- `__construct()`: Sets up Guzzle client with CookieJar
+- `login()`: Authenticates and receives session cookies
+- All other methods: Automatically use cookies from CookieJar
 
 **Example Usage**:
 
@@ -308,9 +301,9 @@ if (!$this->cookieJar->count()) {
 
 ## Related Documentation
 
--   [SAP B1 Service Layer Documentation](https://api.sap.com/api/B1SL/resource)
--   [Guzzle HTTP Client Documentation](https://docs.guzzlephp.org/)
--   [Guzzle CookieJar Documentation](https://docs.guzzlephp.org/en/stable/request-options.html#cookies)
+- [SAP B1 Service Layer Documentation](https://api.sap.com/api/B1SL/resource)
+- [Guzzle HTTP Client Documentation](https://docs.guzzlephp.org/)
+- [Guzzle CookieJar Documentation](https://docs.guzzlephp.org/en/stable/request-options.html#cookies)
 
 ## Multiple Applications / Concurrent Sessions
 
@@ -333,10 +326,10 @@ Application 1 (Laravel)          Application 2 (Other App)
 
 **Key Points**:
 
--   ✅ Each application gets its **own session** (different cookies)
--   ✅ Sessions are **independent** - they don't interfere with each other
--   ✅ Both can make requests **simultaneously**
--   ✅ Each session has its own **transaction context**
+- ✅ Each application gets its **own session** (different cookies)
+- ✅ Sessions are **independent** - they don't interfere with each other
+- ✅ Both can make requests **simultaneously**
+- ✅ Each session has its own **transaction context**
 
 ### Potential Conflicts and Issues
 
@@ -344,9 +337,9 @@ Application 1 (Laravel)          Application 2 (Other App)
 
 SAP B1 may have limits on concurrent sessions per user:
 
--   **Default**: Usually 5-10 concurrent sessions per user
--   **Impact**: If too many applications are logged in, new logins might fail
--   **Solution**: Monitor session count, implement session pooling if needed
+- **Default**: Usually 5-10 concurrent sessions per user
+- **Impact**: If too many applications are logged in, new logins might fail
+- **Solution**: Monitor session count, implement session pooling if needed
 
 #### 2. **Data Conflicts** ⚠️
 
@@ -359,15 +352,15 @@ Application 2: Update Invoice #123 → Status = "Cancelled"
 
 **What Happens**:
 
--   Last write wins (standard database behavior)
--   No automatic conflict resolution
--   Potential data inconsistency
+- Last write wins (standard database behavior)
+- No automatic conflict resolution
+- Potential data inconsistency
 
 **Best Practices**:
 
--   Use optimistic locking (check `UpdateDate` before updating)
--   Implement proper transaction management
--   Use SAP's built-in locking mechanisms if available
+- Use optimistic locking (check `UpdateDate` before updating)
+- Implement proper transaction management
+- Use SAP's built-in locking mechanisms if available
 
 #### 3. **Transaction Conflicts** ⚠️
 
@@ -380,8 +373,8 @@ Application 2: Create Invoice → DocNum = "INV-001" (if using manual numbering)
 
 **What Happens**:
 
--   SAP will reject the second request with a duplicate error
--   One application succeeds, one fails
+- SAP will reject the second request with a duplicate error
+- One application succeeds, one fails
 
 **Solution**: Use SAP's automatic numbering or implement proper sequence management
 
@@ -389,9 +382,9 @@ Application 2: Create Invoice → DocNum = "INV-001" (if using manual numbering)
 
 **Multiple concurrent sessions**:
 
--   ✅ Can improve throughput (parallel processing)
--   ⚠️ May increase database load
--   ⚠️ May cause resource contention
+- ✅ Can improve throughput (parallel processing)
+- ⚠️ May increase database load
+- ⚠️ May cause resource contention
 
 ### Current Implementation Behavior
 
@@ -404,15 +397,15 @@ $sapService = app(SapService::class);
 
 **What This Means**:
 
--   Each HTTP request gets a **new SapService instance** (unless registered as singleton)
--   Each instance has its **own CookieJar**
--   Each instance creates its **own SAP session** (if not shared)
+- Each HTTP request gets a **new SapService instance** (unless registered as singleton)
+- Each instance has its **own CookieJar**
+- Each instance creates its **own SAP session** (if not shared)
 
 **Potential Issue**: If you make multiple requests in the same HTTP request lifecycle, each might create a new SAP session, leading to:
 
--   Multiple sessions per user
--   Session limit exhaustion
--   Unnecessary overhead
+- Multiple sessions per user
+- Session limit exhaustion
+- Unnecessary overhead
 
 ### Best Practices
 
@@ -432,9 +425,9 @@ public function register()
 
 **Benefits**:
 
--   ✅ One session per application instance
--   ✅ Reduced session count
--   ✅ Better performance (reuses connection)
+- ✅ One session per application instance
+- ✅ Reduced session count
+- ✅ Better performance (reuses connection)
 
 #### 2. **Session Pooling** (For High Traffic)
 
@@ -505,9 +498,9 @@ try {
 
 Your current implementation creates a new `SapService` instance per request (unless registered as singleton), which means:
 
--   Each sync operation might create a new SAP session
--   Sessions are independent and don't conflict
--   But you might hit session limits with high traffic
+- Each sync operation might create a new SAP session
+- Sessions are independent and don't conflict
+- But you might hit session limits with high traffic
 
 #### Recommended Improvements
 
@@ -521,7 +514,7 @@ public function register()
 }
 ```
 
-2. **Add Session Validation**:
+1. **Add Session Validation**:
 
 ```php
 // In SapService
@@ -538,7 +531,7 @@ public function ensureSession()
 }
 ```
 
-3. **Implement Session Reuse**:
+1. **Implement Session Reuse**:
 
 ```php
 // In controller
@@ -574,13 +567,15 @@ $results2 = $sapService2->getStockTransferRequests('2025-11-01', '2025-11-10');
 
 **Multiple Applications with Same Credentials**:
 
+
 | Aspect                  | Behavior                      | Risk Level |
 | ----------------------- | ----------------------------- | ---------- |
-| **Session Creation**    | Each app gets own session     | ✅ Low     |
-| **Concurrent Requests** | Allowed, independent          | ✅ Low     |
+| **Session Creation**    | Each app gets own session     | ✅ Low      |
+| **Concurrent Requests** | Allowed, independent          | ✅ Low      |
 | **Data Conflicts**      | Last write wins               | ⚠️ Medium  |
 | **Session Limits**      | May hit limits with many apps | ⚠️ Medium  |
-| **Performance**         | Can improve throughput        | ✅ Low     |
+| **Performance**         | Can improve throughput        | ✅ Low      |
+
 
 **Best Practices**:
 
@@ -601,9 +596,9 @@ $results2 = $sapService2->getStockTransferRequests('2025-11-01', '2025-11-10');
 
 **Multiple Applications**:
 
--   ✅ Can use same credentials simultaneously
--   ✅ Each gets its own independent session
--   ⚠️ Watch for session limits and data conflicts
--   ✅ Implement session reuse for better performance
+- ✅ Can use same credentials simultaneously
+- ✅ Each gets its own independent session
+- ⚠️ Watch for session limits and data conflicts
+- ✅ Implement session reuse for better performance
 
 The session is maintained through HTTP cookies, and Guzzle handles all the complexity for you.

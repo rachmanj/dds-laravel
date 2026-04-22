@@ -99,7 +99,7 @@ php artisan sap:sync-ito --today
 php artisan sap:sync-ito --start=2026-03-01 --end=2026-03-31
 ```
 
-See **`docs/SAP-ITO-SYNC-COMPLETE.md`** (2026-03-30 update) and **`docs/architecture.md`** (SAP ITO Sync Integration) for `trigger` / `triggered_by_user_id` / `synced_at` in `sap_logs.request_payload`.
+See `**docs/SAP-ITO-SYNC-COMPLETE.md**` (2026-03-30 update) and `**docs/architecture.md**` (SAP ITO Sync Integration) for `trigger` / `triggered_by_user_id` / `synced_at` in `sap_logs.request_payload`.
 
 ## Security Considerations
 

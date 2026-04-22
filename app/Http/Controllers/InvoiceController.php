@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Jobs\CreateSapApInvoiceJob;
 use App\Models\AdditionalDocument;
 use App\Models\Invoice;
+use App\Models\InvoiceLineDetail;
 use App\Models\InvoiceType;
 use App\Models\Project;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Rules\UniqueInvoicePerSupplier;
 use App\Services\InvoiceImportAttachmentService;
+use App\Services\InvoiceImportLineDetailsPersister;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -273,6 +275,8 @@ class InvoiceController extends Controller
             }
         }
 
+        app(InvoiceImportLineDetailsPersister::class)->persistFromImportExtraction($invoice);
+
         if ($request->ajax()) {
             return response()->json([
                 'success' => true,
@@ -298,9 +302,73 @@ class InvoiceController extends Controller
             }
         }
 
-        $invoice->load(['supplier', 'type', 'creator', 'attachments.uploader', 'additionalDocuments.type']);
+        $invoice->load(['supplier', 'type', 'creator', 'attachments.uploader', 'additionalDocuments.type', 'lineDetails']);
 
-        return view('invoices.show', compact('invoice'));
+        $canEditInvoiceLineDetails = false;
+        if ($user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
+            $canEditInvoiceLineDetails = true;
+        } else {
+            $locationCode = $user->department_location_code;
+            $canEditInvoiceLineDetails = ! ($locationCode && $invoice->cur_loc !== $locationCode);
+        }
+
+        return view('invoices.show', compact('invoice', 'canEditInvoiceLineDetails'));
+    }
+
+    public function updateLineDetail(Request $request, Invoice $invoice, InvoiceLineDetail $lineDetail)
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        if (! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
+            $locationCode = $user->department_location_code;
+            if ($locationCode && $invoice->cur_loc !== $locationCode) {
+                abort(403, 'You can only edit invoices from your department location.');
+            }
+        }
+
+        if ($lineDetail->invoice_id !== $invoice->id) {
+            abort(404);
+        }
+
+        $normalizeOptionalNumeric = static function ($value): ?string {
+            if ($value === null || $value === '') {
+                return null;
+            }
+
+            return is_numeric($value) ? (string) $value : null;
+        };
+
+        $payload = [
+            'description' => $request->input('description'),
+            'quantity' => $normalizeOptionalNumeric($request->input('quantity')),
+            'unit_price' => $normalizeOptionalNumeric($request->input('unit_price')),
+            'amount' => $normalizeOptionalNumeric($request->input('amount')),
+        ];
+
+        $validated = validator($payload, [
+            'description' => ['required', 'string', 'max:65535'],
+            'quantity' => ['nullable', 'numeric'],
+            'unit_price' => ['nullable', 'numeric'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+        ])->validate();
+
+        $lineDetail->update([
+            'description' => $validated['description'],
+            'quantity' => $validated['quantity'],
+            'unit_price' => $validated['unit_price'],
+            'amount' => $validated['amount'],
+            'source' => $lineDetail->source === 'import' ? 'adjusted' : $lineDetail->source,
+        ]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Line updated.',
+            ]);
+        }
+
+        return redirect()->route('invoices.show', $invoice)
+            ->with('success', 'Line detail updated.');
     }
 
     public function edit(Invoice $invoice)

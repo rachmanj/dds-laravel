@@ -81,6 +81,9 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
         ->whereUuid('uuid')
         ->name('import-draft');
 
+    Route::patch('/{invoice}/line-details/{lineDetail}', [InvoiceController::class, 'updateLineDetail'])
+        ->name('line-details.update');
+
     // Invoice attachment routes
     Route::prefix('attachments')->group(function () {
         Route::get('/{invoice}/show', [InvoiceAttachmentController::class, 'show'])->name('attachments.show');

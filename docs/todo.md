@@ -2,6 +2,27 @@
 
 ## ✅ **Recently Completed**
 
+### **Invoice imported line details (persistence, show, edit, calculator, import polling)** ✅ **COMPLETED**
+
+**Status**: Shipped — structured line rows from import; invoice show review + mismatch warning; modal edit with mini calculator; configurable extract job/poll timing; PATCH URL join fix  
+**Implementation / doc refresh**: 2026-03-31  
+**Priority**: HIGH — accuracy and UX for AI-assisted invoice entry
+
+**Summary**:
+
+1. **Data** — `invoice_line_details`; **`InvoiceImportLineDetailsPersister`** after **`InvoiceController::store`** when **`import_extraction.draft.line_items`** present; OpenRouter/draft pipeline includes **`line_items`** fields.
+2. **Show** — Table on **`invoices.show`**; warning when line amounts sum ≠ header amount (informational); SAP remains header-only.
+3. **Edit** — **`InvoiceController::updateLineDetail`**, route **`invoices.line-details.update`**; modal + **mini calculator** (insert into Qty / Unit price / Amount); **`source`** → **`adjusted`** after user save.
+4. **Import UX** — **`extract_job_timeout`**, **`extract_poll_interval_ms`**, **`extract_poll_max_tries`** in **`config/services.php`** / `.env.example`; queue hint for non-`sync` drivers; client builds line-detail URL with explicit **`/`** before id.
+
+**Key files**: `database/migrations/*_create_invoice_line_details_table.php`, `app/Models/InvoiceLineDetail.php`, `app/Services/InvoiceImportLineDetailsPersister.php`, `app/Http/Controllers/InvoiceController.php`, `routes/invoice.php`, `resources/views/invoices/show.blade.php`, `resources/views/invoices/create.blade.php` (poll config), `app/Jobs/ExtractInvoiceFromDocumentJob.php`, `config/services.php`, `.env.example`.
+
+**Docs**: [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-03-31), [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`MEMORY.md`](../MEMORY.md).
+
+**Tests**: `tests/Feature/InvoiceLineDetailUpdateTest.php`.
+
+---
+
 ### **Domain Assistant — Telegram parity, webhook CLI, admin log question text** ✅ **COMPLETED**
 
 **Status**: ✅ Shipped — `DomainAssistantListScope` (web vs Telegram), `telegram:set-webhook`, `user_message` on logs, report pagination  
@@ -75,7 +96,7 @@
 
 **Key files**: `routes/invoice.php`, `InvoiceImportController.php`, `ExtractInvoiceFromDocumentJob.php`, `InvoiceImportAttachmentService.php`, `InvoiceImportDraftBuilder.php`, `resources/views/invoices/create.blade.php`, `InvoiceController.php`, `Invoice.php`.
 
-**Docs**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-03-27 entry), [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md).
+**Docs**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-03-27 entry), [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md). **Follow-on (line details, polling, edit modal)**: [`docs/decisions.md`](decisions.md) (2026-03-31); see **Recently Completed** → *Invoice imported line details (persistence, show, edit, calculator, import polling)*.
 
 ---
 

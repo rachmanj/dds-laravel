@@ -100,6 +100,14 @@ class Invoice extends Model
     }
 
     /**
+     * Line details captured from document import (informational; SAP posting remains header-only).
+     */
+    public function lineDetails(): HasMany
+    {
+        return $this->hasMany(InvoiceLineDetail::class)->orderBy('line_no');
+    }
+
+    /**
      * Additional documents linked to this invoice.
      */
     public function additionalDocuments(): BelongsToMany

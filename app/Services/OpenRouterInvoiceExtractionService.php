@@ -252,7 +252,7 @@ Return ONLY a JSON object (no markdown) with exactly these keys:
 - po_no (string|null) purchase order reference
 - currency (string|null) 3-letter ISO code (IDR, USD, etc.)
 - amount (number|null) total payable amount as a decimal number
-- line_items (array of objects with description string and amount number|null) optional
+- line_items (array of objects, optional) each object: description (string), quantity (number|null), unit_price (number|null), amount (number|null line total). If amount is missing but quantity and unit_price exist, amount may be omitted (computed later).
 - confidence (number 0-1) your confidence in amount and supplier_name
 - warnings (array of strings) any issues
 - low_confidence_fields (array of strings) field names where values are uncertain

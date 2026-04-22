@@ -5,7 +5,7 @@ namespace App\Data;
 final class InvoiceExtractionResult
 {
     /**
-     * @param  array<int, array{description: string, amount: float|null}>  $lineItems
+     * @param  array<int, array{description: string, quantity: float|null, unit_price: float|null, amount: float|null}>  $lineItems
      * @param  array<int, string>  $warnings
      * @param  array<int, string>  $lowConfidenceFields
      */
@@ -35,8 +35,11 @@ final class InvoiceExtractionResult
             if (! is_array($row)) {
                 continue;
             }
+            $qtyRaw = $row['quantity'] ?? $row['qty'] ?? null;
             $lineItems[] = [
                 'description' => isset($row['description']) ? (string) $row['description'] : '',
+                'quantity' => ($qtyRaw !== null && $qtyRaw !== '' && is_numeric($qtyRaw)) ? (float) $qtyRaw : null,
+                'unit_price' => isset($row['unit_price']) && is_numeric($row['unit_price']) ? (float) $row['unit_price'] : null,
                 'amount' => isset($row['amount']) && is_numeric($row['amount']) ? (float) $row['amount'] : null,
             ];
         }

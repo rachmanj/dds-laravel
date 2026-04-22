@@ -96,74 +96,91 @@
 
                 <div class="card mt-3">
                     <div class="card-header">
-                        <h3 class="card-title">Recent sync activity</h3>
-                        <span class="text-muted small">Last 10 SAP ITO sync runs (from audit log)</span>
+                        <h3 class="card-title">Sync activity (today &amp; yesterday)</h3>
+                        <span class="text-muted small">SAP ITO sync runs by calendar day ({{ config('app.timezone') }})</span>
                     </div>
-                    <div class="card-body table-responsive p-0">
-                        @if ($itoSyncLogs->isEmpty())
-                            <p class="p-3 mb-0 text-muted">No sync activity recorded yet.</p>
-                        @else
-                            <table class="table table-hover table-striped table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Synced at</th>
-                                        <th>Status</th>
-                                        <th>SAP date range</th>
-                                        <th>Method</th>
-                                        <th>Created</th>
-                                        <th>Skipped</th>
-                                        <th>Trigger</th>
-                                        <th>User</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($itoSyncLogs as $log)
-                                        @php
-                                            $req = json_decode($log->request_payload, true);
-                                            if (!is_array($req)) {
-                                                $req = [];
-                                            }
-                                            $res = json_decode($log->response_payload, true);
-                                            if (!is_array($res)) {
-                                                $res = [];
-                                            }
-                                            $syncedAt = \Illuminate\Support\Carbon::parse($log->created_at)
-                                                ->timezone(config('app.timezone'))
-                                                ->format('Y-m-d H:i:s');
-                                        @endphp
-                                        <tr>
-                                            <td>{{ $syncedAt }}</td>
-                                            <td>
-                                                @if ($log->status === 'success')
-                                                    <span class="badge badge-success">Success</span>
-                                                @else
-                                                    <span class="badge badge-danger">Failed</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if (!empty($req['start_date']) || !empty($req['end_date']))
-                                                    {{ $req['start_date'] ?? '?' }} → {{ $req['end_date'] ?? '?' }}
-                                                @else
-                                                    —
-                                                @endif
-                                            </td>
-                                            <td><code class="small">{{ $req['method'] ?? '—' }}</code></td>
-                                            <td>{{ $res['success'] ?? '—' }}</td>
-                                            <td>{{ $res['skipped'] ?? '—' }}</td>
-                                            <td>{{ $req['trigger'] ?? '—' }}</td>
-                                            <td>{{ $req['triggered_by_user_id'] ?? '—' }}</td>
-                                        </tr>
-                                        @if ($log->status !== 'success' && $log->error_message)
-                                            <tr class="bg-light">
-                                                <td colspan="8" class="small text-danger">
-                                                    {{ \Illuminate\Support\Str::limit($log->error_message, 200) }}
-                                                </td>
-                                            </tr>
-                                        @endif
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        @endif
+                    <div class="card-body p-0">
+                        @foreach ([
+                            'Today' => $itoSyncLogsToday,
+                            'Yesterday' => $itoSyncLogsYesterday,
+                        ] as $periodLabel => $itoSyncLogs)
+                            @php
+                                $headingDate = $periodLabel === 'Today' ? $todayDate : $yesterdayDate;
+                            @endphp
+                            <div class="@if (!$loop->last) border-bottom @endif">
+                                <div class="px-3 py-2 bg-light">
+                                    <strong>{{ $periodLabel }}</strong>
+                                    <span class="text-muted">({{ $headingDate }})</span>
+                                    <span class="badge badge-secondary ml-1">{{ $itoSyncLogs->count() }}</span>
+                                </div>
+                                <div class="table-responsive">
+                                    @if ($itoSyncLogs->isEmpty())
+                                        <p class="p-3 mb-0 text-muted">No sync activity for this day.</p>
+                                    @else
+                                        <table class="table table-hover table-striped table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Synced at</th>
+                                                    <th>Status</th>
+                                                    <th>SAP date range</th>
+                                                    <th>Method</th>
+                                                    <th>Created</th>
+                                                    <th>Skipped</th>
+                                                    <th>Trigger</th>
+                                                    <th>User</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($itoSyncLogs as $log)
+                                                    @php
+                                                        $req = json_decode($log->request_payload, true);
+                                                        if (!is_array($req)) {
+                                                            $req = [];
+                                                        }
+                                                        $res = json_decode($log->response_payload, true);
+                                                        if (!is_array($res)) {
+                                                            $res = [];
+                                                        }
+                                                        $syncedAt = \Illuminate\Support\Carbon::parse($log->created_at)
+                                                            ->timezone(config('app.timezone'))
+                                                            ->format('Y-m-d H:i:s');
+                                                    @endphp
+                                                    <tr>
+                                                        <td>{{ $syncedAt }}</td>
+                                                        <td>
+                                                            @if ($log->status === 'success')
+                                                                <span class="badge badge-success">Success</span>
+                                                            @else
+                                                                <span class="badge badge-danger">Failed</span>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            @if (!empty($req['start_date']) || !empty($req['end_date']))
+                                                                {{ $req['start_date'] ?? '?' }} → {{ $req['end_date'] ?? '?' }}
+                                                            @else
+                                                                —
+                                                            @endif
+                                                        </td>
+                                                        <td><code class="small">{{ $req['method'] ?? '—' }}</code></td>
+                                                        <td>{{ $res['success'] ?? '—' }}</td>
+                                                        <td>{{ $res['skipped'] ?? '—' }}</td>
+                                                        <td>{{ $req['trigger'] ?? '—' }}</td>
+                                                        <td>{{ $req['triggered_by_user_id'] ?? '—' }}</td>
+                                                    </tr>
+                                                    @if ($log->status !== 'success' && $log->error_message)
+                                                        <tr class="bg-light">
+                                                            <td colspan="8" class="small text-danger">
+                                                                {{ \Illuminate\Support\Str::limit($log->error_message, 200) }}
+                                                            </td>
+                                                        </tr>
+                                                    @endif
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
             </div>
