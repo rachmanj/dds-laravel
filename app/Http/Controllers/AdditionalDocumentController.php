@@ -1104,14 +1104,19 @@ class AdditionalDocumentController extends Controller
                 $response = json_decode($logEntry->response_payload, true);
                 $successCount = $response['success'] ?? 0;
                 $skippedCount = $response['skipped'] ?? 0;
+                $fetchedCount = $response['fetched'] ?? null;
 
                 $message = 'Sync completed successfully! ';
+                if ($fetchedCount !== null) {
+                    $message .= "SAP rows: {$fetchedCount}. ";
+                }
                 $message .= "Created: {$successCount} record(s), ";
                 $message .= "Skipped: {$skippedCount} record(s)";
 
                 return redirect()->route('admin.sap-sync-ito')
                     ->with('success', $message)
                     ->with('sync_results', [
+                        'fetched' => $fetchedCount,
                         'success' => $successCount,
                         'skipped' => $skippedCount,
                     ]);

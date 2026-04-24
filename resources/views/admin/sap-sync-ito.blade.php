@@ -86,6 +86,11 @@
                             <div class="alert alert-info mt-3">
                                 <h5><i class="icon fas fa-info"></i> Sync Results</h5>
                                 <ul class="mb-0">
+                                    @if (isset(session('sync_results')['fetched']))
+                                        <li><strong>SAP rows (query):</strong>
+                                            {{ session('sync_results')['fetched'] }} — compare with SSMS running
+                                            <code>docs/list_ito_sql.sql</code> for the same date range</li>
+                                    @endif
                                     <li><strong>Created:</strong> {{ session('sync_results')['success'] }} record(s)</li>
                                     <li><strong>Skipped:</strong> {{ session('sync_results')['skipped'] }} record(s)</li>
                                 </ul>
@@ -97,7 +102,9 @@
                 <div class="card mt-3">
                     <div class="card-header">
                         <h3 class="card-title">Sync activity (today &amp; yesterday)</h3>
-                        <span class="text-muted small">SAP ITO sync runs by calendar day ({{ config('app.timezone') }})</span>
+                        <span class="text-muted small">SAP ITO sync runs by calendar day ({{ config('app.timezone') }}).
+                            <strong>SAP rows</strong> = DISTINCT row count returned from the same logic as
+                            <code>docs/list_ito_sql.sql</code> (before create/skip).</span>
                     </div>
                     <div class="card-body p-0">
                         @foreach ([
@@ -123,6 +130,7 @@
                                                     <th>Synced at</th>
                                                     <th>Status</th>
                                                     <th>SAP date range</th>
+                                                    <th>SAP rows</th>
                                                     <th>Method</th>
                                                     <th>Created</th>
                                                     <th>Skipped</th>
@@ -161,6 +169,7 @@
                                                                 —
                                                             @endif
                                                         </td>
+                                                        <td>{{ $res['fetched'] ?? '—' }}</td>
                                                         <td><code class="small">{{ $req['method'] ?? '—' }}</code></td>
                                                         <td>{{ $res['success'] ?? '—' }}</td>
                                                         <td>{{ $res['skipped'] ?? '—' }}</td>
@@ -169,7 +178,7 @@
                                                     </tr>
                                                     @if ($log->status !== 'success' && $log->error_message)
                                                         <tr class="bg-light">
-                                                            <td colspan="8" class="small text-danger">
+                                                            <td colspan="9" class="small text-danger">
                                                                 {{ \Illuminate\Support\Str::limit($log->error_message, 200) }}
                                                             </td>
                                                         </tr>

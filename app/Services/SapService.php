@@ -569,8 +569,10 @@ class SapService
     }
 
     /**
-     * Execute SQL query directly on SAP B1 SQL Server
-     * This method executes the exact SQL query from list_ITO.sql
+     * Execute SQL query directly on SAP B1 SQL Server.
+     * Keeps the same FROM/JOIN/WHERE/SELECT DISTINCT as docs/list_ito_sql.sql and database/list_ITO.sql
+     * (parameterized dates instead of @A/@B; no FOR BROWSE). T10 is included for parity with the SAP query; it
+     * does not add projected columns.
      *
      * @param  string  $startDate  Y-m-d format
      * @param  string  $endDate  Y-m-d format
@@ -582,12 +584,10 @@ class SapService
             // Use Laravel's DB facade with the SAP SQL connection
             $connection = \Illuminate\Support\Facades\DB::connection('sap_sql');
 
-            // Convert dates to SQL Server datetime format
+            // Match inclusive CreateDate window: same intent as @A/@B in list_ito_sql.sql when set to start/end of range
             $startDateTime = $startDate.' 00:00:00';
             $endDateTime = $endDate.' 23:59:59';
 
-            // Execute the SQL query from list_ITO.sql
-            // Note: We're using the exact query structure but with parameterized queries for safety
             $sql = "
                 SELECT DISTINCT
                     T0.[DocNum] AS ito_no, 

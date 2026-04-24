@@ -127,7 +127,11 @@ class SyncSapItoDocumentsJob implements ShouldQueue
                 'action' => 'query_sync',
                 'status' => 'success',
                 'request_payload' => json_encode($this->baseAuditPayload($method, $effectiveUserId)),
-                'response_payload' => json_encode(['success' => $successCount, 'skipped' => $skippedCount]),
+                'response_payload' => json_encode([
+                    'fetched' => count($results),
+                    'success' => $successCount,
+                    'skipped' => $skippedCount,
+                ]),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

@@ -73,7 +73,9 @@ class SapSyncItoCommand extends Command
                 $response = json_decode($logEntry->response_payload, true) ?? [];
                 $successCount = $response['success'] ?? 0;
                 $skippedCount = $response['skipped'] ?? 0;
-                $this->info("Done. Created: {$successCount}, skipped: {$skippedCount}");
+                $fetched = $response['fetched'] ?? null;
+                $fetchedMsg = $fetched !== null ? "SAP rows: {$fetched}. " : '';
+                $this->info("Done. {$fetchedMsg}Created: {$successCount}, skipped: {$skippedCount}");
 
                 return self::SUCCESS;
             }
