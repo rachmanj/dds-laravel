@@ -7,6 +7,15 @@
         </li>
     </ul>
 
+    <div id="menu-search-container" class="d-none d-md-flex mx-auto">
+        <div id="menu-search-input-wrapper">
+            <input type="text" id="menu-search-input" class="form-control" placeholder="Search Menu here"
+                autocomplete="off" aria-label="Search menu">
+            <i id="menu-search-icon" class="fas fa-search"></i>
+        </div>
+        <div id="menu-search-results"></div>
+    </div>
+
     <!-- Right navbar links -->
     <ul class="navbar-nav ml-auto">
 

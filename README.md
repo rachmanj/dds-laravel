@@ -17,6 +17,7 @@ A comprehensive document management and invoice processing platform built with L
 #### **User Experience**
 
 -   **Modern UI**: AdminLTE 3 with responsive design and Bootstrap 4
+-   **Navbar menu search**: Permission-aware destination search from the top bar (keyboard shortcut on desktop); see [architecture.md](docs/architecture.md) (section *Navbar Menu Search*).
 -   **DataTables Integration**: Server-side processing with advanced filtering and search
 -   **Notification System**: Comprehensive toastr integration with SweetAlert2 confirmations
 -   **AJAX Operations**: Smooth form submissions without page reloads with proper error handling

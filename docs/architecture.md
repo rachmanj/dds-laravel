@@ -973,6 +973,34 @@ graph TB
     class ANALYTICS_CTRLS,ANALYTICS_TOGGLE,ACCESSIBILITY_CTRLS controls
 ```
 
+<a id="navbar-menu-search"></a>
+
+### **Navbar Menu Search** ✅ **IMPLEMENTED** (2026-05-10)
+
+**Pattern**: Permission-aware autocomplete in the top navbar so users can jump to any sidebar destination they are allowed to open, without maintaining a separate manual URL list in the frontend.
+
+**Flow**:
+
+1. On first focus or typing, the browser requests **`GET /api/menu/search`** (session cookie; `web` + `auth` middleware) once and caches the JSON in memory.
+2. **`MenuSearchService`** builds a flat list of items that mirrors **`resources/views/layouts/partials/sidebar.blade.php`** and **`layouts/partials/menu/*.blade.php`** (Spatie `can`, `hasAnyRole`, domain-assistant config, department presence, etc.).
+3. **`MenuSearchController`** caches the computed list per user for **3600 seconds** using a key that includes a fingerprint of the user’s resolved permission names (`menu_items_user_{userId}_{md5(...)}`). Optional **`?q=`** returns up to **15** substring matches server-side; the script also filters client-side after load.
+4. **`public/js/menu-search.js`** (jQuery) debounces input, prefers title-prefix matches when sorting, supports ArrowUp/ArrowDown, Enter, Escape, and **Ctrl+K / Cmd+K** when the control is visible (`md` and up).
+
+**Primary files**:
+
+| Layer | Location |
+| --- | --- |
+| Service | `app/Services/MenuSearchService.php` |
+| API | `app/Http/Controllers/Api/MenuSearchController.php` |
+| Route | `routes/api.php` — `GET /menu/search` (named `api.menu.search`), prefix **`/api`** |
+| Navbar | `resources/views/layouts/partials/navbar.blade.php` — `#menu-search-container` |
+| Assets | `public/css/menu-search.css`, `public/js/menu-search.js` |
+| URL to JS | `resources/views/layouts/partials/head.blade.php` — `<meta name="menu-search-url" content="{{ route('api.menu.search') }}">` |
+
+**Maintenance**: New sidebar links must be reflected in **`MenuSearchService`** or they will not appear in search (see portable checklist in [`docs/menu-search-feature-reference.md`](menu-search-feature-reference.md)).
+
+**Automated checks**: `tests/Feature/MenuSearchTest.php` (guest denied, JSON shape, permission-gated entries, `q` filter).
+
 ### **Distribution Creation UX Architecture**
 
 **Pattern**: Enhanced distribution creation with confirmation dialog, linked documents management, and visual location indicators
@@ -2694,9 +2722,11 @@ All sync operations are logged to `sap_logs` table:
 
 **High-level flow**: upload → `POST /invoices/import-extract` → `ExtractInvoiceFromDocumentJob` + OpenRouter (images: vision; PDF: embedded text via `smalot/pdfparser` if enough text, else PDF file + `file-parser` / OCR) → `InvoiceImportSupplierResolver` + `InvoiceImportDraftBuilder` (draft may include **`line_items`**: description, quantity/qty, unit_price, amount) → cache (`invoice_import:{uuid}`) → poll `GET /invoices/import-status/{uuid}` → `GET /invoices/import-draft/{uuid}` → prefill `invoices.create` → user submits `InvoiceController::store` with hidden `import_uuid` → `InvoiceImportAttachmentService::attachFromImport` copies temp file to permanent storage and `InvoiceAttachment` (“Invoice Copy”, description “Imported from document”) → **`InvoiceImportLineDetailsPersister`** replaces `invoice_line_details` rows from `import_extraction.draft.line_items` when present. Optional JSON snapshot on the invoice row: `invoices.import_extraction` (draft metadata, confidence, original filename). **SAP AP posting stays header-only**; line rows are informational.
 
+**Create-page line review (import only)**: After extract, `resources/views/invoices/create.blade.php` shows an editable **line items** table in the import card (horizontal scroll; **Qty × Unit price** auto-fills **Amount**; max **200** rows with UI + toastr when exceeded). When the user posts **`import_line_items`** together with **`import_uuid`**, `InvoiceController::store` calls **`InvoiceImportLineDetailsPersister::persistFromUserInput`** (`source` = `user`); otherwise **`persistFromImportExtraction`** uses `draft.line_items` from saved `import_extraction` (`source` = `import`). See [`docs/INVOICE-CREATE-LINE-ITEMS-REVIEW-PLAN.md`](INVOICE-CREATE-LINE-ITEMS-REVIEW-PLAN.md).
+
 **Imported line rows (show + corrections)**
 
-- **Table** `invoice_line_details` (`InvoiceLineDetail`): `invoice_id`, `line_no`, `description`, `quantity`, `unit_price`, `amount`, `source` (`import` | `adjusted`, …).
+- **Table** `invoice_line_details` (`InvoiceLineDetail`): `invoice_id`, `line_no`, `description`, `quantity`, `unit_price`, `amount`, `source` (`import` | `user` | `adjusted`, …).
 - **Invoice show** (`resources/views/invoices/show.blade.php`): read-only table when lines exist; **warning** if sum of line `amount` differs from header `amount` (tolerance **IDR 1.0**, else **0.01**) — informational only, no blocking validation.
 - **Manual edit**: users who may edit the invoice (same location/role rules as `InvoiceController::edit`) get a per-row control opening a **modal** (description + numeric fields). **Mini calculator** in the modal inserts results into Qty / Unit price / Amount. Save → **`PATCH /invoices/{invoice}/line-details/{lineDetail}`** (`InvoiceController::updateLineDetail`); first user edit after import sets `source` to **`adjusted`**. AJAX URL must join base path and id with an explicit **`/`** (Laravel `url()` may omit a trailing slash; concatenating id produced a broken segment such as `line-details2`).
 - **Tests**: `tests/Feature/InvoiceLineDetailUpdateTest.php`.

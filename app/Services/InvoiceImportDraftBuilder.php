@@ -31,23 +31,6 @@ class InvoiceImportDraftBuilder
         if ($supplierMatch['supplier_id'] === null && $extraction->supplierNameRaw) {
             $remarksParts[] = '[Import] Supplier not matched automatically: '.$extraction->supplierNameRaw;
         }
-        if ($extraction->lineItems !== []) {
-            $lines = array_map(function ($r) {
-                $parts = [trim((string) ($r['description'] ?? ''))];
-                if (($r['quantity'] ?? null) !== null) {
-                    $parts[] = 'qty '.number_format((float) $r['quantity'], 4, '.', '');
-                }
-                if (($r['unit_price'] ?? null) !== null) {
-                    $parts[] = '@ '.number_format((float) $r['unit_price'], 4, '.', '');
-                }
-                if (($r['amount'] ?? null) !== null) {
-                    $parts[] = '= '.number_format((float) $r['amount'], 2, '.', '');
-                }
-
-                return implode(' ', array_filter($parts));
-            }, $extraction->lineItems);
-            $remarksParts[] = '[Import lines] '.implode('; ', array_filter($lines));
-        }
 
         $invoiceProject = $user->project;
         if ($invoiceProject && ! Project::active()->where('code', $invoiceProject)->exists()) {

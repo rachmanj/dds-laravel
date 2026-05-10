@@ -1,3 +1,21 @@
+## 2026-05-10 — Navbar menu search (permission-aware, cached JSON API)
+
+<a id="decision-navbar-menu-search-2026"></a>
+
+-   **Context**: The app has a large AdminLTE sidebar; power users wanted a fast way to open allowed pages without scanning nested menus. A portable pattern (session-backed JSON + client-side filter) was described in [`docs/menu-search-feature-reference.md`](menu-search-feature-reference.md).
+-   **Decision**:
+    1. **Backend** — Add **`MenuSearchService`** to enumerate navigable routes with the **same** Spatie **`can` / `hasAnyRole`** (and config) rules as the Blade sidebar; expose **`GET /api/menu/search`** via **`MenuSearchController`** with **per-user + permission-fingerprint** cache (**3600s**) and optional **`?q=`** (max 15 hits).
+    2. **Routing** — Register the endpoint in **`routes/api.php`** with **`middleware(['web', 'auth'])`** so the SPA **`api`** stack still applies the **`/api`** prefix while **session** authentication works like the rest of the Blade app.
+    3. **Frontend** — Add navbar markup **`#menu-search-container`**, **`public/css/menu-search.css`**, **`public/js/menu-search.js`** (jQuery, debounce, keyboard, Ctrl/Cmd+K); pass the endpoint URL through **`<meta name="menu-search-url">`** (falls back to **`/api/menu/search`**).
+-   **Alternatives considered**:
+    1. **Derive menu from Blade or a shared config DSL** — Deferred; current approach is explicit PHP mirroring the sidebar with a documented drift risk.
+    2. **Livewire / Alpine-only widget** — Rejected; the stack standardizes on **AdminLTE + jQuery** for global chrome.
+-   **Trade-offs**: **`MenuSearchService`** is a **second source of truth** next to sidebar partials until unified menu definitions exist. Cache TTL may briefly show stale items after permission changes unless TTL is lowered or cache is invalidated on role updates.
+-   **Review date**: 2026-11-10 (6 months)
+-   **References**: [`docs/architecture.md`](architecture.md) (Navbar Menu Search), [`docs/menu-search-feature-reference.md`](menu-search-feature-reference.md), [`app/Services/MenuSearchService.php`](../app/Services/MenuSearchService.php), [`tests/Feature/MenuSearchTest.php`](../tests/Feature/MenuSearchTest.php).
+
+---
+
 ## 2026-04-22 — Solar price history: PERTAMINA line sync, scheduled command, unit price from amount ÷ quantity
 
 -   **Context**: Finance needed **`solar_price_histories`** to track borrowing-period solar unit prices. Manual entry and UI flows existed; operations wanted an **automated** row tied to the **latest PERTAMINA** invoice with a **SOLAR** line, aligned to a **default period** (half-month). **Invoice lines** often have **`unit_price` unset** in the database until a user corrects the line; the system must still **derive** a price from **`amount ÷ quantity`** when the explicit unit price is null or zero.

@@ -10,6 +10,7 @@
 <script src="{{ asset('adminlte/plugins/select2/js/select2.full.min.js') }}"></script>
 <!-- AdminLTE App -->
 <script src="{{ asset('adminlte/dist/js/adminlte.min.js') }}"></script>
+<script src="{{ asset('js/menu-search.js') }}"></script>
 
 <script>
     // Logout confirmation function

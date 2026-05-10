@@ -1,11 +1,11 @@
 <?php
 
-use App\Http\Controllers\Api\InvoiceApiController;
-use App\Http\Controllers\Api\SupplierApiController;
-use App\Http\Controllers\Api\DistributionDocumentController;
 use App\Http\Controllers\Api\AnalyticsController;
+use App\Http\Controllers\Api\DistributionDocumentController;
+use App\Http\Controllers\Api\InvoiceApiController;
+use App\Http\Controllers\Api\MenuSearchController;
+use App\Http\Controllers\Api\SupplierApiController;
 use App\Http\Controllers\ProcessingAnalyticsController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -19,12 +19,16 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+Route::middleware(['web', 'auth'])->group(function (): void {
+    Route::get('/menu/search', [MenuSearchController::class, 'index'])->name('api.menu.search');
+});
+
 // Health check endpoint (no authentication required) - Place this FIRST
 Route::get('/health', function () {
     return response()->json([
         'status' => 'healthy',
         'timestamp' => now()->toISOString(),
-        'version' => '1.0.0'
+        'version' => '1.0.0',
     ]);
 });
 

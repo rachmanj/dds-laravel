@@ -234,6 +234,36 @@
                                 <div id="invoice_import_preview_wrap" class="mt-2 d-none">
                                     <img id="invoice_import_preview" alt="Preview" class="img-thumbnail" style="max-height: 200px;">
                                 </div>
+                                <div id="import_line_items_wrap" class="d-none mt-3">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-1 gap-2">
+                                        <strong class="small mb-0">Extracted line items (review before save)</strong>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="import_line_add">
+                                            <i class="fas fa-plus"></i> Add row
+                                        </button>
+                                    </div>
+                                    <div id="import_line_row_limit_msg" class="alert alert-warning small py-2 d-none mb-2"></div>
+                                    <div id="import_line_mismatch" class="alert alert-warning small py-2 d-none mb-2">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        Sum of line amounts (<span id="import_line_sum_display">0.00</span>)
+                                        differs from invoice amount (<span id="import_line_header_display">0.00</span>).
+                                        Verify before saving.
+                                    </div>
+                                    <div class="table-responsive" style="overflow-x: auto;">
+                                        <table class="table table-sm table-bordered mb-0" id="import_line_table" style="min-width: 640px;">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th>Description</th>
+                                                    <th class="text-right" style="width: 7rem">Qty</th>
+                                                    <th class="text-right" style="width: 7.5rem">Unit price</th>
+                                                    <th class="text-right" style="width: 8rem">Amount</th>
+                                                    <th style="width: 2.25rem"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="import_line_tbody"></tbody>
+                                        </table>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">SAP posting stays header-only. Line rows are saved as informational records.</small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1044,6 +1074,118 @@
                     return raw;
                 }
 
+                const MAX_IMPORT_LINE_ITEMS = 200;
+
+                function clearImportLineItemsUi() {
+                    $('#import_line_tbody').empty();
+                    $('#import_line_items_wrap').addClass('d-none');
+                    $('#import_line_mismatch').addClass('d-none');
+                    $('#import_line_row_limit_msg').addClass('d-none').text('');
+                }
+
+                function stripImportLinesFromRemarks(text) {
+                    if (!text) {
+                        return '';
+                    }
+
+                    return String(text).replace(/\[Import lines\][^\n]*/g, '').replace(/\n{3,}/g, '\n\n').trim();
+                }
+
+                function parseImportLineNum($input) {
+                    const v = $input.val();
+                    if (v === '' || v == null) {
+                        return null;
+                    }
+                    const n = parseFloat(String(v).replace(/,/g, '').trim());
+
+                    return isNaN(n) ? null : n;
+                }
+
+                function recalculateRowAmount($tr) {
+                    const q = parseImportLineNum($tr.find('.il-qty'));
+                    const p = parseImportLineNum($tr.find('.il-price'));
+                    if (q !== null && p !== null) {
+                        $tr.find('.il-amt').val((Math.round(q * p * 100) / 100).toFixed(2));
+                    }
+                }
+
+                function reindexImportLines() {
+                    $('#import_line_tbody tr').each(function (i) {
+                        $(this).find('input[name^="import_line_items"]').each(function () {
+                            const name = $(this).attr('name');
+                            if (name) {
+                                $(this).attr('name', name.replace(/import_line_items\[\d+]/, 'import_line_items[' + i + ']'));
+                            }
+                        });
+                    });
+                }
+
+                function appendImportLineRow(index, row) {
+                    row = row || {};
+                    const desc = row.description != null ? String(row.description) : '';
+                    const qVal = row.quantity != null && row.quantity !== '' ? String(row.quantity) : '';
+                    const pVal = row.unit_price != null && row.unit_price !== '' ? String(row.unit_price) : '';
+                    const aVal = row.amount != null && row.amount !== '' ? String(row.amount) : '';
+                    const $tr = $('<tr>');
+                    const $desc = $('<input>', { type: 'text', name: 'import_line_items[' + index + '][description]', class: 'form-control form-control-sm il-desc', required: true });
+                    $desc.val(desc);
+                    $tr.append($('<td>').append($desc));
+                    const $q = $('<input>', { type: 'text', name: 'import_line_items[' + index + '][quantity]', class: 'form-control form-control-sm il-qty text-right', inputmode: 'decimal', autocomplete: 'off' });
+                    $q.val(qVal);
+                    const $p = $('<input>', { type: 'text', name: 'import_line_items[' + index + '][unit_price]', class: 'form-control form-control-sm il-price text-right', inputmode: 'decimal', autocomplete: 'off' });
+                    $p.val(pVal);
+                    const $a = $('<input>', { type: 'text', name: 'import_line_items[' + index + '][amount]', class: 'form-control form-control-sm il-amt text-right', inputmode: 'decimal', autocomplete: 'off' });
+                    $a.val(aVal);
+                    $tr.append($('<td>').append($q));
+                    $tr.append($('<td>').append($p));
+                    $tr.append($('<td>').append($a));
+                    const $del = $('<button>', { type: 'button', class: 'btn btn-link btn-sm text-danger p-0 import-line-delete', title: 'Remove row' }).append($('<i>', { class: 'fas fa-times' }));
+                    $tr.append($('<td>', { class: 'text-center align-middle' }).append($del));
+                    $('#import_line_tbody').append($tr);
+                    recalculateRowAmount($tr);
+                }
+
+                function renderImportLines(lines) {
+                    if (!Array.isArray(lines) || !lines.length) {
+                        clearImportLineItemsUi();
+
+                        return;
+                    }
+                    $('#import_line_tbody').empty();
+                    lines.forEach(function (row, i) {
+                        appendImportLineRow(i, row);
+                    });
+                    reindexImportLines();
+                    $('#import_line_tbody tr').each(function () {
+                        recalculateRowAmount($(this));
+                    });
+                }
+
+                function checkImportLineMismatch() {
+                    const lineRows = $('#import_line_tbody tr');
+                    if (!lineRows.length) {
+                        $('#import_line_mismatch').addClass('d-none');
+
+                        return;
+                    }
+                    let lineSum = 0;
+                    lineRows.each(function () {
+                        const v = parseImportLineNum($(this).find('.il-amt'));
+                        lineSum += (v !== null ? v : 0);
+                    });
+                    const currency = ($('#currency').val() || '').toUpperCase();
+                    const tolerance = currency === 'IDR' ? 1.0 : 0.01;
+                    const headerRaw = $('#amount').val();
+                    const headerAmt = parseFloat(String(headerRaw != null ? headerRaw : '').replace(/,/g, '').trim()) || 0;
+                    const mismatch = Math.abs(headerAmt - lineSum) > tolerance;
+                    const fmt = function (n) {
+                        return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    };
+                    $('#import_line_sum_display').text(fmt(lineSum));
+                    $('#import_line_header_display').text(fmt(headerAmt));
+                    $('#import_line_mismatch').toggleClass('d-none', !mismatch);
+                }
+
                 function applyDraft(rawDraft) {
                     const draft = normalizeDraft(rawDraft);
                     try {
@@ -1072,8 +1214,11 @@
                             $('#cur_loc').val(draft.cur_loc).trigger('change');
                         }
                         if (draft.remarks) {
-                            const cur = $('#remarks').val() || '';
-                            $('#remarks').val(cur ? (cur + '\n' + draft.remarks) : draft.remarks);
+                            const cleaned = stripImportLinesFromRemarks(draft.remarks);
+                            if (cleaned) {
+                                const cur = $('#remarks').val() || '';
+                                $('#remarks').val(cur ? (cur + '\n' + cleaned) : cleaned);
+                            }
                         }
                         (draft.low_confidence_fields || []).forEach(function (name) {
                             const map = {
@@ -1089,6 +1234,13 @@
                         if (draft.warnings && draft.warnings.length && typeof toastr !== 'undefined') {
                             draft.warnings.forEach(function (w) { toastr.warning(w, 'Import'); });
                         }
+                        if (Array.isArray(draft.line_items) && draft.line_items.length) {
+                            renderImportLines(draft.line_items);
+                            $('#import_line_items_wrap').removeClass('d-none');
+                        } else {
+                            clearImportLineItemsUi();
+                        }
+                        checkImportLineMismatch();
                     } catch (e) {
                         console.error('applyDraft', e);
                         setImportStatus('Import data could not be applied to the form. Check the console.', true);
@@ -1190,6 +1342,39 @@
                     revokeImportModalUrl();
                 });
 
+                $(document).on('input', '#import_line_tbody .il-qty, #import_line_tbody .il-price', function () {
+                    const $tr = $(this).closest('tr');
+                    recalculateRowAmount($tr);
+                    checkImportLineMismatch();
+                });
+                $(document).on('input change', '#import_line_tbody .il-amt', function () {
+                    checkImportLineMismatch();
+                });
+                $(document).on('click', '#import_line_tbody .import-line-delete', function () {
+                    $(this).closest('tr').remove();
+                    reindexImportLines();
+                    checkImportLineMismatch();
+                });
+                $('#import_line_add').on('click', function () {
+                    const n = $('#import_line_tbody tr').length;
+                    if (n >= MAX_IMPORT_LINE_ITEMS) {
+                        const msg = 'Maximum ' + MAX_IMPORT_LINE_ITEMS + ' lines reached.';
+                        $('#import_line_row_limit_msg').removeClass('d-none').text(msg);
+                        if (typeof toastr !== 'undefined') {
+                            toastr.warning(msg);
+                        }
+
+                        return;
+                    }
+                    $('#import_line_row_limit_msg').addClass('d-none').text('');
+                    appendImportLineRow(n, {});
+                    reindexImportLines();
+                    checkImportLineMismatch();
+                });
+                $(document).on('input change', '#amount, #amount_display, #currency', function () {
+                    checkImportLineMismatch();
+                });
+
                 $('#invoice_import_btn').on('click', function () {
                     const input = document.getElementById('invoice_import_file');
                     if (!input.files || !input.files.length) return;
@@ -1197,6 +1382,7 @@
                     fd.append('file', input.files[0]);
                     setImportStatus('Uploading…');
                     $('#import_uuid').val('');
+                    clearImportLineItemsUi();
                     $.ajax({
                         url: importRoutes.extract,
                         method: 'POST',

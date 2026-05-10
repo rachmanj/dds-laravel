@@ -199,6 +199,11 @@ class InvoiceController extends Controller
             'cur_loc' => ['required', 'string', 'max:30'],
             'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc'],
             'import_uuid' => ['nullable', 'uuid'],
+            'import_line_items' => ['nullable', 'array', 'max:200'],
+            'import_line_items.*.description' => ['required', 'string', 'max:65535'],
+            'import_line_items.*.quantity' => ['nullable', 'numeric'],
+            'import_line_items.*.unit_price' => ['nullable', 'numeric'],
+            'import_line_items.*.amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         // Auto-populate receive_project from user's project if not provided
@@ -275,7 +280,12 @@ class InvoiceController extends Controller
             }
         }
 
-        app(InvoiceImportLineDetailsPersister::class)->persistFromImportExtraction($invoice);
+        $userImportLines = $request->input('import_line_items');
+        if ($request->filled('import_uuid') && is_array($userImportLines) && count($userImportLines) > 0) {
+            app(InvoiceImportLineDetailsPersister::class)->persistFromUserInput($invoice, $userImportLines);
+        } else {
+            app(InvoiceImportLineDetailsPersister::class)->persistFromImportExtraction($invoice);
+        }
 
         if ($request->ajax()) {
             return response()->json([
