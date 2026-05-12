@@ -132,6 +132,12 @@
                         </div>
                         <div class="card-body">
                             <div class="btn-group-vertical w-100">
+                                @if ($supplier->sap_code && array_key_exists($supplier->sap_code, config('vendor_api.vendors', [])))
+                                    <a href="{{ route('admin.suppliers.vendor-invoices.index', $supplier) }}"
+                                        class="btn btn-info mb-2">
+                                        <i class="fas fa-file-import"></i> Import Invoices from API
+                                    </a>
+                                @endif
                                 <button type="button" class="btn btn-warning mb-2 edit-supplier" data-toggle="modal"
                                     data-target="#supplierModal" data-id="{{ $supplier->id }}"
                                     data-sap-code="{{ $supplier->sap_code ?? '' }}" data-name="{{ $supplier->name }}"

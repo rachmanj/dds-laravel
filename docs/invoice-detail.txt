@@ -1,0 +1,37 @@
+{
+    "data": {
+        "invoice_no": "71260800178",
+        "date": "2026-05-05",
+        "due_date": "2026-06-04",
+        "terms_days": 30,
+        "status": "posted",
+        "total_amount": 53391,
+        "reference_no": "260201884 - 022C",
+        "description": "From DO 71260700231",
+        "posted_at": "2026-04-30T18:23:27+08:00",
+        "exchange_rate": 1,
+        "currency": {
+            "code": "IDR",
+            "symbol": "Rp",
+            "name": "Indonesian Rupiah"
+        },
+        "lines": [
+            {
+                "item": "CON000011 Cable Ties 2,5 X 200",
+                "description": "Cable Ties 2,5 X 200",
+                "qty": 2,
+                "unit_price": 14800,
+                "discount": 0,
+                "total": 32856
+            },
+            {
+                "item": "CON000039 Cable Tie 3,6 X 200 Mm",
+                "description": "Cable Tie 3,6 X 200 Mm",
+                "qty": 1,
+                "unit_price": 18500,
+                "discount": 0,
+                "total": 20535
+            }
+        ]
+    }
+}

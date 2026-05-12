@@ -1,0 +1,365 @@
+{
+    "data": [
+        {
+            "invoice_no": "71260800187",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 109890,
+            "reference_no": "260202315 - 022C",
+            "description": "From DO 71260700247",
+            "posted_at": "2026-04-30T23:11:02+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800186",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 15402360,
+            "reference_no": "260202038 - 017C",
+            "description": "From DO 71260700249",
+            "posted_at": "2026-04-30T22:53:38+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800185",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 1245420,
+            "reference_no": "260201945 - 017C",
+            "description": "From DO 71260700250",
+            "posted_at": "2026-04-30T22:47:54+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800184",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 715950,
+            "reference_no": "260200529 (017C)",
+            "description": "From DO 71260700242",
+            "posted_at": "2026-04-30T22:35:42+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800183",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 13530900,
+            "reference_no": "260202473 - 022C",
+            "description": "From DO 71260700241",
+            "posted_at": "2026-04-30T21:46:44+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800182",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 4588629,
+            "reference_no": "260202474 - 022C",
+            "description": "From DO 71260700240",
+            "posted_at": "2026-04-30T21:23:24+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800181",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 2177820,
+            "reference_no": "260202013 - 017C",
+            "description": "From DO 71260700239",
+            "posted_at": "2026-04-30T21:18:50+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800180",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 4481958,
+            "reference_no": "260201753 - APS",
+            "description": "From DO 71260700238",
+            "posted_at": "2026-04-30T19:42:15+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800179",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 3001329,
+            "reference_no": "260202194 - APS",
+            "description": "From DO 71260700237",
+            "posted_at": "2026-04-30T18:33:49+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800178",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 53391,
+            "reference_no": "260201884 - 022C",
+            "description": "From DO 71260700231",
+            "posted_at": "2026-04-30T18:23:27+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800177",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 2297700,
+            "reference_no": "260201880 - 022C",
+            "description": "From DO 71260700230",
+            "posted_at": "2026-04-30T18:10:53+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800176",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 219780,
+            "reference_no": "260201870 - 022C",
+            "description": "From DO 71260700229",
+            "posted_at": "2026-04-30T18:02:39+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800175",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 819180,
+            "reference_no": "260202013 - 017C",
+            "description": "From DO 71260700228",
+            "posted_at": "2026-04-30T17:51:18+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800174",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 8990778,
+            "reference_no": "260200897 - 017C",
+            "description": "From DO 71260700227",
+            "posted_at": "2026-04-30T17:45:45+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        },
+        {
+            "invoice_no": "71260800173",
+            "date": "2026-05-05",
+            "due_date": "2026-06-04",
+            "terms_days": 30,
+            "status": "posted",
+            "total_amount": 3027525,
+            "reference_no": "260201945 - 017C",
+            "description": "From DO 71260700226",
+            "posted_at": "2026-04-30T17:24:51+08:00",
+            "exchange_rate": 1,
+            "currency": {
+                "code": "IDR",
+                "symbol": "Rp",
+                "name": "Indonesian Rupiah"
+            }
+        }
+    ],
+    "links": {
+        "first": "http://localhost:8000/api/v1/invoices?page=1",
+        "last": "http://localhost:8000/api/v1/invoices?page=46",
+        "prev": null,
+        "next": "http://localhost:8000/api/v1/invoices?page=2"
+    },
+    "meta": {
+        "current_page": 1,
+        "from": 1,
+        "last_page": 46,
+        "links": [
+            {
+                "url": null,
+                "label": "&laquo; Previous",
+                "page": null,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=1",
+                "label": "1",
+                "page": 1,
+                "active": true
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=2",
+                "label": "2",
+                "page": 2,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=3",
+                "label": "3",
+                "page": 3,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=4",
+                "label": "4",
+                "page": 4,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=5",
+                "label": "5",
+                "page": 5,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=6",
+                "label": "6",
+                "page": 6,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=7",
+                "label": "7",
+                "page": 7,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=8",
+                "label": "8",
+                "page": 8,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=9",
+                "label": "9",
+                "page": 9,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=10",
+                "label": "10",
+                "page": 10,
+                "active": false
+            },
+            {
+                "url": null,
+                "label": "...",
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=45",
+                "label": "45",
+                "page": 45,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=46",
+                "label": "46",
+                "page": 46,
+                "active": false
+            },
+            {
+                "url": "http://localhost:8000/api/v1/invoices?page=2",
+                "label": "Next &raquo;",
+                "page": 2,
+                "active": false
+            }
+        ],
+        "path": "http://localhost:8000/api/v1/invoices",
+        "per_page": 15,
+        "to": 15,
+        "total": 676
+    }
+}

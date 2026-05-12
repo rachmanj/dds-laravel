@@ -157,6 +157,7 @@ After running the seeders, you'll have these default accounts:
 ## 📚 Documentation
 
 -   **[Architecture](docs/architecture.md)**: System architecture and technical details
+-   **[Vendor invoice import](docs/VENDOR-INVOICE-IMPORT.md)**: Import purchase invoices from vendor customer-invoice APIs (CAHAYA suppliers)
 -   **[API Reference](docs/api.md)**: API endpoints and usage
 -   **[Development Guide](docs/development.md)**: Development setup and guidelines
 -   **[Deployment](docs/deployment.md)**: Production deployment instructions
