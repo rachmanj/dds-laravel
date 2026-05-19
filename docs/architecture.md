@@ -2255,6 +2255,32 @@ $.ajax({
         searchAdditionalDocuments();
 ```
 
+### **Invoice additional document linking (PO + document number)**
+
+**Overview**: On **`invoices.create`** and **`invoices.edit`**, the **Link Additional Documents** card supports two discovery paths that share one selection model (`selectedDocs`, hidden `additional_document_ids[]`, **Currently selected** table).
+
+| Path | Trigger | Endpoint | Query | Results UI |
+|------|---------|----------|-------|------------|
+| **PO number** | `#po_no` blur, refresh, or search button | `POST /invoices/search-additional-documents` | `po_no LIKE %value%`, `po_no` not null, limit 50 | Inline table in card body |
+| **Document number** | `#link-doc-number-search` + Search / Enter (min 2 chars) | `POST /invoices/search-additional-documents-by-number` | `document_number LIKE %value%`, **no** PO/department/status filters, limit 50 | Bootstrap modal `#link-doc-by-number-modal` |
+
+**Backend** (`InvoiceController`):
+
+- `searchAdditionalDocuments()` — PO-based search (unchanged behaviour).
+- `searchAdditionalDocumentsByNumber()` — document-number fragment search.
+- `mapAdditionalDocumentsForInvoiceSearch()` — shared JSON mapping (`id`, `document_number`, `type_name`, `linked_invoices_count`, `is_linked_to_current`, `is_in_user_department`, etc.).
+
+**Routes** (`routes/invoice.php`): `invoices.search-additional-documents`, `invoices.search-additional-documents-by-number`.
+
+**Frontend** (both Blade views):
+
+- Helpers: `buildAdditionalDocRow`, `appendDocRowsToTable`, `renderResultsTable`, `renderModalResultsTable`, `syncDocCheckboxState`.
+- Checkbox classes: `.doc-checkbox` (inline), `.doc-checkbox-modal` (modal); changes stay in sync by `data-id`.
+
+**Tests**: `tests/Feature/InvoiceSearchAdditionalDocumentsByNumberTest.php`.
+
+**Decision record**: [`docs/decisions.md`](decisions.md) (2026-05-19).
+
 ### **Distribution UI/UX Architecture**
 
 **Overview**: Enhanced user interface for distribution management with improved visual hierarchy and document relationship clarity

@@ -129,7 +129,11 @@ The invoice system manages the complete lifecycle from creation to payment:
     - **Due Date**: When payment is due
     - **Description**: Brief description of goods/services
 3. **Attach Supporting Documents**: PO, delivery notes, etc.
-4. **Submit for Verification**: Change status to "Verify"
+4. **Link Additional Documents** (optional, on create and edit):
+    - **By PO number**: Enter **PO No** on the invoice; the system searches and lists matching additional documents in the card (ITO, BAST, BAPP, etc.).
+    - **By document number**: In the **Link Additional Documents** card header, type part of a document number (at least 2 characters) and click **Search** or press **Enter**. A modal lists all matching additional documents (any department; no PO required). Check the rows you want, then click **Done**. Selected documents appear under **Currently selected** and are saved with the invoice.
+    - **Create on the fly** (if permitted): **Create New Document** opens a modal to add a new additional document and select it immediately.
+5. **Submit for Verification**: Change status to "Verify"
 
 ### **Processing Invoices**
 

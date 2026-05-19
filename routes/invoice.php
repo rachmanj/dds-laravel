@@ -61,6 +61,9 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
     // Search additional documents by PO number (AJAX)
     Route::post('/search-additional-documents', [InvoiceController::class, 'searchAdditionalDocuments'])->name('search-additional-documents');
 
+    // Search additional documents by document number (AJAX)
+    Route::post('/search-additional-documents-by-number', [InvoiceController::class, 'searchAdditionalDocumentsByNumber'])->name('search-additional-documents-by-number');
+
     // Supplier defaults for auto-suggestion (AJAX)
     Route::get('/supplier-defaults/{supplier}', [InvoiceController::class, 'getSupplierDefaults'])->name('supplier-defaults');
 

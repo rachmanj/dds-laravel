@@ -2,6 +2,26 @@
 
 ## ✅ **Recently Completed**
 
+### **Invoice create/edit — link additional documents by document number** ✅ **COMPLETED**
+
+**Status**: Shipped — header search on Link Additional Documents card; modal results; shared selection with PO-based linking  
+**Implementation**: 2026-05-19  
+**Priority**: MEDIUM — link ITO/BAST/etc. when PO is unknown or missing
+
+**Summary**:
+
+1. **API** — `POST /invoices/search-additional-documents-by-number`; `InvoiceController::searchAdditionalDocumentsByNumber`; shared `mapAdditionalDocumentsForInvoiceSearch` with PO search.
+2. **UI** — `#link-doc-number-search` + modal `#link-doc-by-number-modal` on **`invoices.create`** and **`invoices.edit`**; min 2 characters; checkbox sync between modal and inline PO table.
+3. **Scope** — `document_number LIKE %term%` only (no PO/department/status/type filters); up to 50 rows.
+
+**Key files**: `app/Http/Controllers/InvoiceController.php`, `routes/invoice.php`, `resources/views/invoices/create.blade.php`, `resources/views/invoices/edit.blade.php`.
+
+**Docs**: [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-05-19), [`docs/User-Operating-Guide.md`](User-Operating-Guide.md), [`MEMORY.md`](../MEMORY.md).
+
+**Tests**: `tests/Feature/InvoiceSearchAdditionalDocumentsByNumberTest.php`.
+
+---
+
 ### **Batch invoice import (multi-file extract + review table)** ✅ **COMPLETED**
 
 **Status**: Shipped — `invoices.import-batch` page; `InvoiceBatchImportController`; shared **`InvoiceCreatorService`** with single **`InvoiceController::store`**; JSON batch store with partial per-row outcomes; tests **`InvoiceBatchImportTest`**.  

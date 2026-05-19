@@ -587,18 +587,31 @@
                                 <div class="card card-outline card-secondary mt-3" id="additional-docs-card">
                                     <div class="card-header">
                                         <h3 class="card-title">Link Additional Documents (optional)</h3>
-                                        <div class="card-tools">
+                                        <div class="card-tools ml-auto" style="float: none;">
+                                            <div class="d-inline-flex align-items-center flex-nowrap">
+                                            <div class="input-group input-group-sm mr-2" style="width: 200px;">
+                                                <input type="text" class="form-control" id="link-doc-number-search"
+                                                    placeholder="Document number..." minlength="2" maxlength="255"
+                                                    aria-label="Search additional documents by number">
+                                                <div class="input-group-append">
+                                                    <button type="button" class="btn btn-primary btn-sm"
+                                                        id="link-doc-number-btn" title="Search by document number">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                             @if (auth()->user()->can('on-the-fly-addoc-feature'))
-                                                <button type="button" class="btn btn-sm btn-success mr-2"
+                                                <button type="button" class="btn btn-sm btn-success mr-2 flex-shrink-0"
                                                     id="create-doc-btn">
                                                     <i class="fas fa-plus"></i> Create New Document
                                                 </button>
                                             @endif
-                                            <button type="button" class="btn btn-sm btn-outline-secondary mr-2"
+                                            <button type="button" class="btn btn-sm btn-outline-secondary mr-2 flex-shrink-0"
                                                 id="refresh-docs-btn" style="display:none;">
                                                 <i class="fas fa-sync-alt"></i> Refresh
                                             </button>
-                                            <span class="badge badge-info" id="selected-count">Selected: 0</span>
+                                            <span class="badge badge-info ml-2" id="selected-count">Selected: 0</span>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="card-body">
@@ -780,6 +793,50 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Additional Documents by Number Modal -->
+    <div class="modal fade" id="link-doc-by-number-modal" tabindex="-1" role="dialog"
+        aria-labelledby="link-doc-by-number-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="link-doc-by-number-modal-label">Additional documents matching</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="link-doc-by-number-loading" style="display:none;">
+                        <i class="fas fa-spinner fa-spin"></i> Searching...
+                    </div>
+                    <div class="table-responsive" id="link-doc-by-number-table-wrapper" style="display:none;">
+                        <table class="table table-sm table-bordered" id="link-doc-by-number-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:32px;"><input type="checkbox" id="select-all-docs-modal"></th>
+                                    <th>Document No</th>
+                                    <th>Type</th>
+                                    <th>Date</th>
+                                    <th>PO No</th>
+                                    <th>Current Location</th>
+                                    <th>Remarks</th>
+                                    <th>Linked Invoices</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                        <small class="text-muted">Showing up to 50 results.</small>
+                    </div>
+                    <div id="link-doc-by-number-empty" class="text-muted" style="display:none;">
+                        No additional documents found for this document number.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Done</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1301,84 +1358,94 @@
                 updateSelectedCounter();
             }
 
-            function renderResultsTable(docs) {
-                var tbody = $('#additional-docs-table tbody');
+            function ensureDocPreselectedFromLink(doc) {
+                if (doc.is_linked_to_current && !selectedDocs[doc.id]) {
+                    selectedDocs[doc.id] = {
+                        id: doc.id,
+                        document_number: doc.document_number,
+                        type_name: doc.type_name,
+                        document_date: doc.document_date,
+                        po_no: doc.po_no,
+                        cur_loc: doc.cur_loc,
+                        remarks: doc.remarks
+                    };
+                }
+            }
+
+            function buildLinkedInvoicesHtml(doc) {
+                if (doc.linked_invoices_count > 0) {
+                    var badgeClass = doc.linked_invoices_count > 1 ? 'badge-warning' : 'badge-info';
+                    var tooltipText = 'Linked to: ' + doc.linked_invoices_list.join(', ');
+
+                    if (doc.is_linked_to_current) {
+                        badgeClass = 'badge-success';
+                        tooltipText += ' (including current invoice: {{ $invoice->invoice_number }})';
+                    }
+
+                    return '<span class="badge linked-invoices-badge ' + badgeClass +
+                        '" data-toggle="tooltip" title="' + tooltipText + '">' +
+                        doc.linked_invoices_count + ' invoice' + (doc.linked_invoices_count > 1 ? 's' : '') +
+                        '</span>';
+                }
+
+                return '<span class="text-muted">None</span>';
+            }
+
+            function buildLocationHtml(doc) {
+                var locationBadgeClass = 'badge-secondary';
+                var locationTooltip = '';
+
+                if (doc.is_in_user_department) {
+                    locationBadgeClass = 'badge-success';
+                    locationTooltip = 'Document is in your department';
+                } else if (doc.cur_loc && doc.cur_loc !== '-') {
+                    locationBadgeClass = 'badge-danger';
+                    locationTooltip = 'Document is in another department: ' + doc.cur_loc;
+                }
+
+                return '<span class="badge ' + locationBadgeClass +
+                    '" data-toggle="tooltip" title="' + locationTooltip + '">' +
+                    (doc.cur_loc || '-') + '</span>';
+            }
+
+            function buildAdditionalDocRow(doc, checkboxClass) {
+                ensureDocPreselectedFromLink(doc);
+                var checked = selectedDocs[doc.id] ? 'checked' : '';
+
+                return '<tr data-id="' + doc.id + '">' +
+                    '<td><input type="checkbox" class="' + checkboxClass + '" data-id="' + doc.id + '" ' +
+                    checked + '></td>' +
+                    '<td>' + doc.document_number + '</td>' +
+                    '<td>' + (doc.type_name || '-') + '</td>' +
+                    '<td>' + (doc.document_date || '-') + '</td>' +
+                    '<td>' + (doc.po_no || '-') + '</td>' +
+                    '<td>' + buildLocationHtml(doc) + '</td>' +
+                    '<td>' + (doc.remarks || '') + '</td>' +
+                    '<td>' + buildLinkedInvoicesHtml(doc) + '</td>' +
+                    '</tr>';
+            }
+
+            function appendDocRowsToTable(docs, tbodySelector, checkboxClass) {
+                var tbody = $(tbodySelector);
                 tbody.empty();
                 docs.forEach(function(doc) {
-                    // Pre-check if document is already linked to current invoice
-                    if (doc.is_linked_to_current && !selectedDocs[doc.id]) {
-                        selectedDocs[doc.id] = {
-                            id: doc.id,
-                            document_number: doc.document_number,
-                            type_name: doc.type_name,
-                            document_date: doc.document_date,
-                            po_no: doc.po_no,
-                            cur_loc: doc.cur_loc,
-                            remarks: doc.remarks
-                        };
-                    }
-
-                    var checked = selectedDocs[doc.id] ? 'checked' : '';
-
-                    // Build linked invoices display
-                    var linkedInvoicesHtml = '';
-                    if (doc.linked_invoices_count > 0) {
-                        var badgeClass = doc.linked_invoices_count > 1 ? 'badge-warning' : 'badge-info';
-                        var tooltipText = 'Linked to: ' + doc.linked_invoices_list.join(', ');
-
-                        // Check if this document is already linked to current invoice
-                        if (doc.is_linked_to_current) {
-                            badgeClass = 'badge-success';
-                            tooltipText += ' (including current invoice: {{ $invoice->invoice_number }})';
-                        }
-
-                        linkedInvoicesHtml = '<span class="badge linked-invoices-badge ' + badgeClass +
-                            '" data-toggle="tooltip" title="' + tooltipText + '">' +
-                            doc.linked_invoices_count + ' invoice' + (doc.linked_invoices_count > 1 ? 's' : '') +
-                            '</span>';
-                    } else {
-                        linkedInvoicesHtml = '<span class="text-muted">None</span>';
-                    }
-
-                    // Build location badge with color coding
-                    var locationBadgeClass = 'badge-secondary';
-                    var locationTooltip = '';
-
-                    if (doc.is_in_user_department) {
-                        locationBadgeClass = 'badge-success';
-                        locationTooltip = 'Document is in your department';
-                    } else if (doc.cur_loc && doc.cur_loc !== '-') {
-                        locationBadgeClass = 'badge-danger';
-                        locationTooltip = 'Document is in another department: ' + doc.cur_loc;
-                    }
-
-                    var locationHtml = '<span class="badge ' + locationBadgeClass +
-                        '" data-toggle="tooltip" title="' + locationTooltip + '">' +
-                        (doc.cur_loc || '-') + '</span>';
-
-                    var row = '<tr data-id="' + doc.id + '">' +
-                        '<td><input type="checkbox" class="doc-checkbox" data-id="' + doc.id + '" ' + checked +
-                        '></td>' +
-                        '<td>' + doc.document_number + '</td>' +
-                        '<td>' + (doc.type_name || '-') + '</td>' +
-                        '<td>' + (doc.document_date || '-') + '</td>' +
-                        '<td>' + (doc.po_no || '-') + '</td>' +
-                        '<td>' + locationHtml + '</td>' +
-                        '<td>' + (doc.remarks || '') + '</td>' +
-                        '<td>' + linkedInvoicesHtml + '</td>' +
-                        '</tr>';
-                    tbody.append(row);
+                    tbody.append(buildAdditionalDocRow(doc, checkboxClass));
                 });
-
-                // Initialize tooltips for the new badges
                 $('[data-toggle="tooltip"]').tooltip();
+            }
 
+            function renderResultsTable(docs) {
+                appendDocRowsToTable(docs, '#additional-docs-table tbody', 'doc-checkbox');
                 $('#additional-docs-table-wrapper').toggle(docs.length > 0);
                 $('#additional-docs-empty').toggle(docs.length === 0);
                 $('#additional-docs-card').show();
-
-                // Show refresh button when we have results
                 $('#refresh-docs-btn').toggle(docs.length > 0);
+            }
+
+            function renderModalResultsTable(docs) {
+                appendDocRowsToTable(docs, '#link-doc-by-number-table tbody', 'doc-checkbox-modal');
+                $('#link-doc-by-number-table-wrapper').toggle(docs.length > 0);
+                $('#link-doc-by-number-empty').toggle(docs.length === 0);
             }
 
             function searchAdditionalDocuments() {
@@ -1420,6 +1487,51 @@
                 });
             }
 
+            function searchAdditionalDocumentsByNumber() {
+                var term = $('#link-doc-number-search').val().trim();
+                if (term.length < 2) {
+                    if (typeof toastr !== 'undefined') {
+                        toastr.warning('Enter at least 2 characters to search.');
+                    }
+                    return;
+                }
+
+                $('#link-doc-by-number-modal-label').text('Additional documents matching "' + term + '"');
+                $('#link-doc-by-number-modal').modal('show');
+                $('#link-doc-by-number-loading').show();
+                $('#link-doc-by-number-table-wrapper').hide();
+                $('#link-doc-by-number-empty').hide();
+                $('#select-all-docs-modal').prop('checked', false);
+
+                $.ajax({
+                    url: '{{ route('invoices.search-additional-documents-by-number') }}',
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        document_number: term,
+                        current_invoice_id: {{ $invoice->id }}
+                    },
+                    success: function(resp) {
+                        $('#link-doc-by-number-loading').hide();
+                        if (resp.success) {
+                            renderModalResultsTable(resp.documents || []);
+                            renderSelectedTable();
+                            if ((resp.documents || []).length === 0 && typeof toastr !== 'undefined') {
+                                toastr.info('No additional documents found for this document number.');
+                            }
+                        } else if (typeof toastr !== 'undefined') {
+                            toastr.error('Search failed');
+                        }
+                    },
+                    error: function() {
+                        $('#link-doc-by-number-loading').hide();
+                        if (typeof toastr !== 'undefined') {
+                            toastr.error('Failed to search additional documents');
+                        }
+                    }
+                });
+            }
+
             // Initial render of preselected (edit)
             renderSelectedTable();
 
@@ -1431,22 +1543,37 @@
             // Handle blur on PO number
             $('#po_no').on('blur', searchAdditionalDocuments);
 
-            // Row checkbox toggle
-            $(document).on('change', '.doc-checkbox', function() {
+            $('#link-doc-number-btn').on('click', searchAdditionalDocumentsByNumber);
+            $('#link-doc-number-search').on('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchAdditionalDocumentsByNumber();
+                }
+            });
+
+            function syncDocCheckboxState(id, checked) {
+                $('.doc-checkbox[data-id="' + id + '"], .doc-checkbox-modal[data-id="' + id + '"]')
+                    .prop('checked', checked);
+            }
+
+            // Row checkbox toggle (inline table and modal)
+            $(document).on('change', '.doc-checkbox, .doc-checkbox-modal', function() {
                 var id = $(this).data('id');
                 var row = $(this).closest('tr');
+                syncDocCheckboxState(id, this.checked);
+
                 if (this.checked) {
-                    // Check if document is already linked to other invoices
-                    var linkedInvoicesCell = row.find('td').eq(7); // Linked Invoices column
+                    var linkedInvoicesCell = row.find('td').eq(7);
                     var linkedBadge = linkedInvoicesCell.find('.badge');
                     if (linkedBadge.length > 0 && !linkedBadge.hasClass('badge-success')) {
-                        var count = parseInt(linkedBadge.text().match(/\d+/)[0]);
-                        if (count > 0 && typeof toastr !== 'undefined') {
-                            toastr.warning('This document is already linked to ' + count + ' other invoice(s).');
+                        var countMatch = linkedBadge.text().match(/\d+/);
+                        if (countMatch && parseInt(countMatch[0]) > 0 && typeof toastr !== 'undefined') {
+                            toastr.warning('This document is already linked to ' + countMatch[0] +
+                                ' other invoice(s).');
                         }
                     }
 
-                    var data = {
+                    selectedDocs[id] = {
                         id: id,
                         document_number: row.find('td').eq(1).text(),
                         type_name: row.find('td').eq(2).text(),
@@ -1455,7 +1582,6 @@
                         cur_loc: row.find('td').eq(5).text().trim(),
                         remarks: row.find('td').eq(6).text()
                     };
-                    selectedDocs[id] = data;
                 } else {
                     delete selectedDocs[id];
                 }
@@ -1470,11 +1596,18 @@
                 });
             });
 
+            $(document).on('change', '#select-all-docs-modal', function() {
+                var checked = this.checked;
+                $('#link-doc-by-number-table tbody .doc-checkbox-modal').each(function() {
+                    $(this).prop('checked', checked).trigger('change');
+                });
+            });
+
             // Remove from selected list
             $(document).on('click', '.remove-doc', function() {
                 var id = $(this).data('id');
                 delete selectedDocs[id];
-                $('#additional-docs-table tbody .doc-checkbox[data-id="' + id + '"]').prop('checked', false);
+                syncDocCheckboxState(id, false);
                 renderSelectedTable();
             });
 

@@ -16,6 +16,29 @@
 
 ---
 
+## 2026-05-19 — Invoice create/edit: search additional documents by document number (modal)
+
+-   **Context**: On invoice **create** and **edit**, additional documents were discoverable only via **PO number** (`POST /invoices/search-additional-documents`, requires `po_no`, inline table). Users often know the **additional document number** (ITO, BAST, etc.) but not the PO, or the document has **no PO**. They need a quick way to find and link matching records without department/status filters.
+
+-   **Decision**:
+    1. **Dedicated endpoint** — `POST /invoices/search-additional-documents-by-number` (`invoices.search-additional-documents-by-number`): validate `document_number` (required, max 255), optional `current_invoice_id`; query `AdditionalDocument` with `document_number LIKE %term%`, `orderByDesc(document_date)`, **limit 50**; **no** `whereNotNull('po_no')`, department, status, or type filters.
+    2. **Shared response shape** — Extract **`mapAdditionalDocumentsForInvoiceSearch()`** in **`InvoiceController`**; reuse for PO search and document-number search (`linked_invoices_count`, `is_linked_to_current`, `is_in_user_department`, etc.).
+    3. **UI** — Card header input `#link-doc-number-search` + search button on **`invoices.create`** and **`invoices.edit`**; results in **`#link-doc-by-number-modal`** (Bootstrap `modal-lg`, same table columns as PO results). Checkbox handlers sync **modal** (`.doc-checkbox-modal`) and **inline PO table** (`.doc-checkbox`) via shared `selectedDocs`.
+    4. **UX guard** — Minimum **2** characters before AJAX (client + HTML `minlength`); edit passes `current_invoice_id` for `is_linked_to_current`.
+
+-   **Alternatives considered**:
+    1. **Extend PO endpoint with optional `document_number`** — Rejected; mixed validation and query rules would confuse callers and tests.
+    2. **Inline results in card body (like PO)** — Rejected per product request; modal keeps PO flow unchanged and avoids crowding the card.
+    3. **Reuse Additional Documents index filters** — Rejected; invoice linking must show **all** matching numbers across departments without list-page scoping.
+
+-   **Trade-offs**: `LIKE` search may return many rows (capped at 50). Card header uses `d-inline-flex flex-nowrap` so search + action buttons stay on one row on typical widths.
+
+-   **Review date**: 2026-11-19 (6 months)
+
+-   **References**: [`docs/architecture.md`](architecture.md) (Invoice additional document linking), [`app/Http/Controllers/InvoiceController.php`](../app/Http/Controllers/InvoiceController.php), [`routes/invoice.php`](../routes/invoice.php), [`resources/views/invoices/create.blade.php`](../resources/views/invoices/create.blade.php), [`resources/views/invoices/edit.blade.php`](../resources/views/invoices/edit.blade.php), [`tests/Feature/InvoiceSearchAdditionalDocumentsByNumberTest.php`](../tests/Feature/InvoiceSearchAdditionalDocumentsByNumberTest.php).
+
+---
+
 ## 2026-05-13 — Batch invoice import (multi-file extract + one review screen)
 
 -   **Context**: Users often receive **many** supplier invoices as separate PDFs or images. Repeating single-file upload on `invoices.create` is slow. The existing pipeline (`import-extract`, `import-status`, `import-draft`, temp cache, `InvoiceImportAttachmentService`, line persistence) should be reused without duplicating create logic.

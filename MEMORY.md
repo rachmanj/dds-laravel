@@ -1,3 +1,15 @@
+### 2026-05-19 — Invoice create/edit: link additional documents by document number (modal search)
+
+**Feature**: On **Link Additional Documents** card (`invoices.create`, `invoices.edit`), users can search by **document number fragment** (min 2 chars) in the card header; results open in a **modal** with the same checkbox columns as PO search. Selection merges into shared `selectedDocs` / `additional_document_ids[]`. **No** PO, department, status, or type filters — `document_number LIKE %term%`, limit 50.
+
+**API**: `POST /invoices/search-additional-documents-by-number` (`invoices.search-additional-documents-by-number`) → `InvoiceController::searchAdditionalDocumentsByNumber`; shared mapper `mapAdditionalDocumentsForInvoiceSearch` with PO search.
+
+**Tests**: `tests/Feature/InvoiceSearchAdditionalDocumentsByNumberTest.php`.
+
+**Docs**: `docs/architecture.md` (Invoice additional document linking), `docs/decisions.md` (2026-05-19), `docs/todo.md`, `docs/User-Operating-Guide.md`.
+
+---
+
 ### 2026-05-13 — Batch invoice import: `import-batch`, `InvoiceCreatorService`, multi-file UI
 
 **Routes** `invoices.import-batch` / `invoices.import-batch.store`; **`InvoiceBatchImportController`** validates each row and calls **`InvoiceCreatorService`** (also used from **`InvoiceController::store`**). **`config/services.openrouter.batch_import_max`** (`INVOICE_BATCH_IMPORT_MAX`). See **`docs/architecture.md`**, **`docs/decisions.md`** (2026-05-13), **`docs/todo.md`**.

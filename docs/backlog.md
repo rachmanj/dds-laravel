@@ -579,6 +579,7 @@
     -   **Description**: Add a search bar within the "Document Selection" area to quickly find documents by invoice number, document number, or other relevant identifiers. Add filters for date range, status, or document type.
     -   **Estimated Effort**: 1-2 days
     -   **Dependencies**: Frontend JavaScript, potentially new API endpoints for filtered document lists.
+    -   **Note (2026-05-19)**: Invoice **create/edit** already supports **document number** search for linking additional documents (`invoices.search-additional-documents-by-number`); this backlog item remains scoped to **distribution** document selection.
 
 -   [ ] **Provide Clearer Indication of "Documents currently in your department location"**
 

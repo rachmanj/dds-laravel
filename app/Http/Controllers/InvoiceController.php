@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Rules\UniqueInvoicePerSupplier;
 use App\Services\InvoiceCreatorService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -627,15 +628,53 @@ class InvoiceController extends Controller
             ->orderByDesc('document_date')
             ->limit(50);
 
-        // Remove department filtering - show all documents with matching PO number
-        // Users can now link documents from any department
+        return response()->json([
+            'success' => true,
+            'documents' => $this->mapAdditionalDocumentsForInvoiceSearch(
+                $query->get(),
+                $request->integer('current_invoice_id') ?: null,
+                $user
+            ),
+        ]);
+    }
 
-        $documents = $query->get()->map(function ($doc) use ($request, $user) {
+    /**
+     * Search additional documents by document number fragment, with no PO or department filters.
+     */
+    public function searchAdditionalDocumentsByNumber(Request $request)
+    {
+        $request->validate([
+            'document_number' => 'required|string|max:255',
+            'current_invoice_id' => 'nullable|exists:invoices,id',
+        ]);
+
+        /** @var User $user */
+        $user = Auth::user();
+        $query = AdditionalDocument::query()
+            ->with(['type', 'invoices'])
+            ->where('document_number', 'like', '%'.$request->document_number.'%')
+            ->orderByDesc('document_date')
+            ->limit(50);
+
+        return response()->json([
+            'success' => true,
+            'documents' => $this->mapAdditionalDocumentsForInvoiceSearch(
+                $query->get(),
+                $request->integer('current_invoice_id') ?: null,
+                $user
+            ),
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, AdditionalDocument>  $documents
+     * @return list<array<string, mixed>>
+     */
+    private function mapAdditionalDocumentsForInvoiceSearch(Collection $documents, ?int $currentInvoiceId, User $user): array
+    {
+        return $documents->map(function (AdditionalDocument $doc) use ($currentInvoiceId, $user) {
             $linkedInvoices = $doc->invoices;
             $linkedInvoicesCount = $linkedInvoices->count();
-            $currentInvoiceId = $request->current_invoice_id;
-
-            // Determine if document is in user's department for badge coloring
             $isInUserDepartment = $user->department_location_code &&
                 $doc->cur_loc === $user->department_location_code;
 
@@ -653,12 +692,7 @@ class InvoiceController extends Controller
                 'is_linked_to_current' => $currentInvoiceId ? $linkedInvoices->contains('id', $currentInvoiceId) : false,
                 'is_in_user_department' => $isInUserDepartment,
             ];
-        });
-
-        return response()->json([
-            'success' => true,
-            'documents' => $documents,
-        ]);
+        })->values()->all();
     }
 
     /**
