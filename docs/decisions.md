@@ -16,6 +16,30 @@
 
 ---
 
+## 2026-05-13 — Batch invoice import (multi-file extract + one review screen)
+
+-   **Context**: Users often receive **many** supplier invoices as separate PDFs or images. Repeating single-file upload on `invoices.create` is slow. The existing pipeline (`import-extract`, `import-status`, `import-draft`, temp cache, `InvoiceImportAttachmentService`, line persistence) should be reused without duplicating create logic.
+
+-   **Decision**:
+    1. **Dedicated UI** — `GET /invoices/import-batch` (`invoices.import-batch`): multi-select + drag/drop, parallel upload/poll per file, review table (global defaults for type, receive date, `cur_loc`; per-row fields and expandable **line items** with the same header-vs-lines **warning** pattern as create).
+    2. **Batch API** — `POST /invoices/import-batch` (`invoices.import-batch.store`, JSON `invoices[]`): validate each row with the **same** rules as single create (`UniqueInvoicePerSupplier`, line item nested rules, etc.); return JSON **per row** (`created`, `validation_failed`, `failed`) so **partial success** is visible.
+    3. **Shared create path** — Extract **`InvoiceCreatorService`** from **`InvoiceController::store`**; **`InvoiceBatchImportController`** and **`InvoiceController`** both call it so attachment + **`InvoiceImportLineDetailsPersister`** behaviour stays aligned.
+    4. **Limits / safety** — Max **`config('services.openrouter.batch_import_max')`** (default **50**, env **`INVOICE_BATCH_IMPORT_MAX`**). Reject duplicate **`(supplier_id, invoice_number)`** within one request; each **`import_uuid`** at most once per batch. **Throttle** on batch store (`30/min` in **`routes/invoice.php`**).
+    5. **Feature gating** — Same as single import: **`INVOICE_IMPORT_ENABLED`** and API key; **GET** without key **redirects** to invoice index with flash; **POST** returns **503** JSON if misconfigured.
+
+-   **Alternatives considered**:
+    1. **Client-only: N separate posts to `invoices.store`** — Rejected; no single review surface, harder partial-result UX, more round-trips.
+    2. **Server-side folder or SFTP ingest** — Rejected for v1; browser cannot upload a “folder path”; deferred to ops integrations.
+    3. **One queued job that creates all invoices without user review** — Rejected; same business risk as skipping review on single import.
+
+-   **Trade-offs**: Larger Blade/JS surface (`import-batch.blade.php`). Batch POST body can be large (many line items); cap **50** invoices limits worst case. Results table maps rows by **`index`**; client keeps **labels** aligned with submitted `invoices` order.
+
+-   **Review date**: 2026-11-13 (6 months)
+
+-   **References**: [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image — batch subsection), [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`app/Http/Controllers/InvoiceBatchImportController.php`](../app/Http/Controllers/InvoiceBatchImportController.php), [`app/Services/InvoiceCreatorService.php`](../app/Services/InvoiceCreatorService.php), [`tests/Feature/InvoiceBatchImportTest.php`](../tests/Feature/InvoiceBatchImportTest.php).
+
+---
+
 ## 2026-04-22 — Solar price history: PERTAMINA line sync, scheduled command, unit price from amount ÷ quantity
 
 -   **Context**: Finance needed **`solar_price_histories`** to track borrowing-period solar unit prices. Manual entry and UI flows existed; operations wanted an **automated** row tied to the **latest PERTAMINA** invoice with a **SOLAR** line, aligned to a **default period** (half-month). **Invoice lines** often have **`unit_price` unset** in the database until a user corrects the line; the system must still **derive** a price from **`amount ÷ quantity`** when the explicit unit price is null or zero.
@@ -118,7 +142,7 @@
 
 -   **Review date**: 2026-09-30 (6 months)
 
--   **References**: [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`app/Services/InvoiceImportLineDetailsPersister.php`](../app/Services/InvoiceImportLineDetailsPersister.php), [`tests/Feature/InvoiceLineDetailUpdateTest.php`](../tests/Feature/InvoiceLineDetailUpdateTest.php).
+-   **References**: [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`app/Services/InvoiceImportLineDetailsPersister.php`](../app/Services/InvoiceImportLineDetailsPersister.php), [`tests/Feature/InvoiceLineDetailUpdateTest.php`](../tests/Feature/InvoiceLineDetailUpdateTest.php). **Batch import (shared create service)**: [`docs/decisions.md`](decisions.md) (2026-05-13), [`app/Services/InvoiceCreatorService.php`](../app/Services/InvoiceCreatorService.php).
 
 ---
 
@@ -141,7 +165,7 @@
 
 -   **Review date**: 2026-09-27 (6 months)
 
--   **References**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md). **Line-item persistence and show-page edits**: [`docs/decisions.md`](decisions.md) (2026-03-31).
+-   **References**: [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md). **Line-item persistence and show-page edits**: [`docs/decisions.md`](decisions.md) (2026-03-31). **Batch multi-file import**: [`docs/decisions.md`](decisions.md) (2026-05-13).
 
 ---
 

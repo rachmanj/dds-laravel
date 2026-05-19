@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InvoiceAttachmentController;
+use App\Http\Controllers\InvoiceBatchImportController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceDashboardController;
 use App\Http\Controllers\InvoiceImportController;
@@ -68,6 +69,12 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
 
     // Get recent invoices for quick fill (AJAX)
     Route::get('/recent-for-autofill', [InvoiceController::class, 'getRecentInvoices'])->name('recent-for-autofill');
+
+    Route::get('/import-batch', [InvoiceBatchImportController::class, 'show'])
+        ->name('import-batch');
+    Route::post('/import-batch', [InvoiceBatchImportController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('import-batch.store');
 
     Route::post('/import-extract', [InvoiceImportController::class, 'extract'])
         ->middleware('throttle:10,1')

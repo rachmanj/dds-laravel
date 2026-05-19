@@ -1,3 +1,9 @@
+### 2026-05-13 — Batch invoice import: `import-batch`, `InvoiceCreatorService`, multi-file UI
+
+**Routes** `invoices.import-batch` / `invoices.import-batch.store`; **`InvoiceBatchImportController`** validates each row and calls **`InvoiceCreatorService`** (also used from **`InvoiceController::store`**). **`config/services.openrouter.batch_import_max`** (`INVOICE_BATCH_IMPORT_MAX`). See **`docs/architecture.md`**, **`docs/decisions.md`** (2026-05-13), **`docs/todo.md`**.
+
+---
+
 ### 2026-04-22 — Solar price history: `solar:price:sync-from-last-pertamina`, PERTAMINA resolver, half-month schedule
 
 **Command** `solar:price:sync-from-last-pertamina` creates **`solar_price_histories`** from **`PertaminaSolarInvoiceResolver::resolveLast()`** (latest PERTAMINA invoice with a SOLAR line). **Unit price** on the line: use non-null **non-zero** `unit_price`, else **`amount ÷ quantity`** (`bcdiv`, 4 dp). **Period**: current half-month (**1–14** / **15–EOM**) in **`SOLAR_PRICE_SCHEDULER_TIMEZONE`** (default **Asia/Makassar**). **Schedule**: `bootstrap/app.php` **07:30** WITA, `withoutOverlapping`. **Config**: `services.solar_price_scheduler`, optional **`SOLAR_PRICE_SCHEDULER_USER_ID`**. Detail: **`docs/SOLAR-PRICE-HISTORY-PERTAMINA-SYNC.md`**, **`docs/architecture.md`**, **`docs/decisions.md`** (2026-04-22).

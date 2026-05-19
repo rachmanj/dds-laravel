@@ -301,9 +301,14 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Invoice Information</h3>
-                            <a href="{{ route('invoices.index') }}" class="btn btn-sm btn-info float-right">
-                                <i class="fas fa-arrow-left"></i> Back to List
-                            </a>
+                            <div class="card-tools">
+                                <a href="{{ route('invoices.import-batch') }}" class="btn btn-sm btn-secondary mr-1">
+                                    <i class="fas fa-layer-group"></i> Batch import
+                                </a>
+                                <a href="{{ route('invoices.index') }}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-arrow-left"></i> Back to List
+                                </a>
+                            </div>
                         </div>
                         <form action="{{ route('invoices.store') }}" method="POST">
                             @csrf

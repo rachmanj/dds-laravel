@@ -18,6 +18,9 @@
                         <div class="card-header">
                             <h3 class="card-title">Invoices List</h3>
                             <div class="card-tools">
+                                <a href="{{ route('invoices.import-batch') }}" class="btn btn-secondary btn-sm mr-1">
+                                    <i class="fas fa-layer-group"></i> Batch import
+                                </a>
                                 <a href="{{ route('invoices.create') }}" class="btn btn-primary btn-sm">
                                     <i class="fas fa-plus"></i> Add New Invoice
                                 </a>

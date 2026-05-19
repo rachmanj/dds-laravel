@@ -1,8 +1,8 @@
 # Invoice from PDF/Image — Concrete Implementation Plan
 
-**Status**: Phase 1–5 implemented (v1) — queue extraction, draft prefill, post-save attachment, `import_extraction` persistence, first-page PDF for OCR, preview modal, extract response status + optional sync extract, attachment result in JSON + logging; **line items** → **`invoice_line_details`** on save; invoice **show** review + optional line edit (see [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) 2026-03-31)  
-**Last updated**: 2026-03-31  
-**Related**: `InvoiceController`, `InvoiceAttachment`, `InvoiceImportLineDetailsPersister`, `InvoiceLineDetail`, `CreateSapApInvoiceJob`, `SapApInvoicePayloadBuilder`
+**Status**: Phase 1–5 implemented (v1) — queue extraction, draft prefill, post-save attachment, `import_extraction` persistence, first-page PDF for OCR, preview modal, extract response status + optional sync extract, attachment result in JSON + logging; **line items** → **`invoice_line_details`** on save; invoice **show** review + optional line edit (see [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) 2026-03-31). **Batch multi-file import** (same extract routes, dedicated review UI, `InvoiceCreatorService`, `InvoiceBatchImportController`) — [`docs/decisions.md`](decisions.md) 2026-05-13.  
+**Last updated**: 2026-05-13  
+**Related**: `InvoiceController`, `InvoiceCreatorService`, `InvoiceBatchImportController`, `InvoiceAttachment`, `InvoiceImportLineDetailsPersister`, `InvoiceLineDetail`, `CreateSapApInvoiceJob`, `SapApInvoicePayloadBuilder`
 
 ## 1. Objective
 
@@ -166,7 +166,7 @@ flowchart LR
 |--------|--------|
 | **Unit** | `SupplierResolver`, date/amount parsing, PDF text vs image branch |
 | **HTTP** | Import with faked OpenRouter response (Http::fake) |
-| **Feature** | End-to-end: upload → draft → store → attachment exists (use `Storage::fake`) |
+| **Feature** | `tests/Feature/InvoiceImportExtractTest.php`, `tests/Feature/InvoiceBatchImportTest.php`, `tests/Feature/InvoiceCreateLineItemsTest.php` (where applicable) |
 
 Manual QA: real Indonesian tax invoices, USD invoices, multi-page PDF, blurry photo.
 
@@ -184,12 +184,19 @@ Manual QA: real Indonesian tax invoices, USD invoices, multi-page PDF, blurry ph
 
 ## 8. Documentation updates
 
-- [x] [`docs/architecture.md`](architecture.md) — subsection “Invoice creation from PDF/image” + flow, files, env, UX.  
-- [x] [`docs/decisions.md`](decisions.md) — ADR for invoice import v1 (OpenRouter, first page, sync option).  
-- [x] [`docs/todo.md`](todo.md) — “Recently Completed” entry for this feature.  
-- [x] [`docs/MEMORY.md`](MEMORY.md) — short ops note.
+- [x] [`docs/architecture.md`](architecture.md) — subsection “Invoice creation from PDF/image” + flow, files, env, UX; **batch import** subsection (2026-05-13).  
+- [x] [`docs/decisions.md`](decisions.md) — ADR for invoice import v1 (OpenRouter, first page, sync option); **ADR 2026-05-13** batch multi-file import.  
+- [x] [`docs/todo.md`](todo.md) — “Recently Completed” entry for this feature + batch import.  
+- [x] [`docs/backlog.md`](backlog.md) — completed **Batch invoice import** under Invoice System Enhancements.  
+- [x] [`MEMORY.md`](../MEMORY.md) — short ops note (including batch import pointer).
 
 ---
+
+## 8b. Batch multi-file import (implemented 2026-05-13)
+
+- **Flow**: Same **`POST /invoices/import-extract`** + **`import-status`** + **`import-draft`** per file; dedicated **`GET /invoices/import-batch`** UI builds a review table; **`POST /invoices/import-batch`** submits **`invoices[]`** JSON.
+- **Create path**: **`InvoiceCreatorService`** shared with **`InvoiceController::store`** — attachment + **`import_extraction`** + line persister unchanged in spirit.
+- **Docs**: [`docs/decisions.md`](decisions.md) (2026-05-13), [`tests/Feature/InvoiceBatchImportTest.php`](../tests/Feature/InvoiceBatchImportTest.php).
 
 ## 9. Rough effort estimate
 
@@ -214,9 +221,10 @@ Manual QA: real Indonesian tax invoices, USD invoices, multi-page PDF, blurry ph
 
 ## 11. Current status and what to do next
 
-**Status (2026-03-27)**
+**Status (2026-05-13)**
 
-- **Shipped in app**: Import card on create invoice (Preview + Extract), temp upload, `ExtractInvoiceFromDocumentJob`, OpenRouter (text PDF + PDF file / OCR for scans), `PdfInvoiceFirstPageService` for multi-page PDFs on OCR path when `OPEN_ROUTER_PDF_FIRST_PAGE_ONLY` is true, supplier fuzzy match, draft prefill, `import_extraction` JSON on `invoices` when save uses import, attachment after save with `import_attachment_saved` in AJAX JSON + warning log on failure, explicit `import_uuid` in `FormData`, `InvoiceImportExtractTest` + resolver unit test, sample PDF results doc.
+- **Shipped in app**: Import card on create invoice (Preview + Extract), temp upload, `ExtractInvoiceFromDocumentJob`, OpenRouter (text PDF + PDF file / OCR for scans), `PdfInvoiceFirstPageService` for multi-page PDFs on OCR path when `OPEN_ROUTER_PDF_FIRST_PAGE_ONLY` is true, supplier fuzzy match, draft prefill, `import_extraction` JSON on `invoices` when save uses import, attachment after save with `import_attachment_saved` in AJAX JSON + warning log on failure, explicit `import_uuid` in `FormData`, **line items** → `invoice_line_details`, show-page line edits + mismatch warning, **`InvoiceImportExtractTest`** + resolver unit test + **`InvoiceBatchImportTest`**, sample PDF results doc.
+- **Batch import**: **`/invoices/import-batch`** — multi-file review and **`InvoiceCreatorService`**-backed batch create; see ADR **2026-05-13** in [`docs/decisions.md`](decisions.md).
 - **Extract API response**: Returns real job `status` / `error` after dispatch; `INVOICE_IMPORT_EXTRACT_SYNC=true` uses `dispatchSync()` for environments without a queue worker (blocking HTTP — not default for production).
 - **Ops**: With `QUEUE_CONNECTION=database` / `redis`, run **`php artisan queue:work`** (or Windows Task Scheduler / NSSM). Alternatively `QUEUE_CONNECTION=sync` or `INVOICE_IMPORT_EXTRACT_SYNC=true` for local testing (see `.env.example`).
 

@@ -2718,11 +2718,11 @@ All sync operations are logged to `sap_logs` table:
 
 ### Invoice creation from PDF/image (AI-assisted import)
 
-**Status**: Implemented (v1) — see [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), sample extraction notes in [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md).
+**Status**: Implemented (v1) — see [`docs/INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md`](INVOICE-FROM-DOCUMENT-IMPLEMENTATION-PLAN.md), sample extraction notes in [`docs/INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md`](INVOICE-IMPORT-SAMPLE-PDF-TEST-RESULTS.md). **Batch import** and shared **`InvoiceCreatorService`**: [`docs/decisions.md`](decisions.md) (2026-05-13).
 
 **High-level flow**: upload → `POST /invoices/import-extract` → `ExtractInvoiceFromDocumentJob` + OpenRouter (images: vision; PDF: embedded text via `smalot/pdfparser` if enough text, else PDF file + `file-parser` / OCR) → `InvoiceImportSupplierResolver` + `InvoiceImportDraftBuilder` (draft may include **`line_items`**: description, quantity/qty, unit_price, amount) → cache (`invoice_import:{uuid}`) → poll `GET /invoices/import-status/{uuid}` → `GET /invoices/import-draft/{uuid}` → prefill `invoices.create` → user submits `InvoiceController::store` with hidden `import_uuid` → `InvoiceImportAttachmentService::attachFromImport` copies temp file to permanent storage and `InvoiceAttachment` (“Invoice Copy”, description “Imported from document”) → **`InvoiceImportLineDetailsPersister`** replaces `invoice_line_details` rows from `import_extraction.draft.line_items` when present. Optional JSON snapshot on the invoice row: `invoices.import_extraction` (draft metadata, confidence, original filename). **SAP AP posting stays header-only**; line rows are informational.
 
-**Create-page line review (import only)**: After extract, `resources/views/invoices/create.blade.php` shows an editable **line items** table in the import card (horizontal scroll; **Qty × Unit price** auto-fills **Amount**; max **200** rows with UI + toastr when exceeded). When the user posts **`import_line_items`** together with **`import_uuid`**, `InvoiceController::store` calls **`InvoiceImportLineDetailsPersister::persistFromUserInput`** (`source` = `user`); otherwise **`persistFromImportExtraction`** uses `draft.line_items` from saved `import_extraction` (`source` = `import`). See [`docs/INVOICE-CREATE-LINE-ITEMS-REVIEW-PLAN.md`](INVOICE-CREATE-LINE-ITEMS-REVIEW-PLAN.md).
+**Batch import (many files)**: `GET /invoices/import-batch` (`invoices.import-batch`) — multi-file pick/drop; each file uses the same **`import-extract`** / poll / **`import-draft`** pipeline; review table with per-row edits (including expandable **line items**, header vs lines mismatch warning); `POST /invoices/import-batch` (`invoices.import-batch.store`, JSON body `invoices[]`) runs **`InvoiceBatchImportController::store`**, validating each row like a single create and calling **`InvoiceCreatorService`** so behaviour matches **`InvoiceController::store`**. Max rows per request: **`config('services.openrouter.batch_import_max')`** (default **50**, env **`INVOICE_BATCH_IMPORT_MAX`**). Duplicate **`invoice_number`+`supplier_id`** pairs in one batch are rejected for the 2nd+ row; each **`import_uuid`** may appear only once per batch. Requires OpenRouter enabled + API key (same as single import); without key, the page redirects to the invoice list with a flash error.
 
 **Imported line rows (show + corrections)**
 
@@ -2750,22 +2750,24 @@ flowchart LR
 
 | Area | Path |
 |------|------|
-| Routes | `routes/invoice.php` — `import-extract`, `import-status`, `import-draft` (before resource routes) |
-| Controller | `app/Http/Controllers/InvoiceImportController.php` |
+| Routes | `routes/invoice.php` — `import-extract`, `import-status`, `import-draft`; **`import-batch`**, **`import-batch.store`** |
+| Controller | `app/Http/Controllers/InvoiceImportController.php`; **`InvoiceBatchImportController`** |
 | Job | `app/Jobs/ExtractInvoiceFromDocumentJob.php` |
 | Extraction | `app/Services/OpenRouterInvoiceExtractionService.php`, `app/Services/PdfInvoiceFirstPageService.php` (multi-page PDF → page 1 for OCR path when enabled) |
 | Draft / attach | `app/Services/InvoiceImportDraftBuilder.php`, `app/Services/InvoiceImportAttachmentService.php` |
-| Create + store | `resources/views/invoices/create.blade.php`, `app/Http/Controllers/InvoiceController.php` (`store` attaches when `import_uuid` present; calls **`InvoiceImportLineDetailsPersister`** after create) |
+| Create + store | `resources/views/invoices/create.blade.php`, `app/Http/Controllers/InvoiceController.php` (**`InvoiceCreatorService`** for persist when `import_uuid` present; **`InvoiceImportLineDetailsPersister`** after create) |
+| **Batch UI + store** | **`resources/views/invoices/import-batch.blade.php`**, **`InvoiceBatchImportController`**, **`InvoiceCreatorService`** |
 | Line details | `database/migrations/*_create_invoice_line_details_table.php`, `app/Models/InvoiceLineDetail.php`, `app/Services/InvoiceImportLineDetailsPersister.php`, `Invoice::lineDetails()` |
 | Show + edit lines | `resources/views/invoices/show.blade.php`; `InvoiceController::show` / **`updateLineDetail`**; route **`invoices.line-details.update`** in `routes/invoice.php` |
 | Model | `app/Models/Invoice.php` — `import_extraction` cast |
-| Config | `config/services.php` → `openrouter.*` (includes **`extract_job_timeout`**, **`extract_poll_interval_ms`**, **`extract_poll_max_tries`**) |
+| Config | `config/services.php` → `openrouter.*` (**`batch_import_max`** / **`INVOICE_BATCH_IMPORT_MAX`**, plus **extract** job/poll keys where configured) |
 | Logging | `config/logging.php` channel `invoice_import` |
+| Tests | `tests/Feature/InvoiceImportExtractTest.php`, `tests/Feature/InvoiceBatchImportTest.php`, `tests/Feature/InvoiceCreateLineItemsTest.php`, `tests/Feature/InvoiceLineDetailUpdateTest.php` |
 
 **Configuration (env)**
 
 - `OPEN_ROUTER_API_KEY` / `OPENROUTER_API_KEY`, `OPEN_ROUTER_MODEL`, optional `OPEN_ROUTER_BASE_URL`, `OPEN_ROUTER_TIMEOUT`, `OPEN_ROUTER_PDF_TIMEOUT`, `OPEN_ROUTER_PDF_ENGINE`, `OPEN_ROUTER_PDF_FIRST_PAGE_ONLY`.
-- `INVOICE_IMPORT_ENABLED` — gate feature.
+- **`INVOICE_BATCH_IMPORT_MAX`** (default **50**) — max invoices per **`POST /invoices/import-batch`** body.
 - `INVOICE_IMPORT_EXTRACT_SYNC` — if `true`, runs `dispatchSync()` on extract so the upload HTTP request blocks until extraction finishes (dev / no worker); **false in production** unless long-lived requests are acceptable.
 - **`INVOICE_IMPORT_EXTRACT_JOB_TIMEOUT`** (seconds, default 300) — `ExtractInvoiceFromDocumentJob` timeout; set **`extract_poll_*`** so **`(poll_interval_ms / 1000) × poll_max_tries`** exceeds this value (with margin).
 - **`INVOICE_IMPORT_EXTRACT_POLL_INTERVAL_MS`** (default 2000) and **`INVOICE_IMPORT_EXTRACT_POLL_MAX_TRIES`** (default 200) — polling `import-status` on create invoice (wired from `InvoiceController::create` into Blade).

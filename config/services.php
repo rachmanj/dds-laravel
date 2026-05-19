@@ -72,6 +72,7 @@ return [
         'ca_bundle' => env('OPEN_ROUTER_CAINFO', env('OPENROUTER_CAINFO')),
         // Max upload size for invoice import (kilobytes). Laravel validation "max" for files uses KB. Also raise PHP upload_max_filesize / post_max_size and web server limits to match.
         'max_upload_kb' => max(1, (int) env('INVOICE_IMPORT_MAX_FILE_KB', env('OPENROUTER_MAX_UPLOAD_KB', 51200))),
+        'batch_import_max' => max(1, (int) env('INVOICE_BATCH_IMPORT_MAX', 50)),
     ],
 
     'sap' => [

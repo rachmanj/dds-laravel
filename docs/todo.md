@@ -2,6 +2,16 @@
 
 ## ✅ **Recently Completed**
 
+### **Batch invoice import (multi-file extract + review table)** ✅ **COMPLETED**
+
+**Status**: Shipped — `invoices.import-batch` page; `InvoiceBatchImportController`; shared **`InvoiceCreatorService`** with single **`InvoiceController::store`**; JSON batch store with partial per-row outcomes; tests **`InvoiceBatchImportTest`**.  
+**Implementation**: 2026-05-13  
+**Priority**: MEDIUM — bulk entry from many PDFs/images
+
+**Summary**: Reuses **`import-extract`** / **`import-status`** / **`import-draft`** per file; review UI with defaults (type, receive date, cur loc), row-level type override, expandable line items + mismatch warning; **`INVOICE_BATCH_IMPORT_MAX`** (default 50). **Docs**: [`docs/architecture.md`](architecture.md) (Invoice creation from PDF/image), [`docs/decisions.md`](decisions.md) (2026-05-13), [`docs/backlog.md`](backlog.md).
+
+---
+
 ### **Solar price history — PERTAMINA auto-sync (Artisan + schedule + unit price derivation)** ✅ **COMPLETED**
 
 **Status**: Shipped — `solar:price:sync-from-last-pertamina`, half-month period in scheduler TZ, `PertaminaSolarInvoiceResolver` uses **amount ÷ quantity** when line `unit_price` is null or zero, daily schedule in `bootstrap/app.php`  

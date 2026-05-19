@@ -44,6 +44,11 @@
     -   **Description**: Persist **`line_items`** from document import into **`invoice_line_details`**; show table with header-vs-lines warning; modal edit + mini calculator; **`PATCH`** API; extraction poll/job timeout config.
     -   **Docs**: [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-03-31).
 
+-   [x] **Batch invoice import (multi-file PDF/image)** ✅ **COMPLETED** (2026-05-13)
+
+    -   **Description**: **`invoices.import-batch`** — reuse **`import-extract`** / poll / **`import-draft`** per file; review table + JSON **`import-batch.store`**; shared **`InvoiceCreatorService`** with **`InvoiceController::store`**; cap **`INVOICE_BATCH_IMPORT_MAX`** (default 50); partial per-row results in UI.
+    -   **Docs**: [`docs/architecture.md`](architecture.md), [`docs/decisions.md`](decisions.md) (2026-05-13), [`docs/todo.md`](todo.md).
+
 -   [ ] **Invoice Field Synchronization Improvements**
 
     -   **Priority**: Medium

@@ -11,8 +11,7 @@ use App\Models\Project;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Rules\UniqueInvoicePerSupplier;
-use App\Services\InvoiceImportAttachmentService;
-use App\Services\InvoiceImportLineDetailsPersister;
+use App\Services\InvoiceCreatorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -206,13 +205,8 @@ class InvoiceController extends Controller
             'import_line_items.*.amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        // Auto-populate receive_project from user's project if not provided
-        $receiveProject = $request->receive_project;
         /** @var User|null $authUser */
         $authUser = Auth::user();
-        if (! $receiveProject && $authUser && $authUser->project) {
-            $receiveProject = $authUser->project;
-        }
 
         // Ensure we have a valid user ID
         $userId = Auth::id();
@@ -229,63 +223,49 @@ class InvoiceController extends Controller
             ], 401);
         }
 
-        $importExtraction = null;
-        if ($request->filled('import_uuid')) {
-            $importExtraction = app(InvoiceImportAttachmentService::class)->getImportExtractionPayload(
-                $request->string('import_uuid')->toString(),
-                $userId
-            );
-        }
-
-        $invoice = Invoice::create([
-            'invoice_number' => $request->invoice_number,
-            'faktur_no' => $request->faktur_no,
-            'invoice_date' => $request->invoice_date,
-            'receive_date' => $request->receive_date,
-            'supplier_id' => $request->supplier_id,
-            'po_no' => $request->po_no,
-            'receive_project' => $receiveProject,
-            'invoice_project' => $request->invoice_project,
-            'payment_project' => $request->payment_project,
-            'currency' => $request->currency,
-            'amount' => $request->amount,
-            'type_id' => $request->type_id,
-            'payment_date' => $request->payment_date,
-            'remarks' => $request->remarks,
-            'cur_loc' => $request->cur_loc,
-            'sap_doc' => $request->sap_doc,
-            'status' => 'open', // Always set to 'open' for new invoices
-            'created_by' => $userId,
-            'import_extraction' => $importExtraction,
+        $creatorPayload = $request->only([
+            'invoice_number',
+            'faktur_no',
+            'invoice_date',
+            'receive_date',
+            'supplier_id',
+            'po_no',
+            'receive_project',
+            'invoice_project',
+            'payment_project',
+            'currency',
+            'amount',
+            'type_id',
+            'payment_date',
+            'remarks',
+            'cur_loc',
+            'sap_doc',
         ]);
 
-        // Link additional documents if provided
         $additionalDocumentIds = $request->input('additional_document_ids', []);
-        if (! empty($additionalDocumentIds)) {
-            $invoice->additionalDocuments()->sync(array_unique($additionalDocumentIds));
-        }
-
-        $importAttachmentSaved = false;
-        if ($request->filled('import_uuid')) {
-            $importAttachmentSaved = app(InvoiceImportAttachmentService::class)->attachFromImport(
-                $invoice,
-                $request->string('import_uuid')->toString(),
-                $userId
-            );
-            if (! $importAttachmentSaved) {
-                Log::warning('Invoice import file could not be attached after create', [
-                    'invoice_id' => $invoice->id,
-                    'import_uuid' => $request->string('import_uuid')->toString(),
-                ]);
-            }
+        if (! is_array($additionalDocumentIds)) {
+            $additionalDocumentIds = [];
         }
 
         $userImportLines = $request->input('import_line_items');
+        $importLineItems = null;
         if ($request->filled('import_uuid') && is_array($userImportLines) && count($userImportLines) > 0) {
-            app(InvoiceImportLineDetailsPersister::class)->persistFromUserInput($invoice, $userImportLines);
-        } else {
-            app(InvoiceImportLineDetailsPersister::class)->persistFromImportExtraction($invoice);
+            $importLineItems = $userImportLines;
         }
+
+        $importUuid = $request->filled('import_uuid') ? $request->string('import_uuid')->toString() : null;
+
+        $created = app(InvoiceCreatorService::class)->create(
+            $creatorPayload,
+            $userId,
+            $authUser,
+            $importUuid,
+            $importLineItems,
+            $additionalDocumentIds
+        );
+
+        $invoice = $created['invoice'];
+        $importAttachmentSaved = $created['import_attachment_saved'];
 
         if ($request->ajax()) {
             return response()->json([
