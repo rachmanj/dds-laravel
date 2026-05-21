@@ -114,6 +114,8 @@ Route::group(['middleware' => ['auth', 'role:admin|superadmin']], function () {
     Route::get('/admin/sap-logs', [SapController::class, 'logs'])->name('admin.sap-logs');
 });
 
-Route::group(['middleware' => ['auth', 'role:finance|superadmin']], function () {
+Route::group(['middleware' => ['auth', 'permission:send-to-sap']], function () {
+    Route::get('/invoices/{invoice}/sap-preview', [InvoiceController::class, 'previewSapSubmission'])->name('invoices.sap-preview');
+    Route::post('/invoices/{invoice}/submit-to-sap', [InvoiceController::class, 'submitToSap'])->name('invoices.submit-to-sap');
     Route::post('/invoices/{invoice}/sap-sync', [InvoiceController::class, 'sapSync'])->name('invoices.sap-sync');
 });

@@ -12,9 +12,18 @@ class SapApInvoicePayloadBuilder
 
     protected array $config;
 
-    public function __construct(Invoice $invoice)
+    /**
+     * @var array<int, array{grpo_no: string, doc_entry: int|string, amount: float|int|string, line?: int}>
+     */
+    protected array $grpoReferences;
+
+    /**
+     * @param  array<int, array{grpo_no: string, doc_entry: int|string, amount: float|int|string, line?: int}>  $grpoReferences
+     */
+    public function __construct(Invoice $invoice, array $grpoReferences = [])
     {
         $this->invoice = $invoice;
+        $this->grpoReferences = $grpoReferences;
         $this->config = config('services.sap.ap_invoice', []);
     }
 
@@ -104,10 +113,31 @@ class SapApInvoicePayloadBuilder
         $projectCode = $this->mapProjectCode();
         $costingCode = $this->mapCostingCode();
         $taxCode = $this->determineTaxCode();
+        $itemCode = $this->config['default_item_code'] ?? 'SERVICE';
+
+        if (! empty($this->grpoReferences)) {
+            return array_map(function (array $ref) use ($projectCode, $costingCode, $taxCode, $itemCode) {
+                $amount = (float) $ref['amount'];
+                $line = [
+                    'ItemCode' => $itemCode,
+                    'Quantity' => 1,
+                    'UnitPrice' => $amount,
+                    'TaxCode' => $taxCode,
+                    'LineTotal' => $amount,
+                    'ProjectCode' => $projectCode,
+                    'CostingCode' => $costingCode,
+                    'BaseType' => 20,
+                    'BaseEntry' => (int) $ref['doc_entry'],
+                    'BaseLine' => (int) ($ref['line'] ?? 0),
+                ];
+
+                return $line;
+            }, $this->grpoReferences);
+        }
 
         return [
             [
-                'ItemCode' => $this->config['default_item_code'] ?? 'SERVICE',
+                'ItemCode' => $itemCode,
                 'Quantity' => 1,
                 'UnitPrice' => $this->invoice->amount,
                 'TaxCode' => $taxCode,
@@ -220,6 +250,8 @@ class SapApInvoicePayloadBuilder
                     'name' => $costingCode ? SapDepartment::where('sap_code', $costingCode)->first()?->name : null,
                 ],
                 'tax_code' => $this->determineTaxCode(),
+                'document_lines' => $this->mapLineItems(),
+                'grpo_linked' => ! empty($this->grpoReferences),
             ],
         ];
     }

@@ -167,6 +167,41 @@ class SapService
         }
     }
 
+    /**
+     * @return array{DocEntry: int, DocNum: int, CardCode?: string, DocumentLines?: array<int, array<string, mixed>>}|null
+     */
+    public function getGrpoByDocNum(string $docNum): ?array
+    {
+        $this->ensureSession();
+
+        $docNum = trim($docNum);
+        if ($docNum === '') {
+            return null;
+        }
+
+        $filterValue = is_numeric($docNum) ? $docNum : "'".str_replace("'", "''", $docNum)."'";
+
+        try {
+            $result = $this->get('PurchaseDeliveryNotes', [
+                'query' => [
+                    '$filter' => "DocNum eq {$filterValue}",
+                    '$select' => 'DocEntry,DocNum,CardCode,DocumentLines',
+                    '$top' => 1,
+                ],
+            ]);
+
+            $rows = $result['value'] ?? [];
+
+            return ! empty($rows) ? $rows[0] : null;
+        } catch (RequestException $e) {
+            Log::channel('sap')->error('SAP GRPO lookup failed', [
+                'doc_num' => $docNum,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
     public function createApInvoice(array $payload)
     {
         if (! $this->cookieJar->count()) {

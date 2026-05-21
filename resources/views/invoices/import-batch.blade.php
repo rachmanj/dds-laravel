@@ -34,7 +34,8 @@
 
                 <div id="batch_zone_a" class="mb-4">
                     <label class="font-weight-bold d-block">1. Select files (max {{ $batchImportMax }})</label>
-                    <p class="text-muted small mb-2">One file per invoice. PDF, JPG, PNG, WebP, or GIF.</p>
+                    <p class="text-muted small mb-2">One file per invoice. PDF, JPG, PNG, WebP, or GIF. Each file is saved as an
+                        <strong>Invoice Copy</strong> attachment on the created invoice (same as single-file import).</p>
                     <div id="batch_drop_zone" class="border border-secondary rounded p-4 text-center bg-light mb-2"
                         style="cursor: pointer;">
                         <i class="fas fa-cloud-upload-alt fa-2x text-secondary mb-2"></i>
@@ -921,6 +922,14 @@
                                 detail = r.errors.join('; ');
                             } else if (r.message) {
                                 detail = r.message;
+                            }
+                            if (r.status === 'created') {
+                                if (r.import_attachment_saved === true) {
+                                    detail = (detail ? detail + ' ' : '') + 'Invoice Copy attachment saved.';
+                                } else if (r.import_attachment_saved === false) {
+                                    detail = (detail ? detail + ' ' : '') +
+                                        'Warning: uploaded file was not attached (import session may have expired).';
+                                }
                             }
                             const $dt = $('<td>').addClass('small');
                             if (r.status === 'created' && r.invoice_id) {

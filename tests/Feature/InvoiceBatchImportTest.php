@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Invoice;
+use App\Models\InvoiceAttachment;
 use App\Models\InvoiceType;
 use App\Models\Project;
 use App\Models\Supplier;
@@ -165,6 +167,75 @@ class InvoiceBatchImportTest extends TestCase
 
         $this->assertDatabaseHas('invoices', ['invoice_number' => 'BATCH-INV-1', 'supplier_id' => $supplier->id]);
         $this->assertDatabaseHas('invoices', ['invoice_number' => 'BATCH-INV-2', 'supplier_id' => $supplier->id]);
+    }
+
+    public function test_batch_store_attaches_uploaded_pdf_as_invoice_copy(): void
+    {
+        Config::set('services.openrouter.enabled', true);
+        Config::set('services.openrouter.key', 'test-key');
+
+        $user = User::factory()->create(['is_active' => true]);
+        [$typeId, $supplier] = $this->seedBasics($user);
+
+        $uuid = (string) Str::uuid();
+        $tempPath = 'temp/invoice-imports/'.$uuid.'.pdf';
+        Storage::disk('local')->put($tempPath, '%PDF-1.4 batch attachment test');
+        $this->seedImportCache($user, $uuid, 'BATCH-ATT-1');
+
+        $response = $this->actingAs($user)->postJson(route('invoices.import-batch.store'), [
+            'invoices' => [
+                $this->invoicePayload($typeId, $supplier->id, 'BATCH-ATT-1', $uuid),
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.0.import_attachment_saved', true);
+
+        $invoice = Invoice::query()->where('invoice_number', 'BATCH-ATT-1')->firstOrFail();
+        $attachment = InvoiceAttachment::query()->where('invoice_id', $invoice->id)->first();
+        $this->assertNotNull($attachment);
+        $this->assertSame('Invoice Copy', $attachment->category);
+        $this->assertSame('BATCH-ATT-1.pdf', $attachment->file_name);
+        $this->assertSame('application/pdf', $attachment->mime_type);
+        $this->assertTrue(Storage::disk('local')->exists($attachment->file_path));
+        $this->assertFalse(Storage::disk('local')->exists($tempPath));
+    }
+
+    public function test_batch_store_attaches_file_when_extraction_failed_but_upload_remains(): void
+    {
+        Config::set('services.openrouter.enabled', true);
+        Config::set('services.openrouter.key', 'test-key');
+
+        $user = User::factory()->create(['is_active' => true]);
+        [$typeId, $supplier] = $this->seedBasics($user);
+
+        $uuid = (string) Str::uuid();
+        $tempPath = 'temp/invoice-imports/'.$uuid.'.jpg';
+        Storage::disk('local')->put($tempPath, 'fake-image-bytes');
+        Cache::put(InvoiceImportAttachmentService::cacheKey($uuid), [
+            'user_id' => $user->id,
+            'status' => 'failed',
+            'path' => $tempPath,
+            'mime' => 'image/jpeg',
+            'original_name' => 'scan.jpg',
+            'error' => 'OCR failed',
+        ], 3600);
+
+        $response = $this->actingAs($user)->postJson(route('invoices.import-batch.store'), [
+            'invoices' => [
+                $this->invoicePayload($typeId, $supplier->id, 'BATCH-FAIL-ATT', $uuid),
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.0.import_attachment_saved', true);
+
+        $invoice = Invoice::query()->where('invoice_number', 'BATCH-FAIL-ATT')->firstOrFail();
+        $this->assertDatabaseHas('invoice_attachments', [
+            'invoice_id' => $invoice->id,
+            'file_name' => 'scan.jpg',
+            'category' => 'Invoice Copy',
+        ]);
     }
 
     public function test_batch_store_second_duplicate_invoice_number_in_batch_fails(): void

@@ -12,6 +12,8 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Rules\UniqueInvoicePerSupplier;
 use App\Services\InvoiceCreatorService;
+use App\Services\SapApInvoicePayloadBuilder;
+use App\Services\SapService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -814,33 +816,225 @@ class InvoiceController extends Controller
         ]);
     }
 
+    public function previewSapSubmission(Invoice $invoice, SapService $sapService)
+    {
+        $this->authorizeSapSync($invoice);
+
+        $validationErrors = $invoice->canSyncToSap();
+        if (! empty($validationErrors)) {
+            return redirect()
+                ->route('invoices.show', $invoice)
+                ->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
+        }
+
+        if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
+            return redirect()
+                ->route('invoices.show', $invoice)
+                ->with('error', 'Invoice is already sent or pending in SAP.');
+        }
+
+        $invoice->load(['supplier', 'type']);
+        $grpoRows = $this->resolveGrpoRowsForPreview($invoice, $sapService);
+        $grpoReferences = array_values(array_filter($grpoRows, fn (array $row) => $row['found']));
+
+        $payloadBuilder = new SapApInvoicePayloadBuilder(
+            $invoice,
+            array_map(fn (array $row) => [
+                'grpo_no' => $row['grpo_no'],
+                'doc_entry' => $row['doc_entry'],
+                'amount' => $row['amount'],
+                'line' => $row['line'],
+            ], $grpoReferences)
+        );
+
+        $apPreview = $payloadBuilder->getPreviewData()['ap_invoice'];
+
+        return view('invoices.sap-preview', [
+            'invoice' => $invoice,
+            'grpoRows' => $grpoRows,
+            'apPreview' => $apPreview,
+        ]);
+    }
+
+    public function submitToSap(Request $request, Invoice $invoice)
+    {
+        $this->authorizeSapSync($invoice);
+
+        $validationErrors = $invoice->canSyncToSap();
+        if (! empty($validationErrors)) {
+            return back()->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
+        }
+
+        if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
+            return back()->with('error', 'Invoice is already sent or pending in SAP.');
+        }
+
+        $validated = $request->validate([
+            'grpo_references' => 'nullable|array',
+            'grpo_references.*.grpo_no' => 'required_with:grpo_references|string|max:50',
+            'grpo_references.*.doc_entry' => 'required_with:grpo_references|integer',
+            'grpo_references.*.amount' => 'required_with:grpo_references|numeric|min:0.01',
+            'grpo_references.*.line' => 'nullable|integer|min:0',
+        ]);
+
+        $grpoReferences = collect($validated['grpo_references'] ?? [])
+            ->map(fn (array $ref) => [
+                'grpo_no' => trim((string) $ref['grpo_no']),
+                'doc_entry' => (int) $ref['doc_entry'],
+                'amount' => (float) $ref['amount'],
+                'line' => (int) ($ref['line'] ?? 0),
+            ])
+            ->filter(fn (array $ref) => $ref['grpo_no'] !== '' && $ref['doc_entry'] > 0)
+            ->values()
+            ->all();
+
+        if ($invoice->po_no && empty($grpoReferences)) {
+            return back()->withErrors([
+                'grpo_references' => 'At least one valid GRPO reference is required when PO/GRPO number is set.',
+            ]);
+        }
+
+        $amountSum = collect($grpoReferences)->sum('amount');
+        $warning = null;
+        if (! empty($grpoReferences) && abs($amountSum - (float) $invoice->amount) > 0.01) {
+            $warning = sprintf(
+                'GRPO line amounts (%.2f) do not match invoice total (%.2f). Submission will continue.',
+                $amountSum,
+                (float) $invoice->amount
+            );
+        }
+
+        $invoice->update([
+            'sap_status' => 'pending',
+            'sap_grpo_references' => ! empty($grpoReferences) ? $grpoReferences : null,
+        ]);
+
+        CreateSapApInvoiceJob::dispatch($invoice, $grpoReferences);
+
+        $redirect = redirect()
+            ->route('invoices.show', $invoice)
+            ->with('success', 'Invoice queued for SAP posting with GRPO relationship links.');
+
+        if ($warning) {
+            $redirect->with('warning', $warning);
+        }
+
+        return $redirect;
+    }
+
     public function sapSync(Invoice $invoice)
     {
-        // Check if user can sync this invoice
+        $this->authorizeSapSync($invoice);
+
+        $validationErrors = $invoice->canSyncToSap();
+        if (! empty($validationErrors)) {
+            return back()->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
+        }
+
+        if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
+            return back()->with('error', 'Invoice is already sent or pending in SAP.');
+        }
+
+        $invoice->update(['sap_status' => 'pending']);
+        CreateSapApInvoiceJob::dispatch($invoice);
+
+        return back()->with('success', 'Invoice queued for SAP posting.');
+    }
+
+    protected function authorizeSapSync(Invoice $invoice): void
+    {
         /** @var User $user */
         $user = Auth::user();
+
+        if (! $user->can('send-to-sap')) {
+            abort(403, 'You do not have permission to send invoices to SAP.');
+        }
+
         if (! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $locationCode = $user->department_location_code;
             if ($locationCode && $invoice->cur_loc !== $locationCode) {
                 abort(403, 'You can only sync invoices from your department location.');
             }
         }
+    }
 
-        // Validate invoice can be synced
-        $validationErrors = $invoice->canSyncToSap();
-        if (! empty($validationErrors)) {
-            return back()->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
+    /**
+     * @return array<int, array{grpo_no: string, doc_entry: int|null, amount: float, line: int, found: bool, sap_card_code: string|null, error: string|null}>
+     */
+    protected function resolveGrpoRowsForPreview(Invoice $invoice, SapService $sapService): array
+    {
+        $grpoNumbers = $this->parseGrpoNumbersFromPoNo($invoice->po_no);
+        $rows = [];
+
+        if (empty($grpoNumbers)) {
+            return [[
+                'grpo_no' => '',
+                'doc_entry' => null,
+                'amount' => (float) $invoice->amount,
+                'line' => 0,
+                'found' => false,
+                'sap_card_code' => null,
+                'error' => 'No PO/GRPO number on invoice. AP Invoice will post without GRPO relationship.',
+            ]];
         }
 
-        // Check if already synced
-        if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
-            return back()->with('error', 'Invoice is already sent or pending in SAP.');
+        $defaultAmountPerGrpo = round((float) $invoice->amount / count($grpoNumbers), 2);
+        $remaining = (float) $invoice->amount;
+
+        foreach ($grpoNumbers as $index => $grpoNo) {
+            $amount = $index === count($grpoNumbers) - 1
+                ? $remaining
+                : $defaultAmountPerGrpo;
+            $remaining -= $amount;
+
+            $row = [
+                'grpo_no' => $grpoNo,
+                'doc_entry' => null,
+                'amount' => $amount,
+                'line' => 0,
+                'found' => false,
+                'sap_card_code' => null,
+                'error' => null,
+            ];
+
+            try {
+                $grpo = $sapService->getGrpoByDocNum($grpoNo);
+                if ($grpo && isset($grpo['DocEntry'])) {
+                    $row['doc_entry'] = (int) $grpo['DocEntry'];
+                    $row['found'] = true;
+                    $row['sap_card_code'] = $grpo['CardCode'] ?? null;
+                    $lines = $grpo['DocumentLines'] ?? [];
+                    if (! empty($lines)) {
+                        $firstLine = $lines[0];
+                        $row['line'] = (int) ($firstLine['LineNum'] ?? 0);
+                        if (isset($firstLine['LineTotal']) && (float) $firstLine['LineTotal'] > 0) {
+                            $row['amount'] = (float) $firstLine['LineTotal'];
+                        }
+                    }
+                } else {
+                    $row['error'] = 'GRPO not found in SAP B1';
+                }
+            } catch (\Throwable $e) {
+                $row['error'] = $e->getMessage();
+            }
+
+            $rows[] = $row;
         }
 
-        // Update status and queue job
-        $invoice->update(['sap_status' => 'pending']);
-        CreateSapApInvoiceJob::dispatch($invoice);
+        return $rows;
+    }
 
-        return back()->with('success', 'Invoice queued for SAP posting.');
+    /**
+     * @return array<int, string>
+     */
+    protected function parseGrpoNumbersFromPoNo(?string $poNo): array
+    {
+        if (! $poNo || trim($poNo) === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[\s,;|]+/', trim($poNo), -1, PREG_SPLIT_NO_EMPTY);
+
+        return array_values(array_unique(array_map('trim', $parts ?: [])));
     }
 }

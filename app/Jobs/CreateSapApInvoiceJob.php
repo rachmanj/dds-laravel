@@ -22,11 +22,20 @@ class CreateSapApInvoiceJob implements ShouldQueue
 
     public $backoff = [60, 300, 900]; // Exponential backoff in seconds
 
-    protected $invoice;
+    protected Invoice $invoice;
 
-    public function __construct(Invoice $invoice)
+    /**
+     * @var array<int, array{grpo_no: string, doc_entry: int|string, amount: float|int|string, line?: int}>
+     */
+    protected array $grpoReferences;
+
+    /**
+     * @param  array<int, array{grpo_no: string, doc_entry: int|string, amount: float|int|string, line?: int}>  $grpoReferences
+     */
+    public function __construct(Invoice $invoice, array $grpoReferences = [])
     {
         $this->invoice = $invoice;
+        $this->grpoReferences = $grpoReferences;
     }
 
     public function handle(SapService $sapService)
@@ -49,8 +58,7 @@ class CreateSapApInvoiceJob implements ShouldQueue
             // Validate supplier exists in SAP
             $vendor = $this->resolveVendor($sapService, $invoice->supplier->sap_code);
 
-            // Build payload using builder
-            $payloadBuilder = new SapApInvoicePayloadBuilder($invoice);
+            $payloadBuilder = new SapApInvoicePayloadBuilder($invoice, $this->grpoReferences);
             $payload = $payloadBuilder->build();
 
             // Create AP Invoice in SAP
@@ -60,6 +68,8 @@ class CreateSapApInvoiceJob implements ShouldQueue
                 $invoice->update([
                     'sap_status' => 'posted',
                     'sap_doc_num' => $response['DocNum'] ?? null,
+                    'sap_doc_entry' => isset($response['DocEntry']) ? (string) $response['DocEntry'] : null,
+                    'sap_grpo_references' => ! empty($this->grpoReferences) ? $this->grpoReferences : null,
                     'sap_error_message' => null,
                     'sap_last_attempted_at' => now(),
                 ]);

@@ -37,6 +37,8 @@ class Invoice extends Model
         'flag',
         'sap_status',
         'sap_doc_num',
+        'sap_doc_entry',
+        'sap_grpo_references',
         'sap_error_message',
         'sap_last_attempted_at',
         'import_extraction',
@@ -49,6 +51,7 @@ class Invoice extends Model
         'paid_at' => 'datetime',
         'amount' => 'decimal:2',
         'import_extraction' => 'array',
+        'sap_grpo_references' => 'array',
     ];
 
     /**

@@ -76,7 +76,15 @@
                                         </tr>
                                         <tr>
                                             <td><strong>Supplier:</strong></td>
-                                            <td>{{ $invoice->supplier ? $invoice->supplier->name : '-' }}</td>
+                                            <td>
+                                                @if ($invoice->supplier)
+                                                    {{ $invoice->supplier->name }}@if ($invoice->supplier->sap_code)
+                                                        <span class="text-muted">({{ $invoice->supplier->sap_code }})</span>
+                                                    @endif
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
                                         </tr>
                                         <tr>
                                             <td><strong>PO Number:</strong></td>
@@ -106,26 +114,22 @@
                                             <td><strong>SAP Status:</strong></td>
                                             <td>{!! $invoice->sap_status_badge !!}</td>
                                         </tr>
-                                        @if (($invoice->sap_status === null || $invoice->sap_status === 'failed') && $invoice->status === 'sap' && (auth()->user()->can('send-to-sap') || auth()->user()->hasRole('superadmin')))
-                                            <tr>
-                                                <td colspan="2">
-                                                    <form action="{{ route('invoices.sap-sync', $invoice) }}" method="POST">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-primary btn-sm">Send to SAP</button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        @endif
-                                        @if ($invoice->sap_status === 'failed' && (auth()->user()->can('edit-invoices') || auth()->user()->can('update-invoice') || auth()->user()->hasRole('superadmin')))
-                                            <tr>
-                                                <td colspan="2">
-                                                    <form action="{{ route('invoices.sap-sync', $invoice) }}" method="POST">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-warning btn-sm">Retry SAP Sync</button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        @endif
+                                        @can('send-to-sap')
+                                            @if (($invoice->sap_status === null || $invoice->sap_status === 'failed') && $invoice->status === 'sap')
+                                                <tr>
+                                                    <td colspan="2">
+                                                        <a href="{{ route('invoices.sap-preview', $invoice) }}" class="btn btn-primary btn-sm">Send to SAP</a>
+                                                    </td>
+                                                </tr>
+                                            @endif
+                                            @if ($invoice->sap_status === 'failed')
+                                                <tr>
+                                                    <td colspan="2">
+                                                        <a href="{{ route('invoices.sap-preview', $invoice) }}" class="btn btn-warning btn-sm">Retry SAP Sync</a>
+                                                    </td>
+                                                </tr>
+                                            @endif
+                                        @endcan
                                         <tr>
                                             <td><strong>Current Location:</strong></td>
                                             <td>{{ $invoice->cur_loc }}</td>

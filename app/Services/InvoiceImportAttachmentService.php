@@ -55,7 +55,8 @@ class InvoiceImportAttachmentService
         if (($data['user_id'] ?? null) !== $userId) {
             return false;
         }
-        if (($data['status'] ?? '') !== 'completed') {
+        $status = $data['status'] ?? '';
+        if (! in_array($status, ['completed', 'failed'], true)) {
             return false;
         }
         $path = $data['path'] ?? null;

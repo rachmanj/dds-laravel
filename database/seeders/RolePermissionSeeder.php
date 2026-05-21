@@ -86,6 +86,7 @@ class RolePermissionSeeder extends Seeder
 
             // SAP Update
             'view-sap-update',
+            'send-to-sap',
 
             // Reconcile Feature
             'view-reconcile',
@@ -148,6 +149,7 @@ class RolePermissionSeeder extends Seeder
             'reset-document-status',
             'see-all-record-switch',
             'view-sap-update',
+            'send-to-sap',
             'view-reconcile',
             'upload-reconcile',
             'export-reconcile',
@@ -200,6 +202,7 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-sap-update',
+            'send-to-sap',
             'view-reconcile',
             'upload-reconcile',
             'export-reconcile',
@@ -237,6 +240,7 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-sap-update',
+            'send-to-sap',
             'view-reconcile',
             'upload-reconcile',
             'export-reconcile',
