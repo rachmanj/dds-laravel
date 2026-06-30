@@ -1,3 +1,20 @@
+### 2026-06-30 — Distribution linked documents: pivot-only detection, explicit inclusion, edit visibility
+
+**Problem**: Distribution **1728** included additional documents the user never selected (e.g. `71260700338`, `261003264`) because **`checkLinkedDocuments`** matched **all additional documents sharing a PO** with selected invoices, pre-selected them in the confirmation dialog, and **`attachInvoiceAdditionalDocuments`** silently added pivot-linked docs on create/add. PO-only rows appeared on **show** but were **hidden on edit**; additional docs could not be removed individually.
+
+**Fix (live-safe — draft distributions only for data edits)**:
+
+1. **`checkLinkedDocuments`** — returns only additional documents in **`additional_document_invoice`** for selected invoices, in user department, **`availableForDistribution()`**; includes `invoice_numbers` in JSON.
+2. **Create / attach** — additional documents included only via user-confirmed **`linked_document_ids`**; removed silent **`attachInvoiceAdditionalDocuments`** from **`store`** and **`attachDocumentsAjax`**. Confirmation waits for linked-doc check before enabling submit.
+3. **Edit page** — **`formatDistributionDocumentsForEdit`** returns `{ invoices, standalone_additional_documents }`; **Other Additional Documents** section for PO-only / non-pivot rows; **Remove** per row (icon-only `btn-outline-danger`); **`detachDocument`** allows removing additional documents from invoice distributions.
+4. **Manual sync unchanged** — **`POST /distributions/{id}/sync-linked-documents`** (draft show page) still uses **`attachInvoiceAdditionalDocuments`**.
+
+**Tests**: `tests/Feature/DistributionCheckLinkedDocumentsTest.php`, `tests/Feature/DistributionEditDocumentsTest.php`.
+
+**Docs**: `docs/decisions.md` (2026-06-30), `docs/DISTRIBUTION-FEATURE.md`, `docs/INVOICE-ADDITIONAL-DOCUMENTS-AUTO-INCLUSION.md`, `docs/LINKED-DOCUMENTS-DEMO-GUIDE.md`, `docs/architecture.md`, `docs/todo.md`.
+
+---
+
 ### 2026-05-19 — Invoice create/edit: link additional documents by document number (modal search)
 
 **Feature**: On **Link Additional Documents** card (`invoices.create`, `invoices.edit`), users can search by **document number fragment** (min 2 chars) in the card header; results open in a **modal** with the same checkbox columns as PO search. Selection merges into shared `selectedDocs` / `additional_document_ids[]`. **No** PO, department, status, or type filters — `document_number LIKE %term%`, limit 50.

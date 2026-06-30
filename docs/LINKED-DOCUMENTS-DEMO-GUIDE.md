@@ -1,14 +1,16 @@
 # Linked Documents Management Feature - Demo Guide
 
+> **Updated 2026-06-30**: Linked documents at distribution create are detected via **`additional_document_invoice`** (invoice-attached), not PO number equality. See [`docs/decisions.md`](decisions.md) (2026-06-30).
+
 ## Overview
 
-This guide demonstrates the **Linked Documents Management** feature in the DDS (Document Distribution System). This feature automatically detects additional documents linked to selected invoices and allows users to manage which linked documents to include in their distribution.
+This guide demonstrates the **Linked Documents Management** feature in the DDS (Document Distribution System). When creating an invoice distribution, the system finds additional documents **explicitly linked to selected invoices** and lets users choose which to include before submission.
 
 ## Feature Components
 
 ### 1. **Department Location Indicators**
 
--   Green badges showing "000HACC" in the Location column
+-   Green badges showing location code in the Location column
 -   Visual indicators for documents in the current department
 -   Available for both Invoice and Additional Document tables
 
@@ -16,13 +18,21 @@ This guide demonstrates the **Linked Documents Management** feature in the DDS (
 
 -   Appears when submitting distribution form
 -   Shows distribution summary and selected documents
--   Displays linked documents section when found
+-   Displays linked documents section when pivot-linked additional documents exist
+-   **Confirm** is enabled only after linked-documents AJAX completes
 
 ### 3. **Linked Documents Management Modal**
 
--   Allows selection/deselection of linked documents
+-   Allows selection/deselection of linked documents before create
 -   Checkbox interface for each linked document
+-   Shows document number, type, PO, and linked invoice number(s)
 -   Save/Cancel functionality
+
+### 4. **Edit Page — Other Additional Documents (2026-06-30)**
+
+-   Draft edit lists all documents on the distribution
+-   **Other Additional Documents** section shows rows not pivot-linked to any selected invoice (e.g. legacy PO-only attaches)
+-   Icon-only remove buttons on every row
 
 ## Step-by-Step Demo
 
@@ -30,38 +40,42 @@ This guide demonstrates the **Linked Documents Management** feature in the DDS (
 
 1. **Navigate to**: `http://localhost:8000/distributions/create`
 2. **Select Document Type**: Choose "Invoice"
-3. **Select Distribution Type**: Choose "Normal (NORM)"
-4. **Select Destination Department**: Choose "Finance (001HFIN)"
+3. **Select Distribution Type**: Choose appropriate type
+4. **Select Destination Department**: Choose target department
 
 ### Step 2: Select Invoice with Linked Documents
 
-5. **Find Invoice**: Look for invoice "345656" (ABADI TOWER)
-6. **Check the checkbox** next to this invoice
-7. **Verify**: The invoice has a linked additional document "251006079"
+5. **Find Invoice**: Choose an invoice that has additional documents linked on the **invoice edit** page (`additional_document_invoice`)
+6. **Check the checkbox** next to that invoice
+7. **Verify**: Linked additional documents appear only if attached to that invoice in the pivot table (not merely same PO)
 
 ### Step 3: Submit and View Confirmation Dialog
 
 8. **Click**: "Create Distribution" button
 9. **Confirmation Dialog appears** with:
     - Distribution Information (Type, Destination, Document Type, Notes)
-    - Selected Documents (Invoice 345656)
-    - **Linked Documents Section** showing additional document "251006079"
+    - Selected Documents (chosen invoices)
+    - **Linked Documents Section** — invoice-attached additional documents (review before confirm)
 
 ### Step 4: Access Linked Documents Management
 
-10. **Click**: "Manage Linked Documents" button in the confirmation dialog
+10. **Click**: "Manage Linked Documents" in the confirmation dialog
 11. **Linked Documents Management Modal opens** with:
-    -   Title: "Manage Linked Additional Documents"
     -   List of linked documents with checkboxes
-    -   Document details (number, type, PO number)
+    -   Document details (number, type, PO, invoice number)
     -   Save Selection and Cancel buttons
 
 ### Step 5: Manage Document Selection
 
-12. **Review**: The linked document is checked by default
-13. **Option to uncheck** if you don't want to include it
-14. **Click**: "Save Selection" to apply changes
-15. **Click**: "Cancel" to discard changes
+12. **Review**: Linked pivot documents are checked by default
+13. **Uncheck** any document you do not want in the distribution
+14. **Click**: "Save Selection"
+15. **Click**: "Confirm & Create Distribution"
+
+### Step 6: Sync on Draft Show (optional)
+
+16. After create, open draft distribution show page
+17. Use **Sync linked documents** if invoices gained new pivot links after creation
 
 ## Technical Implementation
 
@@ -69,49 +83,41 @@ This guide demonstrates the **Linked Documents Management** feature in the DDS (
 
 -   **Endpoint**: `POST /distributions/check-linked-documents`
 -   **Purpose**: Find additional documents linked to selected invoices
--   **Logic**: Links via PO number matching between invoices and additional documents
--   **Response**: JSON with linked document details
+-   **Logic (current)**: `whereHas('invoices', selected invoice IDs)`, department `cur_loc`, `availableForDistribution()`
+-   **Not used for distribution create**: PO number-only matching (removed 2026-06-30 — caused false positives)
+-   **Response**: JSON with linked document details including `invoice_numbers`
 
 ### Frontend Components
 
 -   **Confirmation Modal**: Bootstrap modal with distribution summary
--   **Linked Documents Section**: Dynamic content showing found linked documents
--   **Management Modal**: Separate modal for document selection management
--   **AJAX Integration**: Real-time checking for linked documents
+-   **Linked Documents Section**: Dynamic content; user must confirm inclusion
+-   **Management Modal**: Checkbox selection before create
+-   **AJAX Integration**: Linked-doc check gates confirm button
 
 ### Database Relationships
 
--   **Invoices**: `po_no` field
--   **Additional Documents**: `po_no` field (matching link)
--   **Location Filtering**: `cur_loc` field for department-based filtering
-
-## Screenshots Available
-
-1. **`confirmation-modal-working.png`**: Shows the confirmation dialog with linked documents section
-2. **`linked-documents-management-modal-working.png`**: Shows the management modal with checkboxes
+-   **Primary link**: `additional_document_invoice` (invoice_id ↔ additional_document_id)
+-   **Distribution rows**: `distribution_documents`
+-   **PO field**: informational; PO search on **invoice create/edit** is separate from distribution linking
 
 ## Key Features Demonstrated
 
-✅ **Automatic Detection**: System automatically finds linked additional documents
-✅ **Visual Indicators**: Clear location badges and document status
-✅ **User Control**: Ability to select/deselect linked documents
-✅ **Confirmation Flow**: Review before submission
-✅ **Modal Interface**: Clean, intuitive management interface
-✅ **Real-time Updates**: AJAX-based linked document detection
+✅ **Pivot-based detection**: Only invoice-attached additional documents suggested at create  
+✅ **User control**: Select/deselect before submission  
+✅ **Confirmation flow**: Review before submission  
+✅ **Edit visibility**: All attached additional documents visible and removable on draft edit  
+✅ **Manual sync**: Draft show sync for newly linked documents  
 
 ## Benefits
 
-1. **Data Integrity**: Ensures related documents are not missed
-2. **User Control**: Users can choose which linked documents to include
-3. **Visual Clarity**: Clear indicators and organized interface
-4. **Efficiency**: Automated detection reduces manual work
-5. **Flexibility**: Can include or exclude linked documents as needed
+1. **Data integrity**: Avoids bundling unrelated documents that share a PO
+2. **User control**: Explicit confirmation of supporting documents
+3. **Live-safe cleanup**: Legacy PO-only rows removable on edit without migration scripts
+4. **Flexibility**: Sync linked documents when invoice links change after draft creation
 
-## Testing Data Used
+## Testing
 
--   **Invoice**: 345656 (ABADI TOWER)
--   **Linked Document**: 251006079 (Type: ITO)
--   **PO Number**: 250206117 (matching link)
--   **Location**: 000HACC (current department)
+-   `tests/Feature/DistributionCheckLinkedDocumentsTest.php`
+-   `tests/Feature/DistributionEditDocumentsTest.php`
 
-This feature successfully demonstrates the complete linked documents management workflow from detection to user control.
+**Last Updated**: 2026-06-30

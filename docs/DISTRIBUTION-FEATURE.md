@@ -215,10 +215,11 @@ Key Business Logic Features
    Documents have cur_loc field tracking physical location
    Distribution automatically updates document locations upon receipt
    Prevents distribution of documents not in user's location
-2. Auto-Document Inclusion
-   When distributing invoices, attached additional documents are automatically included
-   Location validation prevents mismatched document inclusion
-   Warnings generated for location conflicts
+2. Auto-Document Inclusion (updated 2026-06-30)
+   When distributing invoices, **invoice-attached** additional documents (via `additional_document_invoice`) are offered in the create confirmation dialog; user confirms via **Manage Linked Documents** and `linked_document_ids`
+   **No silent attach** on create or edit “Add Documents” — use **Sync linked documents** on draft show page to pull newly linked pivot docs
+   PO number alone does **not** add documents to a distribution (invoice create/edit PO search is a separate workflow)
+   Location validation and skip_verification rules unchanged for out-of-origin additional documents
 3. Granular Verification System
    Distribution-Level: Overall verification with timestamps and notes
    Document-Level: Individual document verification with status (verified/missing/damaged)
@@ -229,16 +230,34 @@ Key Business Logic Features
    Includes user, action type, notes, and metadata
    Discrepancies get individual history entries
 
-### Draft-only Sync Linked Documents (2025-09-06)
+### Draft-only Sync Linked Documents (2025-09-06; create behavior amended 2026-06-30)
 
 -   Purpose: Attach any newly linked additional documents for invoices already included in a draft distribution.
 -   Trigger: Button “Sync linked documents” on distribution show page (only visible in draft).
 -   Behavior:
-    -   Uses existing attachInvoiceAdditionalDocuments logic
+    -   Uses `attachInvoiceAdditionalDocuments` (pivot table only)
     -   Sets `origin_cur_loc` and `skip_verification` per current location vs origin department
     -   Avoids duplicates if already attached
+-   **Note**: Distribution **create** and **attach documents on edit** no longer call `attachInvoiceAdditionalDocuments` automatically; users confirm linked docs at create or run sync on show.
 -   Endpoint: `POST /distributions/{distribution}/sync-linked-documents`
 -   Controller: `DistributionController@syncLinkedDocuments`
+
+### Draft Edit — Document List (2026-06-30)
+
+-   Route: `GET /distributions/{distribution}/edit`
+-   Data shape: `formatDistributionDocumentsForEdit()` → `{ invoices: [...], standalone_additional_documents: [...] }`
+-   **Invoices**: top-level rows with nested additional documents that are pivot-linked to that invoice
+-   **Other Additional Documents**: additional rows in `distribution_documents` not pivot-linked to any invoice in the bundle (e.g. legacy PO-only attaches); each row has icon-only **Remove**
+-   Detach: `DELETE /distributions/{distribution}/documents/{distributionDocument}` — additional documents removable individually on invoice distributions
+-   Views: `resources/views/distributions/edit.blade.php`, `partials/edit-documents-table.blade.php`
+
+### Linked Documents API at Create (2026-06-30)
+
+-   Endpoint: `POST /distributions/check-linked-documents`
+-   Input: `invoice_ids[]`
+-   Logic: additional documents where `whereHas('invoices', invoice_ids)`, user department `cur_loc`, `availableForDistribution()`
+-   Output: `id`, `document_number`, `type`, `po_no`, `status`, `invoice_numbers`
+-   Tests: `tests/Feature/DistributionCheckLinkedDocumentsTest.php`
 
 ### Cancel Sent (Not Received) Workflow (2025-09-09)
 

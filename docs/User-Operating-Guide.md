@@ -64,18 +64,31 @@ Tracks document aging over time to identify trends and potential bottlenecks.
 
 ## 📤 **Managing Distributions**
 
-### **Creating a New Distribution**
+### **Creating a New Distribution (invoice type)**
 
-1. **From Dashboard**: Click "Create Distribution" in Quick Actions
-2. **Fill Required Fields**:
-    - **Document Type**: Select from dropdown (Invoice, PO, etc.)
-    - **Origin Warehouse**: Your current location
-    - **Destination Warehouse**: Where documents should go
-    - **Priority**: High, Medium, or Low
-    - **Expected Delivery Date**: When documents should arrive
-3. **Attach Documents**: Upload supporting files (PDF, Excel, etc.)
-4. **Add Notes**: Any special instructions or comments
-5. **Submit**: Click "Create Distribution"
+1. **Navigate**: Distributions → Create (or dashboard quick action)
+2. **Fill required fields**: Distribution type, destination department, document type **Invoice**
+3. **Select invoices** from the list (documents in your department location)
+4. **Click Create Distribution** — a **confirmation dialog** opens:
+    - Review selected invoices
+    - If invoices have **linked additional documents** (attached on the invoice record), they appear under **Linked Additional Documents**
+    - Use **Manage Linked Documents** to include or exclude each item
+    - Only documents **linked to the invoice** are offered (not every document with the same PO)
+5. **Confirm & Create Distribution**
+
+> **Tip**: Link supporting documents to invoices on the invoice create/edit page first (PO search or document number search). Distribution create uses those invoice links.
+
+### **Editing a Draft Distribution**
+
+1. Open the distribution **Details** page while status is **Draft**
+2. Click **Edit**
+3. **Current Documents** lists invoices, nested linked additional documents, and **Other Additional Documents** (if any legacy or manually attached rows are not linked to an invoice in the bundle)
+4. Use the **trash icon** on a row to remove that document from the distribution
+5. **Add Documents** to attach more invoices (same rules as create for linked docs)
+
+### **Sync Linked Documents (draft only)**
+
+On the distribution **show** page (draft status), **Sync linked documents** pulls in additional documents newly linked to invoices already on the distribution (via the invoice–document link table).
 
 ### **Tracking Distribution Status**
 

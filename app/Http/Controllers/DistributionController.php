@@ -2,23 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
-use App\Models\Distribution;
-use App\Models\DistributionType;
-use App\Models\Department;
-use App\Models\Invoice;
 use App\Models\AdditionalDocument;
+use App\Models\Department;
+use App\Models\Distribution;
 use App\Models\DistributionDocument;
 use App\Models\DistributionHistory;
+use App\Models\DistributionType;
+use App\Models\Invoice;
 use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\View\View;
 
 class DistributionController extends Controller
 {
@@ -31,7 +31,7 @@ class DistributionController extends Controller
         $query = Distribution::with(['type', 'originDepartment', 'destinationDepartment', 'creator']);
 
         // Filter by department access based on user role
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        if (! array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             if ($user->department) {
                 // Enhanced logic: Show both incoming and outgoing distributions
                 $query->where(function ($q) use ($user) {
@@ -52,7 +52,7 @@ class DistributionController extends Controller
 
         // Server-side search functionality
         if ($request->filled('search_distribution_number')) {
-            $query->where('distribution_number', 'like', '%' . $request->search_distribution_number . '%');
+            $query->where('distribution_number', 'like', '%'.$request->search_distribution_number.'%');
         }
 
         if ($request->filled('search_status') && $request->search_status !== 'all') {
@@ -85,7 +85,7 @@ class DistributionController extends Controller
         $user = Auth::user();
 
         // Check if user has a department assigned
-        if (!$user->department) {
+        if (! $user->department) {
             return back()->with('error', 'User must have a department assigned to create distributions');
         }
 
@@ -121,13 +121,14 @@ class DistributionController extends Controller
             'document_ids' => 'required|array|min:1',
             'document_ids.*' => 'required|integer',
             'notes' => 'nullable|string|max:1000',
-            'linked_document_ids' => 'nullable|string'
+            'linked_document_ids' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             if ($request->ajax()) {
                 return response()->json(['errors' => $validator->errors()], 422);
             }
+
             return back()->withErrors($validator)->withInput();
         }
 
@@ -137,7 +138,7 @@ class DistributionController extends Controller
             $user = Auth::user();
 
             // Check if user has a department assigned
-            if (!$user->department) {
+            if (! $user->department) {
                 throw new \Exception('User must have a department assigned to create distributions');
             }
 
@@ -169,21 +170,18 @@ class DistributionController extends Controller
                 'status' => 'draft',
                 'notes' => $request->notes,
                 'year' => $currentYear,
-                'sequence' => $sequence
+                'sequence' => $sequence,
             ]);
 
             // Attach documents
             $this->attachDocuments($distribution, $request->document_type, $request->document_ids);
 
-            // Handle linked documents if provided
+            // Handle linked documents explicitly selected by the user during confirmation
             if ($request->linked_document_ids) {
-                $linkedDocumentIds = explode(',', $request->linked_document_ids);
-                $this->attachDocuments($distribution, 'additional_document', $linkedDocumentIds);
-            }
-
-            // If distributing invoices, also automatically include any attached additional documents
-            if ($request->document_type === 'invoice') {
-                $this->attachInvoiceAdditionalDocuments($distribution, $request->document_ids);
+                $linkedDocumentIds = array_filter(explode(',', $request->linked_document_ids));
+                if (! empty($linkedDocumentIds)) {
+                    $this->attachDocuments($distribution, 'additional_document', $linkedDocumentIds);
+                }
             }
 
             // Log creation
@@ -201,7 +199,7 @@ class DistributionController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Distribution created successfully',
-                    'distribution' => $distribution->load(['type', 'originDepartment', 'destinationDepartment'])
+                    'distribution' => $distribution->load(['type', 'originDepartment', 'destinationDepartment']),
                 ]);
             }
 
@@ -213,11 +211,11 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to create distribution: ' . $e->getMessage()
+                    'message' => 'Failed to create distribution: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to create distribution: ' . $e->getMessage())->withInput();
+            return back()->with('error', 'Failed to create distribution: '.$e->getMessage())->withInput();
         }
     }
 
@@ -232,17 +230,28 @@ class DistributionController extends Controller
             if (empty($invoiceIds)) {
                 return response()->json([
                     'success' => true,
-                    'linked_documents' => []
+                    'linked_documents' => [],
                 ]);
             }
 
-            // Get PO numbers from selected invoices
-            $poNumbers = Invoice::whereIn('id', $invoiceIds)->pluck('po_no')->filter();
+            $locationCode = auth()->user()->department?->location_code;
 
-            // Find additional documents linked to the selected invoices via PO number
-            $linkedDocuments = AdditionalDocument::whereIn('po_no', $poNumbers)
-                ->where('cur_loc', auth()->user()->department->location_code)
-                ->with('type')
+            if (! $locationCode) {
+                return response()->json([
+                    'success' => true,
+                    'linked_documents' => [],
+                ]);
+            }
+
+            // Only include additional documents explicitly linked to the selected invoices
+            $linkedDocuments = AdditionalDocument::query()
+                ->whereHas('invoices', function ($query) use ($invoiceIds) {
+                    $query->whereIn('invoices.id', $invoiceIds);
+                })
+                ->where('cur_loc', $locationCode)
+                ->availableForDistribution()
+                ->with(['type', 'invoices:id,invoice_number'])
+                ->orderBy('document_number')
                 ->get()
                 ->map(function ($doc) {
                     return [
@@ -250,20 +259,21 @@ class DistributionController extends Controller
                         'document_number' => $doc->document_number,
                         'type' => $doc->type->type_name ?? 'N/A',
                         'po_no' => $doc->po_no,
-                        'status' => $doc->status
+                        'status' => $doc->status,
+                        'invoice_numbers' => $doc->invoices->pluck('invoice_number')->implode(', '),
                     ];
                 });
 
             return response()->json([
                 'success' => true,
-                'linked_documents' => $linkedDocuments
+                'linked_documents' => $linkedDocuments,
             ]);
         } catch (\Exception $e) {
-            Log::error('Error checking linked documents: ' . $e->getMessage());
+            Log::error('Error checking linked documents: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error checking linked documents'
+                'message' => 'Error checking linked documents',
             ], 500);
         }
     }
@@ -281,7 +291,7 @@ class DistributionController extends Controller
             'senderVerifier',
             'receiverVerifier',
             'documents.document.type',
-            'histories.user'
+            'histories.user',
         ]);
 
         // Load supplier relationship only for Invoice documents
@@ -312,7 +322,7 @@ class DistributionController extends Controller
             'senderVerifier',
             'receiverVerifier',
             'documents.document',
-            'histories.user'
+            'histories.user',
         ]);
 
         // Load relationships based on document type
@@ -350,7 +360,7 @@ class DistributionController extends Controller
             'total_distributions' => Distribution::count(),
             'current_year_total' => Distribution::where('year', Carbon::now()->year)->count(),
             'departments_with_distributions' => Distribution::distinct('origin_department_id')->count(),
-            'highest_sequence' => Distribution::max('sequence') ?? 0
+            'highest_sequence' => Distribution::max('sequence') ?? 0,
         ];
 
         // Get yearly statistics
@@ -367,7 +377,7 @@ class DistributionController extends Controller
             $yearlyStats[$year] = [
                 'total' => $yearData->total ?? 0,
                 'departments' => $yearData->departments ?? 0,
-                'highest_sequence' => $yearData->highest_sequence ?? 0
+                'highest_sequence' => $yearData->highest_sequence ?? 0,
             ];
         }
 
@@ -385,7 +395,7 @@ class DistributionController extends Controller
                 'name' => $dept->name,
                 'location_code' => $dept->location_code,
                 'total' => $deptData->total ?? 0,
-                'current_year' => $deptData->current_year ?? 0
+                'current_year' => $deptData->current_year ?? 0,
             ];
         }
 
@@ -407,7 +417,7 @@ class DistributionController extends Controller
                     'location_code' => $dept->location_code,
                     'current_sequence' => $analysis->current_sequence ?? 0,
                     'next_sequence' => ($analysis->current_sequence ?? 0) + 1,
-                    'last_used' => $analysis->last_used ? Carbon::parse($analysis->last_used) : null
+                    'last_used' => $analysis->last_used ? Carbon::parse($analysis->last_used) : null,
                 ];
             }
         }
@@ -431,10 +441,22 @@ class DistributionController extends Controller
             return back()->with('error', 'Only draft distributions can be edited');
         }
 
+        $distribution->load([
+            'originDepartment',
+            'documents.document.type',
+        ]);
+
+        foreach ($distribution->documents as $distributionDocument) {
+            if ($distributionDocument->document_type === Invoice::class && $distributionDocument->document) {
+                $distributionDocument->document->load(['supplier', 'additionalDocuments.type']);
+            }
+        }
+
         $distributionTypes = DistributionType::active()->get();
         $departments = Department::orderBy('name')->get();
+        $documentsForEdit = $this->formatDistributionDocumentsForEdit($distribution);
 
-        return view('distributions.edit', compact('distribution', 'distributionTypes', 'departments'));
+        return view('distributions.edit', compact('distribution', 'distributionTypes', 'departments', 'documentsForEdit'));
     }
 
     /**
@@ -447,22 +469,24 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Only draft distributions can be updated'
+                    'message' => 'Only draft distributions can be updated',
                 ], 422);
             }
+
             return back()->with('error', 'Only draft distributions can be updated');
         }
 
         $validator = Validator::make($request->all(), [
             'type_id' => 'required|exists:distribution_types,id',
             'destination_department_id' => 'required|exists:departments,id',
-            'notes' => 'nullable|string|max:1000'
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
             if ($request->ajax()) {
                 return response()->json(['errors' => $validator->errors()], 422);
             }
+
             return back()->withErrors($validator)->withInput();
         }
 
@@ -474,7 +498,7 @@ class DistributionController extends Controller
             $distribution->update([
                 'type_id' => $request->type_id,
                 'destination_department_id' => $request->destination_department_id,
-                'notes' => $request->notes
+                'notes' => $request->notes,
             ]);
 
             // Log update
@@ -492,7 +516,7 @@ class DistributionController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Distribution updated successfully',
-                    'distribution' => $distribution->load(['type', 'originDepartment', 'destinationDepartment'])
+                    'distribution' => $distribution->load(['type', 'originDepartment', 'destinationDepartment']),
                 ]);
             }
 
@@ -504,11 +528,11 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to update distribution: ' . $e->getMessage()
+                    'message' => 'Failed to update distribution: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to update distribution: ' . $e->getMessage())->withInput();
+            return back()->with('error', 'Failed to update distribution: '.$e->getMessage())->withInput();
         }
     }
 
@@ -520,15 +544,16 @@ class DistributionController extends Controller
         $user = Auth::user();
 
         // Check if user has permission to delete this distribution
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        if (! array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             // Regular users can only delete draft distributions they created
             if ($distribution->status !== 'draft' || $distribution->created_by !== $user->id) {
                 if (request()->ajax()) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'You do not have permission to delete this distribution'
+                        'message' => 'You do not have permission to delete this distribution',
                     ], 403);
                 }
+
                 return back()->with('error', 'You do not have permission to delete this distribution');
             }
         } else {
@@ -538,9 +563,10 @@ class DistributionController extends Controller
                 if (request()->ajax()) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Only draft distributions can be deleted'
+                        'message' => 'Only draft distributions can be deleted',
                     ], 422);
                 }
+
                 return back()->with('error', 'Only draft distributions can be deleted');
             }
         }
@@ -564,7 +590,7 @@ class DistributionController extends Controller
             if (request()->ajax()) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'Distribution deleted successfully'
+                    'message' => 'Distribution deleted successfully',
                 ]);
             }
 
@@ -576,11 +602,11 @@ class DistributionController extends Controller
             if (request()->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to delete distribution: ' . $e->getMessage()
+                    'message' => 'Failed to delete distribution: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to delete distribution: ' . $e->getMessage());
+            return back()->with('error', 'Failed to delete distribution: '.$e->getMessage());
         }
     }
 
@@ -591,13 +617,14 @@ class DistributionController extends Controller
      */
     public function verifyBySender(Request $request, Distribution $distribution): JsonResponse|RedirectResponse
     {
-        if (!$distribution->canVerifyBySender()) {
+        if (! $distribution->canVerifyBySender()) {
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Distribution cannot be verified by sender at this stage'
+                    'message' => 'Distribution cannot be verified by sender at this stage',
                 ], 422);
             }
+
             return back()->with('error', 'Distribution cannot be verified by sender at this stage');
         }
 
@@ -606,13 +633,14 @@ class DistributionController extends Controller
             'document_verifications' => 'required|array',
             'document_verifications.*.document_id' => 'required|integer',
             'document_verifications.*.status' => 'required|in:verified,missing,damaged',
-            'document_verifications.*.notes' => 'nullable|string|max:500'
+            'document_verifications.*.notes' => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
             if ($request->ajax()) {
                 return response()->json(['errors' => $validator->errors()], 422);
             }
+
             return back()->withErrors($validator)->withInput();
         }
 
@@ -631,7 +659,7 @@ class DistributionController extends Controller
                     ->where('document_id', $verification['document_id'])
                     ->first();
 
-                if ($distributionDocument && !$distributionDocument->skip_verification) {
+                if ($distributionDocument && ! $distributionDocument->skip_verification) {
                     $distributionDocument->markAsSenderVerified(
                         $verification['status'],
                         $verification['notes'] ?? null
@@ -665,7 +693,7 @@ class DistributionController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Distribution verified by sender successfully',
-                    'distribution' => $distribution->fresh()
+                    'distribution' => $distribution->fresh(),
                 ]);
             }
 
@@ -677,11 +705,11 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to verify distribution: ' . $e->getMessage()
+                    'message' => 'Failed to verify distribution: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to verify distribution: ' . $e->getMessage())->withInput();
+            return back()->with('error', 'Failed to verify distribution: '.$e->getMessage())->withInput();
         }
     }
 
@@ -690,13 +718,14 @@ class DistributionController extends Controller
      */
     public function send(Request $request, Distribution $distribution): JsonResponse|RedirectResponse
     {
-        if (!$distribution->canSend()) {
+        if (! $distribution->canSend()) {
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Distribution cannot be sent at this stage'
+                    'message' => 'Distribution cannot be sent at this stage',
                 ], 422);
             }
+
             return back()->with('error', 'Distribution cannot be sent at this stage');
         }
 
@@ -726,7 +755,7 @@ class DistributionController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Distribution sent successfully',
-                    'distribution' => $distribution->fresh()
+                    'distribution' => $distribution->fresh(),
                 ]);
             }
 
@@ -738,11 +767,11 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to send distribution: ' . $e->getMessage()
+                    'message' => 'Failed to send distribution: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to send distribution: ' . $e->getMessage());
+            return back()->with('error', 'Failed to send distribution: '.$e->getMessage());
         }
     }
 
@@ -754,26 +783,28 @@ class DistributionController extends Controller
         $user = Auth::user();
 
         // Check if user has permission to receive this distribution
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        if (! array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             // Regular users can only receive distributions if they are in the destination department
-            if (!$user->department || $user->department->id !== $distribution->destination_department_id) {
+            if (! $user->department || $user->department->id !== $distribution->destination_department_id) {
                 if ($request->ajax()) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'You can only receive distributions sent to your department'
+                        'message' => 'You can only receive distributions sent to your department',
                     ], 403);
                 }
+
                 return back()->with('error', 'You can only receive distributions sent to your department');
             }
         }
 
-        if (!$distribution->canReceive()) {
+        if (! $distribution->canReceive()) {
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Distribution cannot be received at this stage'
+                    'message' => 'Distribution cannot be received at this stage',
                 ], 422);
             }
+
             return back()->with('error', 'Distribution cannot be received at this stage');
         }
 
@@ -806,7 +837,7 @@ class DistributionController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Distribution received successfully',
-                    'distribution' => $distribution->fresh()
+                    'distribution' => $distribution->fresh(),
                 ]);
             }
 
@@ -818,11 +849,11 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to receive distribution: ' . $e->getMessage()
+                    'message' => 'Failed to receive distribution: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to receive distribution: ' . $e->getMessage());
+            return back()->with('error', 'Failed to receive distribution: '.$e->getMessage());
         }
     }
 
@@ -831,13 +862,14 @@ class DistributionController extends Controller
      */
     public function verifyByReceiver(Request $request, Distribution $distribution): JsonResponse|RedirectResponse
     {
-        if (!$distribution->canVerifyByReceiver()) {
+        if (! $distribution->canVerifyByReceiver()) {
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Distribution cannot be verified by receiver at this stage'
+                    'message' => 'Distribution cannot be verified by receiver at this stage',
                 ], 422);
             }
+
             return back()->with('error', 'Distribution cannot be verified by receiver at this stage');
         }
 
@@ -847,13 +879,14 @@ class DistributionController extends Controller
             'document_verifications.*.document_id' => 'required|integer',
             'document_verifications.*.status' => 'required|in:verified,missing,damaged',
             'document_verifications.*.notes' => 'nullable|string|max:500',
-            'has_discrepancies' => 'required|boolean'
+            'has_discrepancies' => 'required|boolean',
         ]);
 
         if ($validator->fails()) {
             if ($request->ajax()) {
                 return response()->json(['errors' => $validator->errors()], 422);
             }
+
             return back()->withErrors($validator)->withInput();
         }
 
@@ -873,7 +906,7 @@ class DistributionController extends Controller
                     ->where('document_id', $verification['document_id'])
                     ->first();
 
-                if ($distributionDocument && !$distributionDocument->skip_verification) {
+                if ($distributionDocument && ! $distributionDocument->skip_verification) {
                     $distributionDocument->markAsReceiverVerified(
                         $verification['status'],
                         $verification['notes'] ?? null
@@ -922,7 +955,7 @@ class DistributionController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Distribution verified by receiver successfully',
-                    'distribution' => $distribution->fresh()
+                    'distribution' => $distribution->fresh(),
                 ]);
             }
 
@@ -934,11 +967,11 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to verify distribution: ' . $e->getMessage()
+                    'message' => 'Failed to verify distribution: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to verify distribution: ' . $e->getMessage())->withInput();
+            return back()->with('error', 'Failed to verify distribution: '.$e->getMessage())->withInput();
         }
     }
 
@@ -947,13 +980,14 @@ class DistributionController extends Controller
      */
     public function complete(Request $request, Distribution $distribution): JsonResponse|RedirectResponse
     {
-        if (!$distribution->canComplete()) {
+        if (! $distribution->canComplete()) {
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Distribution cannot be completed at this stage'
+                    'message' => 'Distribution cannot be completed at this stage',
                 ], 422);
             }
+
             return back()->with('error', 'Distribution cannot be completed at this stage');
         }
 
@@ -986,7 +1020,7 @@ class DistributionController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Distribution completed successfully',
-                    'distribution' => $distribution->fresh()
+                    'distribution' => $distribution->fresh(),
                 ]);
             }
 
@@ -998,11 +1032,11 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to complete distribution: ' . $e->getMessage()
+                    'message' => 'Failed to complete distribution: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to complete distribution: ' . $e->getMessage());
+            return back()->with('error', 'Failed to complete distribution: '.$e->getMessage());
         }
     }
 
@@ -1015,6 +1049,7 @@ class DistributionController extends Controller
     {
         $yearSuffix = substr($year, -2);
         $formattedSequence = str_pad($sequence, 4, '0', STR_PAD_LEFT);
+
         return "{$yearSuffix}/{$locationCode}/DDS/{$formattedSequence}";
     }
 
@@ -1023,7 +1058,7 @@ class DistributionController extends Controller
      */
     private function isDistributionNumberUnique(string $distributionNumber): bool
     {
-        return !Distribution::where('distribution_number', $distributionNumber)->exists();
+        return ! Distribution::where('distribution_number', $distributionNumber)->exists();
     }
 
     /**
@@ -1054,6 +1089,96 @@ class DistributionController extends Controller
     /**
      * Attach documents to distribution
      */
+    private function formatDistributionDocumentsForEdit(Distribution $distribution): array
+    {
+        $distribution->load([
+            'documents.document.type',
+        ]);
+
+        foreach ($distribution->documents as $distributionDocument) {
+            if ($distributionDocument->document_type === Invoice::class && $distributionDocument->document) {
+                $distributionDocument->document->load(['supplier', 'additionalDocuments.type']);
+            }
+        }
+
+        if ($distribution->document_type === 'invoice') {
+            $invoiceDocuments = $distribution->documents->where('document_type', Invoice::class);
+            $additionalDocumentDocuments = $distribution->documents->where('document_type', AdditionalDocument::class);
+            $attachedDistributionDocumentIds = collect();
+
+            $invoices = $invoiceDocuments->map(function (DistributionDocument $invoiceDoc) use (
+                $additionalDocumentDocuments,
+                &$attachedDistributionDocumentIds
+            ) {
+                $invoice = $invoiceDoc->document;
+                $additionalDocuments = collect();
+
+                if ($invoice && $invoice->additionalDocuments) {
+                    foreach ($invoice->additionalDocuments as $additionalDocument) {
+                        $distDoc = $additionalDocumentDocuments->first(
+                            fn (DistributionDocument $doc) => $doc->document_id === $additionalDocument->id
+                        );
+
+                        if ($distDoc) {
+                            $attachedDistributionDocumentIds->push($distDoc->id);
+                            $additionalDocuments->push([
+                                'id' => $distDoc->id,
+                                'document_id' => $additionalDocument->id,
+                                'number' => $additionalDocument->document_number ?? 'N/A',
+                                'details' => 'Type: '.($additionalDocument->type->type_name ?? 'N/A').', Project: '.($additionalDocument->project ?? 'N/A'),
+                            ]);
+                        }
+                    }
+                }
+
+                return [
+                    'id' => $invoiceDoc->id,
+                    'type' => 'invoice',
+                    'document_id' => $invoiceDoc->document_id,
+                    'number' => $invoice->invoice_number ?? 'N/A',
+                    'details' => 'Supplier: '.($invoice->supplier->name ?? 'N/A').', PO: '.($invoice->po_no ?? 'N/A'),
+                    'additional_documents' => $additionalDocuments->values()->all(),
+                ];
+            })->values()->all();
+
+            $standaloneAdditionalDocuments = $additionalDocumentDocuments
+                ->reject(fn (DistributionDocument $doc) => $attachedDistributionDocumentIds->contains($doc->id))
+                ->map(fn (DistributionDocument $distributionDocument) => $this->formatAdditionalDocumentForEdit($distributionDocument))
+                ->values()
+                ->all();
+
+            return [
+                'invoices' => $invoices,
+                'standalone_additional_documents' => $standaloneAdditionalDocuments,
+            ];
+        }
+
+        return [
+            'invoices' => [],
+            'standalone_additional_documents' => $distribution->documents
+                ->where('document_type', AdditionalDocument::class)
+                ->map(fn (DistributionDocument $distributionDocument) => $this->formatAdditionalDocumentForEdit($distributionDocument))
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return array{id: int, type: string, document_id: int, number: string, details: string}
+     */
+    private function formatAdditionalDocumentForEdit(DistributionDocument $distributionDocument): array
+    {
+        $document = $distributionDocument->document;
+
+        return [
+            'id' => $distributionDocument->id,
+            'type' => 'standalone_additional_document',
+            'document_id' => $distributionDocument->document_id,
+            'number' => $document->document_number ?? 'N/A',
+            'details' => 'Type: '.($document->type->type_name ?? 'N/A').', Project: '.($document->project ?? 'N/A'),
+        ];
+    }
+
     private function attachDocuments(Distribution $distribution, string $documentType, array $documentIds): void
     {
         $originLocationCode = $distribution->originDepartment->location_code;
@@ -1062,7 +1187,7 @@ class DistributionController extends Controller
             $isInvoice = $documentType === 'invoice';
             $documentModel = $isInvoice ? Invoice::find($documentId) : AdditionalDocument::find($documentId);
             $originCurLoc = $documentModel?->cur_loc;
-            $skipVerification = !$isInvoice && $originCurLoc !== $originLocationCode;
+            $skipVerification = ! $isInvoice && $originCurLoc !== $originLocationCode;
 
             DistributionDocument::create([
                 'distribution_id' => $distribution->id,
@@ -1092,7 +1217,7 @@ class DistributionController extends Controller
                         ->where('document_id', $additionalDocument->id)
                         ->first();
 
-                    if (!$existingAttachment) {
+                    if (! $existingAttachment) {
                         DistributionDocument::create([
                             'distribution_id' => $distribution->id,
                             'document_type' => AdditionalDocument::class,
@@ -1112,11 +1237,11 @@ class DistributionController extends Controller
      * 1. Distribution is sent (status = 'in_transit') - Update ALL documents
      * 2. Distribution is received (status = 'distributed') - Only update verified documents
      * 3. Distribution is completed (status = 'distributed') - Only update verified documents
-     * 
+     *
      * Note: When distributing invoices, this also updates the status of any
      * additional documents that are attached to those invoices.
-     * 
-     * CRITICAL: 
+     *
+     * CRITICAL:
      * - When SENT: ALL documents become 'in_transit' (preventing selection in new distributions)
      * - When RECEIVED: Only 'verified' documents become 'distributed'
      * - Missing/damaged documents keep their original status to maintain data integrity
@@ -1167,13 +1292,13 @@ class DistributionController extends Controller
             } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
                 if ($status === 'in_transit') {
                     // ✅ When SENT: Update ALL documents to 'in_transit' (except skipped)
-                    if (!$distributionDocument->skip_verification) {
+                    if (! $distributionDocument->skip_verification) {
                         AdditionalDocument::where('id', $distributionDocument->document_id)
                             ->update(['distribution_status' => $status]);
                     }
                 } elseif ($status === 'distributed') {
                     // ✅ When RECEIVED: Only update verified documents
-                    if ($distributionDocument->receiver_verification_status === 'verified' && !$distributionDocument->skip_verification) {
+                    if ($distributionDocument->receiver_verification_status === 'verified' && ! $distributionDocument->skip_verification) {
                         AdditionalDocument::where('id', $distributionDocument->document_id)
                             ->update(['distribution_status' => $status]);
                     }
@@ -1238,10 +1363,10 @@ class DistributionController extends Controller
      * Called when:
      * 1. Distribution is received (initial location update)
      * 2. Distribution is completed (final location confirmation)
-     * 
+     *
      * Note: When moving invoices, this also moves any additional documents
      * that are attached to those invoices.
-     * 
+     *
      * CRITICAL: Only documents verified as 'verified' by receiver get location updates.
      * Missing or damaged documents keep their original location to maintain data integrity.
      */
@@ -1271,7 +1396,7 @@ class DistributionController extends Controller
                         }
                     }
                 } elseif ($distributionDocument->document_type === AdditionalDocument::class) {
-                    if (!$distributionDocument->skip_verification) {
+                    if (! $distributionDocument->skip_verification) {
                         AdditionalDocument::where('id', $distributionDocument->document_id)
                             ->update(['cur_loc' => $destinationLocationCode]);
                     }
@@ -1294,7 +1419,7 @@ class DistributionController extends Controller
 
         return response()->json([
             'success' => true,
-            'histories' => $histories
+            'histories' => $histories,
         ]);
     }
 
@@ -1309,7 +1434,7 @@ class DistributionController extends Controller
 
         return response()->json([
             'success' => true,
-            'discrepancies' => $discrepancies
+            'discrepancies' => $discrepancies,
         ]);
     }
 
@@ -1320,7 +1445,7 @@ class DistributionController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user->department) {
+        if (! $user->department) {
             return back()->with('error', 'User must have a department assigned to view department history');
         }
 
@@ -1338,7 +1463,7 @@ class DistributionController extends Controller
             'pending_sent' => Distribution::where('origin_department_id', $user->department_id)
                 ->whereIn('status', ['draft', 'verified_by_sender'])->count(),
             'pending_received' => Distribution::where('destination_department_id', $user->department_id)
-                ->where('status', 'sent')->count()
+                ->where('status', 'sent')->count(),
         ];
 
         // Calculate average days documents stay in department before distribution
@@ -1397,7 +1522,7 @@ class DistributionController extends Controller
                 'received' => Distribution::where('destination_department_id', $user->department_id)
                     ->whereYear('created_at', $date->year)
                     ->whereMonth('created_at', $date->month)
-                    ->count()
+                    ->count(),
             ];
         }
 
@@ -1410,7 +1535,7 @@ class DistributionController extends Controller
     public function documentDistributionHistory(string $documentType, int $documentId): View
     {
         // Validate document type
-        if (!in_array($documentType, ['invoice', 'additional-document'])) {
+        if (! in_array($documentType, ['invoice', 'additional-document'])) {
             abort(404);
         }
 
@@ -1434,7 +1559,7 @@ class DistributionController extends Controller
             'total_distributions' => $distributions->count(),
             'total_departments_visited' => $distributions->pluck('destination_department_id')->unique()->count(),
             'current_location' => $document->cur_loc ?? 'N/A',
-            'current_status' => $document->distribution_status ?? 'available'
+            'current_status' => $document->distribution_status ?? 'available',
         ];
 
         // Calculate time spent in each department
@@ -1443,13 +1568,13 @@ class DistributionController extends Controller
             $deptName = $distribution->destinationDepartment->name;
             $deptId = $distribution->destinationDepartment->id;
 
-            if (!isset($departmentTimeStats[$deptId])) {
+            if (! isset($departmentTimeStats[$deptId])) {
                 $departmentTimeStats[$deptId] = [
                     'name' => $deptName,
                     'total_time' => 0,
                     'visits' => 0,
                     'first_visit' => null,
-                    'last_visit' => null
+                    'last_visit' => null,
                 ];
             }
 
@@ -1462,10 +1587,10 @@ class DistributionController extends Controller
             }
 
             // Track first and last visit
-            if (!$departmentTimeStats[$deptId]['first_visit'] || $distribution->created_at < $departmentTimeStats[$deptId]['first_visit']) {
+            if (! $departmentTimeStats[$deptId]['first_visit'] || $distribution->created_at < $departmentTimeStats[$deptId]['first_visit']) {
                 $departmentTimeStats[$deptId]['first_visit'] = $distribution->created_at;
             }
-            if (!$departmentTimeStats[$deptId]['last_visit'] || $distribution->created_at > $departmentTimeStats[$deptId]['last_visit']) {
+            if (! $departmentTimeStats[$deptId]['last_visit'] || $distribution->created_at > $departmentTimeStats[$deptId]['last_visit']) {
                 $departmentTimeStats[$deptId]['last_visit'] = $distribution->created_at;
             }
         }
@@ -1497,7 +1622,7 @@ class DistributionController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'year' => 'required|integer|min:2020|max:2030',
-            'department_id' => 'required|exists:departments,id'
+            'department_id' => 'required|exists:departments,id',
         ]);
 
         if ($validator->fails()) {
@@ -1513,7 +1638,7 @@ class DistributionController extends Controller
                 $request->year,
                 Department::find($request->department_id)->location_code,
                 $nextSequence
-            )
+            ),
         ]);
     }
 
@@ -1524,7 +1649,7 @@ class DistributionController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'year' => 'nullable|integer|min:2020|max:2030',
-            'department_id' => 'nullable|exists:departments,id'
+            'department_id' => 'nullable|exists:departments,id',
         ]);
 
         if ($validator->fails()) {
@@ -1547,12 +1672,12 @@ class DistributionController extends Controller
             'total_distributions' => $query->count(),
             'sequence_range' => [
                 'min' => $query->min('sequence'),
-                'max' => $query->max('sequence')
+                'max' => $query->max('sequence'),
             ],
-            'by_department' => []
+            'by_department' => [],
         ];
 
-        if (!$departmentId) {
+        if (! $departmentId) {
             // Get stats by department
             $departments = Department::all();
             foreach ($departments as $dept) {
@@ -1573,16 +1698,16 @@ class DistributionController extends Controller
                     'total' => $deptStats->total ?? 0,
                     'sequence_range' => [
                         'min' => $deptStats->min_sequence ?? 0,
-                        'max' => $deptStats->max_sequence ?? 0
+                        'max' => $deptStats->max_sequence ?? 0,
                     ],
-                    'next_sequence' => $deptStats->next_sequence ?? 1
+                    'next_sequence' => $deptStats->next_sequence ?? 1,
                 ];
             }
         }
 
         return response()->json([
             'success' => true,
-            'stats' => $stats
+            'stats' => $stats,
         ]);
     }
 
@@ -1596,11 +1721,12 @@ class DistributionController extends Controller
         $user = Auth::user();
 
         // Role check: only superadmin/admin
-        if (!array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
+        if (! array_intersect($user->roles->pluck('name')->toArray(), ['superadmin', 'admin'])) {
             $message = 'You do not have permission to cancel this distribution';
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => $message], 403);
             }
+
             return back()->with('error', $message);
         }
 
@@ -1610,6 +1736,7 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
+
             return back()->with('error', $message);
         }
 
@@ -1644,7 +1771,7 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'Distribution cancelled successfully'
+                    'message' => 'Distribution cancelled successfully',
                 ]);
             }
 
@@ -1654,10 +1781,188 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to cancel distribution: ' . $e->getMessage()
+                    'message' => 'Failed to cancel distribution: '.$e->getMessage(),
                 ], 500);
             }
-            return back()->with('error', 'Failed to cancel distribution: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to cancel distribution: '.$e->getMessage());
+        }
+    }
+
+    public function availableDocuments(Distribution $distribution): JsonResponse
+    {
+        if ($distribution->status !== 'draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Documents can only be modified for draft distributions.',
+            ], 422);
+        }
+
+        $distribution->loadMissing('originDepartment');
+        $locationCode = $distribution->originDepartment->location_code;
+
+        if ($distribution->document_type === 'invoice') {
+            $attachedIds = $distribution->documents()
+                ->where('document_type', Invoice::class)
+                ->pluck('document_id');
+
+            $documents = Invoice::where('cur_loc', $locationCode)
+                ->availableForDistribution()
+                ->whereNotIn('id', $attachedIds)
+                ->with('supplier')
+                ->orderBy('invoice_number')
+                ->get()
+                ->map(fn (Invoice $invoice) => [
+                    'id' => $invoice->id,
+                    'number' => $invoice->invoice_number ?? 'N/A',
+                    'details' => 'Supplier: '.($invoice->supplier->name ?? 'N/A').', PO: '.($invoice->po_no ?? 'N/A'),
+                ]);
+        } else {
+            $attachedIds = $distribution->documents()
+                ->where('document_type', AdditionalDocument::class)
+                ->pluck('document_id');
+
+            $documents = AdditionalDocument::where('cur_loc', $locationCode)
+                ->availableForDistribution()
+                ->whereNotIn('id', $attachedIds)
+                ->with('type')
+                ->orderBy('document_number')
+                ->get()
+                ->map(fn (AdditionalDocument $document) => [
+                    'id' => $document->id,
+                    'number' => $document->document_number ?? 'N/A',
+                    'details' => 'Type: '.($document->type->type_name ?? 'N/A').', Project: '.($document->project ?? 'N/A'),
+                ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'documents' => $documents,
+        ]);
+    }
+
+    public function attachDocumentsAjax(Request $request, Distribution $distribution): JsonResponse
+    {
+        if ($distribution->status !== 'draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Documents can only be modified for draft distributions.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'document_ids' => 'required|array|min:1',
+            'document_ids.*' => 'required|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $this->attachDocuments($distribution, $distribution->document_type, $request->document_ids);
+
+            DistributionHistory::logWorkflowTransition(
+                $distribution,
+                Auth::user(),
+                'draft',
+                'draft',
+                'Documents added'
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Documents added successfully.',
+                'documents' => $this->formatDistributionDocumentsForEdit($distribution),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add documents: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function detachDocument(Request $request, Distribution $distribution, DistributionDocument $distributionDocument): JsonResponse
+    {
+        if ($distribution->status !== 'draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Documents can only be modified for draft distributions.',
+            ], 422);
+        }
+
+        if ($distributionDocument->distribution_id !== $distribution->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Document does not belong to this distribution.',
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            if ($distributionDocument->document_type === Invoice::class) {
+                $invoice = Invoice::with('additionalDocuments')->find($distributionDocument->document_id);
+
+                $distributionDocument->delete();
+
+                if ($invoice) {
+                    $linkedAdditionalDocIds = $invoice->additionalDocuments->pluck('id');
+                    $remainingInvoiceIds = $distribution->documents()
+                        ->where('document_type', Invoice::class)
+                        ->pluck('document_id');
+
+                    $additionalDocIdsToKeep = collect();
+                    if ($remainingInvoiceIds->isNotEmpty()) {
+                        $additionalDocIdsToKeep = Invoice::whereIn('id', $remainingInvoiceIds)
+                            ->with('additionalDocuments')
+                            ->get()
+                            ->flatMap(fn (Invoice $remainingInvoice) => $remainingInvoice->additionalDocuments->pluck('id'))
+                            ->unique();
+                    }
+
+                    $additionalDocIdsToRemove = $linkedAdditionalDocIds->diff($additionalDocIdsToKeep);
+
+                    if ($additionalDocIdsToRemove->isNotEmpty()) {
+                        DistributionDocument::where('distribution_id', $distribution->id)
+                            ->where('document_type', AdditionalDocument::class)
+                            ->whereIn('document_id', $additionalDocIdsToRemove)
+                            ->delete();
+                    }
+                }
+            } else {
+                $distributionDocument->delete();
+            }
+
+            DistributionHistory::logWorkflowTransition(
+                $distribution,
+                Auth::user(),
+                'draft',
+                'draft',
+                'Document removed'
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Document removed successfully.',
+                'documents' => $this->formatDistributionDocumentsForEdit($distribution),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove document: '.$e->getMessage(),
+            ], 500);
         }
     }
 
@@ -1671,6 +1976,7 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
+
             return back()->with('error', $message);
         }
 
@@ -1683,7 +1989,7 @@ class DistributionController extends Controller
                 ->pluck('document_id')
                 ->all();
 
-            if (!empty($invoiceDocIds)) {
+            if (! empty($invoiceDocIds)) {
                 // Attach any currently linked additional documents for these invoices
                 $this->attachInvoiceAdditionalDocuments($distribution, $invoiceDocIds);
             }
@@ -1697,7 +2003,7 @@ class DistributionController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Linked documents synced successfully.',
-                    'distribution' => $distribution
+                    'distribution' => $distribution,
                 ]);
             }
 
@@ -1707,7 +2013,8 @@ class DistributionController extends Controller
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
             }
-            return back()->with('error', 'Failed to sync linked documents: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to sync linked documents: '.$e->getMessage());
         }
     }
 }

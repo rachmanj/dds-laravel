@@ -511,367 +511,7 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th width="20%">Document</th>
-                                    <th width="15%">Supplier</th>
-                                    <th width="12%">Invoice No</th>
-                                    <th width="13%">Type</th>
-                                    <th width="15%">Sender Status</th>
-                                    <th width="15%">Receiver Status</th>
-                                    <th width="10%">Overall Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @php
-                                    // Separate invoices and additional documents
-                                    $invoiceDocuments = $distribution->documents->filter(function ($doc) {
-                                        return $doc->document_type === 'App\Models\Invoice';
-                                    });
-
-                                    $additionalDocumentDocuments = $distribution->documents->filter(function ($doc) {
-                                        return $doc->document_type === 'App\Models\AdditionalDocument';
-                                    });
-
-                                    // Get additional documents that are attached to invoices
-                                    $attachedAdditionalDocs = collect();
-                                    foreach ($invoiceDocuments as $invoiceDoc) {
-                                        $invoice = $invoiceDoc->document;
-                                        if (
-                                            $invoice->additionalDocuments &&
-                                            $invoice->additionalDocuments->count() > 0
-                                        ) {
-                                            foreach ($invoice->additionalDocuments as $addDoc) {
-                                                // Find the distribution document for this additional document
-                                                $distDoc = $additionalDocumentDocuments->first(function ($doc) use (
-                                                    $addDoc,
-                                                ) {
-                                                    return $doc->document_id === $addDoc->id;
-                                                });
-                                                if ($distDoc) {
-                                                    $attachedAdditionalDocs->push([
-                                                        'invoice_id' => $invoice->id,
-                                                        'distribution_doc' => $distDoc,
-                                                        'additional_doc' => $addDoc,
-                                                    ]);
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Get standalone additional documents (not attached to any invoice)
-                                    $standaloneAdditionalDocs = $additionalDocumentDocuments->filter(function (
-                                        $doc,
-                                    ) use ($attachedAdditionalDocs) {
-                                        return !$attachedAdditionalDocs->contains('distribution_doc.id', $doc->id);
-                                    });
-                                @endphp
-
-                                @forelse ($invoiceDocuments as $doc)
-                                    @php $invoice = $doc->document; @endphp
-                                    <tr>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="document-icon mr-2">
-                                                    <i class="fas fa-file-invoice text-primary"></i>
-                                                </div>
-                                                <div>
-                                                    <strong>{{ $invoice->invoice_number ?? 'N/A' }}</strong>
-                                                    <br>
-                                                    <small
-                                                        class="text-muted">{{ $invoice->type->type_name ?? 'N/A' }}</small>
-                                                    <br>
-                                                    <small class="text-muted">
-                                                        <i class="fas fa-calendar"></i>
-                                                        {{ $invoice->invoice_date ? $invoice->invoice_date->format('d M Y') : 'N/A' }}
-                                                    </small>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <small class="text-muted">
-                                                {{ $invoice->supplier->name ?? 'N/A' }}
-                                            </small>
-                                        </td>
-                                        <td>
-                                            <small class="text-muted">
-                                                {{ $invoice->invoice_number ?? 'N/A' }}
-                                            </small>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-primary">Invoice</span>
-                                        </td>
-                                        <td>
-                                            @if ($doc->skip_verification)
-                                                <span class="badge badge-secondary">Not included in this
-                                                    distribution</span>
-                                            @else
-                                                @if ($doc->sender_verified)
-                                                    <span
-                                                        class="badge badge-{{ $doc->sender_verification_status === 'verified' ? 'success' : ($doc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                        {{ ucfirst($doc->sender_verification_status) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-secondary">Pending</span>
-                                                @endif
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if ($doc->skip_verification)
-                                                <span class="badge badge-secondary">Not included in this
-                                                    distribution</span>
-                                            @else
-                                                @if ($doc->receiver_verified)
-                                                    <span
-                                                        class="badge badge-{{ $doc->receiver_verification_status === 'verified' ? 'success' : ($doc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                        {{ ucfirst($doc->receiver_verification_status) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-secondary">Pending</span>
-                                                @endif
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if ($doc->skip_verification)
-                                                <span class="badge badge-secondary">Not included in this
-                                                    distribution</span>
-                                            @else
-                                                <span class="badge {{ $doc->verification_status_badge_class }}">
-                                                    {{ $doc->verification_status_display }}
-                                                </span>
-                                            @endif
-                                        </td>
-                                    </tr>
-
-                                    {{-- Show additional documents attached to this invoice --}}
-                                    @foreach ($attachedAdditionalDocs->where('invoice_id', $invoice->id) as $attachedDoc)
-                                        @php
-                                            $addDoc = $attachedDoc['additional_doc'];
-                                            $distDoc = $attachedDoc['distribution_doc'];
-                                        @endphp
-                                        <tr class="attached-document-row">
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="document-icon mr-2">
-                                                        <i class="fas fa-file-alt text-info"></i>
-                                                    </div>
-                                                    <div>
-                                                        <strong>{{ $addDoc->document_number ?? 'N/A' }}</strong>
-                                                        <br>
-                                                        <small
-                                                            class="text-muted">{{ $addDoc->type->type_name ?? 'N/A' }}</small>
-                                                        @if ($distDoc->skip_verification)
-                                                            <br>
-                                                            <span class="badge badge-secondary"
-                                                                title="Document was not in origin department at creation">Out
-                                                                of origin dept</span>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <small class="text-muted">-</small>
-                                            </td>
-                                            <td>
-                                                <small class="text-muted">
-                                                    {{ $invoice->invoice_number ?? 'N/A' }}
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <span class="badge badge-info">Additional Document</span>
-                                            </td>
-                                            <td>
-                                                @if ($distDoc->skip_verification)
-                                                    <span class="badge badge-secondary">Not included in this
-                                                        distribution</span>
-                                                @elseif ($distDoc->sender_verified)
-                                                    <span
-                                                        class="badge badge-{{ $distDoc->sender_verification_status === 'verified' ? 'success' : ($distDoc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                        {{ ucfirst($distDoc->sender_verification_status) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-secondary">Pending</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if ($distDoc->skip_verification)
-                                                    <span class="badge badge-secondary">Not included in this
-                                                        distribution</span>
-                                                @elseif ($distDoc->receiver_verified)
-                                                    <span
-                                                        class="badge badge-{{ $distDoc->receiver_verification_status === 'verified' ? 'success' : ($distDoc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                        {{ ucfirst($distDoc->receiver_verification_status) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-secondary">Pending</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if ($distDoc->skip_verification)
-                                                    <span class="badge badge-secondary">Not included in this
-                                                        distribution</span>
-                                                @else
-                                                    <span class="badge {{ $distDoc->verification_status_badge_class }}">
-                                                        {{ $distDoc->verification_status_display }}
-                                                    </span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @empty
-                                    {{-- If no invoices, show standalone additional documents --}}
-                                    @foreach ($standaloneAdditionalDocs as $doc)
-                                        @php $additionalDoc = $doc->document; @endphp
-                                        <tr>
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="document-icon mr-2">
-                                                        <i class="fas fa-file-alt text-info"></i>
-                                                    </div>
-                                                    <div>
-                                                        <strong>{{ $additionalDoc->document_number ?? 'N/A' }}</strong>
-                                                        <br>
-                                                        <small
-                                                            class="text-muted">{{ $additionalDoc && $additionalDoc->type ? $additionalDoc->type->type_name : 'N/A' }}</small>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <small class="text-muted">-</small>
-                                            </td>
-                                            <td>
-                                                <small class="text-muted">
-                                                    @if ($additionalDoc && $additionalDoc->invoices && $additionalDoc->invoices->count() > 0)
-                                                        {{ $additionalDoc->invoices->pluck('invoice_number')->implode(', ') }}
-                                                    @else
-                                                        -
-                                                    @endif
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <span class="badge badge-info">Additional Document</span>
-                                            </td>
-                                            <td>
-                                                @if ($doc->skip_verification)
-                                                    <span class="badge badge-warning"
-                                                        title="Document was not physically available in origin department at distribution creation">
-                                                        <i class="fas fa-exclamation-triangle"></i> Out of Location
-                                                    </span>
-                                                @elseif ($doc->sender_verified)
-                                                    <span
-                                                        class="badge badge-{{ $doc->sender_verification_status === 'verified' ? 'success' : ($doc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                        {{ ucfirst($doc->sender_verification_status) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-secondary">Pending</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if ($doc->skip_verification)
-                                                    <span class="badge badge-warning"
-                                                        title="Document was not physically available in origin department at distribution creation">
-                                                        <i class="fas fa-exclamation-triangle"></i> Out of Location
-                                                    </span>
-                                                @elseif ($doc->receiver_verified)
-                                                    <span
-                                                        class="badge badge-{{ $doc->receiver_verification_status === 'verified' ? 'success' : ($doc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                        {{ ucfirst($doc->receiver_verification_status) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-secondary">Pending</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if ($doc->skip_verification)
-                                                    <span class="badge badge-secondary">Not included in this
-                                                        distribution</span>
-                                                @else
-                                                    <span class="badge {{ $doc->verification_status_badge_class }}">
-                                                        {{ $doc->verification_status_display }}
-                                                    </span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @endforelse
-
-                                {{-- Show standalone additional documents after invoices --}}
-                                @if ($invoiceDocuments->count() > 0)
-                                    @foreach ($standaloneAdditionalDocs as $doc)
-                                        @php $additionalDoc = $doc->document; @endphp
-                                        <tr>
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="document-icon mr-2">
-                                                        <i class="fas fa-file-alt text-info"></i>
-                                                    </div>
-                                                    <div>
-                                                        <strong>{{ $additionalDoc->document_number ?? 'N/A' }}</strong>
-                                                        <br>
-                                                        <small
-                                                            class="text-muted">{{ $additionalDoc && $additionalDoc->type ? $additionalDoc->type->type_name : 'N/A' }}</small>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <small class="text-muted">-</small>
-                                            </td>
-                                            <td>
-                                                <small class="text-muted">
-                                                    @if ($additionalDoc && $additionalDoc->invoices && $additionalDoc->invoices->count() > 0)
-                                                        {{ $additionalDoc->invoices->pluck('invoice_number')->implode(', ') }}
-                                                    @else
-                                                        -
-                                                    @endif
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <span class="badge badge-info">Additional Document</span>
-                                            </td>
-                                            <td>
-                                                @if ($doc->sender_verified)
-                                                    <span
-                                                        class="badge badge-{{ $doc->sender_verification_status === 'verified' ? 'success' : ($doc->sender_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                        {{ ucfirst($doc->sender_verification_status) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-secondary">Pending</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if ($doc->receiver_verified)
-                                                    <span
-                                                        class="badge badge-{{ $doc->receiver_verification_status === 'verified' ? 'success' : ($doc->receiver_verification_status === 'missing' ? 'warning' : 'danger') }}">
-                                                        {{ ucfirst($doc->receiver_verification_status) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge badge-secondary">Pending</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <span class="badge {{ $doc->verification_status_badge_class }}">
-                                                    {{ $doc->verification_status_display }}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @endif
-
-                                @if ($distribution->documents->count() === 0)
-                                    <tr>
-                                        <td colspan="7" class="text-center py-4">
-                                            <div class="text-muted">
-                                                <i class="fas fa-file-alt fa-2x mb-2"></i>
-                                                <p>No documents found in this distribution</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endif
-                            </tbody>
-                        </table>
-                    </div>
+                    @include('distributions.partials.distributed-documents-section')
                 </div>
             </div>
 
@@ -1471,14 +1111,57 @@
             font-size: 0.9rem;
             padding: 8px 12px;
         }
+
+        .doc-toolbar .btn + .btn {
+            margin-left: 0.25rem;
+        }
+
+        .doc-group-row {
+            background-color: #fff;
+        }
+
+        .doc-group-row:hover {
+            background-color: #f8f9fa;
+        }
+
+        .doc-toggle {
+            width: 24px;
+            height: 24px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .doc-toggle-icon {
+            transition: transform 0.2s ease;
+        }
+
+        .doc-group-row[data-expanded="true"] .doc-toggle-icon {
+            transform: rotate(90deg);
+        }
+
+        .doc-toggle-spacer {
+            display: inline-block;
+            width: 24px;
+            flex-shrink: 0;
+        }
+
+        #docPagination .pagination {
+            margin-bottom: 0;
+            justify-content: flex-end;
+        }
+
+        #docPagination .page-link {
+            padding: 0.35rem 0.65rem;
+        }
     </style>
 @endsection
 
 @section('scripts')
     <!-- Distribution Show JavaScript -->
     <script src="{{ asset('js/distributions/show.js') }}?v={{ time() }}"></script>
+    <script src="{{ asset('js/distributions/documents-table.js') }}?v={{ time() }}"></script>
     <script src="{{ asset('js/distributions/bulk-operations.js') }}"></script>
-    <script src="{{ asset('js/distributions/analytics.js') }}"></script>
+    <script src="{{ asset('js/distributions/analytics.js') }}?v={{ time() }}"></script>
     <script src="{{ asset('js/distributions/accessibility.js') }}"></script>
 
     <script>
@@ -1493,5 +1176,25 @@
         window.distributionsIndexUrl = '{{ route('distributions.index') }}';
         window.syncLinkedDocumentsUrl = '{{ route('distributions.sync-linked-documents', $distribution) }}';
         window.currentUserId = '{{ auth()->id() }}';
+        @php
+            $analyticsIncludedDocs = $distribution->documents->where('skip_verification', false);
+            $analyticsSenderVerified = $analyticsIncludedDocs->where('sender_verified', true)->count();
+            $analyticsReceiverVerified = $analyticsIncludedDocs->where('receiver_verified', true)->count();
+            $analyticsSenderMissing = $analyticsIncludedDocs->where('sender_verification_status', 'missing')->count();
+            $analyticsSenderDamaged = $analyticsIncludedDocs->where('sender_verification_status', 'damaged')->count();
+            $analyticsReceiverMissing = $analyticsIncludedDocs->where('receiver_verification_status', 'missing')->count();
+            $analyticsReceiverDamaged = $analyticsIncludedDocs->where('receiver_verification_status', 'damaged')->count();
+        @endphp
+        window.distributionAnalyticsData = {
+            status: @json($distribution->status),
+            statusDisplay: @json($distribution->status_display),
+            includedDocuments: {{ $analyticsIncludedDocs->count() }},
+            senderVerified: {{ $analyticsSenderVerified }},
+            receiverVerified: {{ $analyticsReceiverVerified }},
+            senderMissing: {{ $analyticsSenderMissing }},
+            senderDamaged: {{ $analyticsSenderDamaged }},
+            receiverMissing: {{ $analyticsReceiverMissing }},
+            receiverDamaged: {{ $analyticsReceiverDamaged }},
+        };
     </script>
 @endsection

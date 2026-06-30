@@ -16,6 +16,42 @@
 
 ---
 
+## 2026-06-30 — Distribution linked documents: pivot-only detection and edit-page visibility
+
+-   **Context**: Distribution **1728** (`26/000HACC/DDS/0395`) included 13+ additional documents the user did not select (e.g. `71260700338`, `261003264`). Root cause: **`checkLinkedDocuments`** matched **every additional document with the same PO** as any selected invoice, all pre-selected in the confirmation dialog, while **`attachInvoiceAdditionalDocuments`** also silently attached pivot-linked docs on create. PO-only rows existed in **`distribution_documents`** and appeared on **show**, but **edit** only listed additional documents nested under invoices via **`additional_document_invoice`** — PO-only rows were invisible and could not be removed individually.
+
+-   **Decision**: Treat **invoice–additional document pivot** (`additional_document_invoice`) as the sole source for “linked” suggestions at distribution create. Include additional documents in a distribution **only when the user confirms them** (`linked_document_ids`). Stop silent auto-attach on create/add. Surface **all** attached additional documents on the edit page with per-row remove.
+
+-   **Alternatives considered**:
+
+    1. **Keep PO matching but default to none selected** — Rejected; PO still produces false positives (many ITO/BAST rows share a PO without being linked to the chosen invoice).
+    2. **Remove linked-documents UI entirely** — Rejected; users still need to bundle invoice-attached supporting documents with explicit review.
+    3. **Auto-delete PO-only rows on deploy** — Rejected for live app; existing draft distributions (e.g. 1728) are cleaned by users via edit remove.
+
+-   **Implementation**:
+
+    -   **`DistributionController@checkLinkedDocuments`**: `AdditionalDocument::whereHas('invoices', …)`, `availableForDistribution()`, department `cur_loc`; response includes `invoice_numbers`.
+    -   **`store` / `attachDocumentsAjax`**: removed **`attachInvoiceAdditionalDocuments`**; **`linked_document_ids`** only when non-empty after user confirmation.
+    -   **`create.blade.php`**: confirmation waits for linked-doc AJAX; copy updated to “review and manage” (not “automatically included”).
+    -   **`formatDistributionDocumentsForEdit`**: returns `invoices` + `standalone_additional_documents`; edit partial + JS render **Other Additional Documents**.
+    -   **`detachDocument`**: removed block preventing additional-document removal on invoice distributions.
+    -   **Edit UI**: minimalist remove control — `btn-outline-danger btn-sm px-2`, icon only, `title`/`aria-label`.
+    -   **Unchanged**: **`syncLinkedDocuments`** (draft show) still calls **`attachInvoiceAdditionalDocuments`**.
+
+-   **Implications**:
+
+    -   PO equality alone must **not** imply distribution inclusion (invoice create/edit PO search remains separate).
+    -   Draft distributions created before this change may still contain PO-only rows until users remove them on edit.
+    -   Status/location sync for additional documents continues to follow **`distribution_documents`** rows actually attached.
+
+-   **Review date**: 2026-09-30
+
+-   **Supersedes in part**: [2025-10-03 — Distribution Creation UX Improvements](#2025-10-03--distribution-creation-ux-improvements) (PO-based linked-document detection).
+
+-   **Tests**: `tests/Feature/DistributionCheckLinkedDocumentsTest.php`, `tests/Feature/DistributionEditDocumentsTest.php`
+
+---
+
 ## 2026-05-19 — Invoice create/edit: search additional documents by document number (modal)
 
 -   **Context**: On invoice **create** and **edit**, additional documents were discoverable only via **PO number** (`POST /invoices/search-additional-documents`, requires `po_no`, inline table). Users often know the **additional document number** (ITO, BAST, etc.) but not the PO, or the document has **no PO**. They need a quick way to find and link matching records without department/status filters.
@@ -1538,6 +1574,8 @@
 ---
 
 ## 2025-10-03 — Distribution Creation UX Improvements
+
+> **Amended 2026-06-30**: PO-number-based linked-document detection at distribution create was **replaced** by pivot-only detection (`additional_document_invoice`). See [2026-06-30 — Distribution linked documents](#2026-06-30--distribution-linked-documents-pivot-only-detection-and-edit-page-visibility).
 
 -   **Context**: Distribution creation page lacked user confirmation, linked documents management, and visual location indicators. Users had no way to review distribution details before submission, manage automatically linked additional documents, or see document location information. This led to potential errors and poor user experience during distribution creation.
 

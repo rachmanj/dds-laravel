@@ -9,6 +9,7 @@ class AccessibilityManager {
         this.fontSize = "medium";
         this.keyboardMode = false;
         this.announcements = [];
+        this.controlsVisible = true;
         this.init();
     }
 
@@ -28,6 +29,8 @@ class AccessibilityManager {
         // Load saved settings from localStorage
         this.isHighContrast = localStorage.getItem("highContrast") === "true";
         this.fontSize = localStorage.getItem("fontSize") || "medium";
+        this.controlsVisible =
+            localStorage.getItem("accessibilityControlsVisible") !== "false";
 
         // Apply saved settings
         if (this.isHighContrast) {
@@ -381,6 +384,11 @@ class AccessibilityManager {
                         left: auto !important;
                         bottom: 20px !important; /* Same level as analytics dashboard */
                     }
+                    .accessibility-controls-toggle {
+                        right: 20px !important;
+                        left: auto !important;
+                        bottom: 20px !important;
+                    }
                 }
                 @media (max-width: 767px) {
                     .accessibility-controls {
@@ -389,13 +397,90 @@ class AccessibilityManager {
                         width: auto !important;
                         bottom: 20px !important;
                     }
+                    .accessibility-controls-toggle {
+                        right: 20px !important;
+                        left: auto !important;
+                        bottom: 20px !important;
+                    }
+                }
+
+                .accessibility-controls-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 10px;
+                    padding-bottom: 8px;
+                    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+                }
+
+                .accessibility-controls-title {
+                    font-size: 12px;
+                    font-weight: 600;
+                    margin: 0;
+                }
+
+                .accessibility-controls-hide {
+                    padding: 0 6px;
+                    line-height: 1.2;
+                }
+
+                .accessibility-controls-toggle {
+                    position: fixed;
+                    z-index: 1000;
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 50%;
+                    border: 1px solid rgba(221, 221, 221, 0.8);
+                    background: rgba(255, 255, 255, 0.95);
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    backdrop-filter: blur(3px);
+                    color: #495057;
+                    cursor: pointer;
+                    display: none;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .accessibility-controls-toggle:hover {
+                    background: #f8f9fa;
+                    color: #007bff;
+                }
+
+                .accessibility-controls-toggle:focus {
+                    outline: 2px solid #007bff;
+                    outline-offset: 2px;
+                }
+
+                .accessibility-controls.is-hidden {
+                    display: none !important;
+                }
+
+                .accessibility-controls-toggle.is-visible {
+                    display: flex;
                 }
             </style>
         `;
 
         const controlsHtml = `
             ${responsiveStyles}
-            <div class="accessibility-controls" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; background: rgba(255,255,255,0.9); border: 1px solid rgba(221,221,221,0.5); border-radius: 8px; padding: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); backdrop-filter: blur(3px);">
+            <button type="button"
+                class="accessibility-controls-toggle"
+                id="showAccessibilityControls"
+                aria-label="Show accessibility controls"
+                title="Show accessibility controls">
+                <i class="fas fa-universal-access"></i>
+            </button>
+            <div class="accessibility-controls" id="accessibilityControlsPanel" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; background: rgba(255,255,255,0.9); border: 1px solid rgba(221,221,221,0.5); border-radius: 8px; padding: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); backdrop-filter: blur(3px);">
+                <div class="accessibility-controls-header">
+                    <span class="accessibility-controls-title">Accessibility</span>
+                    <button type="button"
+                        class="btn btn-sm btn-link text-muted p-0 accessibility-controls-hide"
+                        id="hideAccessibilityControls"
+                        aria-label="Hide accessibility controls"
+                        title="Hide">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
                 <div class="control-group" style="margin-bottom: 10px;">
                     <label for="fontSizeControl" style="display: block; margin-bottom: 5px; font-size: 12px;">Font Size:</label>
                     <select id="fontSizeControl" class="form-control form-control-sm" style="width: 120px;">
@@ -426,6 +511,7 @@ class AccessibilityManager {
         // Set initial values
         $("#fontSizeControl").val(this.fontSize);
         $("#highContrastToggle").prop("checked", this.isHighContrast);
+        this.applyControlsVisibility(this.controlsVisible);
 
         // Font size control
         $("#fontSizeControl").change((e) => {
@@ -441,6 +527,41 @@ class AccessibilityManager {
         $("#accessibilityHelp").click(() => {
             this.showAccessibilityHelp();
         });
+
+        $("#hideAccessibilityControls").click(() => {
+            this.setControlsVisibility(false);
+        });
+
+        $("#showAccessibilityControls").click(() => {
+            this.setControlsVisibility(true);
+        });
+    }
+
+    setControlsVisibility(visible) {
+        this.controlsVisible = visible;
+        localStorage.setItem(
+            "accessibilityControlsVisible",
+            visible ? "true" : "false"
+        );
+        this.applyControlsVisibility(visible);
+        this.announce(
+            visible
+                ? "Accessibility controls shown"
+                : "Accessibility controls hidden"
+        );
+    }
+
+    applyControlsVisibility(visible) {
+        const $panel = $("#accessibilityControlsPanel");
+        const $toggle = $("#showAccessibilityControls");
+
+        if (visible) {
+            $panel.removeClass("is-hidden");
+            $toggle.removeClass("is-visible");
+        } else {
+            $panel.addClass("is-hidden");
+            $toggle.addClass("is-visible");
+        }
     }
 
     setupHighContrastMode() {

@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DistributionController;
 use App\Http\Controllers\DistributionDashboardController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('distributions')->name('distributions.')->group(function () {
     Route::get('/dashboard', [DistributionDashboardController::class, 'index'])->name('dashboard');
@@ -39,6 +39,13 @@ Route::prefix('distributions')->name('distributions.')->group(function () {
     Route::post('/{distribution}/sync-linked-documents', [DistributionController::class, 'syncLinkedDocuments'])
         ->middleware('permission:edit-distributions')
         ->name('sync-linked-documents');
+
+    Route::get('/{distribution}/available-documents', [DistributionController::class, 'availableDocuments'])
+        ->name('available-documents');
+    Route::post('/{distribution}/documents', [DistributionController::class, 'attachDocumentsAjax'])
+        ->name('documents.attach');
+    Route::delete('/{distribution}/documents/{distributionDocument}', [DistributionController::class, 'detachDocument'])
+        ->name('documents.detach');
 
     // Additional routes
     Route::get('/{distribution}/history', [DistributionController::class, 'history'])->name('history');

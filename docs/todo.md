@@ -2,6 +2,27 @@
 
 ## ✅ **Recently Completed**
 
+### **Distribution linked documents — pivot-only detection, edit visibility, explicit inclusion** ✅ **COMPLETED**
+
+**Status**: Shipped — fixes PO-only false positives on create; edit page shows/removes all attached additional documents  
+**Implementation**: 2026-06-30  
+**Priority**: HIGH — data integrity for live distribution workflow (reported on distribution **1728**)
+
+**Summary**:
+
+1. **`checkLinkedDocuments`** — `whereHas('invoices', …)` on **`additional_document_invoice`** instead of PO matching; **`availableForDistribution()`** + department **`cur_loc`** filter.
+2. **Create** — no silent **`attachInvoiceAdditionalDocuments`** on store; user confirms **`linked_document_ids`** in confirmation modal; async gate before submit.
+3. **Edit** — **`formatDistributionDocumentsForEdit`**: `{ invoices, standalone_additional_documents }`; **Other Additional Documents** section; icon-only remove buttons; **`detachDocument`** allows removing additional docs from invoice distributions.
+4. **Sync (unchanged)** — draft show **Sync linked documents** still pulls pivot-linked docs via **`attachInvoiceAdditionalDocuments`**.
+
+**Key files**: `app/Http/Controllers/DistributionController.php`, `resources/views/distributions/create.blade.php`, `resources/views/distributions/edit.blade.php`, `resources/views/distributions/partials/edit-documents-table.blade.php`.
+
+**Docs**: [`docs/decisions.md`](decisions.md) (2026-06-30), [`docs/DISTRIBUTION-FEATURE.md`](DISTRIBUTION-FEATURE.md), [`docs/INVOICE-ADDITIONAL-DOCUMENTS-AUTO-INCLUSION.md`](INVOICE-ADDITIONAL-DOCUMENTS-AUTO-INCLUSION.md), [`docs/architecture.md`](architecture.md), [`MEMORY.md`](../MEMORY.md).
+
+**Tests**: `tests/Feature/DistributionCheckLinkedDocumentsTest.php`, `tests/Feature/DistributionEditDocumentsTest.php`.
+
+---
+
 ### **Invoice create/edit — link additional documents by document number** ✅ **COMPLETED**
 
 **Status**: Shipped — header search on Link Additional Documents card; modal results; shared selection with PO-based linking  

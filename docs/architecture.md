@@ -1007,9 +1007,9 @@ graph TB
 
 **Implementation**:
 
--   **Confirmation Dialog**: Bootstrap modal with dynamic content population before form submission
--   **Linked Documents Detection**: AJAX-based API for finding additional documents linked via PO number
--   **Management Interface**: Modal-based selection/deselection of linked documents
+-   **Confirmation Dialog**: Bootstrap modal with dynamic content population before form submission; submit disabled until linked-documents AJAX completes (invoice distributions)
+-   **Linked Documents Detection**: AJAX API returns additional documents **explicitly linked to selected invoices** via `additional_document_invoice` (not PO-only matches)
+-   **Management Interface**: Modal-based selection/deselection; user-confirmed set sent as `linked_document_ids` on create
 -   **Location Indicators**: Visual badges showing document department location
 -   **Form Submission**: AJAX-based submission with proper error handling and success feedback
 
@@ -1020,8 +1020,11 @@ graph TB
 DistributionController
 ├── create() → Distribution creation form
 ├── store(Request $request) → Process distribution creation
-├── checkLinkedDocuments(Request $request) → AJAX endpoint for linked documents
-└── validation → Required fields, document selection, etc.
+├── checkLinkedDocuments(Request $request) → AJAX: pivot-linked additional docs for selected invoice IDs
+├── attachDocumentsAjax() → Add invoices/docs to draft (no silent additional-doc attach)
+├── formatDistributionDocumentsForEdit() → { invoices, standalone_additional_documents }
+├── detachDocument() → Remove invoice or additional document from draft
+└── syncLinkedDocuments() → Draft show: manual attachInvoiceAdditionalDocuments
 ```
 
 **Frontend Architecture**:
@@ -1031,34 +1034,41 @@ DistributionController
 Distribution Creation Process
 ├── Form Validation → Required fields check
 ├── Confirmation Dialog → Review before submission
-├── Linked Documents Check → AJAX call to detect linked documents
-├── Linked Documents Management → Modal for document selection
-└── Form Submission → AJAX submission with success handling
+├── Linked Documents Check → AJAX: invoice-attached additional documents only
+├── Linked Documents Management → Modal for include/exclude before confirm
+└── Form Submission → linked_document_ids + selected invoice IDs
 ```
 
 **Database Relationship Architecture**:
 
 ```sql
--- Linked Documents Relationship
-Invoices (po_no) ←→ Additional Documents (po_no)
-├── PO Number Matching → Primary linking mechanism
-├── Location Filtering → cur_loc field for department filtering
-└── Status Validation → Available documents only
+-- Linked documents at distribution CREATE (current)
+additional_document_invoice (invoice_id, additional_document_id)
+├── checkLinkedDocuments → whereHas('invoices', selected invoice IDs)
+├── Filters → cur_loc = user department, availableForDistribution()
+└── NOT used → PO number equality alone (too many false positives)
+
+-- Distribution edit display
+distribution_documents
+├── Nested under invoice → also in additional_document_invoice for that invoice
+└── standalone_additional_documents → rows not pivot-linked to any invoice in bundle
 ```
 
 **UI Component Architecture**:
 
 ```html
 <!-- Confirmation Modal Structure -->
-Confirmation Modal ├── Distribution Information → Type, destination, document
-type, notes ├── Selected Documents → List of chosen documents ├── Linked
-Documents Section → Automatically detected additional documents └── Action
-Buttons → Cancel, Confirm & Create Distribution
+Confirmation Modal
+├── Distribution Information → Type, destination, document type, notes
+├── Selected Documents → Chosen invoices
+├── Linked Documents Section → Invoice-attached additional docs (manage before confirm)
+└── Confirm & Create → enabled after linked-doc check completes
 
-<!-- Linked Documents Management Modal -->
-Management Modal ├── Document List → Checkbox interface for each linked document
-├── Document Details → Number, type, PO number └── Action Buttons → Cancel, Save
-Selection
+<!-- Edit page (draft) -->
+Edit Documents Table
+├── Invoice rows → remove (icon button)
+├── Nested additional docs → remove (icon button)
+└── Other Additional Documents → PO-only / non-pivot rows previously hidden; now removable
 ```
 
 ### **Invoice Edit and Update System Architecture**

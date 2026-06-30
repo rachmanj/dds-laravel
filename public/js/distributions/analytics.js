@@ -42,6 +42,7 @@ class DistributionAnalytics {
     }
 
     init() {
+        this.loadDistributionData();
         this.trackPageLoad();
         this.setupRealTimeUpdates();
         this.setupPerformanceMonitoring();
@@ -49,6 +50,86 @@ class DistributionAnalytics {
         this.setupDocumentFlowTracking();
         this.setupPredictiveAnalytics();
         this.createAnalyticsDashboard();
+        this.syncFromDistributionData();
+        this.updatePredictions();
+    }
+
+    loadDistributionData() {
+        this.distributionData = window.distributionAnalyticsData || {
+            status: "unknown",
+            statusDisplay: "Unknown",
+            includedDocuments: 0,
+            senderVerified: 0,
+            receiverVerified: 0,
+            senderMissing: 0,
+            senderDamaged: 0,
+            receiverMissing: 0,
+            receiverDamaged: 0,
+        };
+    }
+
+    syncFromDistributionData() {
+        this.realTimeData.currentStatus = this.distributionData.statusDisplay;
+        this.metrics.completionRate = this.calculateCompletionRate();
+        this.metrics.errorCount =
+            this.distributionData.senderMissing +
+            this.distributionData.senderDamaged +
+            this.distributionData.receiverMissing +
+            this.distributionData.receiverDamaged;
+
+        this.calculateCompletionPrediction();
+        this.calculateErrorProbability();
+        this.calculateEfficiencyScore();
+        this.updateRealTimeData();
+    }
+
+    calculateCompletionRate() {
+        const total = this.distributionData.includedDocuments;
+
+        if (total === 0 || this.distributionData.status === "completed") {
+            return 100;
+        }
+
+        let verified = 0;
+
+        switch (this.distributionData.status) {
+            case "draft":
+                verified = this.distributionData.senderVerified;
+                break;
+            case "verified_by_sender":
+            case "sent":
+                verified = total;
+                break;
+            case "received":
+            case "verified_by_receiver":
+                verified = this.distributionData.receiverVerified;
+                break;
+            default:
+                verified = this.distributionData.receiverVerified;
+        }
+
+        return (verified / total) * 100;
+    }
+
+    getRemainingDocuments() {
+        const total = this.distributionData.includedDocuments;
+
+        if (total === 0 || this.distributionData.status === "completed") {
+            return 0;
+        }
+
+        switch (this.distributionData.status) {
+            case "draft":
+                return total - this.distributionData.senderVerified;
+            case "verified_by_sender":
+            case "sent":
+                return 0;
+            case "received":
+            case "verified_by_receiver":
+                return total - this.distributionData.receiverVerified;
+            default:
+                return total - this.distributionData.receiverVerified;
+        }
     }
 
     trackPageLoad() {
@@ -73,7 +154,7 @@ class DistributionAnalytics {
 
         // Update every 30 seconds
         setInterval(() => {
-            this.updateRealTimeData();
+            this.syncFromDistributionData();
         }, 30000);
 
         // Send analytics every 300 seconds instead of on every action
@@ -166,15 +247,16 @@ class DistributionAnalytics {
             self.metrics.performanceMetrics.ajaxCalls++;
             const startTime = Date.now();
 
-            return originalAjax.call(this, options).always(function () {
+            return originalAjax.call(this, options).always(function (jqXHR) {
                 const duration = Date.now() - startTime;
-                self.trackAjaxCall(options.url, duration, this.status);
+                const status = jqXHR.status || 0;
+                self.trackAjaxCall(options.url, duration, status);
 
-                if (this.status >= 400) {
+                if (status >= 400) {
                     self.metrics.performanceMetrics.ajaxErrors++;
                     self.trackError("ajax_error", {
                         url: options.url,
-                        status: this.status,
+                        status: status,
                         duration: duration,
                     });
                 }
@@ -321,67 +403,78 @@ class DistributionAnalytics {
     }
 
     trackError(errorType, context) {
-        this.metrics.errorCount++;
-
         this.trackUserAction("error", {
             errorType: errorType,
             context: context,
             timestamp: Date.now(),
         });
 
-        // Update real-time dashboard
         this.updateRealTimeData();
     }
 
-    calculateCompletionPrediction() {
-        const totalDocuments = $(".document-checkbox").length;
-        const verifiedDocuments = $(".document-checkbox:checked").length;
-        const completionRate =
-            totalDocuments > 0 ? (verifiedDocuments / totalDocuments) * 100 : 0;
+    trackDistributionStatusChange(data) {
+        if (data?.status) {
+            this.distributionData.status = data.status;
+        }
 
+        if (data?.statusDisplay) {
+            this.distributionData.statusDisplay = data.statusDisplay;
+        }
+
+        this.syncFromDistributionData();
+    }
+
+    calculateCompletionPrediction() {
+        const completionRate = this.calculateCompletionRate();
         this.metrics.completionRate = completionRate;
 
-        // Simple prediction based on current rate
-        if (completionRate > 0) {
-            const remainingDocuments = totalDocuments - verifiedDocuments;
-            const averageTimePerDocument =
-                this.calculateAverageVerificationTime();
-            const estimatedTime = remainingDocuments * averageTimePerDocument;
+        const remainingDocuments = this.getRemainingDocuments();
 
-            this.predictiveModels.completionTime = estimatedTime;
-            this.realTimeData.estimatedCompletion =
-                this.formatTime(estimatedTime);
+        if (remainingDocuments === 0) {
+            this.predictiveModels.completionTime = 0;
+            this.realTimeData.estimatedCompletion = "Complete";
+            return;
         }
+
+        const averageTimePerDocument = this.calculateAverageVerificationTime();
+        const estimatedTime = remainingDocuments * averageTimePerDocument;
+
+        this.predictiveModels.completionTime = estimatedTime;
+        this.realTimeData.estimatedCompletion = this.formatTime(estimatedTime);
     }
 
     calculateErrorProbability() {
-        const totalActions = this.metrics.userActions.length;
-        const errorActions = this.metrics.userActions.filter(
-            (action) =>
-                action.action === "error" || action.context?.status >= 400
-        ).length;
+        const totalDocuments = this.distributionData.includedDocuments;
+        const discrepancyCount = this.metrics.errorCount;
 
         this.predictiveModels.errorProbability =
-            totalActions > 0 ? (errorActions / totalActions) * 100 : 0;
+            totalDocuments > 0 ? (discrepancyCount / totalDocuments) * 100 : 0;
     }
 
     calculateEfficiencyScore() {
         const verificationTimes = this.metrics.verificationTime;
-        if (verificationTimes.length === 0) {
-            this.predictiveModels.efficiencyScore = null;
+
+        if (verificationTimes.length > 0) {
+            const averageTime =
+                verificationTimes.reduce((a, b) => a + b, 0) /
+                verificationTimes.length;
+            const baselineTime = 30000;
+            const efficiency = Math.max(
+                0,
+                Math.min(100, (baselineTime / averageTime) * 100)
+            );
+
+            this.predictiveModels.efficiencyScore = Math.round(efficiency);
             return;
         }
 
-        const averageTime =
-            verificationTimes.reduce((a, b) => a + b, 0) /
-            verificationTimes.length;
-        const baselineTime = 30000; // 30 seconds baseline
-        const efficiency = Math.max(
-            0,
-            Math.min(100, (baselineTime / averageTime) * 100)
-        );
+        const completionRate = this.calculateCompletionRate();
+        const discrepancyRate = this.predictiveModels.errorProbability || 0;
 
-        this.predictiveModels.efficiencyScore = Math.round(efficiency);
+        this.predictiveModels.efficiencyScore = Math.max(
+            0,
+            Math.round(completionRate - discrepancyRate)
+        );
     }
 
     calculateAverageVerificationTime() {
@@ -396,59 +489,82 @@ class DistributionAnalytics {
     }
 
     updateRealTimeData() {
-        // Update completion rate
+        $("#currentStatus").text(this.realTimeData.currentStatus || "Unknown");
+
         $("#completionRate").text(
             `${Math.round(this.metrics.completionRate)}%`
         );
 
-        // Update estimated completion
-        if (this.realTimeData.estimatedCompletion) {
-            $("#estimatedCompletion").text(
-                this.realTimeData.estimatedCompletion
-            );
-        }
+        $("#estimatedCompletion").text(
+            this.realTimeData.estimatedCompletion || "Complete"
+        );
 
-        // Update efficiency score
-        if (this.predictiveModels.efficiencyScore) {
+        if (this.predictiveModels.efficiencyScore !== null) {
             $("#efficiencyScore").text(
                 `${this.predictiveModels.efficiencyScore}%`
             );
+        } else {
+            $("#efficiencyScore").text("N/A");
         }
 
-        // Update error count
-        $("#errorCount").text(this.metrics.errorCount);
+        const sessionErrors = this.metrics.performanceMetrics.ajaxErrors;
+        const discrepancyCount = this.metrics.errorCount;
+        $("#errorCount").text(
+            discrepancyCount > 0
+                ? `${discrepancyCount} (${sessionErrors} session)`
+                : String(sessionErrors)
+        );
 
-        // Update bottlenecks
         this.identifyBottlenecks();
     }
 
     identifyBottlenecks() {
         const bottlenecks = [];
+        const total = this.distributionData.includedDocuments;
 
-        // Check for slow verification
+        if (total === 0) {
+            this.renderBottlenecks(["No verifiable documents in this distribution"]);
+            return;
+        }
+
+        if (this.distributionData.status === "draft" && this.metrics.completionRate < 100) {
+            bottlenecks.push("Sender verification incomplete");
+        }
+
+        if (
+            ["received", "verified_by_receiver"].includes(this.distributionData.status) &&
+            this.metrics.completionRate < 100
+        ) {
+            bottlenecks.push("Receiver verification incomplete");
+        }
+
+        if (this.distributionData.senderMissing + this.distributionData.receiverMissing > 0) {
+            bottlenecks.push("Missing documents reported");
+        }
+
+        if (this.distributionData.senderDamaged + this.distributionData.receiverDamaged > 0) {
+            bottlenecks.push("Damaged documents reported");
+        }
+
         const avgVerificationTime = this.calculateAverageVerificationTime();
-        if (avgVerificationTime > 60000) {
-            // More than 1 minute
+        if (
+            this.metrics.verificationTime.length > 0 &&
+            avgVerificationTime > 60000
+        ) {
             bottlenecks.push("Slow verification process");
         }
 
-        // Check for high error rate
-        if (this.predictiveModels.errorProbability > 10) {
-            bottlenecks.push("High error rate detected");
-        }
-
-        // Check for incomplete documents
-        if (
-            this.metrics.completionRate < 50 &&
-            this.metrics.userActions.length > 10
-        ) {
-            bottlenecks.push("Low completion rate");
+        if (this.metrics.performanceMetrics.ajaxErrors > 0) {
+            bottlenecks.push("Session request errors detected");
         }
 
         this.realTimeData.bottlenecks = bottlenecks;
+        this.renderBottlenecks(bottlenecks);
+    }
 
-        // Update UI
+    renderBottlenecks(bottlenecks) {
         const bottlenecksList = $("#bottlenecksList");
+
         if (bottlenecks.length > 0) {
             bottlenecksList.html(bottlenecks.map((b) => `• ${b}`).join("<br>"));
         } else {
@@ -459,10 +575,7 @@ class DistributionAnalytics {
     }
 
     updatePredictions() {
-        this.calculateCompletionPrediction();
-        this.calculateErrorProbability();
-        this.calculateEfficiencyScore();
-        this.updateRealTimeData();
+        this.syncFromDistributionData();
     }
 
     formatTime(milliseconds) {

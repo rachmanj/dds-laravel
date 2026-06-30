@@ -624,11 +624,11 @@
                     <!-- Linked Documents Section -->
                     <div class="row mt-3" id="linked-documents-section" style="display: none;">
                         <div class="col-12">
-                            <h6><i class="fas fa-link"></i> Automatically Linked Additional Documents</h6>
-                            <div class="alert alert-warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <strong>Note:</strong> The following additional documents will be automatically included
-                                with the selected invoices:
+                            <h6><i class="fas fa-link"></i> Linked Additional Documents</h6>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Note:</strong> The following additional documents are linked to your selected
+                                invoices. Review the list and use Manage Linked Documents to include or exclude items.
                             </div>
                             <div id="confirm-linked-documents" class="max-height-200 overflow-auto">
                                 <!-- Linked documents will be populated here -->
@@ -1074,13 +1074,17 @@
 
                 // Check for linked documents if distributing invoices
                 if ($('#document_type').val() === 'invoice') {
-                    checkLinkedDocuments();
+                    $('#confirmSubmit').prop('disabled', true).html(
+                        '<i class="fas fa-spinner fa-spin"></i> Checking linked documents...');
+                    checkLinkedDocuments(function() {
+                        $('#confirmSubmit').prop('disabled', false).html(
+                            '<i class="fas fa-check"></i> Confirm & Create Distribution');
+                        $('#confirmationModal').modal('show');
+                    });
                 } else {
                     $('#linked-documents-section').hide();
+                    $('#confirmationModal').modal('show');
                 }
-
-                // Show modal
-                $('#confirmationModal').modal('show');
             }
 
             // Populate confirmation dialog
@@ -1122,13 +1126,19 @@
             }
 
             // Check for linked additional documents
-            function checkLinkedDocuments() {
+            function checkLinkedDocuments(onComplete) {
                 var selectedInvoiceIds = $('input[name="document_ids[]"]:checked').map(function() {
                     return this.value;
                 }).get();
 
                 if (selectedInvoiceIds.length === 0) {
+                    linkedDocuments = [];
+                    selectedLinkedDocuments = [];
                     $('#linked-documents-section').hide();
+                    if (typeof onComplete === 'function') {
+                        onComplete();
+                    }
+
                     return;
                 }
 
@@ -1143,15 +1153,24 @@
                     success: function(response) {
                         if (response.success && response.linked_documents.length > 0) {
                             linkedDocuments = response.linked_documents;
-                            selectedLinkedDocuments = [...linkedDocuments]; // Select all by default
+                            selectedLinkedDocuments = [...linkedDocuments];
                             populateLinkedDocuments();
                             $('#linked-documents-section').show();
                         } else {
+                            linkedDocuments = [];
+                            selectedLinkedDocuments = [];
                             $('#linked-documents-section').hide();
                         }
                     },
                     error: function() {
+                        linkedDocuments = [];
+                        selectedLinkedDocuments = [];
                         $('#linked-documents-section').hide();
+                    },
+                    complete: function() {
+                        if (typeof onComplete === 'function') {
+                            onComplete();
+                        }
                     }
                 });
             }
@@ -1168,7 +1187,11 @@
                     linkedDocsHtml += '<div class="document-summary-item">';
                     linkedDocsHtml += '<strong>' + doc.document_number + '</strong> ';
                     linkedDocsHtml += '<span class="badge badge-info">' + doc.type + '</span><br>';
-                    linkedDocsHtml += '<small class="text-muted">PO: ' + (doc.po_no || 'N/A') + '</small>';
+                    linkedDocsHtml += '<small class="text-muted">PO: ' + (doc.po_no || 'N/A');
+                    if (doc.invoice_numbers) {
+                        linkedDocsHtml += ' | Invoice: ' + doc.invoice_numbers;
+                    }
+                    linkedDocsHtml += '</small>';
                     linkedDocsHtml += '</div>';
                 });
 
@@ -1198,7 +1221,11 @@
                     modalHtml += '<label class="form-check-label" for="linked-doc-' + doc.id + '">';
                     modalHtml += '<strong>' + doc.document_number + '</strong><br>';
                     modalHtml += '<small class="text-muted">Type: ' + doc.type + ' | PO: ' + (doc.po_no ||
-                        'N/A') + '</small>';
+                        'N/A');
+                    if (doc.invoice_numbers) {
+                        modalHtml += ' | Invoice: ' + doc.invoice_numbers;
+                    }
+                    modalHtml += '</small>';
                     modalHtml += '</label>';
                     modalHtml += '</div>';
                     modalHtml += '</div>';

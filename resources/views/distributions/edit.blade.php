@@ -100,58 +100,18 @@
                             <!-- Current Documents -->
                             <div class="row mt-4">
                                 <div class="col-12">
-                                    <h5>Current Documents</h5>
-                                    <div class="alert alert-info">
-                                        <i class="fas fa-info-circle"></i>
-                                        <strong>Note:</strong> Documents cannot be added or removed after creation. You can
-                                        only edit distribution details.
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 class="mb-0">Current Documents</h5>
+                                        <button type="button" class="btn btn-success btn-sm" id="addDocumentsBtn">
+                                            <i class="fas fa-plus"></i> Add Documents
+                                        </button>
                                     </div>
 
-                                    <div class="table-responsive">
-                                        <table class="table table-bordered table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>Document</th>
-                                                    <th>Type</th>
-                                                    <th>Details</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach ($distribution->documents as $doc)
-                                                    <tr>
-                                                        <td>
-                                                            <strong>
-                                                                @if ($doc->document_type === 'App\Models\Invoice')
-                                                                    {{ $doc->document->invoice_number ?? 'N/A' }}
-                                                                @else
-                                                                    {{ $doc->document->document_number ?? 'N/A' }}
-                                                                @endif
-                                                            </strong>
-                                                        </td>
-                                                        <td>
-                                                            @if ($doc->document_type === 'App\Models\Invoice')
-                                                                Invoice
-                                                            @else
-                                                                Additional Document
-                                                            @endif
-                                                        </td>
-                                                        <td>
-                                                            @if ($doc->document_type === 'App\Models\Invoice')
-                                                                Supplier: {{ $doc->document->supplier->name ?? 'N/A' }}<br>
-                                                                PO: {{ $doc->document->po_no ?? 'N/A' }}
-                                                            @else
-                                                                Type: {{ $doc->document->type->name ?? 'N/A' }}<br>
-                                                                Project: {{ $doc->document->project ?? 'N/A' }}
-                                                            @endif
-                                                        </td>
-                                                        <td>
-                                                            <span class="badge badge-secondary">Attached</span>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
+                                    <div id="currentDocumentsContainer">
+                                        @include('distributions.partials.edit-documents-table', [
+                                            'documentsForEdit' => $documentsForEdit,
+                                            'documentType' => $distribution->document_type,
+                                        ])
                                     </div>
                                 </div>
                             </div>
@@ -173,6 +133,54 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="addDocumentsModal" tabindex="-1" role="dialog" aria-labelledby="addDocumentsModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addDocumentsModalLabel">
+                        <i class="fas fa-plus"></i> Add Documents
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="availableDocumentsLoading" class="text-center py-4" style="display: none;">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-2 mb-0">Loading available documents...</p>
+                    </div>
+                    <div id="availableDocumentsEmpty" class="alert alert-info mb-0" style="display: none;">
+                        <i class="fas fa-info-circle"></i>
+                        No additional documents are available to add.
+                    </div>
+                    <div id="availableDocumentsList" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th width="40">
+                                            <input type="checkbox" id="selectAllAvailableDocuments">
+                                        </th>
+                                        <th>Document</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="availableDocumentsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmAddDocumentsBtn" disabled>
+                        <i class="fas fa-plus"></i> Add Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('styles')
@@ -185,13 +193,247 @@
 
     <script>
         $(document).ready(function() {
-            // Initialize Select2
+            const documentType = @json($distribution->document_type);
+            const availableDocumentsUrl = @json(route('distributions.available-documents', $distribution));
+            const attachDocumentsUrl = @json(route('distributions.documents.attach', $distribution));
+            const detachDocumentUrlTemplate = @json(route('distributions.documents.detach', [$distribution, '__ID__']));
+            let currentDocuments = @json($documentsForEdit);
+
             $('#type_id, #destination_department_id').select2({
                 theme: 'bootstrap4',
                 placeholder: 'Select an option'
             });
 
-            // Form submission
+            function escapeHtml(value) {
+                return $('<div>').text(value ?? '').html();
+            }
+
+            function renderCurrentDocuments(documents) {
+                currentDocuments = documents;
+
+                const invoices = documents.invoices || (documentType === 'invoice' ? documents : []);
+                const standaloneAdditionalDocuments = documents.standalone_additional_documents ||
+                    (documentType === 'additional_document' ? documents : []);
+                const hasDocuments = invoices.length > 0 || standaloneAdditionalDocuments.length > 0;
+
+                if (!hasDocuments) {
+                    $('#currentDocumentsContainer').html(
+                        '<div class="alert alert-warning mb-0" id="noDocumentsAlert">' +
+                        '<i class="fas fa-exclamation-triangle"></i> No documents attached to this distribution yet.' +
+                        '</div>'
+                    );
+                    return;
+                }
+
+                let rows = '';
+
+                function appendRemoveButton(distributionDocumentId, documentNumber) {
+                    const label = 'Remove ' + documentNumber;
+
+                    return '<td><button type="button" class="btn btn-outline-danger btn-sm remove-document-btn px-2" ' +
+                        'data-distribution-document-id="' + distributionDocumentId + '" ' +
+                        'data-document-number="' + escapeHtml(documentNumber) + '" ' +
+                        'title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '">' +
+                        '<i class="fas fa-trash"></i></button></td>';
+                }
+
+                if (documentType === 'invoice') {
+                    invoices.forEach(function(document) {
+                        rows += '<tr data-distribution-document-id="' + document.id + '">' +
+                            '<td><strong>' + escapeHtml(document.number) + '</strong></td>' +
+                            '<td>Invoice</td>' +
+                            '<td>' + escapeHtml(document.details) + '</td>' +
+                            appendRemoveButton(document.id, document.number) + '</tr>';
+
+                        (document.additional_documents || []).forEach(function(additionalDocument) {
+                            rows += '<tr class="table-secondary" data-distribution-document-id="' +
+                                additionalDocument.id + '">' +
+                                '<td class="pl-4"><i class="fas fa-level-up-alt fa-rotate-90 text-muted mr-2"></i>' +
+                                '<strong>' + escapeHtml(additionalDocument.number) + '</strong></td>' +
+                                '<td>Additional Document</td>' +
+                                '<td>' + escapeHtml(additionalDocument.details) + '</td>' +
+                                appendRemoveButton(additionalDocument.id, additionalDocument.number) + '</tr>';
+                        });
+                    });
+
+                    if (standaloneAdditionalDocuments.length > 0) {
+                        rows += '<tr class="table-active"><td colspan="4">' +
+                            '<strong><i class="fas fa-file-alt"></i> Other Additional Documents</strong>' +
+                            '<small class="text-muted ml-2">Not linked to a selected invoice</small></td></tr>';
+
+                        standaloneAdditionalDocuments.forEach(function(document) {
+                            rows += '<tr data-distribution-document-id="' + document.id + '">' +
+                                '<td><strong>' + escapeHtml(document.number) + '</strong></td>' +
+                                '<td>Additional Document</td>' +
+                                '<td>' + escapeHtml(document.details) + '</td>' +
+                                appendRemoveButton(document.id, document.number) + '</tr>';
+                        });
+                    }
+                } else {
+                    standaloneAdditionalDocuments.forEach(function(document) {
+                        rows += '<tr data-distribution-document-id="' + document.id + '">' +
+                            '<td><strong>' + escapeHtml(document.number) + '</strong></td>' +
+                            '<td>Additional Document</td>' +
+                            '<td>' + escapeHtml(document.details) + '</td>' +
+                            appendRemoveButton(document.id, document.number) + '</tr>';
+                    });
+                }
+
+                $('#currentDocumentsContainer').html(
+                    '<div class="table-responsive">' +
+                    '<table class="table table-bordered table-hover" id="currentDocumentsTable">' +
+                    '<thead><tr><th>Document</th><th>Type</th><th>Details</th><th width="56">Actions</th></tr></thead>' +
+                    '<tbody>' + rows + '</tbody></table></div>'
+                );
+            }
+
+            function resetAvailableDocumentsModal() {
+                $('#availableDocumentsLoading').hide();
+                $('#availableDocumentsEmpty').hide();
+                $('#availableDocumentsList').hide();
+                $('#availableDocumentsTableBody').empty();
+                $('#selectAllAvailableDocuments').prop('checked', false);
+                $('#confirmAddDocumentsBtn').prop('disabled', true);
+            }
+
+            function renderAvailableDocuments(documents) {
+                resetAvailableDocumentsModal();
+
+                if (!documents.length) {
+                    $('#availableDocumentsEmpty').show();
+                    return;
+                }
+
+                let rows = '';
+                documents.forEach(function(document) {
+                    rows += '<tr>' +
+                        '<td><input type="checkbox" class="available-document-checkbox" value="' + document.id + '"></td>' +
+                        '<td><strong>' + escapeHtml(document.number) + '</strong></td>' +
+                        '<td>' + escapeHtml(document.details) + '</td></tr>';
+                });
+
+                $('#availableDocumentsTableBody').html(rows);
+                $('#availableDocumentsList').show();
+            }
+
+            function updateAddSelectedButtonState() {
+                const selectedCount = $('.available-document-checkbox:checked').length;
+                $('#confirmAddDocumentsBtn').prop('disabled', selectedCount === 0);
+            }
+
+            $('#addDocumentsBtn').on('click', function() {
+                resetAvailableDocumentsModal();
+                $('#addDocumentsModal').modal('show');
+                $('#availableDocumentsLoading').show();
+
+                $.get(availableDocumentsUrl)
+                    .done(function(response) {
+                        if (response.success) {
+                            renderAvailableDocuments(response.documents || []);
+                        } else {
+                            toastr.error(response.message || 'Failed to load available documents');
+                            $('#addDocumentsModal').modal('hide');
+                        }
+                    })
+                    .fail(function(xhr) {
+                        const message = xhr.responseJSON?.message || 'Failed to load available documents';
+                        toastr.error(message);
+                        $('#addDocumentsModal').modal('hide');
+                    })
+                    .always(function() {
+                        $('#availableDocumentsLoading').hide();
+                    });
+            });
+
+            $(document).on('change', '#selectAllAvailableDocuments', function() {
+                $('.available-document-checkbox').prop('checked', $(this).is(':checked'));
+                updateAddSelectedButtonState();
+            });
+
+            $(document).on('change', '.available-document-checkbox', function() {
+                const total = $('.available-document-checkbox').length;
+                const checked = $('.available-document-checkbox:checked').length;
+                $('#selectAllAvailableDocuments').prop('checked', total > 0 && total === checked);
+                updateAddSelectedButtonState();
+            });
+
+            $('#confirmAddDocumentsBtn').on('click', function() {
+                const documentIds = $('.available-document-checkbox:checked').map(function() {
+                    return $(this).val();
+                }).get();
+
+                if (!documentIds.length) {
+                    return;
+                }
+
+                const $button = $(this);
+                $button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Adding...');
+
+                $.ajax({
+                    url: attachDocumentsUrl,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        document_ids: documentIds
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            renderCurrentDocuments(response.documents || []);
+                            $('#addDocumentsModal').modal('hide');
+                        } else {
+                            toastr.error(response.message || 'Failed to add documents');
+                        }
+                    },
+                    error: function(xhr) {
+                        if (xhr.status === 422 && xhr.responseJSON?.errors) {
+                            const firstError = Object.values(xhr.responseJSON.errors)[0]?.[0];
+                            toastr.error(firstError || 'Validation failed');
+                        } else {
+                            toastr.error(xhr.responseJSON?.message || 'Failed to add documents');
+                        }
+                    },
+                    complete: function() {
+                        $button.prop('disabled', false).html('<i class="fas fa-plus"></i> Add Selected');
+                    }
+                });
+            });
+
+            $(document).on('click', '.remove-document-btn', function() {
+                const distributionDocumentId = $(this).data('distribution-document-id');
+                const documentNumber = $(this).data('document-number');
+                const detachUrl = detachDocumentUrlTemplate.replace('__ID__', distributionDocumentId);
+
+                if (!confirm('Remove ' + documentNumber + ' from this distribution?')) {
+                    return;
+                }
+
+                const $button = $(this);
+                $button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+
+                $.ajax({
+                    url: detachUrl,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        _method: 'DELETE'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            renderCurrentDocuments(response.documents || []);
+                        } else {
+                            toastr.error(response.message || 'Failed to remove document');
+                            $button.prop('disabled', false).html('<i class="fas fa-trash"></i>');
+                        }
+                    },
+                    error: function(xhr) {
+                        toastr.error(xhr.responseJSON?.message || 'Failed to remove document');
+                        $button.prop('disabled', false).html('<i class="fas fa-trash"></i>');
+                    }
+                });
+            });
+
             $('#distributionEditForm').submit(function(e) {
                 e.preventDefault();
 
