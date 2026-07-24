@@ -25,12 +25,12 @@ class CreateSapApInvoiceJob implements ShouldQueue
     protected Invoice $invoice;
 
     /**
-     * @var array<int, array{grpo_no: string, doc_entry: int|string, amount: float|int|string, line?: int}>
+     * @var array<int, array{grpo_no: string, doc_entry: int|string, base_line: int|string, item_code: string, quantity: float|int|string, unit_price?: float|int|string|null}>
      */
     protected array $grpoReferences;
 
     /**
-     * @param  array<int, array{grpo_no: string, doc_entry: int|string, amount: float|int|string, line?: int}>  $grpoReferences
+     * @param  array<int, array{grpo_no: string, doc_entry: int|string, base_line: int|string, item_code: string, quantity: float|int|string, unit_price?: float|int|string|null}>  $grpoReferences
      */
     public function __construct(Invoice $invoice, array $grpoReferences = [])
     {
@@ -46,6 +46,19 @@ class CreateSapApInvoiceJob implements ShouldQueue
 
             return;
         }
+
+        if ($invoice->sap_status === 'posted' && $invoice->sap_doc_num) {
+            Log::channel('sap')->info('CreateSapApInvoiceJob: Invoice already posted to SAP, skipping.', [
+                'invoice_id' => $invoice->id,
+                'sap_doc_num' => $invoice->sap_doc_num,
+            ]);
+
+            return;
+        }
+
+        $invoice->update([
+            'sap_last_attempted_at' => now(),
+        ]);
 
         $payload = null;
 
@@ -65,25 +78,16 @@ class CreateSapApInvoiceJob implements ShouldQueue
             $response = $sapService->createApInvoice($payload);
 
             DB::transaction(function () use ($invoice, $response, $payload) {
-                $invoice->update([
+                $docNum = isset($response['DocNum']) ? (string) $response['DocNum'] : null;
+
+                $this->persistPostedInvoice($invoice, [
                     'sap_status' => 'posted',
-                    'sap_doc_num' => $response['DocNum'] ?? null,
+                    'sap_doc_num' => $docNum,
                     'sap_doc_entry' => isset($response['DocEntry']) ? (string) $response['DocEntry'] : null,
                     'sap_grpo_references' => ! empty($this->grpoReferences) ? $this->grpoReferences : null,
                     'sap_error_message' => null,
                     'sap_last_attempted_at' => now(),
-                ]);
-
-                DB::table('sap_logs')->insert([
-                    'invoice_id' => $invoice->id,
-                    'action' => 'create_invoice',
-                    'status' => 'success',
-                    'request_payload' => json_encode($payload),
-                    'response_payload' => json_encode($response),
-                    'attempt_count' => $this->attempts(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                ], $docNum, $payload, $response);
             });
 
             Log::channel('sap')->info('AP Invoice created successfully', [
@@ -91,9 +95,36 @@ class CreateSapApInvoiceJob implements ShouldQueue
                 'sap_doc_num' => $response['DocNum'] ?? null,
             ]);
         } catch (\Exception $e) {
+            $sapErrorMessage = $e instanceof RequestException
+                ? $this->parseSapErrorMessage($e)
+                : $e->getMessage();
+
+            if ($invoice->sap_status === 'posted' && $invoice->sap_doc_num) {
+                Log::channel('sap')->warning('CreateSapApInvoiceJob: Duplicate post attempt failed but invoice is already posted.', [
+                    'invoice_id' => $invoice->id,
+                    'sap_doc_num' => $invoice->sap_doc_num,
+                    'error' => $sapErrorMessage,
+                ]);
+
+                return;
+            }
+
+            $existingSapInvoice = $this->findExistingSapInvoice($sapService, $invoice);
+            if ($existingSapInvoice) {
+                $this->markInvoicePostedFromSap($invoice, $existingSapInvoice, $payload);
+
+                Log::channel('sap')->warning('CreateSapApInvoiceJob: Reconciled invoice from existing SAP document after post failure.', [
+                    'invoice_id' => $invoice->id,
+                    'sap_doc_num' => $existingSapInvoice['DocNum'] ?? null,
+                    'error' => $sapErrorMessage,
+                ]);
+
+                return;
+            }
+
             $invoice->update([
                 'sap_status' => 'failed',
-                'sap_error_message' => $e->getMessage(),
+                'sap_error_message' => $sapErrorMessage,
                 'sap_last_attempted_at' => now(),
             ]);
 
@@ -103,7 +134,7 @@ class CreateSapApInvoiceJob implements ShouldQueue
                 'status' => 'failed',
                 'request_payload' => json_encode($payload ?? []),
                 'response_payload' => null,
-                'error_message' => $e->getMessage(),
+                'error_message' => $sapErrorMessage,
                 'attempt_count' => $this->attempts(),
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -146,6 +177,102 @@ class CreateSapApInvoiceJob implements ShouldQueue
         }
 
         return $vendor;
+    }
+
+    /**
+     * @return array{DocEntry?: int, DocNum?: int, NumAtCard?: string}|null
+     */
+    protected function findExistingSapInvoice(SapService $sapService, Invoice $invoice): ?array
+    {
+        if (! $invoice->invoice_number) {
+            return null;
+        }
+
+        $filterValue = str_replace("'", "''", $invoice->invoice_number);
+
+        try {
+            $result = $sapService->get('PurchaseInvoices', [
+                'query' => [
+                    '$filter' => "NumAtCard eq '{$filterValue}' and Cancelled eq 'N'",
+                    '$select' => 'DocEntry,DocNum,NumAtCard,Cancelled',
+                    '$top' => 1,
+                ],
+            ]);
+
+            $rows = $result['value'] ?? [];
+            if (empty($rows)) {
+                return null;
+            }
+
+            $row = $rows[0];
+            if (strtoupper((string) ($row['Cancelled'] ?? 'N')) === 'Y') {
+                return null;
+            }
+
+            return $row;
+        } catch (\Throwable $exception) {
+            Log::channel('sap')->warning('CreateSapApInvoiceJob: Unable to search existing SAP invoice.', [
+                'invoice_id' => $invoice->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  array{DocEntry?: int, DocNum?: int}  $existingSapInvoice
+     */
+    protected function markInvoicePostedFromSap(Invoice $invoice, array $existingSapInvoice, ?array $payload): void
+    {
+        $docNum = isset($existingSapInvoice['DocNum']) ? (string) $existingSapInvoice['DocNum'] : null;
+
+        DB::transaction(function () use ($invoice, $existingSapInvoice, $payload, $docNum) {
+            $this->persistPostedInvoice($invoice, [
+                'sap_status' => 'posted',
+                'sap_doc_num' => $docNum,
+                'sap_doc_entry' => isset($existingSapInvoice['DocEntry']) ? (string) $existingSapInvoice['DocEntry'] : null,
+                'sap_grpo_references' => ! empty($this->grpoReferences) ? $this->grpoReferences : $invoice->sap_grpo_references,
+                'sap_error_message' => null,
+                'sap_last_attempted_at' => now(),
+            ], $docNum, $payload, $existingSapInvoice);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    protected function persistPostedInvoice(
+        Invoice $invoice,
+        array $attributes,
+        ?string $docNum,
+        ?array $payload,
+        array|string|null $responsePayload
+    ): void {
+        if ($docNum && $this->canAssignSapDoc($docNum, $invoice->id)) {
+            $attributes['sap_doc'] = $docNum;
+        }
+
+        $invoice->update($attributes);
+
+        DB::table('sap_logs')->insert([
+            'invoice_id' => $invoice->id,
+            'action' => 'create_invoice',
+            'status' => 'success',
+            'request_payload' => json_encode($payload ?? []),
+            'response_payload' => is_string($responsePayload) ? $responsePayload : json_encode($responsePayload),
+            'attempt_count' => $this->attempts(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    protected function canAssignSapDoc(string $docNum, int $invoiceId): bool
+    {
+        return ! Invoice::query()
+            ->where('sap_doc', $docNum)
+            ->where('id', '!=', $invoiceId)
+            ->exists();
     }
 
     protected function parseSapErrorMessage(RequestException $exception): string

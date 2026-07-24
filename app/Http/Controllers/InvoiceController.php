@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\CancelSapApInvoiceJob;
 use App\Jobs\CreateSapApInvoiceJob;
 use App\Models\AdditionalDocument;
 use App\Models\Invoice;
@@ -827,14 +828,15 @@ class InvoiceController extends Controller
                 ->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
         }
 
-        if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
+        if (in_array($invoice->sap_status, ['pending', 'posted', 'cancelling'], true)) {
             return redirect()
                 ->route('invoices.show', $invoice)
-                ->with('error', 'Invoice is already sent or pending in SAP.');
+                ->with('error', 'Invoice is already sent, pending, or cancelling in SAP.');
         }
 
         $invoice->load(['supplier', 'type']);
-        $grpoRows = $this->resolveGrpoRowsForPreview($invoice, $sapService);
+        $isStandalone = ! $invoice->po_no || trim((string) $invoice->po_no) === '';
+        $grpoRows = $isStandalone ? [] : $this->resolveGrpoLinesForPreview($invoice, $sapService);
         $grpoReferences = array_values(array_filter($grpoRows, fn (array $row) => $row['found']));
 
         $payloadBuilder = new SapApInvoicePayloadBuilder(
@@ -842,8 +844,10 @@ class InvoiceController extends Controller
             array_map(fn (array $row) => [
                 'grpo_no' => $row['grpo_no'],
                 'doc_entry' => $row['doc_entry'],
-                'amount' => $row['amount'],
-                'line' => $row['line'],
+                'base_line' => $row['base_line'],
+                'item_code' => $row['item_code'],
+                'quantity' => $row['quantity'],
+                'unit_price' => $row['unit_price'],
             ], $grpoReferences)
         );
 
@@ -853,6 +857,7 @@ class InvoiceController extends Controller
             'invoice' => $invoice,
             'grpoRows' => $grpoRows,
             'apPreview' => $apPreview,
+            'isStandalone' => $isStandalone,
         ]);
     }
 
@@ -865,36 +870,46 @@ class InvoiceController extends Controller
             return back()->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
         }
 
-        if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
-            return back()->with('error', 'Invoice is already sent or pending in SAP.');
+        if (in_array($invoice->sap_status, ['pending', 'posted', 'cancelling'], true)) {
+            return back()->with('error', 'Invoice is already sent, pending, or cancelling in SAP.');
         }
 
         $validated = $request->validate([
             'grpo_references' => 'nullable|array',
             'grpo_references.*.grpo_no' => 'required_with:grpo_references|string|max:50',
             'grpo_references.*.doc_entry' => 'required_with:grpo_references|integer',
-            'grpo_references.*.amount' => 'required_with:grpo_references|numeric|min:0.01',
-            'grpo_references.*.line' => 'nullable|integer|min:0',
+            'grpo_references.*.base_line' => 'required_with:grpo_references|integer|min:0',
+            'grpo_references.*.item_code' => 'required_with:grpo_references|string|max:50',
+            'grpo_references.*.quantity' => 'required_with:grpo_references|numeric|min:0.0001',
+            'grpo_references.*.unit_price' => 'nullable|numeric|min:0',
         ]);
 
         $grpoReferences = collect($validated['grpo_references'] ?? [])
             ->map(fn (array $ref) => [
                 'grpo_no' => trim((string) $ref['grpo_no']),
                 'doc_entry' => (int) $ref['doc_entry'],
-                'amount' => (float) $ref['amount'],
-                'line' => (int) ($ref['line'] ?? 0),
+                'base_line' => (int) $ref['base_line'],
+                'item_code' => trim((string) $ref['item_code']),
+                'quantity' => (float) $ref['quantity'],
+                'unit_price' => isset($ref['unit_price']) && $ref['unit_price'] !== ''
+                    ? (float) $ref['unit_price']
+                    : null,
             ])
-            ->filter(fn (array $ref) => $ref['grpo_no'] !== '' && $ref['doc_entry'] > 0)
+            ->filter(fn (array $ref) => $ref['grpo_no'] !== '' && $ref['doc_entry'] > 0 && $ref['item_code'] !== '')
             ->values()
             ->all();
 
-        if ($invoice->po_no && empty($grpoReferences)) {
+        $hasPoNo = $invoice->po_no && trim((string) $invoice->po_no) !== '';
+
+        if ($hasPoNo && empty($grpoReferences)) {
             return back()->withErrors([
-                'grpo_references' => 'At least one valid GRPO reference is required when PO/GRPO number is set.',
+                'grpo_references' => 'At least one valid GRPO line reference is required when PO number is set.',
             ]);
         }
 
-        $amountSum = collect($grpoReferences)->sum('amount');
+        $amountSum = collect($grpoReferences)->sum(
+            fn (array $ref) => (float) $ref['quantity'] * (float) ($ref['unit_price'] ?? 0)
+        );
         $warning = null;
         if (! empty($grpoReferences) && abs($amountSum - (float) $invoice->amount) > 0.01) {
             $warning = sprintf(
@@ -911,9 +926,24 @@ class InvoiceController extends Controller
 
         CreateSapApInvoiceJob::dispatch($invoice, $grpoReferences);
 
+        $message = $hasPoNo
+            ? 'Invoice queued for SAP posting with GRPO relationship links.'
+            : 'Invoice queued for SAP posting as standalone AP Invoice.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'warning' => $warning,
+                'sap_status' => 'pending',
+                'status_url' => route('invoices.sap-status', $invoice),
+                'invoice_url' => route('invoices.show', $invoice),
+            ]);
+        }
+
         $redirect = redirect()
             ->route('invoices.show', $invoice)
-            ->with('success', 'Invoice queued for SAP posting with GRPO relationship links.');
+            ->with('success', $message);
 
         if ($warning) {
             $redirect->with('warning', $warning);
@@ -931,14 +961,65 @@ class InvoiceController extends Controller
             return back()->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
         }
 
-        if ($invoice->sap_status === 'pending' || $invoice->sap_status === 'posted') {
-            return back()->with('error', 'Invoice is already sent or pending in SAP.');
+        if (in_array($invoice->sap_status, ['pending', 'posted', 'cancelling'], true)) {
+            return back()->with('error', 'Invoice is already sent, pending, or cancelling in SAP.');
         }
 
         $invoice->update(['sap_status' => 'pending']);
         CreateSapApInvoiceJob::dispatch($invoice);
 
         return back()->with('success', 'Invoice queued for SAP posting.');
+    }
+
+    public function cancelSapInvoice(Request $request, Invoice $invoice)
+    {
+        $this->authorizeCancelSap($invoice);
+
+        $validationErrors = $invoice->canCancelSapInvoice();
+        if (! empty($validationErrors)) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => implode(', ', $validationErrors),
+                ], 422);
+            }
+
+            return back()->withErrors(['sap_cancel' => implode(', ', $validationErrors)]);
+        }
+
+        if ($invoice->sap_status === 'cancelling') {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invoice cancellation is already in progress.',
+                ], 422);
+            }
+
+            return back()->with('error', 'Invoice cancellation is already in progress.');
+        }
+
+        $invoice->update([
+            'sap_status' => 'cancelling',
+            'sap_cancel_error_message' => null,
+        ]);
+
+        CancelSapApInvoiceJob::dispatch($invoice);
+
+        $message = 'Invoice queued for SAP AP Invoice cancellation.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'sap_status' => 'cancelling',
+                'status_url' => route('invoices.sap-status', $invoice),
+                'invoice_url' => route('invoices.show', $invoice),
+            ]);
+        }
+
+        return redirect()
+            ->route('invoices.show', $invoice)
+            ->with('success', $message);
     }
 
     protected function authorizeSapSync(Invoice $invoice): void
@@ -958,83 +1039,193 @@ class InvoiceController extends Controller
         }
     }
 
-    /**
-     * @return array<int, array{grpo_no: string, doc_entry: int|null, amount: float, line: int, found: bool, sap_card_code: string|null, error: string|null}>
-     */
-    protected function resolveGrpoRowsForPreview(Invoice $invoice, SapService $sapService): array
+    protected function authorizeCancelSap(Invoice $invoice): void
     {
-        $grpoNumbers = $this->parseGrpoNumbersFromPoNo($invoice->po_no);
-        $rows = [];
+        /** @var User $user */
+        $user = Auth::user();
 
-        if (empty($grpoNumbers)) {
-            return [[
-                'grpo_no' => '',
-                'doc_entry' => null,
-                'amount' => (float) $invoice->amount,
-                'line' => 0,
-                'found' => false,
-                'sap_card_code' => null,
-                'error' => 'No PO/GRPO number on invoice. AP Invoice will post without GRPO relationship.',
-            ]];
+        if (! $user->can('cancel-sap-invoice')) {
+            abort(403, 'You do not have permission to cancel SAP invoices.');
         }
 
-        $defaultAmountPerGrpo = round((float) $invoice->amount / count($grpoNumbers), 2);
-        $remaining = (float) $invoice->amount;
+        if (! $user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
+            $locationCode = $user->department_location_code;
+            if ($locationCode && $invoice->cur_loc !== $locationCode) {
+                abort(403, 'You can only cancel SAP invoices from your department location.');
+            }
+        }
+    }
 
-        foreach ($grpoNumbers as $index => $grpoNo) {
-            $amount = $index === count($grpoNumbers) - 1
-                ? $remaining
-                : $defaultAmountPerGrpo;
-            $remaining -= $amount;
+    /**
+     * Resolve open GRPO document lines from the invoice PO number(s).
+     *
+     * @return array<int, array{grpo_no: string, doc_entry: int|null, base_line: int, item_code: string, quantity: float, unit_price: float, found: bool, sap_card_code: string|null, error: string|null, po_no?: string}>
+     */
+    protected function resolveGrpoLinesForPreview(Invoice $invoice, SapService $sapService): array
+    {
+        $poNumbers = $this->parseDocumentNumbers($invoice->po_no);
+        $rows = [];
 
-            $row = [
-                'grpo_no' => $grpoNo,
-                'doc_entry' => null,
-                'amount' => $amount,
-                'line' => 0,
-                'found' => false,
-                'sap_card_code' => null,
-                'error' => null,
-            ];
+        if (empty($poNumbers)) {
+            return [];
+        }
 
+        foreach ($poNumbers as $poNo) {
             try {
-                $grpo = $sapService->getGrpoByDocNum($grpoNo);
-                if ($grpo && isset($grpo['DocEntry'])) {
-                    $row['doc_entry'] = (int) $grpo['DocEntry'];
-                    $row['found'] = true;
-                    $row['sap_card_code'] = $grpo['CardCode'] ?? null;
+                $grpos = $sapService->getGrposByPoNumber($poNo);
+
+                if (empty($grpos)) {
+                    $rows[] = [
+                        'grpo_no' => '',
+                        'doc_entry' => null,
+                        'base_line' => 0,
+                        'item_code' => '',
+                        'quantity' => 0.0,
+                        'unit_price' => 0.0,
+                        'found' => false,
+                        'sap_card_code' => null,
+                        'error' => "No GRPO found in SAP for PO {$poNo}",
+                        'po_no' => $poNo,
+                    ];
+
+                    continue;
+                }
+
+                foreach ($grpos as $grpo) {
+                    $docEntry = (int) ($grpo['DocEntry'] ?? 0);
+                    $grpoNo = (string) ($grpo['DocNum'] ?? '');
+                    $cardCode = $grpo['CardCode'] ?? null;
                     $lines = $grpo['DocumentLines'] ?? [];
-                    if (! empty($lines)) {
-                        $firstLine = $lines[0];
-                        $row['line'] = (int) ($firstLine['LineNum'] ?? 0);
-                        if (isset($firstLine['LineTotal']) && (float) $firstLine['LineTotal'] > 0) {
-                            $row['amount'] = (float) $firstLine['LineTotal'];
+                    $openLinesFound = false;
+
+                    foreach ($lines as $line) {
+                        $openQty = $this->resolveOpenQuantity($line);
+                        if ($openQty <= 0) {
+                            continue;
                         }
+
+                        $openLinesFound = true;
+                        $unitPrice = (float) ($line['Price'] ?? $line['UnitPrice'] ?? 0);
+
+                        $rows[] = [
+                            'grpo_no' => $grpoNo,
+                            'doc_entry' => $docEntry,
+                            'base_line' => (int) ($line['LineNum'] ?? 0),
+                            'item_code' => (string) ($line['ItemCode'] ?? ''),
+                            'quantity' => $openQty,
+                            'unit_price' => $unitPrice,
+                            'found' => true,
+                            'sap_card_code' => $cardCode,
+                            'error' => null,
+                            'po_no' => $poNo,
+                        ];
                     }
-                } else {
-                    $row['error'] = 'GRPO not found in SAP B1';
+
+                    if (! $openLinesFound) {
+                        $rows[] = [
+                            'grpo_no' => $grpoNo,
+                            'doc_entry' => $docEntry,
+                            'base_line' => 0,
+                            'item_code' => '',
+                            'quantity' => 0.0,
+                            'unit_price' => 0.0,
+                            'found' => false,
+                            'sap_card_code' => $cardCode,
+                            'error' => "GRPO {$grpoNo} has no open lines",
+                            'po_no' => $poNo,
+                        ];
+                    }
                 }
             } catch (\Throwable $e) {
-                $row['error'] = $e->getMessage();
+                $rows[] = [
+                    'grpo_no' => '',
+                    'doc_entry' => null,
+                    'base_line' => 0,
+                    'item_code' => '',
+                    'quantity' => 0.0,
+                    'unit_price' => 0.0,
+                    'found' => false,
+                    'sap_card_code' => null,
+                    'error' => $e->getMessage(),
+                    'po_no' => $poNo,
+                ];
             }
-
-            $rows[] = $row;
         }
 
         return $rows;
     }
 
     /**
+     * Prefer RemainingOpenQuantity; fall back to Quantity when open qty is absent.
+     *
+     * @param  array<string, mixed>  $line
+     */
+    protected function resolveOpenQuantity(array $line): float
+    {
+        if (array_key_exists('RemainingOpenQuantity', $line) && $line['RemainingOpenQuantity'] !== null) {
+            return (float) $line['RemainingOpenQuantity'];
+        }
+
+        if (array_key_exists('RemainingOpenInventoryQuantity', $line) && $line['RemainingOpenInventoryQuantity'] !== null) {
+            return (float) $line['RemainingOpenInventoryQuantity'];
+        }
+
+        return (float) ($line['Quantity'] ?? 0);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function parseDocumentNumbers(?string $value): array
+    {
+        if (! $value || trim($value) === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[\s,;|]+/', trim($value), -1, PREG_SPLIT_NO_EMPTY);
+
+        return array_values(array_unique(array_map('trim', $parts ?: [])));
+    }
+
+    /**
+     * @deprecated Use parseDocumentNumbers()
+     *
      * @return array<int, string>
      */
     protected function parseGrpoNumbersFromPoNo(?string $poNo): array
     {
-        if (! $poNo || trim($poNo) === '') {
-            return [];
-        }
+        return $this->parseDocumentNumbers($poNo);
+    }
 
-        $parts = preg_split('/[\s,;|]+/', trim($poNo), -1, PREG_SPLIT_NO_EMPTY);
+    public function sapSubmissionStatus(Invoice $invoice)
+    {
+        $invoice->refresh();
 
-        return array_values(array_unique(array_map('trim', $parts ?: [])));
+        $canCancel = auth()->user()?->can('cancel-sap-invoice') ?? false;
+        $cancelErrors = $invoice->canCancelSapInvoice();
+
+        return response()->json([
+            'sap_status' => $invoice->sap_status,
+            'sap_status_badge' => $invoice->sap_status_badge,
+            'display_sap_document' => $invoice->display_sap_document,
+            'display_sap_cancellation_document' => $invoice->display_sap_cancellation_document,
+            'sap_doc_num' => $invoice->sap_doc_num,
+            'sap_error_message' => $invoice->sap_error_message,
+            'sap_cancel_error_message' => $invoice->sap_cancel_error_message,
+            'sap_cancelled_at' => $invoice->sap_cancelled_at?->toIso8601String(),
+            'sap_cancellation_doc_num' => $invoice->sap_cancellation_doc_num,
+            'is_terminal' => in_array($invoice->sap_status, ['posted', 'failed', 'cancelled'], true),
+            'show_send_button' => auth()->user()?->can('send-to-sap')
+                && in_array($invoice->sap_status, [null, 'failed', 'cancelled'], true)
+                && $invoice->status === 'sap',
+            'show_retry_button' => auth()->user()?->can('send-to-sap')
+                && $invoice->sap_status === 'failed',
+            'show_cancel_button' => $canCancel
+                && empty($cancelErrors)
+                && $invoice->sap_status === 'posted',
+            'show_retry_cancel_button' => $canCancel
+                && $invoice->sap_status === 'posted'
+                && filled($invoice->sap_cancel_error_message),
+        ]);
     }
 }

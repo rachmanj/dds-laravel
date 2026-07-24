@@ -41,6 +41,10 @@ class Invoice extends Model
         'sap_grpo_references',
         'sap_error_message',
         'sap_last_attempted_at',
+        'sap_cancelled_at',
+        'sap_cancel_error_message',
+        'sap_cancellation_doc_num',
+        'sap_cancellation_doc_entry',
         'import_extraction',
     ];
 
@@ -52,6 +56,7 @@ class Invoice extends Model
         'amount' => 'decimal:2',
         'import_extraction' => 'array',
         'sap_grpo_references' => 'array',
+        'sap_cancelled_at' => 'datetime',
     ];
 
     /**
@@ -360,8 +365,20 @@ class Invoice extends Model
             'pending' => '<span class="badge bg-warning">SAP Pending</span>',
             'posted' => '<span class="badge bg-success">SAP Posted: '.($this->sap_doc_num ?? 'N/A').'</span>',
             'failed' => '<span class="badge bg-danger">SAP Failed: '.($this->sap_error_message ?? 'Unknown error').'</span>',
+            'cancelling' => '<span class="badge bg-warning">SAP Cancelling…</span>',
+            'cancelled' => '<span class="badge bg-secondary">SAP Cancelled'.($this->sap_cancellation_doc_num ? ': '.$this->sap_cancellation_doc_num : '').'</span>',
             default => '<span class="badge bg-secondary">Not Sent to SAP</span>',
         };
+    }
+
+    public function getDisplaySapDocumentAttribute(): ?string
+    {
+        return $this->sap_doc_num ?: $this->sap_doc;
+    }
+
+    public function getDisplaySapCancellationDocumentAttribute(): ?string
+    {
+        return $this->sap_cancellation_doc_num;
     }
 
     /**
@@ -529,6 +546,10 @@ class Invoice extends Model
             $errors[] = 'Invoice is already pending SAP sync';
         }
 
+        if ($this->sap_status === 'cancelling') {
+            $errors[] = 'Invoice cancellation is in progress in SAP';
+        }
+
         if ($this->sap_status === 'posted') {
             $errors[] = 'Invoice is already posted to SAP';
         }
@@ -553,6 +574,29 @@ class Invoice extends Model
         // Check currency
         if (! $this->currency) {
             $errors[] = 'Currency is required';
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Check if a posted SAP AP Invoice can be cancelled.
+     * Returns array of error messages (empty if valid).
+     */
+    public function canCancelSapInvoice(): array
+    {
+        $errors = [];
+
+        if ($this->sap_status !== 'posted') {
+            $errors[] = 'Invoice must be posted to SAP before it can be cancelled';
+        }
+
+        if (! $this->sap_doc_entry) {
+            $errors[] = 'Invoice is missing SAP DocEntry required for cancellation';
+        }
+
+        if ($this->payment_status === 'paid') {
+            $errors[] = 'Cannot cancel a paid invoice in SAP';
         }
 
         return $errors;

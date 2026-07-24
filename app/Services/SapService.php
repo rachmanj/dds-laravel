@@ -202,22 +202,191 @@ class SapService
         }
     }
 
+    /**
+     * @return array{DocEntry: int, DocNum: int, CardCode?: string}|null
+     */
+    public function getPurchaseOrderByDocNum(string $docNum): ?array
+    {
+        $this->ensureSession();
+
+        $docNum = trim($docNum);
+        if ($docNum === '') {
+            return null;
+        }
+
+        $filterValue = is_numeric($docNum) ? $docNum : "'".str_replace("'", "''", $docNum)."'";
+
+        try {
+            $result = $this->get('PurchaseOrders', [
+                'query' => [
+                    '$filter' => "DocNum eq {$filterValue}",
+                    '$select' => 'DocEntry,DocNum,CardCode',
+                    '$top' => 1,
+                ],
+            ]);
+
+            $rows = $result['value'] ?? [];
+
+            return ! empty($rows) ? $rows[0] : null;
+        } catch (RequestException $e) {
+            Log::channel('sap')->error('SAP Purchase Order lookup failed', [
+                'doc_num' => $docNum,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Find GRPO(s) created from a Purchase Order DocNum.
+     *
+     * @return array<int, array{DocEntry: int, DocNum: int, CardCode?: string, DocumentLines?: array<int, array<string, mixed>>}>
+     */
+    public function getGrposByPoNumber(string $poDocNum): array
+    {
+        $this->ensureSession();
+
+        $po = $this->getPurchaseOrderByDocNum($poDocNum);
+        if (! $po || empty($po['DocEntry'])) {
+            return [];
+        }
+
+        $poDocEntry = (int) $po['DocEntry'];
+
+        try {
+            $result = $this->get('PurchaseDeliveryNotes', [
+                'query' => [
+                    '$filter' => "DocumentLines/any(l: l/BaseType eq 22 and l/BaseEntry eq {$poDocEntry})",
+                    '$select' => 'DocEntry,DocNum,CardCode,DocumentLines',
+                ],
+            ]);
+
+            return $result['value'] ?? [];
+        } catch (RequestException $e) {
+            Log::channel('sap')->warning('SAP GRPO lambda filter failed, trying CardCode fallback', [
+                'po_doc_num' => $poDocNum,
+                'po_doc_entry' => $poDocEntry,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->getGrposByPoNumberFallback($po);
+        }
+    }
+
+    /**
+     * Fallback when DocumentLines/any() lambda filter is unsupported:
+     * fetch vendor GRPOs and keep those with lines based on the PO.
+     *
+     * @param  array{DocEntry: int, DocNum: int, CardCode?: string}  $po
+     * @return array<int, array{DocEntry: int, DocNum: int, CardCode?: string, DocumentLines?: array<int, array<string, mixed>>}>
+     */
+    protected function getGrposByPoNumberFallback(array $po): array
+    {
+        $poDocEntry = (int) $po['DocEntry'];
+        $cardCode = $po['CardCode'] ?? null;
+
+        if (! $cardCode) {
+            return [];
+        }
+
+        $escapedCardCode = str_replace("'", "''", $cardCode);
+
+        $result = $this->get('PurchaseDeliveryNotes', [
+            'query' => [
+                '$filter' => "CardCode eq '{$escapedCardCode}'",
+                '$select' => 'DocEntry,DocNum,CardCode,DocumentLines',
+                '$orderby' => 'DocEntry desc',
+                '$top' => 100,
+            ],
+        ]);
+
+        $matched = [];
+        foreach ($result['value'] ?? [] as $grpo) {
+            foreach ($grpo['DocumentLines'] ?? [] as $line) {
+                if ((int) ($line['BaseType'] ?? 0) === 22 && (int) ($line['BaseEntry'] ?? 0) === $poDocEntry) {
+                    $matched[] = $grpo;
+                    break;
+                }
+            }
+        }
+
+        return $matched;
+    }
+
     public function createApInvoice(array $payload)
     {
         if (! $this->cookieJar->count()) {
             $this->login();
         }
 
+        $payload = $this->stripNullValues($payload);
+
         try {
-            $response = $this->client->post('Invoices', [
+            $response = $this->client->post('PurchaseInvoices', [
                 'json' => $payload,
             ]);
 
             return json_decode($response->getBody()->getContents(), true);
         } catch (RequestException $e) {
-            Log::channel('sap')->error('SAP Invoice creation failed: '.$e->getMessage());
+            Log::channel('sap')->error('SAP AP Invoice creation failed: '.$e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Cancel a posted AP Invoice in SAP B1 (same as right-click Cancel in the client).
+     * Uses PurchaseInvoicesService_Cancel2, which creates a reversing cancellation document
+     * and marks the original as Cancelled = 'Y', reopening any base GRPO lines.
+     *
+     * @return array<string, mixed>
+     */
+    public function cancelApInvoice(string $docEntry, ?string $comments = null): array
+    {
+        $this->ensureSession();
+
+        $document = array_filter([
+            'DocEntry' => (int) $docEntry,
+            'Comments' => $comments,
+        ], fn ($value) => $value !== null);
+
+        try {
+            $response = $this->client->post('PurchaseInvoicesService_Cancel2', [
+                'json' => ['Document' => $document],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true) ?? [];
+        } catch (RequestException $e) {
+            Log::channel('sap')->error('SAP AP Invoice cancellation failed: '.$e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function stripNullValues(array $data): array
+    {
+        $result = [];
+
+        foreach ($data as $key => $value) {
+            if ($value === null) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $value = $this->stripNullValues($value);
+                if ($key === 'DocumentLines' || ! empty($value)) {
+                    $result[$key] = $value;
+                }
+
+                continue;
+            }
+
+            $result[$key] = $value;
+        }
+
+        return $result;
     }
 
     public function getRecentInvoices($fromDate)

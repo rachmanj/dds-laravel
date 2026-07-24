@@ -55,35 +55,80 @@ class SapApInvoicePreviewTest extends TestCase
         ], $overrides));
     }
 
-    public function test_preview_page_loads_for_finance_user(): void
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function sampleGrpoResponse(): array
+    {
+        return [
+            [
+                'DocEntry' => 99,
+                'DocNum' => 5001,
+                'CardCode' => 'V-SAP',
+                'DocumentLines' => [
+                    [
+                        'LineNum' => 0,
+                        'ItemCode' => 'ITEM-A',
+                        'Quantity' => 10,
+                        'RemainingOpenQuantity' => 10,
+                        'Price' => 50000,
+                    ],
+                    [
+                        'LineNum' => 1,
+                        'ItemCode' => 'ITEM-B',
+                        'Quantity' => 5,
+                        'RemainingOpenQuantity' => 5,
+                        'Price' => 100000,
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    public function test_preview_page_loads_grpo_lines_from_po(): void
     {
         $user = User::factory()->create(['is_active' => true]);
         $user->assignRole('finance');
         $invoice = $this->createSapReadyInvoice($user);
 
-        $this->mock(SapService::class, function ($mock) {
-            $mock->shouldReceive('getGrpoByDocNum')
+        $grpos = $this->sampleGrpoResponse();
+        $this->mock(SapService::class, function ($mock) use ($grpos) {
+            $mock->shouldReceive('getGrposByPoNumber')
                 ->with('12345')
                 ->once()
-                ->andReturn([
-                    'DocEntry' => 99,
-                    'DocNum' => 12345,
-                    'CardCode' => 'V-SAP',
-                    'DocumentLines' => [
-                        ['LineNum' => 0, 'LineTotal' => 500000],
-                    ],
-                ]);
+                ->andReturn($grpos);
         });
 
         $response = $this->actingAs($user)->get(route('invoices.sap-preview', $invoice));
 
         $response->assertOk();
         $response->assertSee('SAP AP Invoice Preview');
-        $response->assertSee('12345');
+        $response->assertSee('GRPO-based');
+        $response->assertSee('5001');
         $response->assertSee('99');
+        $response->assertSee('ITEM-A');
+        $response->assertSee('ITEM-B');
     }
 
-    public function test_submit_dispatches_job_with_grpo_references(): void
+    public function test_preview_standalone_when_no_po_no(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('finance');
+        $invoice = $this->createSapReadyInvoice($user, ['po_no' => null]);
+
+        $this->mock(SapService::class, function ($mock) {
+            $mock->shouldNotReceive('getGrposByPoNumber');
+        });
+
+        $response = $this->actingAs($user)->get(route('invoices.sap-preview', $invoice));
+
+        $response->assertOk();
+        $response->assertSee('Standalone');
+        $response->assertSee('No PO number');
+        $response->assertDontSee('GRPO Lines (SAP Relationship Map)');
+    }
+
+    public function test_submit_dispatches_job_with_grpo_line_references(): void
     {
         Queue::fake();
 
@@ -94,10 +139,12 @@ class SapApInvoicePreviewTest extends TestCase
         $response = $this->actingAs($user)->post(route('invoices.submit-to-sap', $invoice), [
             'grpo_references' => [
                 [
-                    'grpo_no' => '12345',
+                    'grpo_no' => '5001',
                     'doc_entry' => 99,
-                    'amount' => 1000000,
-                    'line' => 0,
+                    'base_line' => 0,
+                    'item_code' => 'ITEM-A',
+                    'quantity' => 10,
+                    'unit_price' => 50000,
                 ],
             ],
         ]);
@@ -108,6 +155,31 @@ class SapApInvoicePreviewTest extends TestCase
         $invoice->refresh();
         $this->assertSame('pending', $invoice->sap_status);
         $this->assertCount(1, $invoice->sap_grpo_references);
+        $this->assertSame('ITEM-A', $invoice->sap_grpo_references[0]['item_code']);
+        $this->assertSame(0, $invoice->sap_grpo_references[0]['base_line']);
+
+        Queue::assertPushed(CreateSapApInvoiceJob::class);
+    }
+
+    public function test_submit_standalone_succeeds_without_grpo_refs(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('finance');
+        $invoice = $this->createSapReadyInvoice($user, ['po_no' => null]);
+
+        $response = $this->actingAs($user)->post(route('invoices.submit-to-sap', $invoice), [
+            'grpo_references' => [],
+        ]);
+
+        $response->assertRedirect(route('invoices.show', $invoice));
+        $response->assertSessionHas('success');
+        $response->assertSessionHas('success', fn ($msg) => str_contains($msg, 'standalone'));
+
+        $invoice->refresh();
+        $this->assertSame('pending', $invoice->sap_status);
+        $this->assertNull($invoice->sap_grpo_references);
 
         Queue::assertPushed(CreateSapApInvoiceJob::class);
     }
@@ -125,23 +197,27 @@ class SapApInvoicePreviewTest extends TestCase
         $response->assertSessionHasErrors('grpo_references');
     }
 
-    public function test_payload_builder_includes_base_document_fields_when_grpo_refs_provided(): void
+    public function test_payload_builder_includes_base_document_fields_per_grpo_line(): void
     {
         $user = User::factory()->create(['is_active' => true]);
         $invoice = $this->createSapReadyInvoice($user);
 
         $builder = new SapApInvoicePayloadBuilder($invoice, [
             [
-                'grpo_no' => '12345',
+                'grpo_no' => '5001',
                 'doc_entry' => 99,
-                'amount' => 500000,
-                'line' => 0,
+                'base_line' => 0,
+                'item_code' => 'ITEM-A',
+                'quantity' => 10,
+                'unit_price' => 50000,
             ],
             [
-                'grpo_no' => '12346',
-                'doc_entry' => 100,
-                'amount' => 500000,
-                'line' => 1,
+                'grpo_no' => '5001',
+                'doc_entry' => 99,
+                'base_line' => 1,
+                'item_code' => 'ITEM-B',
+                'quantity' => 5,
+                'unit_price' => 100000,
             ],
         ]);
 
@@ -151,8 +227,11 @@ class SapApInvoicePreviewTest extends TestCase
         $this->assertSame(20, $payload['DocumentLines'][0]['BaseType']);
         $this->assertSame(99, $payload['DocumentLines'][0]['BaseEntry']);
         $this->assertSame(0, $payload['DocumentLines'][0]['BaseLine']);
-        $this->assertSame(100, $payload['DocumentLines'][1]['BaseEntry']);
+        $this->assertSame('ITEM-A', $payload['DocumentLines'][0]['ItemCode']);
+        $this->assertSame(10.0, $payload['DocumentLines'][0]['Quantity']);
         $this->assertSame(1, $payload['DocumentLines'][1]['BaseLine']);
+        $this->assertSame('ITEM-B', $payload['DocumentLines'][1]['ItemCode']);
+        $this->assertSame(5.0, $payload['DocumentLines'][1]['Quantity']);
     }
 
     public function test_payload_builder_falls_back_to_standalone_line_without_grpo_refs(): void
@@ -179,25 +258,79 @@ class SapApInvoicePreviewTest extends TestCase
         $response->assertForbidden();
     }
 
-    public function test_parse_multiple_grpo_numbers_from_po_no(): void
+    public function test_preview_resolves_multiple_po_numbers(): void
     {
         $user = User::factory()->create(['is_active' => true]);
         $user->assignRole('finance');
         $invoice = $this->createSapReadyInvoice($user, ['po_no' => '1001, 1002;1003']);
 
         $this->mock(SapService::class, function ($mock) {
-            $mock->shouldReceive('getGrpoByDocNum')->andReturn([
-                'DocEntry' => 1,
-                'DocNum' => 1,
-                'DocumentLines' => [],
-            ]);
+            $mock->shouldReceive('getGrposByPoNumber')
+                ->times(3)
+                ->andReturnUsing(function (string $poNo) {
+                    return [
+                        [
+                            'DocEntry' => (int) $poNo,
+                            'DocNum' => (int) $poNo + 4000,
+                            'CardCode' => 'V-SAP',
+                            'DocumentLines' => [
+                                [
+                                    'LineNum' => 0,
+                                    'ItemCode' => 'ITEM-'.$poNo,
+                                    'Quantity' => 1,
+                                    'RemainingOpenQuantity' => 1,
+                                    'Price' => 100,
+                                ],
+                            ],
+                        ],
+                    ];
+                });
         });
 
         $response = $this->actingAs($user)->get(route('invoices.sap-preview', $invoice));
 
         $response->assertOk();
-        $response->assertSee('1001');
-        $response->assertSee('1002');
-        $response->assertSee('1003');
+        $response->assertSee('ITEM-1001');
+        $response->assertSee('ITEM-1002');
+        $response->assertSee('ITEM-1003');
+    }
+
+    public function test_sap_status_endpoint_returns_current_state(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('finance');
+        $invoice = $this->createSapReadyInvoice($user, [
+            'sap_status' => 'pending',
+            'sap_doc_num' => null,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('invoices.sap-status', $invoice));
+
+        $response->assertOk();
+        $response->assertJson([
+            'sap_status' => 'pending',
+            'is_terminal' => false,
+        ]);
+        $response->assertJsonStructure(['sap_status_badge', 'display_sap_document']);
+    }
+
+    public function test_submit_returns_json_for_ajax_requests(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('finance');
+        $invoice = $this->createSapReadyInvoice($user, ['po_no' => null]);
+
+        $response = $this->actingAs($user)->postJson(route('invoices.submit-to-sap', $invoice), [
+            'grpo_references' => [],
+        ]);
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'sap_status' => 'pending',
+        ]);
+        $response->assertJsonStructure(['status_url', 'invoice_url']);
     }
 }

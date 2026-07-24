@@ -111,23 +111,56 @@
                                             <td>{!! $invoice->status_badge !!}</td>
                                         </tr>
                                         <tr>
-                                            <td><strong>SAP Status:</strong></td>
-                                            <td>{!! $invoice->sap_status_badge !!}</td>
+                                            <td><strong>SAP Post Status:</strong></td>
+                                            <td id="invoice-sap-status-cell">
+                                                @if ($invoice->sap_status === 'pending')
+                                                    <span class="badge bg-warning"><i class="fas fa-spinner fa-spin"></i> SAP Processing…</span>
+                                                @elseif ($invoice->sap_status === 'cancelling')
+                                                    <span class="badge bg-warning"><i class="fas fa-spinner fa-spin"></i> SAP Cancelling…</span>
+                                                @else
+                                                    {!! $invoice->sap_status_badge !!}
+                                                @endif
+                                            </td>
                                         </tr>
                                         @can('send-to-sap')
-                                            @if (($invoice->sap_status === null || $invoice->sap_status === 'failed') && $invoice->status === 'sap')
-                                                <tr>
+                                            @if (in_array($invoice->sap_status, [null, 'failed', 'cancelled'], true) && $invoice->status === 'sap')
+                                                <tr id="invoice-sap-send-row" @if ($invoice->sap_status === 'failed') class="d-none" @endif>
                                                     <td colspan="2">
                                                         <a href="{{ route('invoices.sap-preview', $invoice) }}" class="btn btn-primary btn-sm">Send to SAP</a>
                                                     </td>
                                                 </tr>
                                             @endif
                                             @if ($invoice->sap_status === 'failed')
-                                                <tr>
+                                                <tr id="invoice-sap-retry-row">
                                                     <td colspan="2">
                                                         <a href="{{ route('invoices.sap-preview', $invoice) }}" class="btn btn-warning btn-sm">Retry SAP Sync</a>
                                                     </td>
                                                 </tr>
+                                            @endif
+                                        @endcan
+                                        @can('cancel-sap-invoice')
+                                            @if ($invoice->sap_status === 'posted')
+                                                <tr id="invoice-sap-cancel-row" @if ($invoice->sap_cancel_error_message) class="d-none" @endif>
+                                                    <td colspan="2">
+                                                        <button type="button" class="btn btn-danger btn-sm" id="invoice-sap-cancel-btn">
+                                                            <i class="fas fa-ban"></i> Cancel Posted AP Invoice
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                @if ($invoice->sap_cancel_error_message)
+                                                    <tr id="invoice-sap-cancel-error-row">
+                                                        <td colspan="2">
+                                                            <div class="alert alert-danger py-2 mb-2 small" id="invoice-sap-cancel-error-message">{{ $invoice->sap_cancel_error_message }}</div>
+                                                        </td>
+                                                    </tr>
+                                                    <tr id="invoice-sap-cancel-retry-row">
+                                                        <td colspan="2">
+                                                            <button type="button" class="btn btn-warning btn-sm" id="invoice-sap-cancel-retry-btn">
+                                                                <i class="fas fa-redo"></i> Retry Cancel
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                @endif
                                             @endif
                                         @endcan
                                         <tr>
@@ -267,7 +300,16 @@
                                     <h6><strong>Additional Information:</strong></h6>
                                     <div class="row">
                                         <div class="col-md-6">
-                                            <strong>SAP Document:</strong> {{ $invoice->sap_doc ?: '-' }}
+                                            <strong>SAP Document:</strong> <span id="invoice-sap-document-value">{{ $invoice->display_sap_document ?: '-' }}</span>
+                                            @if ($invoice->sap_status === 'cancelled' || $invoice->display_sap_cancellation_document)
+                                                <br>
+                                                <strong>SAP Cancellation Doc:</strong>
+                                                <span id="invoice-sap-cancellation-document-value">{{ $invoice->display_sap_cancellation_document ?: '-' }}</span>
+                                                @if ($invoice->sap_cancelled_at)
+                                                    <br>
+                                                    <small class="text-muted" id="invoice-sap-cancelled-at-value">Cancelled at {{ $invoice->sap_cancelled_at->format('d-M-Y H:i') }}</small>
+                                                @endif
+                                            @endif
                                         </div>
                                         <div class="col-md-6">
                                             <strong>Created By:</strong>
@@ -471,6 +513,8 @@
 @endsection
 
 @section('scripts')
+    @include('invoices.partials.sap-status-monitor')
+
     <script>
         $(document).ready(function() {
             @if (!empty($canEditInvoiceLineDetails) && $invoice->lineDetails->isNotEmpty())
@@ -917,6 +961,198 @@
                         return 'Unknown';
                 }
             }
+
+            @if (in_array($invoice->sap_status, ['pending', 'cancelling'], true))
+                @if ($invoice->sap_status === 'cancelling')
+                    DdsSapStatusMonitor.showOverlay(
+                        'Cancelling in SAP',
+                        'Waiting for SAP B1 to cancel the AP Invoice…',
+                        true,
+                        'cancel'
+                    );
+                @endif
+
+                DdsSapStatusMonitor.poll({
+                    invoiceId: {{ $invoice->id }},
+                    statusUrl: @json(route('invoices.sap-status', $invoice)),
+                    operation: @json($invoice->sap_status === 'cancelling' ? 'cancel' : 'post'),
+                    onUpdate: function(data) {
+                        DdsSapStatusMonitor.updateShowPage(data);
+                    },
+                }).then(function(data) {
+                    DdsSapStatusMonitor.showOverlayResult(
+                        data,
+                        @json(route('invoices.show', $invoice)),
+                        @json($invoice->sap_status === 'cancelling' ? 'cancel' : 'post')
+                    );
+                }).catch(function(error) {
+                    if (@json($invoice->sap_status === 'cancelling')) {
+                        DdsSapStatusMonitor.showOverlay(
+                            'Cancellation taking longer than expected',
+                            error.message || 'Please refresh the page to check the latest status.',
+                            false,
+                            'cancel'
+                        );
+                    }
+                });
+            @endif
+
+            @can('cancel-sap-invoice')
+            (function() {
+                const cancelBtn = document.getElementById('invoice-sap-cancel-btn');
+                const retryCancelBtn = document.getElementById('invoice-sap-cancel-retry-btn');
+                if (!cancelBtn && !retryCancelBtn) {
+                    return;
+                }
+
+                const cancelUrl = @json(route('invoices.cancel-sap', $invoice));
+                const statusUrl = @json(route('invoices.sap-status', $invoice));
+                const invoiceUrl = @json(route('invoices.show', $invoice));
+                const invoiceId = {{ $invoice->id }};
+                const invoiceNumber = @json($invoice->invoice_number);
+                const sapDocNum = @json($invoice->display_sap_document);
+                const csrfToken = @json(csrf_token());
+
+                function setCancelButtonsDisabled(disabled) {
+                    [cancelBtn, retryCancelBtn].forEach(function(btn) {
+                        if (!btn) {
+                            return;
+                        }
+                        btn.disabled = disabled;
+                    });
+                }
+
+                function confirmCancel(isRetry) {
+                    return Swal.fire({
+                        title: isRetry ? 'Retry SAP Cancellation?' : 'Cancel Posted AP Invoice?',
+                        html: isRetry ?
+                            'Retry cancelling SAP document <strong>' + (sapDocNum || 'N/A') + '</strong> for invoice <strong>' + invoiceNumber + '</strong>?' :
+                            'This will cancel SAP document <strong>' + (sapDocNum || 'N/A') + '</strong> for invoice <strong>' + invoiceNumber + '</strong>.' +
+                            '<br><br>Same as right-click <em>Cancel</em> in SAP B1. The base GRPO will reopen.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#dc3545',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: isRetry ? 'Yes, retry cancel' : 'Yes, cancel in SAP',
+                        cancelButtonText: 'Keep posted',
+                        reverseButtons: true,
+                        focusCancel: true,
+                    });
+                }
+
+                function executeCancel(triggerBtn, isRetry) {
+                    setCancelButtonsDisabled(true);
+                    if (triggerBtn) {
+                        triggerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling…';
+                    }
+
+                    DdsSapStatusMonitor.showOverlay(
+                        'Cancelling in SAP',
+                        'Queueing AP Invoice cancellation in SAP B1…',
+                        true,
+                        'cancel'
+                    );
+
+                    fetch(cancelUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                        })
+                        .then(function(response) {
+                            return response.json().then(function(data) {
+                                return {
+                                    ok: response.ok,
+                                    data: data,
+                                };
+                            });
+                        })
+                        .then(function(result) {
+                            if (!result.ok) {
+                                const message = result.data.message ||
+                                    (result.data.errors ?
+                                        Object.values(result.data.errors).flat().join(' ') :
+                                        'Cancellation request failed');
+                                throw new Error(message);
+                            }
+
+                            DdsSapStatusMonitor.showOverlay(
+                                'Processing in SAP',
+                                'Waiting for SAP B1 to cancel the AP Invoice and reopen GRPO lines…',
+                                true,
+                                'cancel'
+                            );
+
+                            return DdsSapStatusMonitor.poll({
+                                invoiceId: invoiceId,
+                                statusUrl: statusUrl,
+                                operation: 'cancel',
+                                onUpdate: function(data) {
+                                    DdsSapStatusMonitor.updateShowPage(data);
+                                    const cancelErrorEl = document.getElementById('invoice-sap-cancel-error-message');
+                                    if (cancelErrorEl && data.sap_cancel_error_message) {
+                                        cancelErrorEl.textContent = data.sap_cancel_error_message;
+                                    }
+                                },
+                            });
+                        })
+                        .then(function(data) {
+                            DdsSapStatusMonitor.showOverlayResult(data, invoiceUrl, 'cancel');
+                            if (cancelBtn) {
+                                cancelBtn.innerHTML = '<i class="fas fa-ban"></i> Cancel Posted AP Invoice';
+                            }
+                            if (retryCancelBtn) {
+                                retryCancelBtn.innerHTML = '<i class="fas fa-redo"></i> Retry Cancel';
+                            }
+                            setCancelButtonsDisabled(false);
+                        })
+                        .catch(function(error) {
+                            DdsSapStatusMonitor.showOverlay(
+                                'Cancellation failed',
+                                error.message || 'Unable to cancel the AP Invoice in SAP.',
+                                false,
+                                'cancel'
+                            );
+                            document.getElementById('sap-status-spinner').classList.add('d-none');
+                            document.getElementById('sap-status-result').classList.remove('d-none');
+                            document.getElementById('sap-status-badge').innerHTML =
+                                '<span class="badge bg-danger">Cancellation failed</span>';
+                            document.getElementById('sap-status-detail').textContent = error.message ||
+                                'Unable to cancel the AP Invoice in SAP.';
+                            document.getElementById('sap-status-invoice-link').href = invoiceUrl;
+                            if (cancelBtn) {
+                                cancelBtn.innerHTML = '<i class="fas fa-ban"></i> Cancel Posted AP Invoice';
+                            }
+                            if (retryCancelBtn) {
+                                retryCancelBtn.innerHTML = '<i class="fas fa-redo"></i> Retry Cancel';
+                            }
+                            setCancelButtonsDisabled(false);
+                        });
+                }
+
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', function() {
+                        confirmCancel(false).then(function(result) {
+                            if (result.isConfirmed) {
+                                executeCancel(cancelBtn, false);
+                            }
+                        });
+                    });
+                }
+
+                if (retryCancelBtn) {
+                    retryCancelBtn.addEventListener('click', function() {
+                        confirmCancel(true).then(function(result) {
+                            if (result.isConfirmed) {
+                                executeCancel(retryCancelBtn, true);
+                            }
+                        });
+                    });
+                }
+            })();
+            @endcan
         });
     </script>
 

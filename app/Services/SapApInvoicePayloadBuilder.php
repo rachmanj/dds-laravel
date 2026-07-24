@@ -13,12 +13,12 @@ class SapApInvoicePayloadBuilder
     protected array $config;
 
     /**
-     * @var array<int, array{grpo_no: string, doc_entry: int|string, amount: float|int|string, line?: int}>
+     * @var array<int, array{grpo_no: string, doc_entry: int|string, base_line: int|string, item_code: string, quantity: float|int|string, unit_price?: float|int|string|null}>
      */
     protected array $grpoReferences;
 
     /**
-     * @param  array<int, array{grpo_no: string, doc_entry: int|string, amount: float|int|string, line?: int}>  $grpoReferences
+     * @param  array<int, array{grpo_no: string, doc_entry: int|string, base_line: int|string, item_code: string, quantity: float|int|string, unit_price?: float|int|string|null}>  $grpoReferences
      */
     public function __construct(Invoice $invoice, array $grpoReferences = [])
     {
@@ -44,7 +44,6 @@ class SapApInvoicePayloadBuilder
             'DocumentLines' => $this->mapLineItems(),
         ];
 
-        // Add PO reference if available
         if ($this->invoice->po_no) {
             $payload['Reference1'] = $this->invoice->po_no;
         }
@@ -99,37 +98,37 @@ class SapApInvoicePayloadBuilder
             return $this->invoice->payment_date->format('Y-m-d');
         }
 
-        // Default: payment terms days from invoice date
         $paymentTerms = $this->config['default_payment_terms'] ?? 30;
 
         return $this->invoice->invoice_date->copy()->addDays($paymentTerms)->format('Y-m-d');
     }
 
     /**
-     * Map line items
+     * Map line items — GRPO-based draw-from-base or standalone service line
      */
     protected function mapLineItems(): array
     {
         $projectCode = $this->mapProjectCode();
         $costingCode = $this->mapCostingCode();
         $taxCode = $this->determineTaxCode();
-        $itemCode = $this->config['default_item_code'] ?? 'SERVICE';
+        $defaultItemCode = $this->config['default_item_code'] ?? 'SERVICE';
 
         if (! empty($this->grpoReferences)) {
-            return array_map(function (array $ref) use ($projectCode, $costingCode, $taxCode, $itemCode) {
-                $amount = (float) $ref['amount'];
+            return array_map(function (array $ref) use ($projectCode, $costingCode, $taxCode, $defaultItemCode) {
                 $line = [
-                    'ItemCode' => $itemCode,
-                    'Quantity' => 1,
-                    'UnitPrice' => $amount,
+                    'ItemCode' => $ref['item_code'] ?: $defaultItemCode,
+                    'Quantity' => (float) $ref['quantity'],
                     'TaxCode' => $taxCode,
-                    'LineTotal' => $amount,
                     'ProjectCode' => $projectCode,
                     'CostingCode' => $costingCode,
                     'BaseType' => 20,
                     'BaseEntry' => (int) $ref['doc_entry'],
-                    'BaseLine' => (int) ($ref['line'] ?? 0),
+                    'BaseLine' => (int) $ref['base_line'],
                 ];
+
+                if (isset($ref['unit_price']) && $ref['unit_price'] !== null && $ref['unit_price'] !== '') {
+                    $line['UnitPrice'] = (float) $ref['unit_price'];
+                }
 
                 return $line;
             }, $this->grpoReferences);
@@ -137,7 +136,7 @@ class SapApInvoicePayloadBuilder
 
         return [
             [
-                'ItemCode' => $itemCode,
+                'ItemCode' => $defaultItemCode,
                 'Quantity' => 1,
                 'UnitPrice' => $this->invoice->amount,
                 'TaxCode' => $taxCode,
@@ -157,7 +156,6 @@ class SapApInvoicePayloadBuilder
             return null;
         }
 
-        // Try direct match by sap_code first
         $sapProject = SapProject::where('sap_code', $this->invoice->invoice_project)
             ->active()
             ->first();
@@ -166,7 +164,6 @@ class SapApInvoicePayloadBuilder
             return $sapProject->sap_code;
         }
 
-        // Try match by name (if invoice_project contains name instead of code)
         $sapProject = SapProject::where('name', $this->invoice->invoice_project)
             ->active()
             ->first();
@@ -183,7 +180,6 @@ class SapApInvoicePayloadBuilder
             return null;
         }
 
-        // Try direct match by sap_code first
         $sapDepartment = SapDepartment::where('sap_code', $this->invoice->cur_loc)
             ->active()
             ->first();
@@ -192,7 +188,6 @@ class SapApInvoicePayloadBuilder
             return $sapDepartment->sap_code;
         }
 
-        // Try match by name (if cur_loc contains name instead of code)
         $sapDepartment = SapDepartment::where('name', $this->invoice->cur_loc)
             ->active()
             ->first();
@@ -207,22 +202,19 @@ class SapApInvoicePayloadBuilder
     {
         $taxConfig = $this->config['tax_codes'] ?? [];
 
-        // Check by currency
         if (isset($taxConfig['by_currency'][$this->invoice->currency])) {
             return $taxConfig['by_currency'][$this->invoice->currency];
         }
 
-        // Check by invoice type (if configured)
         if ($this->invoice->type && isset($taxConfig['by_invoice_type'][$this->invoice->type->type_name])) {
             return $taxConfig['by_invoice_type'][$this->invoice->type->type_name];
         }
 
-        // Default
         return $taxConfig['default'] ?? 'EXEMPT';
     }
 
     /**
-     * Get preview data for UI (future use)
+     * Get preview data for UI
      */
     public function getPreviewData(): array
     {
@@ -252,6 +244,7 @@ class SapApInvoicePayloadBuilder
                 'tax_code' => $this->determineTaxCode(),
                 'document_lines' => $this->mapLineItems(),
                 'grpo_linked' => ! empty($this->grpoReferences),
+                'standalone' => empty($this->grpoReferences) && empty($this->invoice->po_no),
             ],
         ];
     }

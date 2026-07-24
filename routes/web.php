@@ -119,3 +119,11 @@ Route::group(['middleware' => ['auth', 'permission:send-to-sap']], function () {
     Route::post('/invoices/{invoice}/submit-to-sap', [InvoiceController::class, 'submitToSap'])->name('invoices.submit-to-sap');
     Route::post('/invoices/{invoice}/sap-sync', [InvoiceController::class, 'sapSync'])->name('invoices.sap-sync');
 });
+
+Route::group(['middleware' => ['auth', 'permission:cancel-sap-invoice']], function () {
+    Route::post('/invoices/{invoice}/cancel-sap', [InvoiceController::class, 'cancelSapInvoice'])->name('invoices.cancel-sap');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('/invoices/{invoice}/sap-status', [InvoiceController::class, 'sapSubmissionStatus'])->name('invoices.sap-status');
+});
