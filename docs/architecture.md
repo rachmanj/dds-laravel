@@ -2427,6 +2427,54 @@ return response()->json(['success' => false, 'message' => 'Unauthorized']);
 -   Accept SAP `CardType` values of `S` or `cSupplier`; treat mismatches as configuration issues with guidance.
 -   Persist request context for both success and failure (card code at minimum) to simplify production troubleshooting.
 
+### Submission Eligibility & Legacy `sap_doc` (2026-07-28)
+
+**`Invoice::canSyncToSap()`** is the single validation source for preview, submit, and sync routes. **`Invoice::has_legacy_sap_doc`** is true when `sap_status` is null and `sap_doc` is filled (manual entry via **SAP Update** before automated posting).
+
+| Check | Rule |
+|-------|------|
+| Workflow `status` | Block only `cancel`; `open`, `verify`, `return`, `sap`, `close` may submit |
+| Legacy manual SAP doc | Block when `has_legacy_sap_doc` (prevents duplicate AP Invoice in SAP B1) |
+| `sap_status` | Block `pending`, `cancelling`, `posted`; allow `null`, `failed`, `cancelled` (retry) |
+| Supplier | Required with `sap_code` |
+| Amount / date / currency | Amount > 0; `invoice_date` and `currency` required |
+| PO-based submit | When `po_no` is set, at least one GRPO line reference required on submit |
+
+**UI gates** (invoice show + `sapSubmissionStatus` JSON): **Send to SAP** when user has `send-to-sap`, `sap_status` in `null`/`failed`/`cancelled`, `status !== cancel`, and not `has_legacy_sap_doc`.
+
+**On successful post** (`CreateSapApInvoiceJob::persistPostedInvoice()`): set `sap_status = posted`, `sap_doc_num`, `sap_doc_entry`, optionally `sap_doc`, clear `sap_error_message`, and set workflow **`status = 'sap'`**. Cancellation does not revert workflow `status`.
+
+**Invoices list** (`invoices.index`): DataTables column **SAP Status** renders `sap_status_badge` (Not Sent, Legacy, Pending, Posted, Failed, etc.).
+
+**Tests**: `tests/Feature/SapApInvoicePreviewTest.php`, `tests/Feature/SapApInvoiceCancelTest.php`.
+
+### Submission Eligibility & Legacy `sap_doc` (2026-07-28)
+
+**Single source of truth**: `Invoice::canSyncToSap()` (used by preview, submit, sync routes and UI gates).
+
+| Check | Rule |
+|-------|------|
+| Workflow `status` | Block only `cancel`; allow `open`, `verify`, `return`, `sap`, `close` |
+| `sap_status` | Block `pending`, `cancelling`, `posted`; allow `null`, `failed`, `cancelled` for (re)submit |
+| Legacy manual SAP doc | Block when `has_legacy_sap_doc` (`sap_status` null **and** `sap_doc` set — from pre-automation **SAP Update** flow) |
+| Supplier | Required with `sap_code` |
+| Amount / date / currency | Amount > 0, `invoice_date` and `currency` required |
+| PO-based submit | If `po_no` set, at least one GRPO line reference required on submit |
+
+**UI**:
+
+-   Invoice show: **Send to SAP** when `send-to-sap` permission, `status !== cancel`, `sap_status` in `null`/`failed`/`cancelled`, and not `has_legacy_sap_doc`.
+-   Invoice index: **SAP Status** column (`sap_status_badge`) — Not Sent, Legacy, Pending, Posted, Failed, etc.
+-   Legacy rows display badge **SAP Doc: {n} (Legacy)** instead of "Not Sent to SAP".
+
+**Post-success side effects** (`CreateSapApInvoiceJob::persistPostedInvoice`):
+
+-   `sap_status` → `posted`, `sap_doc_num`, `sap_doc_entry`, optional `sap_doc` (unique)
+-   Workflow **`status` → `sap`** (automatic; no manual flip required before submit)
+-   `sap_logs` success row with request/response payloads
+
+**Coexistence with SAP Update**: Manual `sap_doc` entry via `SapUpdateController` does not set `sap_status`. Automated flow always sets `sap_status` when queued (`pending`). The legacy guard prevents double posting for historical data.
+
 ### Database Adjustments
 
 -   **Invoices Table**:
@@ -2449,11 +2497,11 @@ return response()->json(['success' => false, 'message' => 'Unauthorized']);
 
 ### Workflow
 
-1. Trigger: Finance user clicks "Send to SAP" on approved invoice.
-2. Validation: Check data mappings, ensure supplier has SAP CardCode, and capture context for auditing.
-3. Queue: Dispatch `CreateSapApInvoiceJob`.
-4. Processing: Resolve SAP vendor, build payload, POST to /Invoices, handle response.
-5. Update: Set `sap_status` (`pending` → `posted` / `failed`), persist structured log entry in `sap_logs`.
+1. Trigger: Finance user clicks **Send to SAP** on an eligible invoice (any workflow `status` except `cancel`; not legacy `sap_doc`).
+2. Validation: `Invoice::canSyncToSap()` — supplier SAP code, amounts/dates, SAP post state, legacy guard.
+3. Queue: Set `sap_status = pending`, dispatch `CreateSapApInvoiceJob`.
+4. Processing: Resolve SAP vendor, build payload, POST to PurchaseInvoices, handle response.
+5. Update: `sap_status` (`pending` → `posted` / `failed`), workflow `status = sap` on success, persist `sap_logs`.
 6. Reconciliation: Scheduled command queries SAP for updates.
 
 ### Sequence Diagram for Invoice Creation
@@ -2480,7 +2528,7 @@ sequenceDiagram
     LaravelApp->>SAP: POST /Invoices (Payload)
     alt SAP Success
         SAP-->>LaravelApp: 201 Created (with DocNum)
-        LaravelApp->>LaravelApp: Update Invoice (sap_status='posted', sap_doc_num)
+        LaravelApp->>LaravelApp: Update Invoice (sap_status='posted', sap_doc_num, status='sap')
         LaravelApp->>User: Notify Success (e.g., Email/Toast)
     else SAP Failure (e.g., Transient)
         SAP-->>LaravelApp: Error Response

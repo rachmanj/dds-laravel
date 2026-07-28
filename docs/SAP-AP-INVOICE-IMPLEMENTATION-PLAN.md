@@ -4,6 +4,8 @@
 **Status**: Ready for Implementation  
 **Based on**: [SAP-AP-INVOICE-INTEGRATION-CONCEPT.md](./SAP-AP-INVOICE-INTEGRATION-CONCEPT.md)
 
+**Update 2026-07-28**: Submission eligibility and legacy `sap_doc` guard are documented in [`docs/decisions.md`](decisions.md) (2026-07-28) and [`docs/architecture.md`](architecture.md) (SAP B1 Integration). `canSyncToSap()` no longer requires `status = 'sap'` before submit; it blocks `cancel` and `has_legacy_sap_doc`. Successful post sets workflow `status = 'sap'` in `CreateSapApInvoiceJob::persistPostedInvoice()`.
+
 ---
 
 ## Table of Contents
@@ -924,9 +926,9 @@ public function canSyncToSap(): array
 {
     $errors = [];
 
-    // Check status
-    if ($this->status !== 'sap') {
-        $errors[] = 'Invoice status must be "sap" before syncing to SAP';
+    // Check workflow status (2026-07-28: block cancel only; any other status may submit)
+    if ($this->status === 'cancel') {
+        $errors[] = 'Cancelled invoices cannot be synced to SAP';
     }
 
     // Check SAP status
@@ -934,8 +936,17 @@ public function canSyncToSap(): array
         $errors[] = 'Invoice is already pending SAP sync';
     }
 
+    if ($this->sap_status === 'cancelling') {
+        $errors[] = 'Invoice cancellation is in progress in SAP';
+    }
+
     if ($this->sap_status === 'posted') {
         $errors[] = 'Invoice is already posted to SAP';
+    }
+
+    // Legacy manual sap_doc (pre-automation SAP Update feature)
+    if ($this->has_legacy_sap_doc) {
+        $errors[] = 'Invoice already has a SAP document number recorded manually...';
     }
 
     // Check supplier

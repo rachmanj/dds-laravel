@@ -15,6 +15,7 @@ use App\Rules\UniqueInvoicePerSupplier;
 use App\Services\InvoiceCreatorService;
 use App\Services\SapApInvoicePayloadBuilder;
 use App\Services\SapService;
+use App\Support\InvoiceListScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -69,13 +70,7 @@ class InvoiceController extends Controller
             )) as days_in_location')
             ->with(['supplier', 'type', 'creator', 'attachments']);
 
-        // Apply location-based filtering unless user is admin/superadmin/accounting
-        if (! $request->show_all && ! $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
-            $locationCode = $user->department_location_code;
-            if ($locationCode) {
-                $query->where('cur_loc', $locationCode);
-            }
-        }
+        InvoiceListScope::applyLocationFilter($query, $user, $request->boolean('show_all'));
 
         // Apply search filters
         if ($request->filled('search_invoice_number')) {
@@ -110,11 +105,6 @@ class InvoiceController extends Controller
             $query->where('invoice_project', $request->search_invoice_project);
         }
 
-        // Show all records for users with see-all-record-switch permission if requested
-        if ($request->show_all && $user->can('see-all-record-switch')) {
-            // Don't apply location filter - already handled above
-        }
-
         // Use DataTables with database-level sorting and pagination
         return DataTables::of($query)
             ->orderColumn('days_difference', 'days_in_location $1')
@@ -135,6 +125,9 @@ class InvoiceController extends Controller
             })
             ->addColumn('status_badge', function ($invoice) {
                 return $invoice->status_badge;
+            })
+            ->addColumn('sap_status_badge', function ($invoice) {
+                return $invoice->sap_status_badge;
             })
             ->addColumn('days_difference', function ($invoice) {
                 // Use pre-calculated days_in_location from query
@@ -164,7 +157,7 @@ class InvoiceController extends Controller
 
                 return $actions;
             })
-            ->rawColumns(['status_badge', 'days_difference', 'actions'])
+            ->rawColumns(['status_badge', 'sap_status_badge', 'days_difference', 'actions'])
             ->make(true);
     }
 
@@ -1217,9 +1210,11 @@ class InvoiceController extends Controller
             'is_terminal' => in_array($invoice->sap_status, ['posted', 'failed', 'cancelled'], true),
             'show_send_button' => auth()->user()?->can('send-to-sap')
                 && in_array($invoice->sap_status, [null, 'failed', 'cancelled'], true)
-                && $invoice->status === 'sap',
+                && $invoice->status !== 'cancel'
+                && ! $invoice->has_legacy_sap_doc,
             'show_retry_button' => auth()->user()?->can('send-to-sap')
-                && $invoice->sap_status === 'failed',
+                && $invoice->sap_status === 'failed'
+                && ! $invoice->has_legacy_sap_doc,
             'show_cancel_button' => $canCancel
                 && empty($cancelErrors)
                 && $invoice->sap_status === 'posted',

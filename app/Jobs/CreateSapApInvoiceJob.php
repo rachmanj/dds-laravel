@@ -249,6 +249,8 @@ class CreateSapApInvoiceJob implements ShouldQueue
         ?array $payload,
         array|string|null $responsePayload
     ): void {
+        $attributes['status'] = 'sap';
+
         if ($docNum && $this->canAssignSapDoc($docNum, $invoice->id)) {
             $attributes['sap_doc'] = $docNum;
         }

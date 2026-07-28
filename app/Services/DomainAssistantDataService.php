@@ -9,6 +9,7 @@ use App\Models\ReconcileDetail;
 use App\Models\SolarPriceHistory;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Support\InvoiceListScope;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -26,7 +27,7 @@ class DomainAssistantDataService
         $summary = [
             'scope' => [
                 'expand_all_locations' => $expandAll,
-                'note' => 'Invoice and additional-document visibility matches the list screens: location filters and (for additional documents) distribution_status rules apply unless the user is accounting/finance/admin/superadmin, or the assistant request used “show all records” with see-all-record-switch permission.',
+                'note' => 'Invoice visibility matches the invoice list: location filters apply by default; “show all records” with see-all-record-switch expands to all locations (admin/superadmin always see all on lists). Additional documents follow their own list rules.',
             ],
         ];
 
@@ -392,15 +393,11 @@ class DomainAssistantDataService
     {
         $query = Invoice::query();
 
-        $skipLocation = $user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])
-            || $this->expandAllLocationsEffective($user, $showAllRecords);
-
-        if (! $skipLocation) {
-            $locationCode = $user->department_location_code;
-            if ($locationCode) {
-                $query->where('cur_loc', $locationCode);
-            }
-        }
+        InvoiceListScope::applyLocationFilter(
+            $query,
+            $user,
+            $this->expandAllLocationsEffective($user, $showAllRecords)
+        );
 
         return $query;
     }

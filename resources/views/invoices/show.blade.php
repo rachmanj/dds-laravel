@@ -123,14 +123,14 @@
                                             </td>
                                         </tr>
                                         @can('send-to-sap')
-                                            @if (in_array($invoice->sap_status, [null, 'failed', 'cancelled'], true) && $invoice->status === 'sap')
+                                            @if (in_array($invoice->sap_status, [null, 'failed', 'cancelled'], true) && $invoice->status !== 'cancel' && ! $invoice->has_legacy_sap_doc)
                                                 <tr id="invoice-sap-send-row" @if ($invoice->sap_status === 'failed') class="d-none" @endif>
                                                     <td colspan="2">
                                                         <a href="{{ route('invoices.sap-preview', $invoice) }}" class="btn btn-primary btn-sm">Send to SAP</a>
                                                     </td>
                                                 </tr>
                                             @endif
-                                            @if ($invoice->sap_status === 'failed')
+                                            @if ($invoice->sap_status === 'failed' && ! $invoice->has_legacy_sap_doc)
                                                 <tr id="invoice-sap-retry-row">
                                                     <td colspan="2">
                                                         <a href="{{ route('invoices.sap-preview', $invoice) }}" class="btn btn-warning btn-sm">Retry SAP Sync</a>

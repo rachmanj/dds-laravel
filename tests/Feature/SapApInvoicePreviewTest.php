@@ -333,4 +333,144 @@ class SapApInvoicePreviewTest extends TestCase
         ]);
         $response->assertJsonStructure(['status_url', 'invoice_url']);
     }
+
+    public function test_legacy_sap_doc_blocks_preview_submission_and_sync(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('finance');
+        $invoice = $this->createSapReadyInvoice($user, [
+            'sap_doc' => '9001234',
+            'sap_status' => null,
+        ]);
+
+        $this->assertTrue($invoice->has_legacy_sap_doc);
+        $this->assertNotEmpty($invoice->canSyncToSap());
+
+        $previewResponse = $this->actingAs($user)->get(route('invoices.sap-preview', $invoice));
+        $previewResponse->assertRedirect(route('invoices.show', $invoice));
+        $previewResponse->assertSessionHasErrors('sap_sync');
+
+        $submitResponse = $this->actingAs($user)->post(route('invoices.submit-to-sap', $invoice), [
+            'grpo_references' => [],
+        ]);
+        $submitResponse->assertSessionHasErrors('sap_sync');
+
+        $syncResponse = $this->actingAs($user)->post(route('invoices.sap-sync', $invoice));
+        $syncResponse->assertSessionHasErrors('sap_sync');
+
+        $statusResponse = $this->actingAs($user)->getJson(route('invoices.sap-status', $invoice));
+        $statusResponse->assertOk();
+        $statusResponse->assertJson([
+            'show_send_button' => false,
+            'show_retry_button' => false,
+        ]);
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_legacy_sap_doc_renders_legacy_badge(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $invoice = $this->createSapReadyInvoice($user, [
+            'sap_doc' => '9001234',
+            'sap_status' => null,
+        ]);
+
+        $this->assertStringContainsString('SAP Doc: 9001234 (Legacy)', $invoice->sap_status_badge);
+        $this->assertStringNotContainsString('Not Sent to SAP', $invoice->sap_status_badge);
+    }
+
+    public function test_open_status_invoice_can_submit_to_sap(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('finance');
+        $invoice = $this->createSapReadyInvoice($user, [
+            'status' => 'open',
+            'po_no' => null,
+        ]);
+
+        $this->assertEmpty($invoice->canSyncToSap());
+
+        $response = $this->actingAs($user)->post(route('invoices.submit-to-sap', $invoice), [
+            'grpo_references' => [],
+        ]);
+
+        $response->assertRedirect(route('invoices.show', $invoice));
+        $response->assertSessionHas('success');
+
+        $invoice->refresh();
+        $this->assertSame('open', $invoice->status);
+        $this->assertSame('pending', $invoice->sap_status);
+
+        Queue::assertPushed(CreateSapApInvoiceJob::class);
+    }
+
+    public function test_cancelled_invoice_cannot_submit_to_sap(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('finance');
+        $invoice = $this->createSapReadyInvoice($user, [
+            'status' => 'cancel',
+            'po_no' => null,
+        ]);
+
+        $this->assertNotEmpty($invoice->canSyncToSap());
+
+        $response = $this->actingAs($user)->post(route('invoices.submit-to-sap', $invoice), [
+            'grpo_references' => [],
+        ]);
+
+        $response->assertSessionHasErrors('sap_sync');
+
+        $statusResponse = $this->actingAs($user)->getJson(route('invoices.sap-status', $invoice));
+        $statusResponse->assertOk();
+        $statusResponse->assertJson([
+            'show_send_button' => false,
+        ]);
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_successful_post_sets_status_to_sap(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $invoice = $this->createSapReadyInvoice($user, [
+            'status' => 'open',
+            'po_no' => null,
+            'sap_status' => 'pending',
+        ]);
+        $invoice->load('supplier');
+
+        $this->mock(SapService::class, function ($mock) use ($invoice) {
+            $mock->shouldReceive('getBusinessPartner')
+                ->once()
+                ->with($invoice->supplier->sap_code)
+                ->andReturn([
+                    'CardCode' => $invoice->supplier->sap_code,
+                    'CardName' => 'SAP Vendor',
+                    'CardType' => 'S',
+                ]);
+
+            $mock->shouldReceive('createApInvoice')
+                ->once()
+                ->andReturn([
+                    'DocNum' => 7001,
+                    'DocEntry' => 88,
+                ]);
+        });
+
+        $job = new CreateSapApInvoiceJob($invoice, []);
+        $job->handle(app(SapService::class));
+
+        $invoice->refresh();
+        $this->assertSame('sap', $invoice->status);
+        $this->assertSame('posted', $invoice->sap_status);
+        $this->assertSame('7001', $invoice->sap_doc_num);
+    }
 }

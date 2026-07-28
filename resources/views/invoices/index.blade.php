@@ -153,6 +153,7 @@
                                             <th>PO No.</th>
                                             <th>Amount</th>
                                             <th>Status</th>
+                                            <th>SAP Status</th>
                                             <th>Current Location</th>
                                             <th>Days</th>
                                             <th>Actions</th>
@@ -530,6 +531,12 @@
                         data: 'status_badge',
                         name: 'status',
                         width: '80px',
+                        className: 'text-center'
+                    },
+                    {
+                        data: 'sap_status_badge',
+                        name: 'sap_status',
+                        width: '120px',
                         className: 'text-center'
                     },
                     {

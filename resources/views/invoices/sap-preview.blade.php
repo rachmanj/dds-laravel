@@ -263,7 +263,7 @@
                             </div>
                         </div>
 
-                        <div class="mt-3 d-flex gap-2">
+                        <div class="mt-3 d-flex" style="gap: 8px;">
                             <button type="submit" class="btn btn-primary" id="submit-btn">
                                 Confirm &amp; Submit to SAP B1
                             </button>

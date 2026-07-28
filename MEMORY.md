@@ -1,3 +1,20 @@
+### 2026-07-28 — SAP AP Invoice: legacy guard, relaxed eligibility, auto workflow status
+
+**Problem**: (1) Pre-automation invoices with manually entered `sap_doc` but `sap_status = null` showed **Send to SAP** and risked duplicate SAP B1 AP Invoices. (2) Invoices at `status = open` could not submit because the gate required `status = sap` with no automatic transition.
+
+**Fix**:
+
+1. **`has_legacy_sap_doc`** — `sap_status === null && sap_doc` filled; blocks sync, hides buttons, badge **SAP Doc: … (Legacy)**.
+2. **`canSyncToSap()`** — blocks only `status === cancel`; no longer requires `status === sap`.
+3. **`CreateSapApInvoiceJob::persistPostedInvoice()`** — sets `status = 'sap'` on successful post.
+4. **Invoices index** — **SAP Status** column via `sap_status_badge`.
+
+**Tests**: `tests/Feature/SapApInvoicePreviewTest.php` (legacy block, open-status submit, cancel rejection, auto status on post).
+
+**Docs**: `docs/decisions.md` (2026-07-28), `docs/architecture.md` (SAP B1 Integration), `docs/SAP-AP-INVOICE-INTEGRATION-CONCEPT.md`, `docs/todo.md`.
+
+---
+
 ### 2026-06-30 — Distribution linked documents: pivot-only detection, explicit inclusion, edit visibility
 
 **Problem**: Distribution **1728** included additional documents the user never selected (e.g. `71260700338`, `261003264`) because **`checkLinkedDocuments`** matched **all additional documents sharing a PO** with selected invoices, pre-selected them in the confirmation dialog, and **`attachInvoiceAdditionalDocuments`** silently added pivot-linked docs on create/add. PO-only rows appeared on **show** but were **hidden on edit**; additional docs could not be removed individually.
@@ -1666,7 +1683,7 @@ Documents by type:
 - Refresh invoice+supplier context inside `CreateSapApInvoiceJob`, fail fast when `sap_code` mapping is missing.
 - Wrap `SapService::getBusinessPartner` to surface Service Layer error payloads and accept `CardType` values `S`/`cSupplier`.
 - Log structured request payloads (including card code) for both success and failure attempts.
-- Update invoice controller guard to require status `sap` before dispatch and expose descriptive `sap_status_badge` messaging in UI.
+- Update invoice controller and `canSyncToSap()` to block legacy `sap_doc` duplicates and allow any status except `cancel`; expose descriptive `sap_status_badge` messaging in UI. **Superseded 2026-07-28** — see `docs/decisions.md` (2026-07-28).
 
 **Impact**:
 - Finance sees precise failure reasons on invoice detail page and can retry after correcting mappings.

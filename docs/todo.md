@@ -2,6 +2,27 @@
 
 ## ✅ **Recently Completed**
 
+### **SAP AP Invoice submission — legacy `sap_doc` guard, relaxed status gate, auto `status = sap`** ✅ **COMPLETED**
+
+**Status**: Shipped — prevents duplicate SAP posts for pre-automation invoices; open invoices can submit; workflow status updates on success  
+**Implementation**: 2026-07-28  
+**Priority**: HIGH — duplicate AP Invoice risk in SAP B1; blocked open invoices (e.g. `5311548105`)
+
+**Summary**:
+
+1. **Legacy guard** — `Invoice::has_legacy_sap_doc` when `sap_status` is null and `sap_doc` is set (manual **SAP Update** path). `canSyncToSap()` rejects; UI hides **Send to SAP**; badge shows **SAP Doc: … (Legacy)**.
+2. **Eligibility** — Any invoice `status` except `cancel` may submit (`open`, `verify`, `return`, `sap`, `close`). Removed requirement that `status` must already be `sap` before submit.
+3. **Post-success** — `CreateSapApInvoiceJob::persistPostedInvoice()` sets `status = 'sap'` when posting succeeds.
+4. **List UI** — **SAP Status** column on invoices index DataTable.
+
+**Key files**: `app/Models/Invoice.php`, `app/Jobs/CreateSapApInvoiceJob.php`, `app/Http/Controllers/InvoiceController.php`, `resources/views/invoices/show.blade.php`, `resources/views/invoices/index.blade.php`.
+
+**Docs**: [`docs/decisions.md`](decisions.md) (2026-07-28), [`docs/architecture.md`](architecture.md), [`docs/SAP-AP-INVOICE-INTEGRATION-CONCEPT.md`](SAP-AP-INVOICE-INTEGRATION-CONCEPT.md), [`MEMORY.md`](../MEMORY.md).
+
+**Tests**: `tests/Feature/SapApInvoicePreviewTest.php`.
+
+---
+
 ### **Distribution linked documents — pivot-only detection, edit visibility, explicit inclusion** ✅ **COMPLETED**
 
 **Status**: Shipped — fixes PO-only false positives on create; edit page shows/removes all attached additional documents  
@@ -380,13 +401,13 @@
 
 ### **SAP B1 A/P Invoice Integration – Queue Job Hardening** 🚧 **IN PROGRESS**
 
-**Status**: 🚧 Phase 2 – Vendor validation & logging in place (2025-11-13)
+**Status**: 🚧 Phase 2 – Vendor validation & logging in place (2025-11-13); **submission eligibility refresh** (2026-07-28)
 
 **Progress**:
 
 1. **Controller Safeguards** ✅
-   - Route gate now requires invoice status `sap` before dispatching sync job (prevents premature submissions).
-   - Finance/Superadmin roles remain the only actors allowed to trigger sync.
+   - ~~Route gate requires invoice status `sap` before dispatch~~ **Updated 2026-07-28**: any status except `cancel` may submit; legacy `sap_doc` without `sap_status` is blocked to prevent duplicate SAP posts.
+   - Finance/Superadmin roles remain the only actors allowed to trigger sync (permission `send-to-sap`).
 
 2. **Job Hardening** ✅
    - Refresh invoice + supplier context per job run; fail fast if supplier lacks `sap_code`.
@@ -394,10 +415,12 @@
    - Normalized CardType handling (`S` or `cSupplier`) and clarified mismatch messaging.
    - Structured logging for both success and failure (`sap_logs.request_payload` now records card code context).
    - Invoice updates reset `sap_error_message` on success and persist attempt timestamps.
+   - **2026-07-28**: On successful post, `persistPostedInvoice()` sets workflow `status = 'sap'`.
 
 3. **UI Feedback Loop** ✅
-   - `sap_status_badge` surfaces precise failure messaging on invoice detail view.
-   - "Retry SAP Sync" button available when status resolves to `failed`.
+   - `sap_status_badge` surfaces precise failure messaging on invoice detail view; legacy manual `sap_doc` shows **(Legacy)** badge.
+   - "Retry SAP Sync" button available when status resolves to `failed` (not for legacy `sap_doc` rows).
+   - **2026-07-28**: Invoices index lists **SAP Status** column.
 
 **Pending / Follow-up**:
 

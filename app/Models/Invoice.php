@@ -359,6 +359,11 @@ class Invoice extends Model
         return '<span class="badge '.$color.'">'.ucfirst($this->payment_status).'</span>';
     }
 
+    public function getHasLegacySapDocAttribute(): bool
+    {
+        return $this->sap_status === null && filled($this->sap_doc);
+    }
+
     public function getSapStatusBadgeAttribute()
     {
         return match ($this->sap_status) {
@@ -367,7 +372,9 @@ class Invoice extends Model
             'failed' => '<span class="badge bg-danger">SAP Failed: '.($this->sap_error_message ?? 'Unknown error').'</span>',
             'cancelling' => '<span class="badge bg-warning">SAP Cancelling…</span>',
             'cancelled' => '<span class="badge bg-secondary">SAP Cancelled'.($this->sap_cancellation_doc_num ? ': '.$this->sap_cancellation_doc_num : '').'</span>',
-            default => '<span class="badge bg-secondary">Not Sent to SAP</span>',
+            default => $this->has_legacy_sap_doc
+                ? '<span class="badge bg-info">SAP Doc: '.$this->sap_doc.' (Legacy)</span>'
+                : '<span class="badge bg-secondary">Not Sent to SAP</span>',
         };
     }
 
@@ -536,9 +543,8 @@ class Invoice extends Model
     {
         $errors = [];
 
-        // Check status
-        if ($this->status !== 'sap') {
-            $errors[] = 'Invoice status must be "sap" before syncing to SAP';
+        if ($this->status === 'cancel') {
+            $errors[] = 'Cancelled invoices cannot be synced to SAP';
         }
 
         // Check SAP status
@@ -552,6 +558,10 @@ class Invoice extends Model
 
         if ($this->sap_status === 'posted') {
             $errors[] = 'Invoice is already posted to SAP';
+        }
+
+        if ($this->has_legacy_sap_doc) {
+            $errors[] = 'Invoice already has a SAP document number ('.$this->sap_doc.') recorded manually. Resubmitting may create a duplicate document in SAP B1.';
         }
 
         // Check supplier

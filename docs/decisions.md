@@ -1,3 +1,31 @@
+## 2026-07-28 — SAP AP Invoice submission: legacy `sap_doc` guard, relaxed status gate, auto `status = sap`
+
+-   **Context**: Before automated AP Invoice posting, finance users recorded SAP document numbers manually via the **SAP Update** feature (`sap_doc` column). Those rows kept `sap_status = null`, so the new **Send to SAP** flow treated them as never submitted and could create duplicate AP Invoices in SAP B1 (~4,396 invoices in production). Separately, invoices at workflow `status = open` (e.g. invoice `5311548105`) could not show **Send to SAP** because eligibility required `status = 'sap'` even though nothing in the app auto-set that field before submission.
+
+-   **Decision**:
+
+    1. **Legacy duplicate guard** — Treat `sap_status IS NULL` **and** `sap_doc` present as **legacy manual entry** (`Invoice::has_legacy_sap_doc`). Block `canSyncToSap()`, hide **Send to SAP** / **Retry**, and show badge **SAP Doc: {n} (Legacy)**. Automated posts always set `sap_status` before/after the job, so this combination cannot occur from the new flow.
+    2. **Relaxed workflow gate** — Allow submission for any invoice `status` **except** `cancel` (`open`, `verify`, `return`, `sap`, `close`). Remove the precondition `status === 'sap'`.
+    3. **Auto workflow status on success** — In `CreateSapApInvoiceJob::persistPostedInvoice()`, set `status = 'sap'` when `sap_status` becomes `posted` (covers direct post and reconciliation paths).
+    4. **Invoices list** — Add **SAP Status** column on `invoices.index` (DataTables `sap_status_badge`).
+
+-   **Alternatives considered**:
+
+    1. **One-time data migration** setting `sap_status = 'posted'` for all legacy `sap_doc` rows — Rejected for v1; guard is safer without mass-updating historical rows; migration can be a follow-up.
+    2. **Keep requiring `status = 'sap'` before submit** — Rejected; users expect open invoices at finance location to be submittable without a manual status flip.
+
+-   **Implications**:
+
+    -   Legacy **SAP Update** (`SapUpdateController`) remains for manual `sap_doc` entry; it does not set `sap_status`.
+    -   `close` invoices can still be sent to SAP (per user choice); only `cancel` is blocked.
+    -   Cancellation job does not revert `status` when an AP Invoice is cancelled in SAP.
+
+-   **Review date**: 2027-01-28
+
+-   **References**: [`docs/architecture.md`](architecture.md) (SAP B1 Integration), [`app/Models/Invoice.php`](../app/Models/Invoice.php) (`canSyncToSap`, `has_legacy_sap_doc`), [`app/Jobs/CreateSapApInvoiceJob.php`](../app/Jobs/CreateSapApInvoiceJob.php), [`tests/Feature/SapApInvoicePreviewTest.php`](../tests/Feature/SapApInvoicePreviewTest.php).
+
+---
+
 ## 2026-05-10 — Navbar menu search (permission-aware, cached JSON API)
 
 <a id="decision-navbar-menu-search-2026"></a>
