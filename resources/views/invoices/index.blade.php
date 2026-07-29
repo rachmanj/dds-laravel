@@ -310,12 +310,20 @@
         /* Days */
         .compact-table th:nth-child(12),
         .compact-table td:nth-child(12) {
-            width: 120px;
+            width: 60px;
         }
 
         /* Actions */
+        .compact-table th:nth-child(13),
+        .compact-table td:nth-child(13) {
+            width: 130px;
+        }
 
         .table-responsive {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
             overflow-y: auto;
             border: 1px solid #dee2e6;
             border-radius: 0.375rem;
@@ -343,6 +351,15 @@
         /* Additional compact styling */
         .compact-table {
             table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 1210px;
+            width: auto !important;
+        }
+
+        #invoices-table {
+            width: auto !important;
+            min-width: 1210px;
         }
 
         .compact-table td,
@@ -383,6 +400,32 @@
 
         .compact-table .btn-group .btn {
             padding: 2px 4px;
+        }
+
+        .compact-table th:last-child,
+        .compact-table td:last-child {
+            position: sticky;
+            right: 0;
+            z-index: 2;
+            overflow: visible;
+            white-space: nowrap;
+            width: 130px;
+            min-width: 130px;
+            max-width: 130px;
+        }
+
+        .table-fixed-header thead th:last-child {
+            z-index: 12;
+            background-color: #343a40 !important;
+        }
+
+        .compact-table tbody td:last-child {
+            background-color: #fff;
+            box-shadow: -2px 0 4px rgba(0, 0, 0, 0.08);
+        }
+
+        .compact-table tbody tr:nth-of-type(odd) td:last-child {
+            background-color: #f2f2f2;
         }
     </style>
 @endsection
@@ -561,7 +604,9 @@
                 ],
                 order: [],
                 pageLength: 25,
-                responsive: true
+                drawCallback: function() {
+                    $('#invoices-table').css('width', 'auto');
+                }
             });
 
             // Apply search
