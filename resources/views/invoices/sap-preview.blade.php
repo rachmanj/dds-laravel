@@ -45,6 +45,18 @@
                                     <td>{{ $invoice->formatted_invoice_date }}</td>
                                 </tr>
                                 <tr>
+                                    <th>Posting Date</th>
+                                    <td>{{ $apPreview['posting_date'] ?? '—' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Faktur No</th>
+                                    <td>{{ $apPreview['faktur_no'] ?: '—' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Faktur Date</th>
+                                    <td>{{ $apPreview['faktur_date'] ?? '—' }}</td>
+                                </tr>
+                                <tr>
                                     <th>Amount</th>
                                     <td>{{ $invoice->formatted_amount }}</td>
                                 </tr>

@@ -34,21 +34,57 @@ class SapApInvoicePayloadBuilder
     {
         $this->validate();
 
-        $payload = [
+        $payload = array_merge([
             'CardCode' => $this->mapSupplier(),
-            'DocDate' => $this->invoice->invoice_date->format('Y-m-d'),
             'DocDueDate' => $this->mapDueDate(),
             'DocCurrency' => $this->invoice->currency,
             'NumAtCard' => $this->invoice->invoice_number,
             'Comments' => $this->invoice->remarks ?? 'Imported from DDS - Invoice #'.$this->invoice->id,
             'DocumentLines' => $this->mapLineItems(),
-        ];
+        ], $this->buildPostingAndFakturFields());
 
         if ($this->invoice->po_no) {
             $payload['Reference1'] = $this->invoice->po_no;
         }
 
         return $payload;
+    }
+
+    /**
+     * Faktur UDF fields for post-create PATCH (DocDate cannot be updated after posting).
+     *
+     * @return array<string, string>
+     */
+    public function buildFakturPatchFields(): array
+    {
+        return $this->buildFakturUdfFields();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function buildPostingAndFakturFields(): array
+    {
+        return array_merge(
+            ['DocDate' => $this->invoice->receive_date->format('Y-m-d')],
+            $this->buildFakturUdfFields()
+        );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function buildFakturUdfFields(): array
+    {
+        $fields = [
+            'U_MIS_FPDate' => $this->invoice->invoice_date->format('Y-m-d'),
+        ];
+
+        if ($this->invoice->faktur_no) {
+            $fields['U_MIS_FPNum'] = $this->invoice->faktur_no;
+        }
+
+        return $fields;
     }
 
     /**
@@ -68,6 +104,10 @@ class SapApInvoicePayloadBuilder
 
         if (! $this->invoice->invoice_date) {
             $errors[] = 'Invoice date is required';
+        }
+
+        if (! $this->invoice->receive_date) {
+            $errors[] = 'Receive date is required';
         }
 
         if (! empty($errors)) {
@@ -229,6 +269,9 @@ class SapApInvoicePayloadBuilder
                 ],
                 'invoice_number' => $this->invoice->invoice_number,
                 'invoice_date' => $this->invoice->invoice_date->format('Y-m-d'),
+                'posting_date' => $this->invoice->receive_date->format('Y-m-d'),
+                'faktur_no' => $this->invoice->faktur_no,
+                'faktur_date' => $this->invoice->invoice_date->format('Y-m-d'),
                 'due_date' => $this->mapDueDate(),
                 'amount' => $this->invoice->amount,
                 'currency' => $this->invoice->currency,

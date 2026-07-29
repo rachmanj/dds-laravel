@@ -77,6 +77,24 @@ class CreateSapApInvoiceJob implements ShouldQueue
             // Create AP Invoice in SAP
             $response = $sapService->createApInvoice($payload);
 
+            $fakturPatch = $payloadBuilder->buildFakturPatchFields();
+            if (! empty($fakturPatch) && isset($response['DocEntry'])) {
+                try {
+                    $sapService->updateApInvoice($response['DocEntry'], $fakturPatch);
+                    Log::channel('sap')->info('AP Invoice faktur UDF fields patched', [
+                        'invoice_id' => $invoice->id,
+                        'doc_entry' => $response['DocEntry'],
+                        'fields' => array_keys($fakturPatch),
+                    ]);
+                } catch (\Throwable $patchException) {
+                    Log::channel('sap')->warning('AP Invoice faktur UDF patch failed', [
+                        'invoice_id' => $invoice->id,
+                        'doc_entry' => $response['DocEntry'],
+                        'error' => $patchException->getMessage(),
+                    ]);
+                }
+            }
+
             DB::transaction(function () use ($invoice, $response, $payload) {
                 $docNum = isset($response['DocNum']) ? (string) $response['DocNum'] : null;
 

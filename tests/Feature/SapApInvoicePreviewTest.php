@@ -197,6 +197,44 @@ class SapApInvoicePreviewTest extends TestCase
         $response->assertSessionHasErrors('grpo_references');
     }
 
+    public function test_payload_builder_maps_posting_date_faktur_fields(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $invoice = $this->createSapReadyInvoice($user, [
+            'invoice_date' => '2026-03-15',
+            'receive_date' => '2026-03-20',
+            'faktur_no' => '04002600101856924',
+            'po_no' => null,
+        ]);
+
+        $builder = new SapApInvoicePayloadBuilder($invoice);
+        $payload = $builder->build();
+        $preview = $builder->getPreviewData()['ap_invoice'];
+
+        $this->assertSame('2026-03-20', $payload['DocDate']);
+        $this->assertSame('2026-03-15', $payload['U_MIS_FPDate']);
+        $this->assertSame('04002600101856924', $payload['U_MIS_FPNum']);
+        $this->assertSame('2026-03-20', $preview['posting_date']);
+        $this->assertSame('04002600101856924', $preview['faktur_no']);
+        $this->assertSame('2026-03-15', $preview['faktur_date']);
+        $this->assertSame(['U_MIS_FPDate' => '2026-03-15', 'U_MIS_FPNum' => '04002600101856924'], $builder->buildFakturPatchFields());
+    }
+
+    public function test_payload_builder_omits_faktur_num_when_faktur_no_is_null(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $invoice = $this->createSapReadyInvoice($user, [
+            'faktur_no' => null,
+            'po_no' => null,
+        ]);
+
+        $builder = new SapApInvoicePayloadBuilder($invoice);
+        $payload = $builder->build();
+
+        $this->assertArrayNotHasKey('U_MIS_FPNum', $payload);
+        $this->assertArrayHasKey('U_MIS_FPDate', $payload);
+    }
+
     public function test_payload_builder_includes_base_document_fields_per_grpo_line(): void
     {
         $user = User::factory()->create(['is_active' => true]);
@@ -444,6 +482,9 @@ class SapApInvoicePreviewTest extends TestCase
             'status' => 'open',
             'po_no' => null,
             'sap_status' => 'pending',
+            'invoice_date' => '2026-03-15',
+            'receive_date' => '2026-03-20',
+            'faktur_no' => '04002600101856924',
         ]);
         $invoice->load('supplier');
 
@@ -459,10 +500,23 @@ class SapApInvoicePreviewTest extends TestCase
 
             $mock->shouldReceive('createApInvoice')
                 ->once()
+                ->with(\Mockery::on(function (array $payload): bool {
+                    return $payload['DocDate'] === '2026-03-20'
+                        && $payload['U_MIS_FPDate'] === '2026-03-15'
+                        && $payload['U_MIS_FPNum'] === '04002600101856924';
+                }))
                 ->andReturn([
                     'DocNum' => 7001,
                     'DocEntry' => 88,
                 ]);
+
+            $mock->shouldReceive('updateApInvoice')
+                ->once()
+                ->with(88, \Mockery::on(function (array $fields): bool {
+                    return $fields['U_MIS_FPDate'] === '2026-03-15'
+                        && $fields['U_MIS_FPNum'] === '04002600101856924';
+                }))
+                ->andReturn([]);
         });
 
         $job = new CreateSapApInvoiceJob($invoice, []);

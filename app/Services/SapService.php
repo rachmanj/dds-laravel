@@ -321,6 +321,12 @@ class SapService
 
         $payload = $this->stripNullValues($payload);
 
+        Log::channel('sap')->info('SAP AP Invoice POST payload', [
+            'DocDate' => $payload['DocDate'] ?? null,
+            'U_MIS_FPNum' => $payload['U_MIS_FPNum'] ?? null,
+            'U_MIS_FPDate' => $payload['U_MIS_FPDate'] ?? null,
+        ]);
+
         try {
             $response = $this->client->post('PurchaseInvoices', [
                 'json' => $payload,
@@ -329,6 +335,32 @@ class SapService
             return json_decode($response->getBody()->getContents(), true);
         } catch (RequestException $e) {
             Log::channel('sap')->error('SAP AP Invoice creation failed: '.$e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function updateApInvoice(int|string $docEntry, array $payload): array
+    {
+        if (! $this->cookieJar->count()) {
+            $this->login();
+        }
+
+        $payload = $this->stripNullValues($payload);
+
+        try {
+            $response = $this->client->patch("PurchaseInvoices({$docEntry})", [
+                'json' => $payload,
+            ]);
+
+            $body = $response->getBody()->getContents();
+
+            return $body !== '' ? json_decode($body, true) : [];
+        } catch (RequestException $e) {
+            Log::channel('sap')->error('SAP AP Invoice update failed: '.$e->getMessage());
             throw $e;
         }
     }
