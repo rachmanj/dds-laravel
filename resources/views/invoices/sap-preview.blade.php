@@ -49,6 +49,10 @@
                                     <td>{{ $apPreview['posting_date'] ?? '—' }}</td>
                                 </tr>
                                 <tr>
+                                    <th>Document Date</th>
+                                    <td>{{ $apPreview['document_date'] ?? '—' }}</td>
+                                </tr>
+                                <tr>
                                     <th>Faktur No</th>
                                     <td>{{ $apPreview['faktur_no'] ?: '—' }}</td>
                                 </tr>

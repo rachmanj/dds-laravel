@@ -212,9 +212,11 @@ class SapApInvoicePreviewTest extends TestCase
         $preview = $builder->getPreviewData()['ap_invoice'];
 
         $this->assertSame('2026-03-20', $payload['DocDate']);
+        $this->assertSame('2026-03-15', $payload['TaxDate']);
         $this->assertSame('2026-03-15', $payload['U_MIS_FPDate']);
         $this->assertSame('04002600101856924', $payload['U_MIS_FPNum']);
         $this->assertSame('2026-03-20', $preview['posting_date']);
+        $this->assertSame('2026-03-15', $preview['document_date']);
         $this->assertSame('04002600101856924', $preview['faktur_no']);
         $this->assertSame('2026-03-15', $preview['faktur_date']);
         $this->assertSame(['U_MIS_FPDate' => '2026-03-15', 'U_MIS_FPNum' => '04002600101856924'], $builder->buildFakturPatchFields());
@@ -502,6 +504,7 @@ class SapApInvoicePreviewTest extends TestCase
                 ->once()
                 ->with(\Mockery::on(function (array $payload): bool {
                     return $payload['DocDate'] === '2026-03-20'
+                        && $payload['TaxDate'] === '2026-03-15'
                         && $payload['U_MIS_FPDate'] === '2026-03-15'
                         && $payload['U_MIS_FPNum'] === '04002600101856924';
                 }))

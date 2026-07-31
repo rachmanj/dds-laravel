@@ -66,7 +66,10 @@ class SapApInvoicePayloadBuilder
     protected function buildPostingAndFakturFields(): array
     {
         return array_merge(
-            ['DocDate' => $this->invoice->receive_date->format('Y-m-d')],
+            [
+                'DocDate' => $this->invoice->receive_date->format('Y-m-d'),
+                'TaxDate' => $this->invoice->invoice_date->format('Y-m-d'),
+            ],
             $this->buildFakturUdfFields()
         );
     }
@@ -270,6 +273,7 @@ class SapApInvoicePayloadBuilder
                 'invoice_number' => $this->invoice->invoice_number,
                 'invoice_date' => $this->invoice->invoice_date->format('Y-m-d'),
                 'posting_date' => $this->invoice->receive_date->format('Y-m-d'),
+                'document_date' => $this->invoice->invoice_date->format('Y-m-d'),
                 'faktur_no' => $this->invoice->faktur_no,
                 'faktur_date' => $this->invoice->invoice_date->format('Y-m-d'),
                 'due_date' => $this->mapDueDate(),
