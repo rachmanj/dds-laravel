@@ -340,6 +340,119 @@ class SapService
     }
 
     /**
+     * @return array{DocEntry: int, DocNum: int|string, CardCode?: string, DocumentStatus?: string, Cancelled?: string, NumAtCard?: string}|null
+     */
+    public function getPurchaseInvoiceByDocEntry(string|int $docEntry): ?array
+    {
+        $this->ensureSession();
+
+        $docEntry = trim((string) $docEntry);
+        if ($docEntry === '') {
+            return null;
+        }
+
+        try {
+            return $this->get("PurchaseInvoices({$docEntry})", [
+                'query' => [
+                    '$select' => 'DocEntry,DocNum,CardCode,DocumentStatus,Cancelled,NumAtCard,DocTotal',
+                ],
+            ]);
+        } catch (RequestException $e) {
+            if ($e->getResponse() && $e->getResponse()->getStatusCode() === 404) {
+                return null;
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * @return array{DocEntry: int, DocNum: int|string, CardCode?: string, DocumentStatus?: string, Cancelled?: string, NumAtCard?: string}|null
+     */
+    public function getPurchaseInvoiceByDocNum(string $docNum): ?array
+    {
+        $this->ensureSession();
+
+        $docNum = trim($docNum);
+        if ($docNum === '') {
+            return null;
+        }
+
+        $filterValue = is_numeric($docNum) ? $docNum : "'".str_replace("'", "''", $docNum)."'";
+
+        $result = $this->get('PurchaseInvoices', [
+            'query' => [
+                '$filter' => "DocNum eq {$filterValue} and Cancelled eq 'N'",
+                '$select' => 'DocEntry,DocNum,CardCode,DocumentStatus,Cancelled,NumAtCard,DocTotal',
+                '$top' => 1,
+            ],
+        ]);
+
+        $rows = $result['value'] ?? [];
+
+        return ! empty($rows) ? $rows[0] : null;
+    }
+
+    /**
+     * @return array{DocEntry: int, DocNum: int|string, CardCode?: string, DocumentStatus?: string, Cancelled?: string, NumAtCard?: string}|null
+     */
+    public function getPurchaseInvoiceByNumAtCard(string $numAtCard): ?array
+    {
+        $this->ensureSession();
+
+        $numAtCard = trim($numAtCard);
+        if ($numAtCard === '') {
+            return null;
+        }
+
+        $filterValue = str_replace("'", "''", $numAtCard);
+
+        $result = $this->get('PurchaseInvoices', [
+            'query' => [
+                '$filter' => "NumAtCard eq '{$filterValue}' and Cancelled eq 'N'",
+                '$select' => 'DocEntry,DocNum,CardCode,DocumentStatus,Cancelled,NumAtCard,DocTotal',
+                '$orderby' => 'DocEntry desc',
+                '$top' => 1,
+            ],
+        ]);
+
+        $rows = $result['value'] ?? [];
+
+        return ! empty($rows) ? $rows[0] : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createOutgoingPayment(array $payload): array
+    {
+        if (! $this->cookieJar->count()) {
+            $this->login();
+        }
+
+        $payload = $this->stripNullValues($payload);
+        $entity = config('services.sap.outgoing_payment.service_layer_entity', 'VendorPayments');
+
+        Log::channel('sap')->info('SAP Outgoing Payment POST payload', [
+            'CardCode' => $payload['CardCode'] ?? null,
+            'DocDate' => $payload['DocDate'] ?? null,
+            'entity' => $entity,
+        ]);
+
+        try {
+            $response = $this->client->post($entity, [
+                'json' => $payload,
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (RequestException $e) {
+            Log::channel('sap')->error('SAP Outgoing Payment creation failed: '.$e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */

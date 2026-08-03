@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DomainAssistantController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoicePaymentController;
 use App\Http\Controllers\ProcessingAnalyticsController;
 use App\Http\Controllers\SapController;
 use App\Http\Controllers\TelegramWebhookController;
@@ -120,10 +121,16 @@ Route::group(['middleware' => ['auth', 'permission:send-to-sap']], function () {
     Route::post('/invoices/{invoice}/sap-sync', [InvoiceController::class, 'sapSync'])->name('invoices.sap-sync');
 });
 
+Route::group(['middleware' => ['auth', 'permission:send-payment-to-sap']], function () {
+    Route::get('/invoices/{invoice}/payment-sap-preview', [InvoicePaymentController::class, 'previewSapPayment'])->name('invoices.payment-sap-preview');
+    Route::post('/invoices/{invoice}/submit-payment-to-sap', [InvoicePaymentController::class, 'submitPaymentToSap'])->name('invoices.submit-payment-to-sap');
+});
+
 Route::group(['middleware' => ['auth', 'permission:cancel-sap-invoice']], function () {
     Route::post('/invoices/{invoice}/cancel-sap', [InvoiceController::class, 'cancelSapInvoice'])->name('invoices.cancel-sap');
 });
 
 Route::middleware('auth')->group(function () {
     Route::get('/invoices/{invoice}/sap-status', [InvoiceController::class, 'sapSubmissionStatus'])->name('invoices.sap-status');
+    Route::get('/invoices/{invoice}/payment-sap-status', [InvoicePaymentController::class, 'paymentSapStatus'])->name('invoices.payment-sap-status');
 });

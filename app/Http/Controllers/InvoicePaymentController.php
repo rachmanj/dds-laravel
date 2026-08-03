@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Invoice;
+use App\Jobs\CreateSapOutgoingPaymentJob;
 use App\Models\Department;
+use App\Models\Invoice;
+use App\Services\SapApInvoicePaymentResolver;
+use App\Services\SapOutgoingPaymentPayloadBuilder;
+use App\Services\SapService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +107,7 @@ class InvoicePaymentController extends Controller
             $query->where('paid_at', '>=', $request->date_from);
         }
         if ($request->filled('date_to')) {
-            $query->where('paid_at', '<=', $request->date_to . ' 23:59:59');
+            $query->where('paid_at', '<=', $request->date_to.' 23:59:59');
         }
 
         $invoices = $query->paginate(15);
@@ -125,7 +129,7 @@ class InvoicePaymentController extends Controller
         if ($invoice->cur_loc !== $userLocationCode) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only update invoices in your department.'
+                'message' => 'You can only update invoices in your department.',
             ], 403);
         }
 
@@ -163,13 +167,14 @@ class InvoicePaymentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Invoice payment status updated successfully.',
-                'invoice' => $invoice->fresh(['supplier', 'type', 'paidByUser'])
+                'invoice' => $invoice->fresh(['supplier', 'type', 'paidByUser']),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update invoice payment status: ' . $e->getMessage()
+                'message' => 'Failed to update invoice payment status: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -188,7 +193,7 @@ class InvoicePaymentController extends Controller
         if ($invoice->cur_loc !== $userLocationCode) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only update invoices in your department.'
+                'message' => 'You can only update invoices in your department.',
             ], 403);
         }
 
@@ -196,7 +201,7 @@ class InvoicePaymentController extends Controller
         if ($invoice->payment_status !== 'paid') {
             return response()->json([
                 'success' => false,
-                'message' => 'This invoice is not currently marked as paid.'
+                'message' => 'This invoice is not currently marked as paid.',
             ], 400);
         }
 
@@ -235,13 +240,14 @@ class InvoicePaymentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'invoice' => $invoice->fresh(['supplier', 'type', 'paidByUser'])
+                'invoice' => $invoice->fresh(['supplier', 'type', 'paidByUser']),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update invoice: ' . $e->getMessage()
+                'message' => 'Failed to update invoice: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -277,7 +283,7 @@ class InvoicePaymentController extends Controller
             if ($invoices->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No valid invoices found for bulk update.'
+                    'message' => 'No valid invoices found for bulk update.',
                 ], 400);
             }
 
@@ -298,13 +304,14 @@ class InvoicePaymentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Successfully updated {$updatedCount} invoices.",
-                'updated_count' => $updatedCount
+                'updated_count' => $updatedCount,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to bulk update invoices: ' . $e->getMessage()
+                'message' => 'Failed to bulk update invoices: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -361,5 +368,141 @@ class InvoicePaymentController extends Controller
             ->get();
 
         return $metrics;
+    }
+
+    public function previewSapPayment(Invoice $invoice, SapService $sapService, SapApInvoicePaymentResolver $apInvoiceResolver)
+    {
+        $this->authorizePaymentSapSync();
+
+        $validationErrors = $invoice->canSubmitPaymentToSap();
+        if (! empty($validationErrors)) {
+            return redirect()
+                ->route('invoices.payments.paid')
+                ->withErrors(['sap_payment' => implode(', ', $validationErrors)]);
+        }
+
+        $invoice->load(['supplier']);
+
+        try {
+            $resolvedApInvoice = $apInvoiceResolver->resolve($invoice, $sapService);
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('invoices.payments.paid')
+                ->withErrors(['sap_payment' => $e->getMessage()]);
+        }
+
+        $paymentMeans = request('payment_means', 'transfer');
+        $accountCode = request('account_code', '');
+        $paymentDate = request('payment_date', $invoice->payment_date?->format('Y-m-d'));
+
+        $payloadBuilder = new SapOutgoingPaymentPayloadBuilder(
+            $invoice,
+            $paymentMeans,
+            $accountCode,
+            (int) $resolvedApInvoice['DocEntry'],
+            $paymentDate
+        );
+
+        $paymentPreview = $payloadBuilder->getPreviewData()['outgoing_payment'];
+        $paymentPreview['ap_invoice']['doc_entry'] = $resolvedApInvoice['DocEntry'];
+        $paymentPreview['ap_invoice']['doc_num'] = $resolvedApInvoice['DocNum'] ?? $invoice->sap_doc_num;
+
+        return view('invoice-payments.payment-sap-preview', [
+            'invoice' => $invoice,
+            'paymentPreview' => $paymentPreview,
+            'paymentMeans' => $paymentMeans,
+            'accountCode' => $accountCode,
+            'paymentDate' => $paymentDate,
+        ]);
+    }
+
+    public function submitPaymentToSap(Request $request, Invoice $invoice, SapService $sapService, SapApInvoicePaymentResolver $apInvoiceResolver)
+    {
+        $this->authorizePaymentSapSync();
+
+        $validationErrors = $invoice->canSubmitPaymentToSap();
+        if (! empty($validationErrors)) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => implode(', ', $validationErrors),
+                ], 422);
+            }
+
+            return back()->withErrors(['sap_payment' => implode(', ', $validationErrors)]);
+        }
+
+        $invoice->load(['supplier']);
+
+        $validated = $request->validate([
+            'payment_means' => ['required', Rule::in(['cash', 'transfer'])],
+            'account_code' => 'required|string|max:15',
+            'payment_date' => 'nullable|date',
+        ]);
+
+        try {
+            $apInvoiceResolver->resolve($invoice, $sapService);
+        } catch (\Exception $e) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
+            return back()->withErrors(['sap_payment' => $e->getMessage()]);
+        }
+
+        $invoice->update([
+            'sap_payment_status' => 'pending',
+            'sap_payment_means' => $validated['payment_means'],
+            'sap_payment_account_code' => $validated['account_code'],
+        ]);
+
+        CreateSapOutgoingPaymentJob::dispatch(
+            $invoice,
+            $validated['payment_means'],
+            $validated['account_code'],
+            $validated['payment_date'] ?? null
+        );
+
+        $message = 'Invoice payment queued for SAP posting.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'sap_payment_status' => 'pending',
+                'status_url' => route('invoices.payment-sap-status', $invoice),
+                'invoice_url' => route('invoices.payments.paid'),
+            ]);
+        }
+
+        return redirect()
+            ->route('invoices.payments.paid')
+            ->with('success', $message);
+    }
+
+    public function paymentSapStatus(Invoice $invoice)
+    {
+        $invoice->refresh();
+
+        return response()->json([
+            'sap_status' => $invoice->sap_payment_status,
+            'sap_status_badge' => $invoice->sap_payment_status_badge,
+            'sap_doc_num' => $invoice->sap_payment_doc_num,
+            'sap_error_message' => $invoice->sap_payment_error_message,
+            'display_sap_document' => $invoice->sap_payment_doc_num,
+            'is_terminal' => in_array($invoice->sap_payment_status, ['posted', 'failed'], true),
+        ]);
+    }
+
+    protected function authorizePaymentSapSync(): void
+    {
+        $user = Auth::user();
+
+        if (! $user || ! $user->can('send-payment-to-sap')) {
+            abort(403, 'You do not have permission to send payments to SAP.');
+        }
     }
 }

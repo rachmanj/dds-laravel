@@ -41,6 +41,10 @@
                                     <td>{{ $invoice->supplier?->name }} ({{ $invoice->supplier?->sap_code }})</td>
                                 </tr>
                                 <tr>
+                                    <th>Submitted By</th>
+                                    <td>{{ $apPreview['submitted_by_name'] ?: '—' }}</td>
+                                </tr>
+                                <tr>
                                     <th>Date</th>
                                     <td>{{ $invoice->formatted_invoice_date }}</td>
                                 </tr>

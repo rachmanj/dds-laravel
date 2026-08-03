@@ -87,7 +87,22 @@ class SapApInvoicePayloadBuilder
             $fields['U_MIS_FPNum'] = $this->invoice->faktur_no;
         }
 
+        $submittedByName = $this->mapSubmittedByName();
+        if ($submittedByName !== null) {
+            $fields['U_MIS_Created'] = $submittedByName;
+        }
+
         return $fields;
+    }
+
+    /**
+     * Map SAP submitter name to SAP U_MIS_Created
+     */
+    protected function mapSubmittedByName(): ?string
+    {
+        $name = trim((string) ($this->invoice->sapSubmitter?->name ?? ''));
+
+        return $name !== '' ? $name : null;
     }
 
     /**
@@ -276,6 +291,7 @@ class SapApInvoicePayloadBuilder
                 'document_date' => $this->invoice->invoice_date->format('Y-m-d'),
                 'faktur_no' => $this->invoice->faktur_no,
                 'faktur_date' => $this->invoice->invoice_date->format('Y-m-d'),
+                'submitted_by_name' => $this->mapSubmittedByName(),
                 'due_date' => $this->mapDueDate(),
                 'amount' => $this->invoice->amount,
                 'currency' => $this->invoice->currency,

@@ -40,7 +40,7 @@ class CreateSapApInvoiceJob implements ShouldQueue
 
     public function handle(SapService $sapService)
     {
-        $invoice = $this->invoice->fresh(['supplier', 'type']);
+        $invoice = $this->invoice->fresh(['supplier', 'type', 'sapSubmitter']);
         if (! $invoice) {
             Log::channel('sap')->error('CreateSapApInvoiceJob: Invoice reference could not be reloaded.');
 

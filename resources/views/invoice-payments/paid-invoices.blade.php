@@ -64,6 +64,7 @@
                                 <th>Payment Date</th>
                                 <th>Paid By</th>
                                 <th>Payment Status</th>
+                                <th>SAP Payment</th>
                                 <th>Days to Pay</th>
                                 <th>Actions</th>
                             </tr>
@@ -108,6 +109,9 @@
                                         {!! $invoice->payment_status_badge !!}
                                     </td>
                                     <td>
+                                        {!! $invoice->sap_payment_status_badge !!}
+                                    </td>
+                                    <td>
                                         @if ($invoice->receive_date && $invoice->payment_date)
                                             @php
                                                 $daysToPay = $invoice->receive_date->diffInDays($invoice->payment_date);
@@ -122,6 +126,15 @@
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
+                                            @can('send-payment-to-sap')
+                                                @if (empty($invoice->canSubmitPaymentToSap()))
+                                                    <a href="{{ route('invoices.payment-sap-preview', $invoice) }}"
+                                                        class="btn btn-sm btn-success"
+                                                        title="Submit Payment to SAP">
+                                                        <i class="fas fa-paper-plane"></i>
+                                                    </a>
+                                                @endif
+                                            @endcan
                                             <button type="button" class="btn btn-sm btn-primary"
                                                 onclick="updatePaidInvoice({{ $invoice->id }}, '{{ $invoice->payment_date }}', '{{ $invoice->remarks ?? '' }}')"
                                                 title="Update Payment Details">

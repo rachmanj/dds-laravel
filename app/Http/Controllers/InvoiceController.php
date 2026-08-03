@@ -827,7 +827,7 @@ class InvoiceController extends Controller
                 ->with('error', 'Invoice is already sent, pending, or cancelling in SAP.');
         }
 
-        $invoice->load(['supplier', 'type']);
+        $invoice->load(['supplier', 'type', 'sapSubmitter']);
         $isStandalone = ! $invoice->po_no || trim((string) $invoice->po_no) === '';
         $grpoRows = $isStandalone ? [] : $this->resolveGrpoLinesForPreview($invoice, $sapService);
         $grpoReferences = array_values(array_filter($grpoRows, fn (array $row) => $row['found']));
@@ -845,6 +845,10 @@ class InvoiceController extends Controller
         );
 
         $apPreview = $payloadBuilder->getPreviewData()['ap_invoice'];
+
+        if (empty($apPreview['submitted_by_name']) && auth()->user()) {
+            $apPreview['submitted_by_name'] = auth()->user()->name;
+        }
 
         return view('invoices.sap-preview', [
             'invoice' => $invoice,
@@ -915,6 +919,8 @@ class InvoiceController extends Controller
         $invoice->update([
             'sap_status' => 'pending',
             'sap_grpo_references' => ! empty($grpoReferences) ? $grpoReferences : null,
+            'sap_submitted_by_user_id' => auth()->id(),
+            'sap_submitted_at' => now(),
         ]);
 
         CreateSapApInvoiceJob::dispatch($invoice, $grpoReferences);

@@ -90,6 +90,9 @@ return [
                 ],
             ],
         ],
+        'outgoing_payment' => [
+            'service_layer_entity' => env('SAP_OUTGOING_PAYMENT_ENTITY', 'VendorPayments'),
+        ],
     ],
 
     'solar_price_scheduler' => [

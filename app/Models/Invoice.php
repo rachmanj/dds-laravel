@@ -41,10 +41,19 @@ class Invoice extends Model
         'sap_grpo_references',
         'sap_error_message',
         'sap_last_attempted_at',
+        'sap_submitted_by_user_id',
+        'sap_submitted_at',
         'sap_cancelled_at',
         'sap_cancel_error_message',
         'sap_cancellation_doc_num',
         'sap_cancellation_doc_entry',
+        'sap_payment_status',
+        'sap_payment_doc_num',
+        'sap_payment_doc_entry',
+        'sap_payment_means',
+        'sap_payment_account_code',
+        'sap_payment_error_message',
+        'sap_payment_last_attempted_at',
         'import_extraction',
     ];
 
@@ -56,7 +65,9 @@ class Invoice extends Model
         'amount' => 'decimal:2',
         'import_extraction' => 'array',
         'sap_grpo_references' => 'array',
+        'sap_submitted_at' => 'datetime',
         'sap_cancelled_at' => 'datetime',
+        'sap_payment_last_attempted_at' => 'datetime',
     ];
 
     /**
@@ -81,6 +92,14 @@ class Invoice extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Get the user who submitted the invoice to SAP.
+     */
+    public function sapSubmitter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sap_submitted_by_user_id');
     }
 
     /**
@@ -607,6 +626,74 @@ class Invoice extends Model
 
         if ($this->payment_status === 'paid') {
             $errors[] = 'Cannot cancel a paid invoice in SAP';
+        }
+
+        return $errors;
+    }
+
+    public function getSapPaymentStatusBadgeAttribute(): string
+    {
+        return match ($this->sap_payment_status) {
+            'pending' => '<span class="badge bg-warning">SAP Payment Pending</span>',
+            'posted' => '<span class="badge bg-success">SAP Payment Posted: '.($this->sap_payment_doc_num ?? 'N/A').'</span>',
+            'failed' => '<span class="badge bg-danger">SAP Payment Failed: '.($this->sap_payment_error_message ?? 'Unknown error').'</span>',
+            default => '<span class="badge bg-secondary">Not Sent to SAP</span>',
+        };
+    }
+
+    public function canSubmitPaymentToSap(): array
+    {
+        $errors = [];
+
+        if ($this->payment_status !== 'paid') {
+            $errors[] = 'Invoice must be marked as paid locally before submitting payment to SAP';
+        }
+
+        if ($this->sap_status !== 'posted' || ! $this->sap_doc_entry) {
+            $errors[] = 'Invoice must be posted to SAP as an AP Invoice before submitting payment';
+        }
+
+        if (in_array($this->sap_payment_status, ['pending', 'posted'], true)) {
+            $errors[] = 'Payment is already pending or posted to SAP';
+        }
+
+        if (! $this->supplier) {
+            $errors[] = 'Invoice must have a supplier';
+        } elseif (! $this->supplier->sap_code) {
+            $errors[] = 'Supplier does not have SAP code';
+        }
+
+        if ($this->amount <= 0) {
+            $errors[] = 'Invoice amount must be greater than 0';
+        }
+
+        return $errors;
+    }
+
+    public function canProcessPaymentToSapJob(): array
+    {
+        $errors = [];
+
+        if ($this->payment_status !== 'paid') {
+            $errors[] = 'Invoice must be marked as paid locally before submitting payment to SAP';
+        }
+
+        if ($this->sap_status !== 'posted' || ! $this->sap_doc_entry) {
+            $errors[] = 'Invoice must be posted to SAP as an AP Invoice before submitting payment';
+        }
+
+        if ($this->sap_payment_status === 'posted') {
+            $errors[] = 'Payment is already posted to SAP';
+        }
+
+        if (! $this->supplier) {
+            $errors[] = 'Invoice must have a supplier';
+        } elseif (! $this->supplier->sap_code) {
+            $errors[] = 'Supplier does not have SAP code';
+        }
+
+        if ($this->amount <= 0) {
+            $errors[] = 'Invoice amount must be greater than 0';
         }
 
         return $errors;

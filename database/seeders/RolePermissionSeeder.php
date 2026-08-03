@@ -87,6 +87,7 @@ class RolePermissionSeeder extends Seeder
             // SAP Update
             'view-sap-update',
             'send-to-sap',
+            'send-payment-to-sap',
             'cancel-sap-invoice',
 
             // Reconcile Feature
@@ -151,6 +152,7 @@ class RolePermissionSeeder extends Seeder
             'see-all-record-switch',
             'view-sap-update',
             'send-to-sap',
+            'send-payment-to-sap',
             'cancel-sap-invoice',
             'view-reconcile',
             'upload-reconcile',
@@ -205,6 +207,7 @@ class RolePermissionSeeder extends Seeder
             'delete-distributions',
             'view-sap-update',
             'send-to-sap',
+            'send-payment-to-sap',
             'cancel-sap-invoice',
             'view-reconcile',
             'upload-reconcile',
@@ -244,6 +247,7 @@ class RolePermissionSeeder extends Seeder
             'delete-distributions',
             'view-sap-update',
             'send-to-sap',
+            'send-payment-to-sap',
             'view-reconcile',
             'upload-reconcile',
             'export-reconcile',
