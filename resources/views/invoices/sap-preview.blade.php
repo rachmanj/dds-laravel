@@ -85,7 +85,11 @@
                                 <tr>
                                     <th>Mode</th>
                                     <td>
-                                        @if ($isStandalone)
+                                        @if ($isConsignment && ! $isStandalone)
+                                            <span class="badge bg-success">Consignment (GRPO-linked)</span>
+                                        @elseif ($isConsignment)
+                                            <span class="badge bg-success">Consignment (CONSIGNMENT item)</span>
+                                        @elseif ($isStandalone)
                                             <span class="badge bg-secondary">Standalone (no GRPO)</span>
                                         @else
                                             <span class="badge bg-primary">GRPO-based (BaseType 20)</span>
@@ -107,6 +111,12 @@
                                 (single service line, no GRPO base document / relationship map link).
                             </div>
                         @else
+                            @if ($isConsignment)
+                                <div class="alert alert-info">
+                                    Consignment invoice: each GRPO-linked stock line will use G/L Account
+                                    <strong>{{ $invoice->gl_account ?: '—' }}</strong> instead of the item default.
+                                </div>
+                            @endif
                             <div class="card card-warning card-outline">
                                 <div class="card-header d-flex justify-content-between align-items-center">
                                     <h3 class="card-title mb-0">GRPO Lines (SAP Relationship Map)</h3>
@@ -259,6 +269,9 @@
                                                 <th>Unit Price</th>
                                                 <th>Project</th>
                                                 <th>Cost Center</th>
+                                                @if ($isConsignment)
+                                                    <th>G/L Account</th>
+                                                @endif
                                                 <th>GRPO Link</th>
                                             </tr>
                                         </thead>
@@ -272,6 +285,9 @@
                                                     </td>
                                                     <td>{{ $line['ProjectCode'] ?? '—' }}</td>
                                                     <td>{{ $line['CostingCode'] ?? '—' }}</td>
+                                                    @if ($isConsignment)
+                                                        <td>{{ $line['AccountCode'] ?? '—' }}</td>
+                                                    @endif
                                                     <td>
                                                         @if (!empty($line['BaseEntry']))
                                                             <span class="badge bg-primary">GRPO

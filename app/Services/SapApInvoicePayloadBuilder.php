@@ -181,9 +181,12 @@ class SapApInvoicePayloadBuilder
         $costingCode = $this->mapCostingCode();
         $taxCode = $this->determineTaxCode();
         $defaultItemCode = $this->config['default_item_code'] ?? 'SERVICE';
+        $consignmentAccountCode = $this->invoice->isConsignment() && filled($this->invoice->gl_account)
+            ? $this->invoice->gl_account
+            : null;
 
         if (! empty($this->grpoReferences)) {
-            return array_map(function (array $ref) use ($projectCode, $costingCode, $taxCode, $defaultItemCode) {
+            return array_map(function (array $ref) use ($projectCode, $costingCode, $taxCode, $defaultItemCode, $consignmentAccountCode) {
                 $line = [
                     'ItemCode' => $ref['item_code'] ?: $defaultItemCode,
                     'Quantity' => (float) $ref['quantity'],
@@ -197,6 +200,10 @@ class SapApInvoicePayloadBuilder
 
                 if (isset($ref['unit_price']) && $ref['unit_price'] !== null && $ref['unit_price'] !== '') {
                     $line['UnitPrice'] = (float) $ref['unit_price'];
+                }
+
+                if ($consignmentAccountCode !== null) {
+                    $line['AccountCode'] = $consignmentAccountCode;
                 }
 
                 return $line;

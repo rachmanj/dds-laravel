@@ -215,7 +215,7 @@ class InvoiceConsignmentSapTest extends TestCase
         $this->assertArrayNotHasKey('BaseType', $payload['DocumentLines'][0]);
     }
 
-    public function test_payload_builder_prefers_grpo_lines_for_consignment_invoice(): void
+    public function test_payload_builder_applies_gl_account_to_grpo_lines_for_consignment_invoice(): void
     {
         [$user, , $consignmentType, $supplier] = $this->seedActors();
         $date = now()->toDateString();
@@ -238,7 +238,7 @@ class InvoiceConsignmentSapTest extends TestCase
         InvoiceLineDetail::query()->create([
             'invoice_id' => $invoice->id,
             'line_no' => 1,
-            'description' => 'Should not be posted',
+            'description' => 'Consignment line',
             'quantity' => 1,
             'unit_price' => 7_660_000,
             'amount' => 7_660_000,
@@ -260,7 +260,7 @@ class InvoiceConsignmentSapTest extends TestCase
         $this->assertSame('ITEM-A', $payload['DocumentLines'][0]['ItemCode']);
         $this->assertSame(20, $payload['DocumentLines'][0]['BaseType']);
         $this->assertSame(99, $payload['DocumentLines'][0]['BaseEntry']);
-        $this->assertArrayNotHasKey('AccountCode', $payload['DocumentLines'][0]);
+        $this->assertSame('51106011', $payload['DocumentLines'][0]['AccountCode']);
         $this->assertSame('B111', $payload['DocumentLines'][0]['TaxCode']);
     }
 

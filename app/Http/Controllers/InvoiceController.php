@@ -872,6 +872,7 @@ class InvoiceController extends Controller
         }
 
         $invoice->load(['supplier', 'type', 'sapSubmitter']);
+        $isConsignment = $invoice->isConsignment();
         $isStandalone = ! $invoice->po_no || trim((string) $invoice->po_no) === '';
         $grpoRows = $isStandalone ? [] : $this->resolveGrpoLinesForPreview($invoice, $sapService);
         $grpoReferences = array_values(array_filter($grpoRows, fn (array $row) => $row['found']));
@@ -899,6 +900,7 @@ class InvoiceController extends Controller
             'grpoRows' => $grpoRows,
             'apPreview' => $apPreview,
             'isStandalone' => $isStandalone,
+            'isConsignment' => $isConsignment,
         ]);
     }
 
