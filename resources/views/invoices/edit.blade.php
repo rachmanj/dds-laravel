@@ -300,12 +300,28 @@
                                                 <option value="">Select Invoice Type</option>
                                                 @foreach ($invoiceTypes as $type)
                                                     <option value="{{ $type->id }}"
+                                                        data-consignment="{{ $type->is_consignment ? '1' : '0' }}"
                                                         {{ old('type_id', $invoice->type_id) == $type->id ? 'selected' : '' }}>
                                                         {{ $type->type_name }}
                                                     </option>
                                                 @endforeach
                                             </select>
                                             @error('type_id')
+                                                <span class="invalid-feedback">{{ $message }}</span>
+                                            @enderror
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row {{ old('gl_account', $invoice->gl_account) || ($invoice->type && $invoice->type->is_consignment) ? '' : 'd-none' }}" id="gl_account_wrap">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="gl_account">G/L Account <span class="text-danger">*</span></label>
+                                            <input type="text"
+                                                class="form-control @error('gl_account') is-invalid @enderror"
+                                                id="gl_account" name="gl_account" maxlength="30"
+                                                value="{{ old('gl_account', $invoice->gl_account) }}">
+                                            @error('gl_account')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
                                         </div>
@@ -435,6 +451,79 @@
                                             @enderror
                                         </div>
                                     </div>
+                                </div>
+
+                                @php
+                                    $editLineItems = old('import_line_items');
+                                    if (! is_array($editLineItems) || $editLineItems === []) {
+                                        $editLineItems = $invoice->lineDetails->map(fn ($line) => [
+                                            'description' => $line->description,
+                                            'quantity' => $line->quantity,
+                                            'unit_price' => $line->unit_price,
+                                            'amount' => $line->amount,
+                                        ])->all();
+                                    }
+                                @endphp
+                                <div id="import_line_items_wrap" class="{{ ($invoice->isConsignment() || count($editLineItems) > 0) ? '' : 'd-none' }} mt-1 mb-3">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-1 gap-2">
+                                        <strong class="small mb-0">Line items</strong>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="import_line_add">
+                                            <i class="fas fa-plus"></i> Add row
+                                        </button>
+                                    </div>
+                                    @error('import_line_items')
+                                        <div class="alert alert-danger small py-2 mb-2">{{ $message }}</div>
+                                    @enderror
+                                    <div class="table-responsive" style="overflow-x: auto;">
+                                        <table class="table table-sm table-bordered mb-0" id="import_line_table" style="min-width: 640px;">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th>Description</th>
+                                                    <th class="text-right" style="width: 7rem">Qty</th>
+                                                    <th class="text-right" style="width: 7.5rem">Unit price</th>
+                                                    <th class="text-right" style="width: 8rem">Amount</th>
+                                                    <th style="width: 2.25rem"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="import_line_tbody">
+                                                @foreach ($editLineItems as $index => $line)
+                                                    <tr>
+                                                        <td>
+                                                            <input type="text" name="import_line_items[{{ $index }}][description]"
+                                                                class="form-control form-control-sm il-desc"
+                                                                value="{{ $line['description'] ?? '' }}" required>
+                                                        </td>
+                                                        <td>
+                                                            <input type="text" name="import_line_items[{{ $index }}][quantity]"
+                                                                class="form-control form-control-sm il-qty text-right"
+                                                                inputmode="decimal" autocomplete="off"
+                                                                value="{{ $line['quantity'] ?? '' }}">
+                                                        </td>
+                                                        <td>
+                                                            <input type="text" name="import_line_items[{{ $index }}][unit_price]"
+                                                                class="form-control form-control-sm il-price text-right"
+                                                                inputmode="decimal" autocomplete="off"
+                                                                value="{{ $line['unit_price'] ?? '' }}">
+                                                        </td>
+                                                        <td>
+                                                            <input type="text" name="import_line_items[{{ $index }}][amount]"
+                                                                class="form-control form-control-sm il-amt text-right"
+                                                                inputmode="decimal" autocomplete="off"
+                                                                value="{{ $line['amount'] ?? '' }}">
+                                                        </td>
+                                                        <td class="text-center align-middle">
+                                                            <button type="button" class="btn btn-link btn-sm text-danger p-0 import-line-delete" title="Remove row">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <small class="text-muted d-block mt-1" id="import_line_help">
+                                        Consignment invoices post these lines to SAP as CONSIGNMENT items (pre-tax amounts).
+                                    </small>
                                 </div>
 
                                 <div class="row">
@@ -2193,8 +2282,99 @@
             // Initialize all Phase 1 features
             initializePhase1Features();
             initializePreviewFeature();
+            initializeConsignmentFields();
 
             // ---------- End Phase 1: High Priority Improvements ----------
+        }
+
+        function initializeConsignmentFields() {
+            const MAX_IMPORT_LINE_ITEMS = 200;
+
+            function isConsignmentTypeSelected() {
+                return $('#type_id option:selected').data('consignment') == 1;
+            }
+
+            function reindexImportLines() {
+                $('#import_line_tbody tr').each(function (i) {
+                    $(this).find('input[name^="import_line_items"]').each(function () {
+                        const name = $(this).attr('name');
+                        if (name) {
+                            $(this).attr('name', name.replace(/import_line_items\[\d+]/, 'import_line_items[' + i + ']'));
+                        }
+                    });
+                });
+            }
+
+            function appendImportLineRow(index) {
+                const $tr = $('<tr>');
+                $tr.append($('<td>').append($('<input>', {
+                    type: 'text',
+                    name: 'import_line_items[' + index + '][description]',
+                    class: 'form-control form-control-sm il-desc',
+                    required: true
+                })));
+                $tr.append($('<td>').append($('<input>', {
+                    type: 'text',
+                    name: 'import_line_items[' + index + '][quantity]',
+                    class: 'form-control form-control-sm il-qty text-right',
+                    inputmode: 'decimal',
+                    autocomplete: 'off'
+                })));
+                $tr.append($('<td>').append($('<input>', {
+                    type: 'text',
+                    name: 'import_line_items[' + index + '][unit_price]',
+                    class: 'form-control form-control-sm il-price text-right',
+                    inputmode: 'decimal',
+                    autocomplete: 'off'
+                })));
+                $tr.append($('<td>').append($('<input>', {
+                    type: 'text',
+                    name: 'import_line_items[' + index + '][amount]',
+                    class: 'form-control form-control-sm il-amt text-right',
+                    inputmode: 'decimal',
+                    autocomplete: 'off'
+                })));
+                const $del = $('<button>', {
+                    type: 'button',
+                    class: 'btn btn-link btn-sm text-danger p-0 import-line-delete',
+                    title: 'Remove row'
+                }).append($('<i>', { class: 'fas fa-times' }));
+                $tr.append($('<td>', { class: 'text-center align-middle' }).append($del));
+                $('#import_line_tbody').append($tr);
+            }
+
+            function syncConsignmentUi() {
+                const isCons = isConsignmentTypeSelected();
+                $('#gl_account_wrap').toggleClass('d-none', !isCons);
+                $('#gl_account').prop('required', isCons);
+                if (isCons) {
+                    $('#import_line_items_wrap').removeClass('d-none');
+                    if ($('#import_line_tbody tr').length === 0) {
+                        appendImportLineRow(0);
+                    }
+                    $('#import_line_tbody .il-desc').prop('required', true);
+                } else if ($('#import_line_tbody tr').length === 0) {
+                    $('#import_line_items_wrap').addClass('d-none');
+                }
+            }
+
+            $('#type_id').on('change', syncConsignmentUi);
+            $('#import_line_add').on('click', function () {
+                const n = $('#import_line_tbody tr').length;
+                if (n >= MAX_IMPORT_LINE_ITEMS) {
+                    return;
+                }
+                appendImportLineRow(n);
+                reindexImportLines();
+            });
+            $(document).on('click', '#import_line_tbody .import-line-delete', function () {
+                $(this).closest('tr').remove();
+                reindexImportLines();
+                if (isConsignmentTypeSelected() && $('#import_line_tbody tr').length === 0) {
+                    appendImportLineRow(0);
+                }
+            });
+            syncConsignmentUi();
         }
 
         // Start initialization when DOM is ready

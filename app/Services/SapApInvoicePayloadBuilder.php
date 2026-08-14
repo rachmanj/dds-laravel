@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Models\InvoiceLineDetail;
 use App\Models\SapDepartment;
 use App\Models\SapProject;
 
@@ -22,7 +23,7 @@ class SapApInvoicePayloadBuilder
      */
     public function __construct(Invoice $invoice, array $grpoReferences = [])
     {
-        $this->invoice = $invoice;
+        $this->invoice = $invoice->loadMissing(['type', 'lineDetails', 'supplier', 'sapSubmitter']);
         $this->grpoReferences = $grpoReferences;
         $this->config = config('services.sap.ap_invoice', []);
     }
@@ -128,6 +129,16 @@ class SapApInvoicePayloadBuilder
             $errors[] = 'Receive date is required';
         }
 
+        if ($this->invoice->isConsignment()) {
+            if (! filled($this->invoice->gl_account)) {
+                $errors[] = 'G/L account is required for consignment invoices';
+            }
+
+            if (empty($this->grpoReferences) && $this->invoice->lineDetails->isEmpty()) {
+                $errors[] = 'Consignment invoices require at least one line item';
+            }
+        }
+
         if (! empty($errors)) {
             throw new \Exception('Validation failed: '.implode(', ', $errors));
         }
@@ -192,6 +203,10 @@ class SapApInvoicePayloadBuilder
             }, $this->grpoReferences);
         }
 
+        if ($this->invoice->isConsignment()) {
+            return $this->mapConsignmentLineItems($projectCode, $costingCode, $taxCode);
+        }
+
         return [
             [
                 'ItemCode' => $defaultItemCode,
@@ -203,6 +218,45 @@ class SapApInvoicePayloadBuilder
                 'CostingCode' => $costingCode,
             ],
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function mapConsignmentLineItems(?string $projectCode, ?string $costingCode, string $taxCode): array
+    {
+        $itemCode = $this->config['consignment_item_code'] ?? 'CONSIGNMENT';
+        $accountCode = $this->invoice->gl_account;
+
+        return $this->invoice->lineDetails->map(function (InvoiceLineDetail $detail) use ($itemCode, $projectCode, $costingCode, $taxCode, $accountCode) {
+            $quantity = (float) ($detail->quantity ?? 1);
+            if ($quantity <= 0) {
+                $quantity = 1;
+            }
+
+            $unitPrice = $detail->unit_price !== null
+                ? (float) $detail->unit_price
+                : (float) ($detail->amount ?? 0);
+            $lineTotal = $detail->amount !== null
+                ? (float) $detail->amount
+                : round($quantity * $unitPrice, 2);
+
+            $line = [
+                'ItemCode' => $itemCode,
+                'Quantity' => $quantity,
+                'UnitPrice' => $unitPrice,
+                'LineTotal' => $lineTotal,
+                'TaxCode' => $taxCode,
+                'ProjectCode' => $projectCode,
+                'CostingCode' => $costingCode,
+            ];
+
+            if (filled($accountCode)) {
+                $line['AccountCode'] = $accountCode;
+            }
+
+            return $line;
+        })->values()->all();
     }
 
     /**
@@ -250,7 +304,11 @@ class SapApInvoicePayloadBuilder
             ->active()
             ->first();
 
-        return $sapDepartment?->sap_code;
+        if ($sapDepartment) {
+            return $sapDepartment->sap_code;
+        }
+
+        return $this->config['default_costing_code'] ?? null;
     }
 
     /**
@@ -259,6 +317,10 @@ class SapApInvoicePayloadBuilder
     protected function determineTaxCode(): string
     {
         $taxConfig = $this->config['tax_codes'] ?? [];
+
+        if ($this->invoice->isConsignment()) {
+            return $taxConfig['by_invoice_type']['Consignment'] ?? 'B111';
+        }
 
         if (isset($taxConfig['by_currency'][$this->invoice->currency])) {
             return $taxConfig['by_currency'][$this->invoice->currency];
@@ -305,6 +367,8 @@ class SapApInvoicePayloadBuilder
                     'name' => $costingCode ? SapDepartment::where('sap_code', $costingCode)->first()?->name : null,
                 ],
                 'tax_code' => $this->determineTaxCode(),
+                'gl_account' => $this->invoice->gl_account,
+                'is_consignment' => $this->invoice->isConsignment(),
                 'document_lines' => $this->mapLineItems(),
                 'grpo_linked' => ! empty($this->grpoReferences),
                 'standalone' => empty($this->grpoReferences) && empty($this->invoice->po_no),

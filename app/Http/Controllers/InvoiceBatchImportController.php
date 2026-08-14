@@ -111,7 +111,7 @@ class InvoiceBatchImportController extends Controller
                 continue;
             }
 
-            $validator = Validator::make($row, $this->singleInvoiceRules());
+            $validator = Validator::make($row, $this->singleInvoiceRules($row));
 
             if ($validator->fails()) {
                 $results[] = [
@@ -201,10 +201,13 @@ class InvoiceBatchImportController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
-    private function singleInvoiceRules(): array
+    private function singleInvoiceRules(array $row = []): array
     {
+        $isConsignment = InvoiceType::isConsignmentTypeId($row['type_id'] ?? null);
+
         return [
             'invoice_number' => ['required', 'string', 'max:255', new UniqueInvoicePerSupplier],
             'faktur_no' => ['nullable', 'string', 'max:255'],
@@ -218,12 +221,13 @@ class InvoiceBatchImportController extends Controller
             'currency' => ['required', 'string', 'max:3'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'type_id' => ['required', 'exists:invoice_types,id'],
+            'gl_account' => [$isConsignment ? 'required' : 'nullable', 'string', 'max:30'],
             'payment_date' => ['nullable', 'date', 'after_or_equal:receive_date'],
             'remarks' => ['nullable', 'string'],
             'cur_loc' => ['required', 'string', 'max:30'],
             'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc'],
             'import_uuid' => ['nullable', 'uuid'],
-            'import_line_items' => ['nullable', 'array', 'max:200'],
+            'import_line_items' => [$isConsignment ? 'required' : 'nullable', 'array', 'min:1', 'max:200'],
             'import_line_items.*.description' => ['required', 'string', 'max:65535'],
             'import_line_items.*.quantity' => ['nullable', 'numeric'],
             'import_line_items.*.unit_price' => ['nullable', 'numeric'],

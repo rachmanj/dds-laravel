@@ -76,6 +76,12 @@
                                     <th>Tax Code</th>
                                     <td>{{ $apPreview['tax_code'] ?? '—' }}</td>
                                 </tr>
+                                @if (!empty($apPreview['is_consignment']) || filled($apPreview['gl_account'] ?? null))
+                                    <tr>
+                                        <th>G/L Account</th>
+                                        <td>{{ $apPreview['gl_account'] ?: '—' }}</td>
+                                    </tr>
+                                @endif
                                 <tr>
                                     <th>Mode</th>
                                     <td>

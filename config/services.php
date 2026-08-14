@@ -78,6 +78,8 @@ return [
     'sap' => [
         'ap_invoice' => [
             'default_item_code' => env('SAP_AP_INVOICE_DEFAULT_ITEM_CODE', 'SERVICE'),
+            'consignment_item_code' => env('SAP_AP_INVOICE_CONSIGNMENT_ITEM_CODE', 'CONSIGNMENT'),
+            'default_costing_code' => env('SAP_AP_INVOICE_DEFAULT_COSTING_CODE', '40'),
             'default_payment_terms' => env('SAP_AP_INVOICE_DEFAULT_PAYMENT_TERMS', 30),
             'tax_codes' => [
                 'default' => env('SAP_AP_INVOICE_DEFAULT_TAX_CODE', 'EXEMPT'),
@@ -86,7 +88,7 @@ return [
                     'USD' => env('SAP_AP_INVOICE_TAX_CODE_USD', 'EXEMPT'),
                 ],
                 'by_invoice_type' => [
-                    // Add mappings if needed
+                    'Consignment' => env('SAP_AP_INVOICE_TAX_CODE_CONSIGNMENT', 'B111'),
                 ],
             ],
         ],

@@ -98,6 +98,12 @@
                                             <td><strong>Invoice Type:</strong></td>
                                             <td>{{ $invoice->type ? $invoice->type->type_name : '-' }}</td>
                                         </tr>
+                                        @if ($invoice->isConsignment() || filled($invoice->gl_account))
+                                            <tr>
+                                                <td><strong>G/L Account:</strong></td>
+                                                <td>{{ $invoice->gl_account ?: '-' }}</td>
+                                            </tr>
+                                        @endif
                                         <tr>
                                             <td><strong>Currency:</strong></td>
                                             <td>{{ $invoice->currency }}</td>
@@ -222,7 +228,15 @@
                             @if ($invoice->lineDetails->isNotEmpty())
                                 <div class="row mt-3">
                                     <div class="col-12">
-                                        <h6><strong>Imported line details</strong> <span class="text-muted small">(informational; SAP posting is header-only)</span></h6>
+                                        <h6><strong>Imported line details</strong>
+                                            <span class="text-muted small">
+                                                @if ($invoice->isConsignment())
+                                                    (posted to SAP as CONSIGNMENT lines when no GRPO is selected)
+                                                @else
+                                                    (informational; SAP posting is header-only)
+                                                @endif
+                                            </span>
+                                        </h6>
                                         @php
                                             $lineSum = $invoice->lineDetails->sum(fn ($l) => (float) ($l->amount ?? 0));
                                             $headerAmt = (float) $invoice->amount;

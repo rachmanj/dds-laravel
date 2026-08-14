@@ -48,6 +48,7 @@ class InvoiceCreatorService
             'currency' => $data['currency'],
             'amount' => $data['amount'],
             'type_id' => $data['type_id'],
+            'gl_account' => $data['gl_account'] ?? null,
             'payment_date' => $data['payment_date'] ?? null,
             'remarks' => $data['remarks'] ?? null,
             'cur_loc' => $data['cur_loc'],
@@ -76,7 +77,10 @@ class InvoiceCreatorService
             }
         }
 
-        if ($importUuid !== null && $importUuid !== '' && is_array($importLineItems) && count($importLineItems) > 0) {
+        $shouldPersistUserLines = is_array($importLineItems) && count($importLineItems) > 0
+            && (($importUuid !== null && $importUuid !== '') || $invoice->isConsignment());
+
+        if ($shouldPersistUserLines) {
             app(InvoiceImportLineDetailsPersister::class)->persistFromUserInput($invoice, $importLineItems);
         } else {
             app(InvoiceImportLineDetailsPersister::class)->persistFromImportExtraction($invoice);

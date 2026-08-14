@@ -78,7 +78,7 @@
                                     <select id="batch_default_type_id" class="form-control form-control-sm" required>
                                         <option value="">Select type</option>
                                         @foreach ($invoiceTypes as $t)
-                                            <option value="{{ $t->id }}">{{ $t->type_name }}</option>
+                                            <option value="{{ $t->id }}" data-consignment="{{ $t->is_consignment ? '1' : '0' }}">{{ $t->type_name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -93,6 +93,12 @@
                                         (all rows) <span class="text-danger">*</span></label>
                                     <input type="text" id="batch_default_cur_loc" class="form-control form-control-sm"
                                         value="{{ auth()->user()->department_location_code ?? '' }}" required maxlength="30">
+                                </div>
+                                <div class="col-md-3 mb-2 d-none" id="batch_default_gl_wrap">
+                                    <label for="batch_default_gl_account" class="small font-weight-bold mb-0">G/L Account
+                                        (consignment) <span class="text-danger">*</span></label>
+                                    <input type="text" id="batch_default_gl_account" class="form-control form-control-sm"
+                                        maxlength="30">
                                 </div>
                                 <div class="col-md-3 mb-2">
                                     <label for="batch_default_supplier_id" class="small font-weight-bold mb-0">Supplier
@@ -742,7 +748,19 @@
                 renderFileList();
             });
 
-            $('#batch_default_type_id').on('change', updateSubmitCount);
+            function isBatchConsignmentType() {
+                return $('#batch_default_type_id option:selected').data('consignment') == 1;
+            }
+
+            function syncBatchConsignmentUi() {
+                $('#batch_default_gl_wrap').toggleClass('d-none', !isBatchConsignmentType());
+            }
+
+            $('#batch_default_type_id').on('change', function() {
+                updateSubmitCount();
+                syncBatchConsignmentUi();
+            });
+            syncBatchConsignmentUi();
             $('#batch_default_supplier_id').on('change', updateSubmitCount);
 
             $('#batch_apply_defaults_btn').on('click', function() {
@@ -829,6 +847,12 @@
                     }
                     return;
                 }
+                if (isBatchConsignmentType() && !($('#batch_default_gl_account').val() || '').trim()) {
+                    if (typeof toastr !== 'undefined') {
+                        toastr.warning('G/L Account is required for consignment invoices.');
+                    }
+                    return;
+                }
                 if (!window.confirm('Create the selected invoices?')) {
                     return;
                 }
@@ -857,6 +881,7 @@
                         currency: ($tr.find('.batch-currency').val() || '').trim(),
                         amount: stripAmount($tr.find('.batch-amount').val()),
                         type_id: typeId,
+                        gl_account: ($('#batch_default_gl_account').val() || '').trim() || null,
                         cur_loc: curLoc,
                         faktur_no: snap.faktur_no || null,
                         po_no: snap.po_no || null,

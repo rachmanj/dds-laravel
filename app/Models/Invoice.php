@@ -22,6 +22,7 @@ class Invoice extends Model
         'currency',
         'amount',
         'type_id',
+        'gl_account',
         'payment_date',
         'payment_status',
         'paid_by',
@@ -86,6 +87,11 @@ class Invoice extends Model
         return $this->belongsTo(InvoiceType::class, 'type_id');
     }
 
+    public function isConsignment(): bool
+    {
+        return (bool) $this->type?->is_consignment;
+    }
+
     /**
      * Get the user that created the invoice.
      */
@@ -127,7 +133,7 @@ class Invoice extends Model
     }
 
     /**
-     * Line details captured from document import (informational; SAP posting remains header-only).
+     * Line details captured from document import or entered for consignment SAP posting.
      */
     public function lineDetails(): HasMany
     {
@@ -603,6 +609,16 @@ class Invoice extends Model
         // Check currency
         if (! $this->currency) {
             $errors[] = 'Currency is required';
+        }
+
+        if ($this->isConsignment()) {
+            if (! filled($this->gl_account)) {
+                $errors[] = 'G/L account is required for consignment invoices';
+            }
+
+            if ($this->lineDetails()->doesntExist()) {
+                $errors[] = 'Consignment invoices require at least one line item';
+            }
         }
 
         return $errors;

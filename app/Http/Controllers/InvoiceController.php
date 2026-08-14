@@ -13,6 +13,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Rules\UniqueInvoicePerSupplier;
 use App\Services\InvoiceCreatorService;
+use App\Services\InvoiceImportLineDetailsPersister;
 use App\Services\SapApInvoicePayloadBuilder;
 use App\Services\SapService;
 use App\Support\InvoiceListScope;
@@ -21,6 +22,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
 
 class InvoiceController extends Controller
@@ -190,12 +192,24 @@ class InvoiceController extends Controller
             'currency' => ['required', 'string', 'max:3'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'type_id' => ['required', 'exists:invoice_types,id'],
+            'gl_account' => [
+                Rule::requiredIf(fn () => InvoiceType::isConsignmentTypeId($request->input('type_id'))),
+                'nullable',
+                'string',
+                'max:30',
+            ],
             'payment_date' => ['nullable', 'date', 'after_or_equal:receive_date'],
             'remarks' => ['nullable', 'string'],
             'cur_loc' => ['required', 'string', 'max:30'],
             'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc'],
             'import_uuid' => ['nullable', 'uuid'],
-            'import_line_items' => ['nullable', 'array', 'max:200'],
+            'import_line_items' => [
+                Rule::requiredIf(fn () => InvoiceType::isConsignmentTypeId($request->input('type_id'))),
+                'nullable',
+                'array',
+                'min:1',
+                'max:200',
+            ],
             'import_line_items.*.description' => ['required', 'string', 'max:65535'],
             'import_line_items.*.quantity' => ['nullable', 'numeric'],
             'import_line_items.*.unit_price' => ['nullable', 'numeric'],
@@ -233,6 +247,7 @@ class InvoiceController extends Controller
             'currency',
             'amount',
             'type_id',
+            'gl_account',
             'payment_date',
             'remarks',
             'cur_loc',
@@ -246,7 +261,9 @@ class InvoiceController extends Controller
 
         $userImportLines = $request->input('import_line_items');
         $importLineItems = null;
-        if ($request->filled('import_uuid') && is_array($userImportLines) && count($userImportLines) > 0) {
+        $isConsignment = InvoiceType::isConsignmentTypeId($request->input('type_id'));
+        if (is_array($userImportLines) && count($userImportLines) > 0
+            && ($request->filled('import_uuid') || $isConsignment)) {
             $importLineItems = $userImportLines;
         }
 
@@ -370,6 +387,7 @@ class InvoiceController extends Controller
             }
         }
 
+        $invoice->load('lineDetails');
         $invoiceTypes = InvoiceType::orderBy('type_name')->get();
         $suppliers = Supplier::active()->orderBy('name')->get();
         $projects = Project::active()->orderBy('code')->get();
@@ -415,12 +433,33 @@ class InvoiceController extends Controller
             'currency' => ['required', 'string', 'max:3'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'type_id' => ['required', 'exists:invoice_types,id'],
+            'gl_account' => [
+                Rule::requiredIf(fn () => InvoiceType::isConsignmentTypeId($request->input('type_id'))),
+                'nullable',
+                'string',
+                'max:30',
+            ],
             'payment_date' => ['nullable', 'date', 'after_or_equal:receive_date'],
             'remarks' => ['nullable', 'string'],
             'cur_loc' => ['required', 'string', 'max:30'],
             'status' => ['required', 'string', 'in:open,verify,return,sap,close,cancel'],
             'sap_doc' => ['nullable', 'string', 'max:20', 'unique:invoices,sap_doc,'.$invoice->id],
+            'import_line_items' => ['nullable', 'array', 'max:200'],
+            'import_line_items.*.description' => ['required', 'string', 'max:65535'],
+            'import_line_items.*.quantity' => ['nullable', 'numeric'],
+            'import_line_items.*.unit_price' => ['nullable', 'numeric'],
+            'import_line_items.*.amount' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $userImportLines = $request->input('import_line_items');
+        $hasSubmittedLines = is_array($userImportLines) && count($userImportLines) > 0;
+        if (InvoiceType::isConsignmentTypeId($request->input('type_id'))
+            && ! $hasSubmittedLines
+            && $invoice->lineDetails()->doesntExist()) {
+            return redirect()->back()
+                ->withErrors(['import_line_items' => 'Consignment invoices require at least one line item.'])
+                ->withInput();
+        }
 
         $invoice->update([
             'invoice_number' => $request->invoice_number,
@@ -435,12 +474,17 @@ class InvoiceController extends Controller
             'currency' => $request->currency,
             'amount' => $request->amount,
             'type_id' => $request->type_id,
+            'gl_account' => $request->gl_account,
             'payment_date' => $request->payment_date,
             'remarks' => $request->remarks,
             'cur_loc' => $request->cur_loc,
             'sap_doc' => $request->sap_doc,
             'status' => $request->status,
         ]);
+
+        if ($hasSubmittedLines) {
+            app(InvoiceImportLineDetailsPersister::class)->persistFromUserInput($invoice, $userImportLines);
+        }
 
         // Sync additional documents if provided
         $additionalDocumentIds = $request->input('additional_document_ids', []);
