@@ -5,6 +5,7 @@ namespace App\Services;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
 use GuzzleHttp\Exception\RequestException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SapService
@@ -240,9 +241,120 @@ class SapService
     /**
      * Find GRPO(s) created from a Purchase Order DocNum.
      *
+     * SQL on OPDN/PDN1 is the primary path: Service Layer rejects DocumentLines/any()
+     * lambdas, and the CardCode + $top 100 scan misses older GRPOs on busy vendors.
+     *
      * @return array<int, array{DocEntry: int, DocNum: int, CardCode?: string, DocumentLines?: array<int, array<string, mixed>>}>
      */
     public function getGrposByPoNumber(string $poDocNum): array
+    {
+        $poDocNum = trim($poDocNum);
+        if ($poDocNum === '') {
+            return [];
+        }
+
+        try {
+            return $this->getGrposByPoNumberFromSql($poDocNum);
+        } catch (\Throwable $e) {
+            Log::channel('sap')->warning('SAP GRPO SQL lookup failed, trying Service Layer fallback', [
+                'po_doc_num' => $poDocNum,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $this->getGrposByPoNumberFromServiceLayer($poDocNum);
+    }
+
+    /**
+     * Resolve GRPOs copied from a PO via SAP SQL (OPOR + OPDN/PDN1).
+     *
+     * @return array<int, array{DocEntry: int, DocNum: int, CardCode?: string, DocumentLines: array<int, array<string, mixed>>}>
+     */
+    protected function getGrposByPoNumberFromSql(string $poDocNum): array
+    {
+        $connection = DB::connection('sap_sql');
+        $docNumValue = is_numeric($poDocNum) ? (int) $poDocNum : $poDocNum;
+
+        $po = $connection->selectOne(
+            "SELECT TOP 1 T0.[DocEntry], T0.[DocNum], T0.[CardCode]
+             FROM [OPOR] T0
+             WHERE T0.[DocNum] = ? AND T0.[CANCELED] = 'N'",
+            [$docNumValue]
+        );
+
+        if (! $po || empty($po->DocEntry)) {
+            Log::channel('sap')->info('SAP GRPO SQL lookup: purchase order not found', [
+                'po_doc_num' => $poDocNum,
+            ]);
+
+            return [];
+        }
+
+        $poDocEntry = (int) $po->DocEntry;
+
+        $lines = $connection->select(
+            "SELECT
+                T0.[DocEntry],
+                T0.[DocNum],
+                T0.[CardCode],
+                T1.[LineNum],
+                T1.[ItemCode],
+                T1.[Quantity],
+                T1.[OpenQty],
+                T1.[Price]
+             FROM [OPDN] T0
+             INNER JOIN [PDN1] T1 ON T0.[DocEntry] = T1.[DocEntry]
+             WHERE T1.[BaseType] = 22
+               AND T1.[BaseEntry] = ?
+               AND T0.[CANCELED] = 'N'
+             ORDER BY T0.[DocEntry], T1.[LineNum]",
+            [$poDocEntry]
+        );
+
+        $grouped = [];
+        foreach ($lines as $line) {
+            $docEntry = (int) $line->DocEntry;
+            if (! isset($grouped[$docEntry])) {
+                $grouped[$docEntry] = [
+                    'DocEntry' => $docEntry,
+                    'DocNum' => (int) $line->DocNum,
+                    'CardCode' => $line->CardCode ?? null,
+                    'DocumentLines' => [],
+                ];
+            }
+
+            $openQty = (float) ($line->OpenQty ?? 0);
+            $quantity = (float) ($line->Quantity ?? 0);
+            $price = (float) ($line->Price ?? 0);
+
+            $grouped[$docEntry]['DocumentLines'][] = [
+                'LineNum' => (int) ($line->LineNum ?? 0),
+                'ItemCode' => (string) ($line->ItemCode ?? ''),
+                'Quantity' => $quantity,
+                'RemainingOpenQuantity' => $openQty,
+                'Price' => $price,
+                'UnitPrice' => $price,
+            ];
+        }
+
+        $grpos = array_values($grouped);
+
+        Log::channel('sap')->info('SAP GRPO SQL lookup succeeded', [
+            'po_doc_num' => $poDocNum,
+            'po_doc_entry' => $poDocEntry,
+            'grpo_count' => count($grpos),
+            'line_count' => count($lines),
+        ]);
+
+        return $grpos;
+    }
+
+    /**
+     * Service Layer fallback when sap_sql is unavailable.
+     *
+     * @return array<int, array{DocEntry: int, DocNum: int, CardCode?: string, DocumentLines?: array<int, array<string, mixed>>}>
+     */
+    protected function getGrposByPoNumberFromServiceLayer(string $poDocNum): array
     {
         $this->ensureSession();
 

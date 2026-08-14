@@ -1,0 +1,1085 @@
+[2026-08-14 00:00:40] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 00:00:40] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 00:00:40] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 00:10:45] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 00:10:45] production.INFO: SQL query executed successfully, found 26 records  
+[2026-08-14 00:10:45] production.INFO: SQL Server direct query successful, found 26 records  
+[2026-08-14 01:00:07] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 01:00:07] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 01:00:07] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 02:00:34] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 02:00:34] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 02:00:34] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 03:01:00] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 03:01:00] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 03:01:00] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 04:00:26] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 04:00:26] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 04:00:26] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 05:00:52] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 05:00:53] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 05:00:53] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 06:00:18] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 06:00:19] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 06:00:19] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 07:00:45] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 07:00:45] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 07:00:45] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 08:00:12] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 08:00:12] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 08:00:12] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 08:30:38] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021293%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 08:30:38] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 08:30:38] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205107","po_doc_entry":21293,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021293%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 08:31:16] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600309382634","U_MIS_FPDate":"2026-07-30"} 
+[2026-08-14 08:31:17] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7624,"doc_entry":28197,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 08:31:18] production.INFO: AP Invoice created successfully {"invoice_id":7624,"sap_doc_num":267006806} 
+[2026-08-14 08:33:14] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021330%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 08:33:14] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 08:33:14] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205144","po_doc_entry":21330,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021330%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 08:37:55] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600309382944","U_MIS_FPDate":"2026-07-30"} 
+[2026-08-14 08:37:56] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7626,"doc_entry":28198,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 08:37:56] production.INFO: AP Invoice created successfully {"invoice_id":7626,"sap_doc_num":267006807} 
+[2026-08-14 08:43:31] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021334%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 08:43:31] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 08:43:31] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205148","po_doc_entry":21334,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021334%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 08:44:52] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600309382615","U_MIS_FPDate":"2026-07-30"} 
+[2026-08-14 08:44:53] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7627,"doc_entry":28199,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 08:44:54] production.INFO: AP Invoice created successfully {"invoice_id":7627,"sap_doc_num":267006808} 
+[2026-08-14 08:46:02] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021335%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 08:46:02] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 08:46:02] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205149","po_doc_entry":21335,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021335%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 08:49:27] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600309382614","U_MIS_FPDate":"2026-07-30"} 
+[2026-08-14 08:49:28] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7628,"doc_entry":28200,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 08:49:28] production.INFO: AP Invoice created successfully {"invoice_id":7628,"sap_doc_num":267006809} 
+[2026-08-14 08:53:07] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021073%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 08:53:07] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 08:53:07] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204887","po_doc_entry":21073,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021073%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 08:54:10] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600309382619","U_MIS_FPDate":"2026-07-30"} 
+[2026-08-14 08:54:11] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7630,"doc_entry":28201,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 08:54:11] production.INFO: AP Invoice created successfully {"invoice_id":7630,"sap_doc_num":267006810} 
+[2026-08-14 08:58:18] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021292%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 08:58:18] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 08:58:18] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205106","po_doc_entry":21292,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021292%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 09:00:18] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600309382598","U_MIS_FPDate":"2026-07-30"} 
+[2026-08-14 09:00:19] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7631,"doc_entry":28202,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 09:00:19] production.INFO: AP Invoice created successfully {"invoice_id":7631,"sap_doc_num":267006811} 
+[2026-08-14 09:00:38] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 09:00:38] production.INFO: SQL query executed successfully, found 0 records  
+[2026-08-14 09:00:38] production.INFO: SQL Server direct query successful, found 0 records  
+[2026-08-14 09:04:27] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021276%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 09:04:27] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 09:04:27] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205090","po_doc_entry":21276,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021276%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 09:05:56] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600310949292","U_MIS_FPDate":"2026-08-08"} 
+[2026-08-14 09:05:58] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7615,"doc_entry":28203,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 09:05:58] production.INFO: AP Invoice created successfully {"invoice_id":7615,"sap_doc_num":267006812} 
+[2026-08-14 09:12:38] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021315%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 09:12:38] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 09:12:38] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205129","po_doc_entry":21315,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021315%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 09:13:53] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600310949288","U_MIS_FPDate":"2026-08-08"} 
+[2026-08-14 09:13:55] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7617,"doc_entry":28204,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 09:13:55] production.INFO: AP Invoice created successfully {"invoice_id":7617,"sap_doc_num":267006813} 
+[2026-08-14 09:16:15] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021363%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 09:16:15] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 09:16:15] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205177","po_doc_entry":21363,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021363%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 09:20:57] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600310948488","U_MIS_FPDate":"2026-08-08"} 
+[2026-08-14 09:20:59] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7618,"doc_entry":28205,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 09:20:59] production.INFO: AP Invoice created successfully {"invoice_id":7618,"sap_doc_num":267006814} 
+[2026-08-14 09:40:50] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021454%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 09:40:50] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 09:40:50] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205268","po_doc_entry":21454,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021454%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 09:43:14] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021126%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 09:43:14] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 09:43:14] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204940","po_doc_entry":21126,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021126%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 09:44:36] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021126%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 09:44:36] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 09:44:36] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204940","po_doc_entry":21126,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021126%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 09:45:04] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-13","U_MIS_FPNum":"04002600309928555","U_MIS_FPDate":"2026-08-10"} 
+[2026-08-14 09:45:06] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7647,"doc_entry":28206,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 09:45:06] production.INFO: AP Invoice created successfully {"invoice_id":7647,"sap_doc_num":267006815} 
+[2026-08-14 09:46:40] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600310949276","U_MIS_FPDate":"2026-08-08"} 
+[2026-08-14 09:46:41] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7620,"doc_entry":28207,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 09:46:41] production.INFO: AP Invoice created successfully {"invoice_id":7620,"sap_doc_num":267006816} 
+[2026-08-14 09:49:05] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021478%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 09:49:05] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 09:49:05] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205292","po_doc_entry":21478,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021478%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 09:49:06] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021478%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 09:49:06] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 09:49:06] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205292","po_doc_entry":21478,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021478%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 10:00:40] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 10:00:40] production.INFO: SQL query executed successfully, found 13 records  
+[2026-08-14 10:00:40] production.INFO: SQL Server direct query successful, found 13 records  
+[2026-08-14 10:04:45] production.INFO: AP Invoice cancelled successfully {"invoice_id":7647,"sap_doc_entry":"28206","sap_cancellation_doc_num":null} 
+[2026-08-14 10:05:55] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021126%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 10:05:55] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 10:05:55] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204940","po_doc_entry":21126,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021126%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 10:35:34] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021478%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 10:35:34] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 10:35:34] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205292","po_doc_entry":21478,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021478%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 10:36:04] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021126%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 10:36:04] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 10:36:04] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204940","po_doc_entry":21126,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021126%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 10:36:20] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-13","U_MIS_FPNum":"04002600309928555","U_MIS_FPDate":"2026-08-10"} 
+[2026-08-14 10:36:21] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7647,"doc_entry":28210,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 10:36:21] production.INFO: AP Invoice created successfully {"invoice_id":7647,"sap_doc_num":267006819} 
+[2026-08-14 10:40:22] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-13","U_MIS_FPNum":"04002600303836451","U_MIS_FPDate":"2026-08-03"} 
+[2026-08-14 10:40:22] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7643,"doc_entry":28211,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 10:40:23] production.INFO: AP Invoice created successfully {"invoice_id":7643,"sap_doc_num":267006820} 
+[2026-08-14 10:53:31] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021322%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 10:53:31] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 10:53:31] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260205136","po_doc_entry":21322,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021322%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 10:55:50] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-13","U_MIS_FPNum":"04002600303844451","U_MIS_FPDate":"2026-08-03"} 
+[2026-08-14 10:55:51] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7644,"doc_entry":28213,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 10:55:51] production.INFO: AP Invoice created successfully {"invoice_id":7644,"sap_doc_num":267006822} 
+[2026-08-14 11:00:06] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 11:00:07] production.INFO: SQL query executed successfully, found 13 records  
+[2026-08-14 11:00:07] production.INFO: SQL Server direct query successful, found 13 records  
+[2026-08-14 12:00:34] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 12:00:34] production.INFO: SQL query executed successfully, found 13 records  
+[2026-08-14 12:00:34] production.INFO: SQL Server direct query successful, found 13 records  
+[2026-08-14 13:36:34] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020946%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 13:36:34] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 13:36:34] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204760","po_doc_entry":20946,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020946%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 13:40:38] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600310831049","U_MIS_FPDate":"2026-08-07"} 
+[2026-08-14 13:40:40] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7613,"doc_entry":28216,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 13:40:40] production.INFO: AP Invoice created successfully {"invoice_id":7613,"sap_doc_num":267006825} 
+[2026-08-14 13:49:57] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 13:49:57] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 13:49:57] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 13:53:28] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 13:53:28] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 13:53:28] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 13:59:21] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 13:59:21] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 13:59:21] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:00:14] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:00:14] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:00:14] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:00:26] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 14:00:26] production.INFO: SQL query executed successfully, found 17 records  
+[2026-08-14 14:00:26] production.INFO: SQL Server direct query successful, found 17 records  
+[2026-08-14 14:18:32] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021020%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:18:32] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:18:32] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204834","po_doc_entry":21020,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2021020%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:22:57] production.INFO: SAP AP Invoice POST payload {"DocDate":"2026-08-12","U_MIS_FPNum":"04002600310831051","U_MIS_FPDate":"2026-08-07"} 
+[2026-08-14 14:22:58] production.INFO: AP Invoice faktur UDF fields patched {"invoice_id":7616,"doc_entry":28217,"fields":["U_MIS_FPDate","U_MIS_FPNum","U_MIS_Created"]} 
+[2026-08-14 14:22:58] production.INFO: AP Invoice created successfully {"invoice_id":7616,"sap_doc_num":267006826} 
+[2026-08-14 14:26:06] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020853%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:26:06] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:26:06] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204667","po_doc_entry":20853,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020853%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:32:37] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020855%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:32:37] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:32:37] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204669","po_doc_entry":20855,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020855%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:34:09] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020855%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:34:09] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:34:09] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204669","po_doc_entry":20855,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020855%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:34:16] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020853%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:34:16] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:34:16] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204667","po_doc_entry":20853,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020853%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:34:53] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020854%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:34:53] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:34:53] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204668","po_doc_entry":20854,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020854%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:34:59] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:34:59] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:34:59] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:35:22] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020856%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:35:22] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:35:22] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204670","po_doc_entry":20856,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020856%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:38:13] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:38:13] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:38:13] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:38:59] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:38:59] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:38:59] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:52:54] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:52:54] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:52:54] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:53:05] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:53:05] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:53:05] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:54:58] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:54:58] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:54:58] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 14:59:38] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 14:59:38] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 14:59:38] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
+[2026-08-14 15:00:45] production.INFO: Attempting direct SQL Server query for ITO data...  
+[2026-08-14 15:00:45] production.INFO: SQL query executed successfully, found 24 records  
+[2026-08-14 15:00:45] production.INFO: SQL Server direct query successful, found 24 records  
+[2026-08-14 15:15:29] production.ERROR: SAP GET request failed: Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string err (truncated...)
+  
+[2026-08-14 15:15:29] production.ERROR: SAP Error Response: {
+   "error" : {
+      "code" : 201,
+      "message" : {
+         "lang" : "en-us",
+         "value" : "Query string error - Invalid symbol in the filter condition"
+      }
+   }
+}
+  
+[2026-08-14 15:15:29] production.WARNING: SAP GRPO lambda filter failed, trying CardCode fallback {"po_doc_num":"260204302","po_doc_entry":20488,"error":"Client error: `GET https://arkasrv2:50000/b1s/v1/PurchaseDeliveryNotes?%24filter=DocumentLines%2Fany%28l%3A%20l%2FBaseType%20eq%2022%20and%20l%2FBaseEntry%20eq%2020488%29&%24select=DocEntry%2CDocNum%2CCardCode%2CDocumentLines` resulted in a `400 Bad Request` response:
+{
+   \"error\" : {
+      \"code\" : 201,
+      \"message\" : {
+         \"lang\" : \"en-us\",
+         \"value\" : \"Query string err (truncated...)
+"} 
