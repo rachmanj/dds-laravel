@@ -1,6 +1,6 @@
-# Spec: AI-Assisted DO Signature Matching
+# Spec: AI-Assisted Document Signature Matching
 
-**Feature**: AI membantu accounting mencocokkan tanda tangan penerima barang pada Delivery Order (DO) dengan specimen tanda tangan yang terdaftar di DDS.
+**Feature**: AI membantu accounting mencocokkan tanda tangan pada dokumen yang dipersyaratkan (Delivery Order/DO & Inventory Transfer Out/ITO) dengan specimen tanda tangan yang terdaftar di DDS.
 **Status**: Spec hasil grill (disetujui Iwan) — siap implementasi.
 **Mode**: Assist + human-in-the-loop (AI memberi skor + crop + verdict, manusia yang konfirmasi).
 
@@ -11,15 +11,20 @@
 Menggantikan proses manual saat ini — penerima barang mendaftarkan specimen tanda tangan via email ke accounting, lalu accounting mencocokkan secara manual — dengan alur berbantuan AI di dalam DDS:
 
 - Tanda tangan specimen terdaftar terstruktur di DDS (bukan via email).
-- Saat DO diupload, AI otomatis membandingkan tanda tangan pada DO terhadap specimen kandidat (dari project yang dipilih) dan menghasilkan **top-K kandidat + skor confidence + crop + verdict**.
+- Saat dokumen yang memerlukan verifikasi tanda tangan (**DO & ITO**) memiliki scan (attachment) dan diupload, AI otomatis membandingkan tanda tangan pada dokumen terhadap specimen kandidat (dari project yang dipilih) dan menghasilkan **top-K kandidat + skor confidence + crop + verdict**.
 - Accounting mengonfirmasi hasil (memilih petugas yang cocok, atau menandai "tidak cocok").
-- DO yang belum terverifikasi / tidak cocok **memblokir submit invoice** sampai di-override oleh accounting dengan alasan.
+- Dokumen yang belum terverifikasi / tidak cocok **memblokir submit invoice** sampai di-override oleh accounting dengan alasan.
 
 AI bukan gerbang final — keputusan akhir tetap di tangan accounting.
 
 ---
 
 ## 2. Scope
+
+### Dokumen yang kena verifikasi (configurable)
+
+- Verifikasi berlaku untuk `additional_document_types` yang punya flag **`requires_signature = true`** (kolom baru, data-driven — mudah tambah type baru tanpa ubah kode).
+- **Fase 1**: flag aktif untuk **"Delivery Order (DO)"** dan **"ITO"**.
 
 ### In scope (fase 1)
 
@@ -29,18 +34,18 @@ AI bukan gerbang final — keputusan akhir tetap di tangan accounting.
    - Hak akses: accounting + admin/superadmin (permission `manage-signature-specimens`).
 2. **Matching 1:N** (N ≤ 30 total specimen). User memilih **project** untuk menentukan kandidat specimen.
    - Open-set: AI boleh menjawab **"tidak cocok / unknown"**.
-3. **Trigger otomatis saat upload DO** (background job) + tombol **Re-verify** manual (ganti project).
+3. **Trigger otomatis saat upload scan** (background job) untuk type `requires_signature`, + tombol **Re-verify** manual (ganti project).
 4. **Hasil**: top-K (default 3) kandidat + skor + crop + verdict `matched / uncertain / no_match`.
 5. **Konfirmasi & override**: accounting memilih petugas yang cocok, atau override "no match" dengan alasan.
-6. **Guard submit invoice**: blokir submit bila ada DO terkait yang belum verified / no_match tanpa override.
+6. **Guard submit invoice**: blokir submit bila ada dokumen terkait (DO/ITO) yang belum verified / no_match tanpa override.
 
 ### Out of scope (fase 1 / nanti)
 
 - Auto-suggest project dari lokasi/PO (user pilih project manual dulu).
 - Auto-verification penuh tanpa manusia.
-- Deteksi/crop signature region terpisah dengan model khusus (pakai crop langsung dari hasil vision model, atau full-page).
+- Deteksi/crop signature region dengan model khusus (pakai crop langsung dari hasil vision model, atau full-page).
 - PWA / capture kamera langsung.
-- Matching multi-signature dalam satu DO (fokus 1 tanda tangan penerima utama).
+- Matching multi-signature dalam satu dokumen (fokus 1 tanda tangan utama).
 
 ---
 
@@ -51,7 +56,7 @@ AI bukan gerbang final — keputusan akhir tetap di tangan accounting.
 - **Model**: config baru `OPEN_ROUTER_SIGNATURE_MODEL` (default fallback ke `OPEN_ROUTER_MODEL`). Vision-capable. Suhu rendah (0.1), `response_format: json_object`.
 - **Strategi matching**: pairwise per kandidat (N kecil, ≤30, makin kecil setelah filter project). Tiap kandidat → satu panggilan yang mengembalikan `{ score, verdict, reasoning }`. Alternatif optimasi (batch semua specimen dalam 1 prompt) dipertimbangkan saat implementasi bila N per project besar.
 - **Prompt**: minta model bedakan **tanda tangan tulisan tangan** dari **stempel/cap** dan **nama tercetak**; beri opsi eksplisit `no_match`; larang menebak nama bila ragu.
-- **Job**: `app/Jobs/VerifyDoSignatureJob.php` (ShouldQueue) — ambil DO (image/PDF) + specimen kandidat, panggil service, tulis hasil.
+- **Job**: `app/Jobs/VerifyDocumentSignatureJob.php` (ShouldQueue) — ambil dokumen (image/PDF) + specimen kandidat, panggil service, tulis hasil.
 - **Threshold** (config `services.openrouter.signature_*`):
   - `>= signature_match_threshold` (default 0.75) → `matched`
   - `>= signature_uncertain_threshold` (default 0.45) → `uncertain`
@@ -96,6 +101,14 @@ signature_match_results (audit)
   - created_at
 ```
 
+### Kolom baru di `additional_document_types`
+
+```text
+  - requires_signature (boolean, default false)
+```
+
+Seeder set `requires_signature = true` untuk **"Delivery Order (DO)"** dan **"ITO"**.
+
 ### Kolom baru di `additional_documents`
 
 ```text
@@ -108,14 +121,15 @@ signature_match_results (audit)
   - signature_override_at (timestamp, nullable)
 ```
 
-- Matching hanya berlaku untuk `additional_documents.type_id` = **"Delivery Order (DO)"** (id 9 dari seeder).
-- `signature_status = skipped` bila DO tidak punya `project` (tidak bisa auto-determine kandidat) — user jalankan Re-verify manual.
+- Verifikasi hanya untuk dokumen dengan `type_id` yang `requires_signature = true`.
+- **Syarat attachment**: matching hanya berjalan bila dokumen punya `attachment` (scan/image). Dokumen yang belum punya scan (mis. **ITO hasil sync SAP** yang metadata-only) → `signature_status = skipped` (tunggu scan diupload), lalu bisa di-verify manual.
 
 ### Migration & Seeder
 
 - Migration baru sesuai tabel/kolom di atas.
 - Seeder permission: `manage-signature-specimens` → role `accounting`, `admin`, `superadmin`.
-- Seeder menambah permission ke seeder `RolePermissionSeeder` (atau migration add-permission sesuai konvensi existing, lihat `2025_10_10_*` add-permission migrations).
+- Seeder flag `requires_signature` untuk DO & ITO.
+- Seeder menambah permission ke `RolePermissionSeeder` (atau migration add-permission sesuai konvensi existing, lihat `2025_10_10_*` add-permission migrations).
 
 ---
 
@@ -128,20 +142,20 @@ signature_match_results (audit)
 - Create/Edit: name, nik, department, project (multi-select), upload 1..n gambar specimen (Dropzone, reuse pola attachment invoice).
 - Delete: SweetAlert2 confirm.
 
-### Halaman DO (AdditionalDocument show)
+### Halaman Additional Document (DO/ITO) show
 
 - Card **"Signature Verification"** menampilkan:
   - Badge status (`pending` / `matched` / `uncertain` / `no_match` / `skipped`).
   - Tombol **"Verify"** → modal pilih **project** → dispatch job → polling status.
-  - Hasil: top-K kandidat dengan **crop tanda tangan DO** + **crop specimen** + skor + verdict.
+  - Hasil: top-K kandidat dengan **crop tanda tangan dokumen** + **crop specimen** + skor + verdict.
   - Tombol **"Confirm as <name>"** (pilih kandidat → `signature_status = matched`).
   - Tombol **"Mark as no match"** (→ `no_match`, muncul form override reason).
-- Auto-run saat upload DO (bila `project` terisi): badge `pending` → `matched/uncertain/no_match`.
+- Auto-run saat scan diupload (bila `project` terisi): badge `pending` → `matched/uncertain/no_match`.
 
 ### Invoice
 
-- Di halaman invoice (detail/submit), tampilkan daftar DO terkait + status signature-nya (warning badge bila `pending/uncertain/no_match`).
-- **Guard**: `submitToSap` / finalize invoice diblokir bila ada DO terkait dengan `signature_status` ∈ {`pending`, `uncertain`, `no_match`} **tanpa override**. Pesan error jelas + tunjuk DO mana yang belum beres.
+- Di halaman invoice (detail/submit), tampilkan daftar dokumen terkait (DO/ITO) + status signature-nya (warning badge bila `pending/uncertain/no_match`).
+- **Guard**: `submitToSap` / finalize invoice diblokir bila ada dokumen terkait dengan `signature_status` ∈ {`pending`, `uncertain`, `no_match`} **tanpa override**. Pesan error jelas + tunjuk dokumen mana yang belum beres.
 
 ---
 
@@ -157,7 +171,7 @@ PUT    /admin/signature-specimens/{id}            -> update
 DELETE /admin/signature-specimens/{id}            -> destroy
 
 # Matching (additional documents)
-POST /additional-documents/{id}/signature-verify     -> dispatch VerifyDoSignatureJob (body: project_id)
+POST /additional-documents/{id}/signature-verify     -> dispatch VerifyDocumentSignatureJob (body: project_id)
 GET  /additional-documents/{id}/signature-status     -> polling status + top-K result
 POST /additional-documents/{id}/signature-confirm    -> body: specimen_id (confirm matched)
 POST /additional-documents/{id}/signature-override   -> body: reason (override no_match)
@@ -171,6 +185,7 @@ POST /additional-documents/{id}/signature-override   -> body: reason (override n
 - **Salah tunjuk (false attribution) di 1:N**. → Mitigasi: opsi `no_match`, top-K + skor, manusia konfirmasi, jangan paksa pilih 1.
 - **Stempel/cap & nama tercetak vs tanda tangan asli**. → Mitigasi: prompt eksplisit bedakan tulisan tangan vs cap/print.
 - **Kualitas scan buruk (blur/resolusi rendah)**. → Mitigasi: crop, izinkan re-upload/re-scan, fallback manual.
+- **Dokumen tanpa scan (ITO sync SAP metadata-only)**. → Mitigasi: `signature_status = skipped` sampai scan diupload; verifikasi manual tetap tersedia.
 - **Privasi data pribadi (tanda tangan = data pribadi)**. → Mitigasi: registry dibatasi permission, akses file via disk lokal terproteksi.
-- **Biaya & latensi panggilan AI**. → Mitigasi: N kecil + filter project, async queue, cache hasil per DO.
+- **Biaya & latensi panggilan AI**. → Mitigasi: N kecil + filter project, async queue, cache hasil per dokumen.
 - **Konsistensi model / hallucination**. → Mitigasi: suhu 0.1, JSON strict, parse gagal → retry sekali → fallback `uncertain`.
