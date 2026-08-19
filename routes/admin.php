@@ -43,4 +43,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('suppliers/{supplier}/vendor-invoices/lookup', [\App\Http\Controllers\Admin\VendorInvoiceImportController::class, 'lookup'])->name('suppliers.vendor-invoices.lookup');
     Route::post('suppliers/{supplier}/vendor-invoices/import', [\App\Http\Controllers\Admin\VendorInvoiceImportController::class, 'import'])->name('suppliers.vendor-invoices.import');
     Route::resource('suppliers', \App\Http\Controllers\Admin\SupplierController::class)->except(['create', 'edit']);
+
+    Route::middleware('permission:manage-signature-specimens')->group(function () {
+        Route::get('signature-specimens/data', [\App\Http\Controllers\Admin\SignatureSpecimenController::class, 'data'])->name('signature-specimens.data');
+        Route::delete('signature-specimens/{signatureSpecimen}/images/{image}', [\App\Http\Controllers\Admin\SignatureSpecimenController::class, 'destroyImage'])->name('signature-specimens.images.destroy');
+        Route::resource('signature-specimens', \App\Http\Controllers\Admin\SignatureSpecimenController::class)->except(['show']);
+    });
 });

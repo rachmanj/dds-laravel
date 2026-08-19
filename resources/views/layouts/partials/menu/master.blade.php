@@ -53,6 +53,16 @@
             </a>
         </li>
 
+        @can('manage-signature-specimens')
+            <li class="nav-item">
+                <a href="{{ route('admin.signature-specimens.index') }}"
+                    class="nav-link {{ request()->routeIs('admin.signature-specimens.*') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>Signature Specimens</p>
+                </a>
+            </li>
+        @endcan
+
         <!-- Document Status Management -->
         @can('reset-document-status')
             <li class="nav-item">

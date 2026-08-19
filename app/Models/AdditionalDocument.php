@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AdditionalDocument extends Model
 {
@@ -29,11 +29,20 @@ class AdditionalDocument extends Model
         'origin_wh',
         'destination_wh',
         'batch_no',
+        'signature_status',
+        'signature_project_id',
+        'signature_checked_by',
+        'signature_checked_at',
+        'signature_override_reason',
+        'signature_override_by',
+        'signature_override_at',
     ];
 
     protected $casts = [
         'document_date' => 'date',
         'receive_date' => 'date',
+        'signature_checked_at' => 'datetime',
+        'signature_override_at' => 'datetime',
     ];
 
     /**
@@ -90,7 +99,7 @@ class AdditionalDocument extends Model
     public function canBeEditedBy(User $user): bool
     {
         // Check if user has edit permission
-        if (!$user->can('edit-additional-documents')) {
+        if (! $user->can('edit-additional-documents')) {
             return false;
         }
 
@@ -130,11 +139,11 @@ class AdditionalDocument extends Model
 
     /**
      * Scope a query to only include documents available for distribution.
-     * 
+     *
      * Documents are NOT available if they are:
      * - 'in_transit' (currently being distributed to another department)
      * - 'unaccounted_for' (missing or damaged in previous distribution)
-     * 
+     *
      * Note: 'distributed' documents are now included to allow re-distribution
      */
     public function scopeAvailableForDistribution($query)
@@ -163,14 +172,60 @@ class AdditionalDocument extends Model
         return $query->where('distribution_status', 'unaccounted_for');
     }
 
-
-
     /**
      * Invoices linked to this additional document.
      */
     public function invoices(): BelongsToMany
     {
         return $this->belongsToMany(Invoice::class, 'additional_document_invoice')->withTimestamps();
+    }
+
+    public function signatureProject(): BelongsTo
+    {
+        return $this->belongsTo(Project::class, 'signature_project_id');
+    }
+
+    public function signatureCheckedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'signature_checked_by');
+    }
+
+    public function signatureOverrideBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'signature_override_by');
+    }
+
+    public function signatureMatchResults(): HasMany
+    {
+        return $this->hasMany(SignatureMatchResult::class);
+    }
+
+    public function requiresSignature(): bool
+    {
+        return (bool) ($this->type?->requires_signature);
+    }
+
+    public function scopeRequiresSignature($query)
+    {
+        return $query->whereHas('type', fn ($q) => $q->where('requires_signature', true));
+    }
+
+    public function hasSignatureOverride(): bool
+    {
+        return filled($this->signature_override_reason);
+    }
+
+    public function blocksInvoiceSubmission(): bool
+    {
+        if (! $this->requiresSignature()) {
+            return false;
+        }
+
+        if ($this->hasSignatureOverride()) {
+            return false;
+        }
+
+        return in_array($this->signature_status, ['pending', 'uncertain', 'no_match'], true);
     }
 
     /**
@@ -189,7 +244,7 @@ class AdditionalDocument extends Model
     public function getCurrentLocationArrivalDateAttribute()
     {
         // If document has never been distributed, use original receive_date
-        if ($this->distribution_status === 'available' && !$this->hasBeenDistributed()) {
+        if ($this->distribution_status === 'available' && ! $this->hasBeenDistributed()) {
             return $this->receive_date ?: $this->created_at;
         }
 
@@ -218,6 +273,7 @@ class AdditionalDocument extends Model
     public function getDaysInCurrentLocationAttribute()
     {
         $arrivalDate = $this->current_location_arrival_date;
+
         return $arrivalDate ? $arrivalDate->diffInDays(now()) : 0;
     }
 
@@ -253,7 +309,7 @@ class AdditionalDocument extends Model
      */
     public function canChangeLocationManually(): bool
     {
-        return !$this->hasBeenDistributed();
+        return ! $this->hasBeenDistributed();
     }
 
     /**

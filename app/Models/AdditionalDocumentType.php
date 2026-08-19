@@ -8,8 +8,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class AdditionalDocumentType extends Model
 {
     protected $fillable = [
-        'type_name'
+        'type_name',
+        'requires_signature',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'requires_signature' => 'boolean',
+        ];
+    }
 
     /**
      * Get the documents for this type.

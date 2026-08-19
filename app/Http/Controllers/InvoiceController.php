@@ -308,6 +308,10 @@ class InvoiceController extends Controller
 
         $invoice->load(['supplier', 'type', 'creator', 'attachments.uploader', 'additionalDocuments.type', 'lineDetails']);
 
+        $blockingSignatureDocuments = $invoice->additionalDocuments->filter(
+            fn (AdditionalDocument $doc) => $doc->blocksInvoiceSubmission()
+        );
+
         $canEditInvoiceLineDetails = false;
         if ($user->hasAnyRole(['superadmin', 'admin', 'accounting', 'finance'])) {
             $canEditInvoiceLineDetails = true;
@@ -316,7 +320,7 @@ class InvoiceController extends Controller
             $canEditInvoiceLineDetails = ! ($locationCode && $invoice->cur_loc !== $locationCode);
         }
 
-        return view('invoices.show', compact('invoice', 'canEditInvoiceLineDetails'));
+        return view('invoices.show', compact('invoice', 'canEditInvoiceLineDetails', 'blockingSignatureDocuments'));
     }
 
     public function updateLineDetail(Request $request, Invoice $invoice, InvoiceLineDetail $lineDetail)
@@ -858,6 +862,28 @@ class InvoiceController extends Controller
     {
         $this->authorizeSapSync($invoice);
 
+        $blockingSignatureDocuments = $invoice->additionalDocuments()
+            ->with('type')
+            ->get()
+            ->filter(fn (AdditionalDocument $doc) => $doc->blocksInvoiceSubmission());
+
+        if ($blockingSignatureDocuments->isNotEmpty()) {
+            $documentList = $blockingSignatureDocuments
+                ->map(fn (AdditionalDocument $doc) => sprintf(
+                    '%s (%s, signature: %s)',
+                    $doc->document_number,
+                    $doc->type?->type_name ?? 'Unknown',
+                    $doc->signature_status ?? 'unknown'
+                ))
+                ->implode('; ');
+
+            return redirect()
+                ->route('invoices.show', $invoice)
+                ->withErrors([
+                    'sap_sync' => 'Invoice cannot be submitted to SAP until signature verification is resolved or overridden for: '.$documentList,
+                ]);
+        }
+
         $validationErrors = $invoice->canSyncToSap();
         if (! empty($validationErrors)) {
             return redirect()
@@ -907,6 +933,26 @@ class InvoiceController extends Controller
     public function submitToSap(Request $request, Invoice $invoice)
     {
         $this->authorizeSapSync($invoice);
+
+        $blockingSignatureDocuments = $invoice->additionalDocuments()
+            ->with('type')
+            ->get()
+            ->filter(fn (AdditionalDocument $doc) => $doc->blocksInvoiceSubmission());
+
+        if ($blockingSignatureDocuments->isNotEmpty()) {
+            $documentList = $blockingSignatureDocuments
+                ->map(fn (AdditionalDocument $doc) => sprintf(
+                    '%s (%s, signature: %s)',
+                    $doc->document_number,
+                    $doc->type?->type_name ?? 'Unknown',
+                    $doc->signature_status ?? 'unknown'
+                ))
+                ->implode('; ');
+
+            return back()->withErrors([
+                'sap_sync' => 'Invoice cannot be submitted to SAP until signature verification is resolved or overridden for: '.$documentList,
+            ]);
+        }
 
         $validationErrors = $invoice->canSyncToSap();
         if (! empty($validationErrors)) {

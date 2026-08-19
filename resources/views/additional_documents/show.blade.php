@@ -226,6 +226,100 @@
                         </div>
                     </div>
 
+                    @if ($additionalDocument->requiresSignature())
+                        <div class="card mt-3" id="signature-verification-card">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="fas fa-signature"></i> Signature Verification</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <strong class="mr-2">Status:</strong>
+                                    <span id="signature-status-badge" class="badge badge-secondary">
+                                        {{ ucfirst($additionalDocument->signature_status ?? 'not started') }}
+                                    </span>
+                                    @if ($additionalDocument->signature_override_reason)
+                                        <span class="badge badge-info ml-2">Override recorded</span>
+                                    @endif
+                                </div>
+
+                                @if ($additionalDocument->signature_project_id)
+                                    <p class="mb-2">
+                                        <strong>Verification project:</strong>
+                                        {{ $additionalDocument->signatureProject?->code ?? $additionalDocument->signature_project_id }}
+                                    </p>
+                                @endif
+
+                                @if ($additionalDocument->signature_checked_at)
+                                    <p class="mb-2 text-muted">
+                                        Confirmed {{ $additionalDocument->signature_checked_at->format('d/m/Y H:i') }}
+                                        @if ($additionalDocument->signatureCheckedBy)
+                                            by {{ $additionalDocument->signatureCheckedBy->name }}
+                                        @endif
+                                    </p>
+                                @endif
+
+                                @if ($additionalDocument->signature_override_reason)
+                                    <div class="alert alert-warning">
+                                        <strong>Override reason:</strong> {{ $additionalDocument->signature_override_reason }}
+                                    </div>
+                                @endif
+
+                                @if (! $additionalDocument->attachment)
+                                    <div class="alert alert-info">
+                                        Upload a scan attachment to run signature verification.
+                                    </div>
+                                @else
+                                    @hasanyrole('superadmin|admin|accounting|finance')
+                                        <button type="button" class="btn btn-primary btn-sm" id="btn-signature-verify">
+                                            <i class="fas fa-search"></i> Verify / Re-verify
+                                        </button>
+                                    @endhasanyrole
+                                @endif
+
+                                <div id="signature-results" class="mt-3"></div>
+
+                                <div id="signature-no-match-form" class="mt-3" style="display:none;">
+                                    <div class="form-group">
+                                        <label for="signature_override_reason">Override reason <span class="text-danger">*</span></label>
+                                        <textarea id="signature_override_reason" class="form-control" rows="3"
+                                            placeholder="Explain why this document should proceed without a matching signature"></textarea>
+                                    </div>
+                                    <button type="button" class="btn btn-warning btn-sm" id="btn-signature-override">
+                                        <i class="fas fa-exclamation-circle"></i> Submit override
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal fade" id="signatureProjectModal" tabindex="-1" role="dialog">
+                            <div class="modal-dialog" role="document">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Select project for signature matching</h5>
+                                        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="form-group">
+                                            <label for="signature_project_id">Project</label>
+                                            <select id="signature_project_id" class="form-control">
+                                                <option value="">— Select project —</option>
+                                                @foreach ($projects as $project)
+                                                    <option value="{{ $project->id }}" @selected($additionalDocument->signature_project_id == $project->id)>
+                                                        {{ $project->code }} — {{ $project->owner }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                                        <button type="button" class="btn btn-primary" id="btn-start-signature-verify">Start verification</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Document Journey Tracking -->
                     <div class="card mt-3">
                         <div class="card-header">
@@ -257,6 +351,170 @@
 @section('scripts')
     <script>
         $(document).ready(function() {
+            var signaturePollTimer = null;
+            var documentId = {{ $additionalDocument->id }};
+            var statusUrl = @json(route('additional-documents.signature-status', $additionalDocument));
+            var verifyUrl = @json(route('additional-documents.signature-verify', $additionalDocument));
+            var confirmUrl = @json(route('additional-documents.signature-confirm', $additionalDocument));
+            var overrideUrl = @json(route('additional-documents.signature-override', $additionalDocument));
+
+            function signatureBadgeClass(status) {
+                switch (status) {
+                    case 'matched':
+                        return 'badge-success';
+                    case 'uncertain':
+                    case 'pending':
+                        return 'badge-warning';
+                    case 'no_match':
+                        return 'badge-danger';
+                    case 'skipped':
+                        return 'badge-secondary';
+                    default:
+                        return 'badge-secondary';
+                }
+            }
+
+            function updateSignatureBadge(status) {
+                var badge = $('#signature-status-badge');
+                badge.removeClass('badge-success badge-warning badge-danger badge-secondary badge-info');
+                badge.addClass(signatureBadgeClass(status));
+                badge.text(status ? status.replace('_', ' ') : 'not started');
+            }
+
+            function renderSignatureResults(results) {
+                var container = $('#signature-results');
+                if (!results || results.length === 0) {
+                    container.html('<p class="text-muted">No match results yet.</p>');
+                    return;
+                }
+
+                var html = '<div class="row">';
+                results.forEach(function(result) {
+                    html += '<div class="col-md-4 mb-3"><div class="card h-100">';
+                    html += '<div class="card-header py-2"><strong>' + (result.specimen_name || 'Candidate') + '</strong>';
+                    html += ' <span class="badge ' + signatureBadgeClass(result.verdict) + '">' + result.verdict + '</span></div>';
+                    html += '<div class="card-body">';
+                    if (result.score !== null) {
+                        html += '<p><strong>Score:</strong> ' + Number(result.score).toFixed(3) + '</p>';
+                    }
+                    if (result.reasoning) {
+                        html += '<p class="small text-muted">' + result.reasoning + '</p>';
+                    }
+                    if (result.document_crop) {
+                        html += '<p class="small"><strong>Document crop</strong></p><img src="' + result.document_crop + '" class="img-fluid border mb-2" alt="Document signature">';
+                    }
+                    if (result.specimen_crop) {
+                        html += '<p class="small"><strong>Specimen crop</strong></p><img src="' + result.specimen_crop + '" class="img-fluid border mb-2" alt="Specimen signature">';
+                    }
+                    html += '<button type="button" class="btn btn-success btn-sm btn-confirm-signature" data-specimen-id="' + result.specimen_id + '" data-name="' + (result.specimen_name || '') + '">';
+                    html += '<i class="fas fa-check"></i> Confirm as ' + (result.specimen_name || 'match') + '</button>';
+                    html += '</div></div></div>';
+                });
+                html += '</div>';
+                html += '<button type="button" class="btn btn-outline-danger btn-sm mt-2" id="btn-mark-no-match"><i class="fas fa-times"></i> Mark as no match</button>';
+                container.html(html);
+            }
+
+            function pollSignatureStatus() {
+                $.get(statusUrl, function(response) {
+                    if (!response.success) {
+                        return;
+                    }
+
+                    updateSignatureBadge(response.signature_status);
+                    renderSignatureResults(response.results);
+
+                    if (response.signature_status === 'no_match' || response.signature_status === 'uncertain') {
+                        $('#signature-no-match-form').show();
+                    } else if (response.signature_status === 'matched') {
+                        $('#signature-no-match-form').hide();
+                    }
+
+                    if (response.is_processing) {
+                        signaturePollTimer = setTimeout(pollSignatureStatus, 3000);
+                    } else if (signaturePollTimer) {
+                        clearTimeout(signaturePollTimer);
+                        signaturePollTimer = null;
+                    }
+                });
+            }
+
+            $('#btn-signature-verify').on('click', function() {
+                $('#signatureProjectModal').modal('show');
+            });
+
+            $('#btn-start-signature-verify').on('click', function() {
+                var projectId = $('#signature_project_id').val();
+                if (!projectId) {
+                    alert('Please select a project.');
+                    return;
+                }
+
+                $.ajax({
+                    url: verifyUrl,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        project_id: projectId
+                    },
+                    success: function(response) {
+                        $('#signatureProjectModal').modal('hide');
+                        updateSignatureBadge('pending');
+                        pollSignatureStatus();
+                    },
+                    error: function(xhr) {
+                        var message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Verification could not be started.';
+                        alert(message);
+                    }
+                });
+            });
+
+            $(document).on('click', '.btn-confirm-signature', function() {
+                var specimenId = $(this).data('specimen-id');
+                $.ajax({
+                    url: confirmUrl,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        specimen_id: specimenId
+                    },
+                    success: function(response) {
+                        updateSignatureBadge(response.signature_status);
+                        $('#signature-no-match-form').hide();
+                        alert(response.message);
+                    }
+                });
+            });
+
+            $('#btn-mark-no-match').on('click', function() {
+                $('#signature-no-match-form').show();
+            });
+
+            $('#btn-signature-override').on('click', function() {
+                var reason = $('#signature_override_reason').val();
+                if (!reason) {
+                    alert('Please provide an override reason.');
+                    return;
+                }
+
+                $.ajax({
+                    url: overrideUrl,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        reason: reason
+                    },
+                    success: function(response) {
+                        updateSignatureBadge(response.signature_status);
+                        alert(response.message);
+                    }
+                });
+            });
+
+            @if ($additionalDocument->requiresSignature())
+                pollSignatureStatus();
+            @endif
+
             // Document Journey Tracking
             $('#loadJourneyBtn').on('click', function() {
                 loadDocumentJourney();

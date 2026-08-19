@@ -103,6 +103,9 @@ class RolePermissionSeeder extends Seeder
             'create-solar-price-histories',
             'edit-solar-price-histories',
             'delete-solar-price-histories',
+
+            // Signature specimens
+            'manage-signature-specimens',
         ];
 
         foreach ($permissions as $permission) {
@@ -164,6 +167,7 @@ class RolePermissionSeeder extends Seeder
             'create-solar-price-histories',
             'edit-solar-price-histories',
             'delete-solar-price-histories',
+            'manage-signature-specimens',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);
@@ -218,6 +222,7 @@ class RolePermissionSeeder extends Seeder
             'create-solar-price-histories',
             'edit-solar-price-histories',
             'delete-solar-price-histories',
+            'manage-signature-specimens',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance']);

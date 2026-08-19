@@ -7,9 +7,13 @@ use App\Exports\GeneralDocumentTemplate;
 use App\Imports\AdditionalDocumentImport;
 use App\Imports\GeneralDocumentImport;
 use App\Jobs\SyncSapItoDocumentsJob;
+use App\Jobs\VerifyDocumentSignatureJob;
 use App\Models\AdditionalDocument;
 use App\Models\AdditionalDocumentType;
 use App\Models\Department;
+use App\Models\Project;
+use App\Models\SignatureMatchResult;
+use App\Models\SignatureSpecimen;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -313,7 +317,9 @@ class AdditionalDocumentController extends Controller
             $data['attachment'] = $filePath;
         }
 
-        AdditionalDocument::create($data);
+        $document = AdditionalDocument::create($data);
+
+        $this->dispatchSignatureVerificationIfNeeded($document, $data['project'] ?? null);
 
         return redirect()->route('additional-documents.index')
             ->with('success', 'Additional Document created successfully.');
@@ -339,9 +345,11 @@ class AdditionalDocumentController extends Controller
             }
         }
 
-        $additionalDocument->load(['type', 'creator.department', 'distributions']);
+        $additionalDocument->load(['type', 'creator.department', 'distributions', 'signatureProject', 'signatureCheckedBy', 'signatureOverrideBy']);
 
-        return view('additional_documents.show', compact('additionalDocument'));
+        $projects = Project::active()->orderBy('code')->get();
+
+        return view('additional_documents.show', compact('additionalDocument', 'projects'));
     }
 
     public function edit(AdditionalDocument $additionalDocument)
@@ -419,6 +427,11 @@ class AdditionalDocumentController extends Controller
         }
 
         $additionalDocument->update($data);
+
+        if ($request->hasFile('attachment')) {
+            $additionalDocument->refresh();
+            $this->dispatchSignatureVerificationIfNeeded($additionalDocument, $additionalDocument->project);
+        }
 
         return redirect()->route('additional-documents.index')
             ->with('success', 'Additional Document updated successfully.');
@@ -1130,5 +1143,200 @@ class AdditionalDocumentController extends Controller
             return redirect()->route('admin.sap-sync-ito')
                 ->with('error', 'Sync failed: '.$e->getMessage());
         }
+    }
+
+    public function signatureVerify(Request $request, AdditionalDocument $additionalDocument)
+    {
+        $this->authorizeSignatureActions($additionalDocument);
+
+        if (! $additionalDocument->requiresSignature()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This document type does not require signature verification.',
+            ], 422);
+        }
+
+        if (! $additionalDocument->attachment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Upload a scan attachment before verifying signatures.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'project_id' => ['required', 'exists:projects,id'],
+        ]);
+
+        $additionalDocument->update([
+            'signature_project_id' => $validated['project_id'],
+            'signature_status' => 'pending',
+            'signature_override_reason' => null,
+            'signature_override_by' => null,
+            'signature_override_at' => null,
+            'signature_checked_by' => null,
+            'signature_checked_at' => null,
+        ]);
+
+        VerifyDocumentSignatureJob::dispatch($additionalDocument->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Signature verification started.',
+            'signature_status' => 'pending',
+        ]);
+    }
+
+    public function signatureStatus(AdditionalDocument $additionalDocument)
+    {
+        $this->authorizeSignatureView($additionalDocument);
+
+        $topK = (int) config('services.openrouter.signature_top_k', 3);
+        $latestRunAt = SignatureMatchResult::query()
+            ->where('additional_document_id', $additionalDocument->id)
+            ->max('created_at');
+
+        $results = collect();
+        if ($latestRunAt) {
+            $results = SignatureMatchResult::query()
+                ->where('additional_document_id', $additionalDocument->id)
+                ->where('created_at', $latestRunAt)
+                ->with('specimen')
+                ->orderByDesc('score')
+                ->limit($topK)
+                ->get()
+                ->map(function (SignatureMatchResult $result): array {
+                    $raw = json_decode($result->raw_response ?? '', true);
+                    $documentCrop = is_array($raw) ? ($raw['document_signature_crop'] ?? null) : null;
+                    $specimenCrop = is_array($raw) ? ($raw['specimen_signature_crop'] ?? null) : null;
+                    $reasoning = is_array($raw) ? ($raw['reasoning'] ?? null) : null;
+
+                    return [
+                        'specimen_id' => $result->specimen_id,
+                        'specimen_name' => $result->specimen?->name,
+                        'score' => $result->score !== null ? (float) $result->score : null,
+                        'verdict' => $result->verdict,
+                        'reasoning' => $reasoning,
+                        'document_crop' => $documentCrop,
+                        'specimen_crop' => $specimenCrop,
+                    ];
+                });
+        }
+
+        return response()->json([
+            'success' => true,
+            'signature_status' => $additionalDocument->signature_status,
+            'signature_project_id' => $additionalDocument->signature_project_id,
+            'signature_checked_at' => $additionalDocument->signature_checked_at?->toIso8601String(),
+            'signature_override_reason' => $additionalDocument->signature_override_reason,
+            'results' => $results,
+            'is_processing' => $additionalDocument->signature_status === 'pending',
+        ]);
+    }
+
+    public function signatureConfirm(Request $request, AdditionalDocument $additionalDocument)
+    {
+        $this->authorizeSignatureActions($additionalDocument);
+
+        $validated = $request->validate([
+            'specimen_id' => ['required', 'exists:signature_specimens,id'],
+        ]);
+
+        $specimen = SignatureSpecimen::query()->findOrFail($validated['specimen_id']);
+
+        $additionalDocument->update([
+            'signature_status' => 'matched',
+            'signature_checked_by' => Auth::id(),
+            'signature_checked_at' => now(),
+            'signature_override_reason' => null,
+            'signature_override_by' => null,
+            'signature_override_at' => null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Signature confirmed as '.$specimen->name.'.',
+            'signature_status' => 'matched',
+        ]);
+    }
+
+    public function signatureOverride(Request $request, AdditionalDocument $additionalDocument)
+    {
+        $this->authorizeSignatureActions($additionalDocument);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $additionalDocument->update([
+            'signature_status' => 'no_match',
+            'signature_override_reason' => $validated['reason'],
+            'signature_override_by' => Auth::id(),
+            'signature_override_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Signature override recorded.',
+            'signature_status' => 'no_match',
+        ]);
+    }
+
+    private function authorizeSignatureView(AdditionalDocument $additionalDocument): void
+    {
+        $user = Auth::user();
+        if (! $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
+            $userLocationCode = $user->department_location_code;
+            if ($userLocationCode && $additionalDocument->cur_loc !== $userLocationCode) {
+                abort(403, 'You do not have permission to view signature status for this document.');
+            }
+        }
+    }
+
+    private function authorizeSignatureActions(AdditionalDocument $additionalDocument): void
+    {
+        $this->authorizeSignatureView($additionalDocument);
+
+        $user = Auth::user();
+        if (! $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
+            abort(403, 'You do not have permission to manage signature verification.');
+        }
+    }
+
+    private function dispatchSignatureVerificationIfNeeded(AdditionalDocument $document, ?string $projectCode = null): void
+    {
+        $document->loadMissing('type');
+
+        if (! $document->requiresSignature()) {
+            return;
+        }
+
+        if (! $document->attachment) {
+            $document->update(['signature_status' => 'skipped']);
+
+            return;
+        }
+
+        $projectId = null;
+        if ($projectCode) {
+            $projectId = Project::query()->where('code', $projectCode)->value('id');
+        }
+
+        if (! $projectId) {
+            $document->update(['signature_status' => 'skipped']);
+
+            return;
+        }
+
+        $document->update([
+            'signature_status' => 'pending',
+            'signature_project_id' => $projectId,
+            'signature_override_reason' => null,
+            'signature_override_by' => null,
+            'signature_override_at' => null,
+            'signature_checked_by' => null,
+            'signature_checked_at' => null,
+        ]);
+
+        VerifyDocumentSignatureJob::dispatch($document->id);
     }
 }

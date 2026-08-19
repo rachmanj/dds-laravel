@@ -404,6 +404,14 @@
                             </h3>
                         </div>
                         <div class="card-body">
+                            @if (isset($blockingSignatureDocuments) && $blockingSignatureDocuments->isNotEmpty())
+                                <div class="alert alert-warning">
+                                    <strong>Signature verification required:</strong>
+                                    The following linked documents block SAP submission until verified or overridden:
+                                    {{ $blockingSignatureDocuments->pluck('document_number')->implode(', ') }}
+                                </div>
+                            @endif
+
                             @if ($invoice->additionalDocuments->count() > 0)
                                 <div class="table-responsive">
                                     <table class="table table-sm table-striped">
@@ -414,16 +422,38 @@
                                                 <th>Date</th>
                                                 <th>PO No</th>
                                                 <th>Cur Loc</th>
+                                                <th>Signature</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @foreach ($invoice->additionalDocuments as $doc)
                                                 <tr>
-                                                    <td>{{ $doc->document_number }}</td>
+                                                    <td>
+                                                        <a href="{{ route('additional-documents.show', $doc) }}">{{ $doc->document_number }}</a>
+                                                    </td>
                                                     <td>{{ optional($doc->type)->type_name }}</td>
                                                     <td>{{ optional($doc->document_date)->format('Y-m-d') }}</td>
                                                     <td>{{ $doc->po_no }}</td>
-                                                    <td><span class="badge badge-secondary">{{ $doc->cur_loc }}</span>
+                                                    <td><span class="badge badge-secondary">{{ $doc->cur_loc }}</span></td>
+                                                    <td>
+                                                        @if ($doc->requiresSignature())
+                                                            @php
+                                                                $sigStatus = $doc->signature_status ?? 'not started';
+                                                                $sigClass = match ($sigStatus) {
+                                                                    'matched' => 'success',
+                                                                    'pending', 'uncertain' => 'warning',
+                                                                    'no_match' => 'danger',
+                                                                    'skipped' => 'secondary',
+                                                                    default => 'secondary',
+                                                                };
+                                                            @endphp
+                                                            <span class="badge badge-{{ $sigClass }}">{{ $sigStatus }}</span>
+                                                            @if ($doc->hasSignatureOverride())
+                                                                <span class="badge badge-info">override</span>
+                                                            @endif
+                                                        @else
+                                                            <span class="text-muted">—</span>
+                                                        @endif
                                                     </td>
                                                 </tr>
                                             @endforeach

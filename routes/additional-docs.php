@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdditionalDocumentDashboardController;
+use Illuminate\Support\Facades\Route;
 
 // Additional Documents Routes (accessible to all authenticated users)
 Route::prefix('additional-documents')->name('additional-documents.')->group(function () {
@@ -40,4 +40,9 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     Route::delete('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'destroy'])->name('destroy');
     Route::get('{additionalDocument}/download', [\App\Http\Controllers\AdditionalDocumentController::class, 'downloadAttachment'])->name('download');
     Route::get('{additionalDocument}/preview', [\App\Http\Controllers\AdditionalDocumentController::class, 'previewAttachment'])->name('preview');
+
+    Route::post('{additionalDocument}/signature-verify', [\App\Http\Controllers\AdditionalDocumentController::class, 'signatureVerify'])->name('signature-verify');
+    Route::get('{additionalDocument}/signature-status', [\App\Http\Controllers\AdditionalDocumentController::class, 'signatureStatus'])->name('signature-status');
+    Route::post('{additionalDocument}/signature-confirm', [\App\Http\Controllers\AdditionalDocumentController::class, 'signatureConfirm'])->name('signature-confirm');
+    Route::post('{additionalDocument}/signature-override', [\App\Http\Controllers\AdditionalDocumentController::class, 'signatureOverride'])->name('signature-override');
 });
