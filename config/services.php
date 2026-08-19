@@ -78,6 +78,8 @@ return [
         'signature_match_threshold' => (float) env('OPEN_ROUTER_SIGNATURE_MATCH_THRESHOLD', env('OPENROUTER_SIGNATURE_MATCH_THRESHOLD', 0.75)),
         'signature_uncertain_threshold' => (float) env('OPEN_ROUTER_SIGNATURE_UNCERTAIN_THRESHOLD', env('OPENROUTER_SIGNATURE_UNCERTAIN_THRESHOLD', 0.45)),
         'signature_top_k' => max(1, (int) env('OPEN_ROUTER_SIGNATURE_TOP_K', env('OPENROUTER_SIGNATURE_TOP_K', 3))),
+        'batch_ocr_model' => env('OPEN_ROUTER_BATCH_OCR_MODEL', env('OPENROUTER_BATCH_OCR_MODEL')),
+        'batch_ocr_timeout' => (int) env('OPEN_ROUTER_BATCH_OCR_TIMEOUT', env('OPENROUTER_BATCH_OCR_TIMEOUT', 120)),
     ],
 
     'sap' => [

@@ -1,6 +1,6 @@
 <!-- Additional Documents -->
-<li class="nav-item {{ request()->routeIs('additional-documents.*') || request()->routeIs('admin.sap-sync-ito') ? 'menu-open' : '' }}">
-    <a href="#" class="nav-link {{ request()->routeIs('additional-documents.*') || request()->routeIs('admin.sap-sync-ito') ? 'active' : '' }}">
+<li class="nav-item {{ request()->routeIs('additional-documents.*') || request()->routeIs('admin.sap-sync-ito') || request()->routeIs('ito-batch-import.*') ? 'menu-open' : '' }}">
+    <a href="#" class="nav-link {{ request()->routeIs('additional-documents.*') || request()->routeIs('admin.sap-sync-ito') || request()->routeIs('ito-batch-import.*') ? 'active' : '' }}">
         <i class="nav-icon fas fa-file-alt"></i>
         <p>
             Additional Documents
@@ -51,6 +51,17 @@
                         <p>Import Documents</p>
                     </a>
                 @endif
+            </li>
+        @endif
+
+        <!-- ITO Batch Import -->
+        @if (auth()->user()->can('manage-ito-batch-import'))
+            <li class="nav-item">
+                <a href="{{ route('ito-batch-import.index') }}"
+                    class="nav-link {{ request()->routeIs('ito-batch-import.*') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>ITO Batch Import</p>
+                </a>
             </li>
         @endif
 

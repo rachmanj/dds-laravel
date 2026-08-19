@@ -273,8 +273,9 @@ Return ONLY a JSON object (no markdown) with exactly these keys:
 - specimen_signature_crop (string|null) base64 data URL of the cropped signature from the specimen image, or null
 
 Rules:
+- Compare the HANDWRITTEN signature in the "Received by" field/area only. Ignore signatures in "Prepared by", "Approved by", "Transporter by", and any other fields.
 - Compare HANDWRITTEN signatures only. Ignore stamps/seals (cap/stempel), printed names, and logos.
-- If you cannot find a handwritten signature on the document, set score to 0, verdict to no_match, and explain why.
+- If you cannot find a handwritten signature in the "Received by" area on the document, set score to 0, verdict to no_match, and explain why.
 - If unsure, use verdict uncertain and a conservative score. Do not guess a person's name when uncertain.
 - Use no_match when the signatures clearly belong to different people or when no valid signature is visible.
 PROMPT;

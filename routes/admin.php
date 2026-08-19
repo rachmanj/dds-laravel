@@ -50,3 +50,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('signature-specimens', \App\Http\Controllers\Admin\SignatureSpecimenController::class)->except(['show']);
     });
 });
+
+Route::middleware(['auth', 'permission:manage-ito-batch-import'])->prefix('ito-batch-import')->name('ito-batch-import.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Admin\ItoBatchImportController::class, 'index'])->name('index');
+    Route::get('/data', [\App\Http\Controllers\Admin\ItoBatchImportController::class, 'data'])->name('data');
+    Route::post('/', [\App\Http\Controllers\Admin\ItoBatchImportController::class, 'store'])->name('store');
+    Route::get('/{batch}', [\App\Http\Controllers\Admin\ItoBatchImportController::class, 'show'])->name('show');
+    Route::get('/{batch}/review', [\App\Http\Controllers\Admin\ItoBatchImportController::class, 'review'])->name('review');
+    Route::post('/items/{item}/assign', [\App\Http\Controllers\Admin\ItoBatchImportController::class, 'assign'])->name('items.assign');
+    Route::post('/items/{item}/create', [\App\Http\Controllers\Admin\ItoBatchImportController::class, 'createAndAttach'])->name('items.create');
+    Route::post('/items/{item}/skip', [\App\Http\Controllers\Admin\ItoBatchImportController::class, 'skip'])->name('items.skip');
+});
