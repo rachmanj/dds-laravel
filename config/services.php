@@ -73,8 +73,9 @@ return [
         // Max upload size for invoice import (kilobytes). Laravel validation "max" for files uses KB. Also raise PHP upload_max_filesize / post_max_size and web server limits to match.
         'max_upload_kb' => max(1, (int) env('INVOICE_IMPORT_MAX_FILE_KB', env('OPENROUTER_MAX_UPLOAD_KB', 51200))),
         'batch_import_max' => max(1, (int) env('INVOICE_BATCH_IMPORT_MAX', 50)),
-        'signature_model' => env('OPEN_ROUTER_SIGNATURE_MODEL', env('OPENROUTER_SIGNATURE_MODEL')),
-        'signature_timeout' => (int) env('OPEN_ROUTER_SIGNATURE_TIMEOUT', env('OPENROUTER_SIGNATURE_TIMEOUT', 120)),
+        'signature_model' => env('OPEN_ROUTER_SIGNATURE_MODEL', env('OPENROUTER_SIGNATURE_MODEL', 'google/gemini-2.5-flash')),
+        'signature_timeout' => (int) env('OPEN_ROUTER_SIGNATURE_TIMEOUT', env('OPENROUTER_SIGNATURE_TIMEOUT', 180)),
+        'signature_crop_bottom_ratio' => (float) env('OPEN_ROUTER_SIGNATURE_CROP_BOTTOM_RATIO', env('OPENROUTER_SIGNATURE_CROP_BOTTOM_RATIO', 0.30)),
         'signature_match_threshold' => (float) env('OPEN_ROUTER_SIGNATURE_MATCH_THRESHOLD', env('OPENROUTER_SIGNATURE_MATCH_THRESHOLD', 0.75)),
         'signature_uncertain_threshold' => (float) env('OPEN_ROUTER_SIGNATURE_UNCERTAIN_THRESHOLD', env('OPENROUTER_SIGNATURE_UNCERTAIN_THRESHOLD', 0.45)),
         'signature_top_k' => max(1, (int) env('OPEN_ROUTER_SIGNATURE_TOP_K', env('OPENROUTER_SIGNATURE_TOP_K', 3))),

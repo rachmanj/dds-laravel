@@ -79,8 +79,7 @@ class VerifyDocumentSignatureJobTest extends TestCase
 
         $attachment = 'attachments/test-do.jpg';
         $absolute = storage_path('app/public/'.$attachment);
-        @mkdir(dirname($absolute), 0777, true);
-        file_put_contents($absolute, 'scan');
+        $this->writeTinyJpeg($absolute);
 
         $document = $this->createDoDocument($user, $attachment, $project->id);
 
@@ -131,10 +130,8 @@ class VerifyDocumentSignatureJobTest extends TestCase
         $specimenPath = 'signature-specimens/spec.jpg';
         $attachmentAbsolute = storage_path('app/public/'.$attachment);
         $specimenAbsolute = storage_path('app/public/'.$specimenPath);
-        @mkdir(dirname($attachmentAbsolute), 0777, true);
-        @mkdir(dirname($specimenAbsolute), 0777, true);
-        file_put_contents($attachmentAbsolute, 'scan');
-        file_put_contents($specimenAbsolute, 'specimen');
+        $this->writeTinyJpeg($attachmentAbsolute);
+        $this->writeTinyJpeg($specimenAbsolute);
 
         $specimen = SignatureSpecimen::query()->create([
             'name' => 'Receiver One',
@@ -161,5 +158,16 @@ class VerifyDocumentSignatureJobTest extends TestCase
 
         @unlink($attachmentAbsolute);
         @unlink($specimenAbsolute);
+    }
+
+    private function writeTinyJpeg(string $path, int $width = 20, int $height = 20): void
+    {
+        @mkdir(dirname($path), 0777, true);
+
+        $image = imagecreatetruecolor($width, $height);
+        $white = imagecolorallocate($image, 255, 255, 255);
+        imagefilledrectangle($image, 0, 0, $width - 1, $height - 1, $white);
+        imagejpeg($image, $path, 90);
+        imagedestroy($image);
     }
 }

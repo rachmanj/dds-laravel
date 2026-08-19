@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Smalot\PdfParser\Parser;
 
 class SignatureMatchingService
 {
@@ -17,17 +18,25 @@ class SignatureMatchingService
             return [];
         }
 
-        $documentPayload = $this->buildDocumentContent($documentAbsolutePath, $documentMime);
+        $documentCropDataUrl = $this->buildDocumentCropDataUrl($documentAbsolutePath, $documentMime);
         $results = [];
 
         foreach ($candidates as $candidate) {
-            $results[] = $this->matchSingleCandidate($documentPayload, $documentMime, $candidate);
+            $results[] = $this->matchSingleCandidate(
+                [
+                    'type' => 'image',
+                    'content' => $documentCropDataUrl,
+                ],
+                $documentMime,
+                $candidate
+            );
         }
 
         return $results;
     }
 
     /**
+     * @param  array{type?: string, content: string}  $documentPayload
      * @param  array{id: int, name: string, image_path: string}  $candidate
      * @return array{specimen_id: int, score: float|null, verdict: string, reasoning: string|null, document_crop: string|null, specimen_crop: string|null, raw_response: string|null}
      */
@@ -36,7 +45,7 @@ class SignatureMatchingService
         $specimenDataUrl = $this->fileToDataUrl($candidate['image_path']);
 
         try {
-            $decoded = $this->callOpenRouter($documentPayload, $documentMime, $specimenDataUrl, $candidate['name']);
+            $decoded = $this->callOpenRouter($documentPayload, $specimenDataUrl);
         } catch (\Throwable $e) {
             Log::warning('Signature matching API call failed', [
                 'specimen_id' => $candidate['id'],
@@ -48,6 +57,18 @@ class SignatureMatchingService
                 'score' => null,
                 'verdict' => 'uncertain',
                 'reasoning' => 'AI request failed: '.$e->getMessage(),
+                'document_crop' => null,
+                'specimen_crop' => null,
+                'raw_response' => null,
+            ];
+        }
+
+        if ($decoded === null) {
+            return [
+                'specimen_id' => $candidate['id'],
+                'score' => null,
+                'verdict' => 'uncertain',
+                'reasoning' => 'Could not parse JSON from model response.',
                 'document_crop' => null,
                 'specimen_crop' => null,
                 'raw_response' => null,
@@ -92,103 +113,176 @@ class SignatureMatchingService
         return 'no_match';
     }
 
-    /**
-     * @return array{type: string, content: mixed}
-     */
-    private function buildDocumentContent(string $absolutePath, string $mime): array
+    private function buildDocumentCropDataUrl(string $absolutePath, string $mime): string
+    {
+        $bytes = $this->readDocumentImageBytes($absolutePath, $mime);
+
+        return $this->cropBottomRegionToJpegDataUrl($bytes);
+    }
+
+    private function readDocumentImageBytes(string $absolutePath, string $mime): string
     {
         if ($mime === 'application/pdf' || str_ends_with(strtolower($absolutePath), '.pdf')) {
-            $raw = file_get_contents($absolutePath);
-            if ($raw === false) {
-                throw new \RuntimeException('Could not read PDF file.');
-            }
-
-            return [
-                'type' => 'pdf',
-                'content' => [
-                    'filename' => basename($absolutePath) ?: 'document.pdf',
-                    'data_url' => 'data:application/pdf;base64,'.base64_encode($raw),
-                ],
-            ];
+            return $this->extractPdfEmbeddedImage($absolutePath);
         }
 
-        return [
-            'type' => 'image',
-            'content' => $this->fileToDataUrl($absolutePath, $mime),
-        ];
+        $bytes = file_get_contents($absolutePath);
+        if ($bytes === false || $bytes === '') {
+            throw new \RuntimeException('Could not read document image: '.$absolutePath);
+        }
+
+        return $bytes;
+    }
+
+    private function extractPdfEmbeddedImage(string $absolutePath): string
+    {
+        try {
+            $parser = new Parser;
+            $pdf = $parser->parseFile($absolutePath);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('Could not parse PDF for signature matching: '.$e->getMessage(), 0, $e);
+        }
+
+        $images = array_values($pdf->getObjectsByType('XObject', 'Image'));
+        $image = $images[0] ?? null;
+        $bytes = $image?->getContent();
+
+        if (! is_string($bytes) || $bytes === '') {
+            throw new \RuntimeException('Could not extract an embedded page image from the PDF. Signature matching requires a scanned PDF.');
+        }
+
+        return $bytes;
+    }
+
+    private function cropBottomRegionToJpegDataUrl(string $bytes): string
+    {
+        $image = @imagecreatefromstring($bytes);
+        if ($image === false) {
+            throw new \RuntimeException('Could not decode document image for signature matching.');
+        }
+
+        $cropped = $this->cropBottomRegion($image);
+
+        ob_start();
+        $encoded = imagejpeg($cropped, null, 85);
+        $jpeg = ob_get_clean();
+
+        if ($cropped !== $image) {
+            imagedestroy($cropped);
+        }
+        imagedestroy($image);
+
+        if ($encoded === false || ! is_string($jpeg) || $jpeg === '') {
+            throw new \RuntimeException('Could not encode signature crop as JPEG.');
+        }
+
+        return 'data:image/jpeg;base64,'.base64_encode($jpeg);
+    }
+
+    private function cropBottomRegion(\GdImage $image): \GdImage
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $ratio = (float) config('services.openrouter.signature_crop_bottom_ratio', 0.30);
+        if ($ratio <= 0.0 || $ratio > 1.0) {
+            $ratio = 0.30;
+        }
+
+        $cropY = (int) ($height * (1 - $ratio));
+        $cropHeight = $height - $cropY;
+        if ($cropHeight < 1 || $cropY < 0) {
+            return $image;
+        }
+
+        $cropped = imagecrop($image, [
+            'x' => 0,
+            'y' => $cropY,
+            'width' => $width,
+            'height' => $cropHeight,
+        ]);
+
+        if ($cropped instanceof \GdImage) {
+            return $cropped;
+        }
+
+        $manual = imagecreatetruecolor($width, $cropHeight);
+        if ($manual === false) {
+            return $image;
+        }
+
+        imagecopy($manual, $image, 0, 0, 0, $cropY, $width, $cropHeight);
+
+        return $manual;
     }
 
     /**
-     * @param  array{type: string, content: mixed}  $documentPayload
-     * @return array<string, mixed>
+     * @param  array{type?: string, content: string}  $documentPayload
+     * @return array<string, mixed>|null
      */
-    private function callOpenRouter(array $documentPayload, string $documentMime, string $specimenDataUrl, string $specimenName): array
+    private function callOpenRouter(array $documentPayload, string $specimenDataUrl): ?array
     {
         $key = config('services.openrouter.key');
         if (! $key) {
             throw new \RuntimeException('OpenRouter API key is not configured.');
         }
 
-        $userContent = [
-            [
-                'type' => 'text',
-                'text' => 'Compare the handwritten signature on the document with the specimen signature for "'.$specimenName.'". Respond with JSON only as specified.',
-            ],
-        ];
-
-        if ($documentPayload['type'] === 'pdf') {
-            $userContent[] = [
-                'type' => 'file',
-                'file' => [
-                    'filename' => $documentPayload['content']['filename'],
-                    'file_data' => $documentPayload['content']['data_url'],
-                ],
-            ];
-        } else {
-            $userContent[] = [
-                'type' => 'image_url',
-                'image_url' => ['url' => $documentPayload['content']],
-            ];
+        $documentDataUrl = $documentPayload['content'];
+        if (! is_string($documentDataUrl) || $documentDataUrl === '') {
+            throw new \RuntimeException('Document crop image is missing.');
         }
 
-        $userContent[] = [
-            'type' => 'image_url',
-            'image_url' => ['url' => $specimenDataUrl],
-        ];
-
-        $model = config('services.openrouter.signature_model') ?: config('services.openrouter.model');
-
         $payload = [
-            'model' => $model,
+            'model' => $this->signatureModel(),
             'temperature' => 0.1,
             'response_format' => ['type' => 'json_object'],
             'messages' => [
-                ['role' => 'system', 'content' => $this->systemPrompt()],
-                ['role' => 'user', 'content' => $userContent],
+                [
+                    'role' => 'user',
+                    'content' => [
+                        [
+                            'type' => 'text',
+                            'text' => $this->userPrompt(),
+                        ],
+                        [
+                            'type' => 'image_url',
+                            'image_url' => ['url' => $documentDataUrl],
+                        ],
+                        [
+                            'type' => 'image_url',
+                            'image_url' => ['url' => $specimenDataUrl],
+                        ],
+                    ],
+                ],
             ],
         ];
 
-        if ($documentPayload['type'] === 'pdf') {
-            $engine = (string) config('services.openrouter.pdf_engine', 'mistral-ocr');
-            $payload['plugins'] = [
-                [
-                    'id' => 'file-parser',
-                    'pdf' => ['engine' => $engine],
-                ],
-            ];
-        }
-
-        $timeout = (int) config('services.openrouter.signature_timeout', config('services.openrouter.timeout', 120));
+        $timeout = (int) config('services.openrouter.signature_timeout', 180);
         $response = $this->dispatchRequest($payload, $timeout);
         $decoded = $this->decodeJsonContent($response);
 
         if ($decoded === null) {
-            throw new \RuntimeException('Could not parse JSON from model response.');
+            $response = $this->dispatchRequest($payload, $timeout);
+            $decoded = $this->decodeJsonContent($response);
         }
 
         return $decoded;
     }
 
+    private function signatureModel(): string
+    {
+        $model = config('services.openrouter.signature_model');
+
+        return filled($model) ? (string) $model : 'google/gemini-2.5-flash';
+    }
+
+    private function userPrompt(): string
+    {
+        return 'Compare the handwritten signature in the "Received by" area of the document (first image) with the specimen signature (second image). Are they written by the same person? Ignore stamps/seals and printed names. Reply ONLY a JSON object: {"score": <number 0-1>, "verdict": "matched"|"uncertain"|"no_match", "reasoning": "<brief>"}';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     private function dispatchRequest(array $payload, int $timeout): string
     {
         $baseUrl = rtrim((string) config('services.openrouter.base_url'), '/');
@@ -259,25 +353,5 @@ class SignatureMatchingService
         }
 
         return 'data:'.$mime.';base64,'.base64_encode($contents);
-    }
-
-    private function systemPrompt(): string
-    {
-        return <<<'PROMPT'
-You are a forensic handwriting analyst assisting accounting staff to compare handwritten signatures.
-Return ONLY a JSON object (no markdown) with exactly these keys:
-- score (number 0-1) confidence that the document signature was made by the same person as the specimen
-- verdict (string) one of: matched, uncertain, no_match
-- reasoning (string) brief explanation
-- document_signature_crop (string|null) base64 data URL of the cropped handwritten signature region from the document, or null if not found
-- specimen_signature_crop (string|null) base64 data URL of the cropped signature from the specimen image, or null
-
-Rules:
-- Compare the HANDWRITTEN signature in the "Received by" field/area only. Ignore signatures in "Prepared by", "Approved by", "Transporter by", and any other fields.
-- Compare HANDWRITTEN signatures only. Ignore stamps/seals (cap/stempel), printed names, and logos.
-- If you cannot find a handwritten signature in the "Received by" area on the document, set score to 0, verdict to no_match, and explain why.
-- If unsure, use verdict uncertain and a conservative score. Do not guess a person's name when uncertain.
-- Use no_match when the signatures clearly belong to different people or when no valid signature is visible.
-PROMPT;
     }
 }
