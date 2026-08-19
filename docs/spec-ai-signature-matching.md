@@ -26,6 +26,11 @@ AI bukan gerbang final — keputusan akhir tetap di tangan accounting.
 - Verifikasi berlaku untuk `additional_document_types` yang punya flag **`requires_signature = true`** (kolom baru, data-driven — mudah tambah type baru tanpa ubah kode).
 - **Fase 1**: flag aktif untuk **"Delivery Order (DO)"** dan **"ITO"**.
 
+### Tanda tangan yang diverifikasi
+
+- Yang diverifikasi = tanda tangan **"Received by"** (penerima barang) SAJA. Tanda tangan lain (Prepared by / Approved by / Transporter by) TIDAK diverifikasi.
+- DO & ITO sama-sama punya blok `Received by`; prompt AI diarahkan spesifik ke blok tersebut agar tidak salah banding dengan penandatangan lain.
+
 ### In scope (fase 1)
 
 1. **Registry specimen tanda tangan** (CRUD) untuk entitas "Petugas/Penerima barang" (karyawan ARKA, bukan harus `users` DDS).
@@ -55,7 +60,7 @@ AI bukan gerbang final — keputusan akhir tetap di tangan accounting.
 - **Service baru**: `app/Services/SignatureMatchingService.php` — reuse pola `OpenRouterInvoiceExtractionService` (HTTP → `/chat/completions`, vision `image_url` / PDF via `file` + `file-parser`).
 - **Model**: config baru `OPEN_ROUTER_SIGNATURE_MODEL` (default fallback ke `OPEN_ROUTER_MODEL`). Vision-capable. Suhu rendah (0.1), `response_format: json_object`.
 - **Strategi matching**: pairwise per kandidat (N kecil, ≤30, makin kecil setelah filter project). Tiap kandidat → satu panggilan yang mengembalikan `{ score, verdict, reasoning }`. Alternatif optimasi (batch semua specimen dalam 1 prompt) dipertimbangkan saat implementasi bila N per project besar.
-- **Prompt**: minta model bedakan **tanda tangan tulisan tangan** dari **stempel/cap** dan **nama tercetak**; beri opsi eksplisit `no_match`; larang menebak nama bila ragu.
+- **Prompt**: minta model bedakan **tanda tangan tulisan tangan** dari **stempel/cap** dan **nama tercetak**; arahkan ke tanda tangan **"Received by"** (penerima barang) secara spesifik — abaikan Prepared/Approved/Transporter; beri opsi eksplisit `no_match`; larang menebak nama bila ragu.
 - **Job**: `app/Jobs/VerifyDocumentSignatureJob.php` (ShouldQueue) — ambil dokumen (image/PDF) + specimen kandidat, panggil service, tulis hasil.
 - **Threshold** (config `services.openrouter.signature_*`):
   - `>= signature_match_threshold` (default 0.75) → `matched`
