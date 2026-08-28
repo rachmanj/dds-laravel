@@ -77,6 +77,7 @@ class RolePermissionSeeder extends Seeder
 
             // Reports
             'view-reports',
+            'view-document-report',
 
             // Document Status Management
             'reset-document-status',
@@ -164,6 +165,7 @@ class RolePermissionSeeder extends Seeder
             'upload-reconcile',
             'export-reconcile',
             'delete-reconcile',
+            'view-document-report',
             'view-master',
             'view-admin',
             'access-domain-assistant',
@@ -184,6 +186,7 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'delete-distributions',
+            'view-document-report',
         ]);
 
         $accounting = Role::firstOrCreate(['name' => 'accounting']);
@@ -221,6 +224,7 @@ class RolePermissionSeeder extends Seeder
             'upload-reconcile',
             'export-reconcile',
             'delete-reconcile',
+            'view-document-report',
             'view-master',
             'see-all-record-switch',
             'create-solar-price-histories',
@@ -262,6 +266,7 @@ class RolePermissionSeeder extends Seeder
             'upload-reconcile',
             'export-reconcile',
             'delete-reconcile',
+            'view-document-report',
             'view-master',
             'view-admin',
             'see-all-record-switch',
@@ -284,6 +289,7 @@ class RolePermissionSeeder extends Seeder
             'create-distributions',
             'edit-distributions',
             'see-all-record-switch',
+            'view-document-report',
         ]);
     }
 }

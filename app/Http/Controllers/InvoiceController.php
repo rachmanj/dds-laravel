@@ -16,6 +16,7 @@ use App\Services\InvoiceCreatorService;
 use App\Services\InvoiceImportLineDetailsPersister;
 use App\Services\SapApInvoicePayloadBuilder;
 use App\Services\SapService;
+use App\Support\InvoiceListFilters;
 use App\Support\InvoiceListScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -46,66 +47,11 @@ class InvoiceController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        // Main query with optimized database-level arrival date calculation
-        // This avoids N+1 queries by calculating arrival_date and days_in_location in SQL
-        $query = Invoice::query()
-            ->select('invoices.*')
-            ->selectRaw('COALESCE(
-                (SELECT received_at FROM distributions 
-                 INNER JOIN distribution_documents ON distributions.id = distribution_documents.distribution_id
-                 WHERE distribution_documents.document_type = \'App\\\\Models\\\\Invoice\'
-                   AND distribution_documents.document_id = invoices.id
-                   AND distribution_documents.receiver_verification_status = \'verified\'
-                   AND distributions.received_at IS NOT NULL
-                 ORDER BY distributions.received_at DESC LIMIT 1),
-                COALESCE(invoices.receive_date, invoices.created_at)
-            ) as arrival_date')
-            ->selectRaw('DATEDIFF(NOW(), COALESCE(
-                (SELECT received_at FROM distributions 
-                 INNER JOIN distribution_documents ON distributions.id = distribution_documents.distribution_id
-                 WHERE distribution_documents.document_type = \'App\\\\Models\\\\Invoice\'
-                   AND distribution_documents.document_id = invoices.id
-                   AND distribution_documents.receiver_verification_status = \'verified\'
-                   AND distributions.received_at IS NOT NULL
-                 ORDER BY distributions.received_at DESC LIMIT 1),
-                COALESCE(invoices.receive_date, invoices.created_at)
-            )) as days_in_location')
-            ->with(['supplier', 'type', 'creator', 'attachments']);
+        $query = InvoiceListFilters::baseQuery();
 
         InvoiceListScope::applyLocationFilter($query, $user, $request->boolean('show_all'));
 
-        // Apply search filters
-        if ($request->filled('search_invoice_number')) {
-            $query->where('invoice_number', 'like', '%'.$request->search_invoice_number.'%');
-        }
-
-        if ($request->filled('search_faktur_no')) {
-            $query->where('faktur_no', 'like', '%'.$request->search_faktur_no.'%');
-        }
-
-        if ($request->filled('search_po_no')) {
-            $query->where('po_no', 'like', '%'.$request->search_po_no.'%');
-        }
-
-        if ($request->filled('search_type')) {
-            $query->whereHas('type', function ($q) use ($request) {
-                $q->where('type_name', $request->search_type);
-            });
-        }
-
-        if ($request->filled('search_status')) {
-            $query->where('status', $request->search_status);
-        }
-
-        if ($request->filled('search_supplier')) {
-            $query->whereHas('supplier', function ($q) use ($request) {
-                $q->where('name', 'like', '%'.$request->search_supplier.'%');
-            });
-        }
-
-        if ($request->filled('search_invoice_project')) {
-            $query->where('invoice_project', $request->search_invoice_project);
-        }
+        InvoiceListFilters::apply($request, $query);
 
         // Use DataTables with database-level sorting and pagination
         return DataTables::of($query)

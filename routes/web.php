@@ -70,6 +70,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     // Include Accounting Fulfillment Routes
     require __DIR__.'/accounting-fulfillment.php';
 
+    // Include Document Report Routes
+    require __DIR__.'/document-report.php';
+
     Route::middleware(['can:access-domain-assistant'])->prefix('assistant')->name('assistant.')->group(function () {
         Route::get('/conversations', [DomainAssistantController::class, 'conversationsIndex'])->name('conversations.index');
         Route::post('/conversations', [DomainAssistantController::class, 'conversationsStore'])->name('conversations.store');

@@ -318,19 +318,17 @@ class MenuSearchService
      */
     private function addReports(User $user, array &$items): void
     {
-        if (! $user->can('view-reconcile')) {
-            return;
+        if ($user->can('view-reconcile')) {
+            $this->push(
+                $items,
+                'Reconciliation',
+                'reconcile.index',
+                'fas fa-chart-line',
+                'Reports',
+                'MAIN > Reports > Reconciliation',
+                ['reconcile', 'report', 'reports']
+            );
         }
-
-        $this->push(
-            $items,
-            'Reconciliation',
-            'reconcile.index',
-            'fas fa-chart-line',
-            'Reports',
-            'MAIN > Reports > Reconciliation',
-            ['reconcile', 'report', 'reports']
-        );
 
         if ($user->hasAnyRole(['superadmin', 'admin', 'accounting'])) {
             $this->push(
@@ -341,6 +339,28 @@ class MenuSearchService
                 'Reports',
                 'MAIN > Reports > Accounting Monthly Invoice Fulfillment',
                 ['accounting', 'fulfillment', 'monthly', 'invoice']
+            );
+        }
+
+        if ($user->can('view-document-report')) {
+            $this->push(
+                $items,
+                'All Invoice Report',
+                'document-report.invoices',
+                'fas fa-chart-line',
+                'Reports',
+                'MAIN > Reports > All Invoice Report',
+                ['document', 'report', 'invoice', 'all invoice']
+            );
+
+            $this->push(
+                $items,
+                'All Additional Documents Report',
+                'document-report.additional-documents',
+                'fas fa-chart-line',
+                'Reports',
+                'MAIN > Reports > All Additional Documents Report',
+                ['document', 'report', 'additional document', 'all additional documents']
             );
         }
     }

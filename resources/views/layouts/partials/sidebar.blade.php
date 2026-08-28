@@ -83,9 +83,9 @@
                 @endcan
 
                 <!-- Reports Section -->
-                @can('view-reconcile')
+                @canany(['view-reconcile', 'view-document-report'])
                     @include('layouts.partials.menu.reports')
-                @endcan
+                @endcanany
 
                 <!-- Messages Section -->
                 <li class="nav-item {{ request()->is('messages*') ? 'menu-open' : '' }}">

@@ -10,6 +10,7 @@ use App\Models\DistributionHistory;
 use App\Models\DistributionType;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Services\DocumentJourneyService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -1534,85 +1535,15 @@ class DistributionController extends Controller
      */
     public function documentDistributionHistory(string $documentType, int $documentId): View
     {
-        // Validate document type
-        if (! in_array($documentType, ['invoice', 'additional-document'])) {
-            abort(404);
-        }
+        $journey = app(DocumentJourneyService::class)->build($documentType, $documentId);
 
-        // Get the document with its relationships
-        if ($documentType === 'invoice') {
-            $document = Invoice::with(['distributions.originDepartment', 'distributions.destinationDepartment'])->findOrFail($documentId);
-        } else {
-            $document = AdditionalDocument::with(['distributions.originDepartment', 'distributions.destinationDepartment'])->findOrFail($documentId);
-        }
-
-        // Get all distributions this document has been part of
-        $distributions = Distribution::whereHas('documents', function ($query) use ($documentType, $documentId) {
-            $query->where('document_type', $documentType === 'invoice' ? Invoice::class : AdditionalDocument::class)
-                ->where('document_id', $documentId);
-        })->with(['originDepartment', 'destinationDepartment', 'histories.user', 'creator'])
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        // Calculate enhanced document journey statistics
-        $stats = [
-            'total_distributions' => $distributions->count(),
-            'total_departments_visited' => $distributions->pluck('destination_department_id')->unique()->count(),
-            'current_location' => $document->cur_loc ?? 'N/A',
-            'current_status' => $document->distribution_status ?? 'available',
-        ];
-
-        // Calculate time spent in each department
-        $departmentTimeStats = [];
-        foreach ($distributions as $distribution) {
-            $deptName = $distribution->destinationDepartment->name;
-            $deptId = $distribution->destinationDepartment->id;
-
-            if (! isset($departmentTimeStats[$deptId])) {
-                $departmentTimeStats[$deptId] = [
-                    'name' => $deptName,
-                    'total_time' => 0,
-                    'visits' => 0,
-                    'first_visit' => null,
-                    'last_visit' => null,
-                ];
-            }
-
-            $departmentTimeStats[$deptId]['visits']++;
-
-            // Calculate time spent in this department
-            if ($distribution->received_at && $distribution->sent_at) {
-                $timeSpent = $distribution->sent_at->diffInDays($distribution->received_at);
-                $departmentTimeStats[$deptId]['total_time'] += $timeSpent;
-            }
-
-            // Track first and last visit
-            if (! $departmentTimeStats[$deptId]['first_visit'] || $distribution->created_at < $departmentTimeStats[$deptId]['first_visit']) {
-                $departmentTimeStats[$deptId]['first_visit'] = $distribution->created_at;
-            }
-            if (! $departmentTimeStats[$deptId]['last_visit'] || $distribution->created_at > $departmentTimeStats[$deptId]['last_visit']) {
-                $departmentTimeStats[$deptId]['last_visit'] = $distribution->created_at;
-            }
-        }
-
-        // Calculate average time per department
-        foreach ($departmentTimeStats as &$dept) {
-            $dept['avg_time'] = $dept['visits'] > 0 ? round($dept['total_time'] / $dept['visits'], 1) : 0;
-        }
-
-        // Calculate overall journey statistics
-        if ($distributions->count() > 0) {
-            $firstDistribution = $distributions->last(); // Oldest
-            $lastDistribution = $distributions->first(); // Newest
-
-            $stats['journey_start'] = $firstDistribution->created_at;
-            $stats['journey_duration'] = $firstDistribution->created_at->diffInDays(now());
-            $stats['total_distance'] = $distributions->count() - 1; // Number of transfers
-            $stats['avg_time_per_department'] = $distributions->count() > 0 ?
-                round($stats['journey_duration'] / $distributions->count(), 1) : 0;
-        }
-
-        return view('distributions.document-distribution-history', compact('document', 'distributions', 'stats', 'documentType', 'departmentTimeStats'));
+        return view('distributions.document-distribution-history', [
+            'document' => $journey['document'],
+            'distributions' => $journey['distributions'],
+            'stats' => $journey['stats'],
+            'departmentTimeStats' => $journey['departmentTimeStats'],
+            'documentType' => $journey['documentType'],
+        ]);
     }
 
     /**
