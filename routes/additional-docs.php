@@ -36,7 +36,7 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     Route::get('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'show'])->name('show');
     Route::get('{additionalDocument}/edit', [\App\Http\Controllers\AdditionalDocumentController::class, 'edit'])->name('edit');
     Route::put('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'update'])->name('update');
-    Route::patch('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'update'])->name('update');
+    Route::patch('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'update']);
     Route::delete('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'destroy'])->name('destroy');
     Route::get('{additionalDocument}/download', [\App\Http\Controllers\AdditionalDocumentController::class, 'downloadAttachment'])->name('download');
     Route::get('{additionalDocument}/preview', [\App\Http\Controllers\AdditionalDocumentController::class, 'previewAttachment'])->name('preview');
