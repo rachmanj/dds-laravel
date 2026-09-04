@@ -285,7 +285,7 @@ class GeneralDocumentImport implements ToModel, WithHeadingRow, WithChunkReading
         try {
             // Map type codes to full names
             $typeNames = [
-                'DO' => 'Delivery Order',
+                'DO' => 'Delivery Order (DO)',
                 'GR' => 'Goods Receipt',
                 'MR' => 'Material Requisition'
             ];
