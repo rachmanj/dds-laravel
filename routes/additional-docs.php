@@ -15,6 +15,7 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     // General documents import routes (separate page with permission)
     Route::get('import-general', [\App\Http\Controllers\AdditionalDocumentController::class, 'importGeneral'])->name('import-general')->middleware('permission:import-general-documents');
     Route::post('process-general-import', [\App\Http\Controllers\AdditionalDocumentController::class, 'processGeneralImport'])->name('process-general-import')->middleware('permission:import-general-documents');
+    Route::post('process-paste-general-import', [\App\Http\Controllers\AdditionalDocumentController::class, 'processPasteGeneralImport'])->name('process-paste-general-import')->middleware('permission:import-general-documents');
     Route::get('download-general-template', [\App\Http\Controllers\AdditionalDocumentController::class, 'downloadGeneralTemplate'])->name('download-general-template')->middleware('permission:import-general-documents');
     Route::get('export', [\App\Http\Controllers\AdditionalDocumentController::class, 'export'])->name('export');
 

@@ -14,6 +14,7 @@ use App\Models\Department;
 use App\Models\Project;
 use App\Models\SignatureMatchResult;
 use App\Models\SignatureSpecimen;
+use App\Services\PasteDocumentImportService;
 use App\Support\AdditionalDocumentListFilters;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -432,8 +433,10 @@ class AdditionalDocumentController extends Controller
         $this->authorize('import-general-documents');
 
         $user = Auth::user();
+        $documentTypes = AdditionalDocumentType::orderByName()->get();
+        $projects = Project::active()->orderBy('code')->get();
 
-        return view('additional_documents.import-general', compact('user'));
+        return view('additional_documents.import-general', compact('user', 'documentTypes', 'projects'));
     }
 
     public function processImport(Request $request)
@@ -690,6 +693,67 @@ class AdditionalDocumentController extends Controller
         $this->authorize('import-general-documents');
 
         return Excel::download(new GeneralDocumentTemplate, 'general_documents_template.xlsx');
+    }
+
+    public function processPasteGeneralImport(Request $request, PasteDocumentImportService $pasteImportService)
+    {
+        $this->authorize('import-general-documents');
+
+        $validated = $request->validate([
+            'document_type_id' => 'required|exists:additional_document_types,id',
+            'project_id' => 'nullable|exists:projects,id',
+            'fallback_date' => 'nullable|date',
+            'lines' => 'required|array|max:500',
+            'lines.*' => 'string',
+        ]);
+
+        try {
+            $user = Auth::user();
+            $documentType = AdditionalDocumentType::findOrFail($validated['document_type_id']);
+
+            $result = $pasteImportService->import(
+                $validated['lines'],
+                (int) $validated['document_type_id'],
+                isset($validated['project_id']) ? (int) $validated['project_id'] : null,
+                $validated['fallback_date'] ?? null,
+                $user
+            );
+
+            $toastrMessage = 'Paste import completed successfully!';
+            if ($result['success_count'] > 0) {
+                $toastrMessage .= " {$result['success_count']} documents imported.";
+            }
+            if ($result['skipped_count'] > 0) {
+                $toastrMessage .= " {$result['skipped_count']} rows skipped.";
+            }
+            if ($result['error_count'] > 0) {
+                $toastrMessage .= " {$result['error_count']} errors found.";
+            }
+
+            $importSummary = [
+                'success_count' => $result['success_count'],
+                'skipped_count' => $result['skipped_count'],
+                'error_count' => $result['error_count'],
+                'errors' => $result['errors'],
+                'total_processed' => $result['total_processed'],
+                'document_type' => $documentType->type_name,
+                'imported_at' => now()->format('d/m/Y H:i:s'),
+                'duplicate_action' => 'skip',
+                'check_duplicates' => true,
+                'file_name' => '(paste)',
+            ];
+
+            return redirect()->route('additional-documents.import-general')
+                ->with('general_import_success', $toastrMessage)
+                ->with('general_import_summary', $importSummary);
+        } catch (\Exception $e) {
+            Log::error('Paste general import error: '.$e->getMessage());
+            Log::error('Paste general import error trace: '.$e->getTraceAsString());
+
+            return redirect()->route('additional-documents.import-general')
+                ->with('general_error', 'Paste import failed: '.$e->getMessage())
+                ->withInput();
+        }
     }
 
     /**
