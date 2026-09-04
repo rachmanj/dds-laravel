@@ -1110,5 +1110,60 @@ class SapService
         }
     }
 
+    /**
+     * Fetch GRPO (OPDN) rows eligible for DO auto-sync for a single CreateDate.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function executeGrpoDoSqlQuery(string $targetDate): array
+    {
+        try {
+            $connection = \Illuminate\Support\Facades\DB::connection('sap_sql');
+
+            $sql = "
+                SELECT
+                    h.DocEntry,
+                    h.DocNum,
+                    h.CardCode,
+                    oc.CardName,
+                    h.NumAtCard,
+                    h.TaxDate,
+                    h.DocDate,
+                    CONVERT(date, h.CreateDate) AS CreateDate,
+                    po.PoNo,
+                    po.Project
+                FROM OPDN h
+                LEFT JOIN OCRD oc ON oc.CardCode = h.CardCode
+                OUTER APPLY (
+                    SELECT TOP 1
+                        CONVERT(varchar, p.DocNum) AS PoNo,
+                        l.Project
+                    FROM PDN1 d1
+                    JOIN OPOR p ON p.DocEntry = d1.BaseEntry AND d1.BaseType = 22
+                    JOIN POR1 l ON l.DocEntry = d1.BaseEntry AND l.LineNum = d1.BaseLine
+                    WHERE d1.DocEntry = h.DocEntry
+                ) po
+                WHERE h.Canceled = 'N'
+                    AND h.NumAtCard IS NOT NULL
+                    AND LTRIM(RTRIM(h.NumAtCard)) <> ''
+                    AND CONVERT(date, h.CreateDate) = ?
+                ORDER BY h.DocNum ASC
+            ";
+
+            $results = $connection->select($sql, [$targetDate]);
+
+            $resultsArray = array_map(function ($row) {
+                return (array) $row;
+            }, $results);
+
+            Log::channel('sap')->info('GRPO DO SQL query executed successfully, found '.count($resultsArray).' records for '.$targetDate);
+
+            return $resultsArray;
+        } catch (\Exception $e) {
+            Log::channel('sap')->error('GRPO DO SQL query failed: '.$e->getMessage());
+            throw $e;
+        }
+    }
+
     // Add more methods later (e.g., for invoice creation)
 }

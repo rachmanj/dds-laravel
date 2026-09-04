@@ -27,6 +27,16 @@ return Application::configure(basePath: dirname(__DIR__))
             ->timezone($wita)
             ->withoutOverlapping();
 
+        $schedule->command('sap:sync-do-from-grpo --today')
+            ->hourly()
+            ->timezone($wita)
+            ->withoutOverlapping();
+
+        $schedule->command('sap:sync-do-from-grpo --yesterday')
+            ->dailyAt('07:00')
+            ->timezone($wita)
+            ->withoutOverlapping();
+
         $schedule->command('solar:price:sync-from-last-pertamina')
             ->dailyAt('07:30')
             ->timezone($wita)
