@@ -84,7 +84,7 @@ class SyncSapDoFromGrpoJobTest extends TestCase
         $this->assertSame('250206314', $first->po_no);
         $this->assertSame('VCASJIDR01', $first->vendor_code);
         $this->assertSame('022C', $first->project);
-        $this->assertSame('000HACC', $first->cur_loc);
+        $this->assertSame('000HLOG', $first->cur_loc);
         $this->assertSame($user->id, $first->created_by);
         $this->assertSame('open', $first->status);
         $this->assertSame('Auto-sync dari GRPO 2605001', $first->remarks);

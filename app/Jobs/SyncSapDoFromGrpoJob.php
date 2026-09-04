@@ -80,7 +80,7 @@ class SyncSapDoFromGrpoJob implements ShouldQueue
                     'vendor_code' => $row['CardCode'] ?? null,
                     'project' => $row['Project'] ?? null,
                     'grpo_no' => (string) $grpoNo,
-                    'cur_loc' => '000HACC',
+                    'cur_loc' => '000HLOG',
                     'created_by' => $effectiveUserId,
                     'status' => 'open',
                     'remarks' => 'Auto-sync dari GRPO '.$grpoNo,
