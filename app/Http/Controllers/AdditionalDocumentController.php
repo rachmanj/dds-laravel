@@ -178,8 +178,21 @@ class AdditionalDocumentController extends Controller
 
         $this->dispatchSignatureVerificationIfNeeded($document, $data['project'] ?? null);
 
-        return redirect()->route('additional-documents.index')
+        $redirect = redirect()->route('additional-documents.index')
             ->with('success', 'Additional Document created successfully.');
+
+        $duplicate = $this->findDuplicateAdditionalDocument(
+            (int) $data['type_id'],
+            $data['document_number'],
+            $data['vendor_code'] ?? null,
+            $document->id
+        );
+
+        if ($duplicate) {
+            $redirect->with('warning', 'Nomor dokumen sudah ada pada dokumen #'.$duplicate->id.' — periksa kemungkinan duplikat.');
+        }
+
+        return $redirect;
     }
 
     public function show(AdditionalDocument $additionalDocument)
@@ -290,8 +303,21 @@ class AdditionalDocumentController extends Controller
             $this->dispatchSignatureVerificationIfNeeded($additionalDocument, $additionalDocument->project);
         }
 
-        return redirect()->route('additional-documents.index')
+        $redirect = redirect()->route('additional-documents.index')
             ->with('success', 'Additional Document updated successfully.');
+
+        $duplicate = $this->findDuplicateAdditionalDocument(
+            (int) $data['type_id'],
+            $data['document_number'],
+            $data['vendor_code'] ?? null,
+            $additionalDocument->id
+        );
+
+        if ($duplicate) {
+            $redirect->with('warning', 'Nomor dokumen sudah ada pada dokumen #'.$duplicate->id.' — periksa kemungkinan duplikat.');
+        }
+
+        return $redirect;
     }
 
     public function destroy(AdditionalDocument $additionalDocument)
@@ -738,6 +764,41 @@ class AdditionalDocumentController extends Controller
         }
     }
 
+    public function checkDuplicateNumber(Request $request)
+    {
+        $typeId = $request->input('type_id');
+        $documentNumber = $request->input('document_number');
+        $vendorCode = $request->input('vendor_code');
+        $excludeId = $request->input('exclude_id');
+
+        $existing = $this->findDuplicateAdditionalDocument(
+            $typeId !== null && $typeId !== '' ? (int) $typeId : null,
+            is_string($documentNumber) ? $documentNumber : null,
+            is_string($vendorCode) ? $vendorCode : null,
+            $excludeId !== null && $excludeId !== '' ? (int) $excludeId : null
+        );
+
+        if ($existing) {
+            return response()->json([
+                'exists' => true,
+                'document' => [
+                    'id' => $existing->id,
+                    'document_number' => $existing->document_number,
+                    'po_no' => $existing->po_no,
+                    'vendor_code' => $existing->vendor_code,
+                    'document_date' => $existing->document_date
+                        ? $existing->document_date->format('d/m/Y')
+                        : null,
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'exists' => false,
+            'document' => null,
+        ]);
+    }
+
     // ENHANCED SEARCH & FILTERING METHODS
 
     /**
@@ -1157,6 +1218,31 @@ class AdditionalDocumentController extends Controller
         if (! $user->hasAnyRole(['admin', 'superadmin', 'accounting', 'finance'])) {
             abort(403, 'You do not have permission to manage signature verification.');
         }
+    }
+
+    private function findDuplicateAdditionalDocument(
+        ?int $typeId,
+        ?string $documentNumber,
+        ?string $vendorCode,
+        ?int $excludeId = null
+    ): ?AdditionalDocument {
+        if ($typeId === null || $documentNumber === null || trim($documentNumber) === '') {
+            return null;
+        }
+
+        $query = AdditionalDocument::query()
+            ->where('type_id', $typeId)
+            ->where('document_number', trim($documentNumber));
+
+        if ($vendorCode !== null && trim($vendorCode) !== '') {
+            $query->where('vendor_code', trim($vendorCode));
+        }
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->first();
     }
 
     private function dispatchSignatureVerificationIfNeeded(AdditionalDocument $document, ?string $projectCode = null): void

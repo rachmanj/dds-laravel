@@ -81,4 +81,12 @@
     </script>
 @endif
 
+@if (session('warning'))
+    <script>
+        if (typeof toastr !== 'undefined') {
+            toastr.warning(@json(session('warning')));
+        }
+    </script>
+@endif
+
 @yield('scripts')

@@ -156,6 +156,52 @@ class SyncSapDoFromGrpoJobTest extends TestCase
         $this->assertSame(1, $response['skipped']);
     }
 
+    public function test_job_skips_duplicate_document_number(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $doType = AdditionalDocumentType::query()->where('type_name', 'Delivery Order (DO)')->firstOrFail();
+        $targetDate = '2026-09-03';
+
+        AdditionalDocument::query()->create([
+            'type_id' => $doType->id,
+            'document_number' => 'DO-TEST-001',
+            'document_date' => '2026-09-01',
+            'receive_date' => '2026-09-01',
+            'grpo_no' => '9999999',
+            'created_by' => $user->id,
+            'status' => 'open',
+            'cur_loc' => '000HACC',
+        ]);
+
+        $this->mock(SapService::class, function ($mock) use ($targetDate) {
+            $mock->shouldReceive('executeGrpoDoSqlQuery')
+                ->once()
+                ->with($targetDate)
+                ->andReturn($this->sampleGrpoRows());
+        });
+
+        $job = new SyncSapDoFromGrpoJob($targetDate, [
+            'trigger' => 'cli',
+            'triggered_by_user_id' => $user->id,
+        ]);
+        $job->handle(app(SapService::class));
+
+        $this->assertSame(2, AdditionalDocument::query()->where('type_id', $doType->id)->count());
+        $this->assertDatabaseHas('additional_documents', [
+            'grpo_no' => '2605002',
+            'document_number' => '26/019753',
+        ]);
+        $this->assertDatabaseMissing('additional_documents', [
+            'grpo_no' => '2605001',
+        ]);
+
+        $log = DB::table('sap_logs')->latest('id')->first();
+        $response = json_decode($log->response_payload, true);
+        $this->assertSame(2, $response['fetched']);
+        $this->assertSame(1, $response['success']);
+        $this->assertSame(1, $response['skipped']);
+    }
+
     public function test_job_writes_failed_sap_log_on_exception(): void
     {
         $user = User::factory()->create(['is_active' => true]);

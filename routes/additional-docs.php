@@ -33,6 +33,7 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
 
     // On-the-fly creation for invoice forms
     Route::post('on-the-fly', [\App\Http\Controllers\AdditionalDocumentController::class, 'createOnTheFly'])->name('on-the-fly');
+    Route::post('check-duplicate-number', [\App\Http\Controllers\AdditionalDocumentController::class, 'checkDuplicateNumber'])->name('check-duplicate-number');
     Route::get('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'show'])->name('show');
     Route::get('{additionalDocument}/edit', [\App\Http\Controllers\AdditionalDocumentController::class, 'edit'])->name('edit');
     Route::put('{additionalDocument}', [\App\Http\Controllers\AdditionalDocumentController::class, 'update'])->name('update');

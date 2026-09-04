@@ -219,6 +219,7 @@
                                             @error('document_number')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
+                                            <div id="duplicate-warning" class="alert alert-warning mt-2" style="display:none"></div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
@@ -423,7 +424,49 @@
 
             // Initialize progress tracking
             initializeProgressTracking();
+
+            initializeDuplicateNumberWarning();
         });
+
+        function initializeDuplicateNumberWarning() {
+            const checkUrl = @json(route('additional-documents.check-duplicate-number'));
+
+            function checkDuplicateDocumentNumber() {
+                const typeId = $('#type_id').val();
+                const documentNumber = $('#document_number').val().trim();
+                const vendorCode = $('#vendor_code').val().trim();
+
+                if (!typeId || !documentNumber) {
+                    $('#duplicate-warning').hide();
+
+                    return;
+                }
+
+                $.ajax({
+                    url: checkUrl,
+                    method: 'POST',
+                    data: {
+                        type_id: typeId,
+                        document_number: documentNumber,
+                        vendor_code: vendorCode,
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.exists && response.document) {
+                            const docDate = response.document.document_date || '-';
+                            $('#duplicate-warning')
+                                .text('⚠️ Nomor dokumen sudah terdaftar: #' + response.document.id + ' (' + docDate + ') — pastikan ini bukan duplikat.')
+                                .show();
+                        } else {
+                            $('#duplicate-warning').hide();
+                        }
+                    }
+                });
+            }
+
+            $('#type_id, #document_number, #vendor_code').on('change input', checkDuplicateDocumentNumber);
+            $('#type_id').on('select2:select select2:clear', checkDuplicateDocumentNumber);
+        }
 
         function loadSapCodeSuggestions() {
             $.ajax({

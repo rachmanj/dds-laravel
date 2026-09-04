@@ -61,9 +61,19 @@ class SyncSapDoFromGrpoJob implements ShouldQueue
                     continue;
                 }
 
+                $documentNumber = $row['NumAtCard'] ?? null;
+                if ($documentNumber && AdditionalDocument::query()
+                    ->where('type_id', $doTypeId)
+                    ->where('document_number', $documentNumber)
+                    ->exists()) {
+                    $skippedCount++;
+
+                    continue;
+                }
+
                 $document = new AdditionalDocument([
                     'type_id' => $doTypeId,
-                    'document_number' => $row['NumAtCard'] ?? null,
+                    'document_number' => $documentNumber,
                     'document_date' => $this->convertDate($row['TaxDate'] ?? null),
                     'receive_date' => $this->convertDate($row['DocDate'] ?? null),
                     'po_no' => $row['PoNo'] ?? null,
