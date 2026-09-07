@@ -134,4 +134,17 @@ return [
 
     'suppliers_sync_url' => env('SUPPLIERS_SYNC_URL'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Inbound API key
+    |--------------------------------------------------------------------------
+    |
+    | Key yang diterima dari X-API-Key pada route /api/* (ApiKeyMiddleware).
+    | Wajib lewat config() supaya tetap terbaca saat config di-cache
+    | (env() langsung = null ketika bootstrap/cache/config.php ada).
+    |
+    */
+
+    'dds_api_key' => env('DDS_API_KEY'),
+
 ];
