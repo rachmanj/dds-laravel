@@ -504,74 +504,6 @@
                                     </div>
                                 @endif
 
-                                @if (filled($additionalDocument->grpo_no) && !$canChangeLocation && auth()->user()->can('override-document-location'))
-                                    <div class="modal fade" id="forceLocationOverrideModal" tabindex="-1" role="dialog"
-                                        aria-labelledby="forceLocationOverrideModalLabel" aria-hidden="true">
-                                        <div class="modal-dialog" role="document">
-                                            <div class="modal-content">
-                                                <form method="POST"
-                                                    action="{{ route('additional-documents.force-location', $additionalDocument) }}">
-                                                    @csrf
-                                                    <div class="modal-header bg-danger">
-                                                        <h5 class="modal-title" id="forceLocationOverrideModalLabel">
-                                                            Koreksi Lokasi Dokumen
-                                                        </h5>
-                                                        <button type="button" class="close" data-dismiss="modal"
-                                                            aria-label="Tutup">
-                                                            <span aria-hidden="true">&times;</span>
-                                                        </button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        @error('force_location')
-                                                            <div class="alert alert-danger">{{ $message }}</div>
-                                                        @enderror
-                                                        <p class="text-muted">
-                                                            Lokasi saat ini: <strong>{{ $additionalDocument->cur_loc }}</strong>
-                                                        </p>
-                                                        <div class="form-group">
-                                                            <label for="force_to_loc">Lokasi Tujuan <span
-                                                                    class="text-danger">*</span></label>
-                                                            <select name="to_loc" id="force_to_loc"
-                                                                class="form-control @error('to_loc') is-invalid @enderror"
-                                                                required>
-                                                                <option value="">Pilih lokasi tujuan</option>
-                                                                @foreach ($departments as $department)
-                                                                    @if ($department->location_code !== $additionalDocument->cur_loc)
-                                                                        <option value="{{ $department->location_code }}"
-                                                                            {{ old('to_loc') === $department->location_code ? 'selected' : '' }}>
-                                                                            {{ $department->location_code }} -
-                                                                            {{ $department->name }}
-                                                                        </option>
-                                                                    @endif
-                                                                @endforeach
-                                                            </select>
-                                                            @error('to_loc')
-                                                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                                                            @enderror
-                                                        </div>
-                                                        <div class="form-group">
-                                                            <label for="force_reason">Alasan Koreksi <span
-                                                                    class="text-danger">*</span></label>
-                                                            <textarea name="reason" id="force_reason" rows="3"
-                                                                class="form-control @error('reason') is-invalid @enderror"
-                                                                placeholder="Jelaskan alasan koreksi lokasi (minimal 10 karakter)"
-                                                                required minlength="10">{{ old('reason') }}</textarea>
-                                                            @error('reason')
-                                                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                                                            @enderror
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary"
-                                                            data-dismiss="modal">Batal</button>
-                                                        <button type="submit" class="btn btn-danger">Simpan Koreksi</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endif
-
                                 <!-- Document Location Info -->
                                 @if ($additionalDocument->cur_loc)
                                     <div class="row">
@@ -610,6 +542,74 @@
                                 </a>
                             </div>
                         </form>
+
+                        @if (filled($additionalDocument->grpo_no) && !$canChangeLocation && auth()->user()->can('override-document-location'))
+                            <div class="modal fade" id="forceLocationOverrideModal" tabindex="-1" role="dialog"
+                                aria-labelledby="forceLocationOverrideModalLabel" aria-hidden="true">
+                                <div class="modal-dialog" role="document">
+                                    <div class="modal-content">
+                                        <form method="POST"
+                                            action="{{ route('additional-documents.force-location', $additionalDocument) }}">
+                                            @csrf
+                                            <div class="modal-header bg-danger">
+                                                <h5 class="modal-title" id="forceLocationOverrideModalLabel">
+                                                    Koreksi Lokasi Dokumen
+                                                </h5>
+                                                <button type="button" class="close" data-dismiss="modal"
+                                                    aria-label="Tutup">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            </div>
+                                            <div class="modal-body">
+                                                @error('force_location')
+                                                    <div class="alert alert-danger">{{ $message }}</div>
+                                                @enderror
+                                                <p class="text-muted">
+                                                    Lokasi saat ini: <strong>{{ $additionalDocument->cur_loc }}</strong>
+                                                </p>
+                                                <div class="form-group">
+                                                    <label for="force_to_loc">Lokasi Tujuan <span
+                                                            class="text-danger">*</span></label>
+                                                    <select name="to_loc" id="force_to_loc"
+                                                        class="form-control @error('to_loc') is-invalid @enderror"
+                                                        required>
+                                                        <option value="">Pilih lokasi tujuan</option>
+                                                        @foreach ($departments as $department)
+                                                            @if ($department->location_code !== $additionalDocument->cur_loc)
+                                                                <option value="{{ $department->location_code }}"
+                                                                    {{ old('to_loc') === $department->location_code ? 'selected' : '' }}>
+                                                                    {{ $department->location_code }} -
+                                                                    {{ $department->name }}
+                                                                </option>
+                                                            @endif
+                                                        @endforeach
+                                                    </select>
+                                                    @error('to_loc')
+                                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                                    @enderror
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="force_reason">Alasan Koreksi <span
+                                                            class="text-danger">*</span></label>
+                                                    <textarea name="reason" id="force_reason" rows="3"
+                                                        class="form-control @error('reason') is-invalid @enderror"
+                                                        placeholder="Jelaskan alasan koreksi lokasi (minimal 10 karakter)"
+                                                        required minlength="10">{{ old('reason') }}</textarea>
+                                                    @error('reason')
+                                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                                    @enderror
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary"
+                                                    data-dismiss="modal">Batal</button>
+                                                <button type="submit" class="btn btn-danger">Simpan Koreksi</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -629,6 +629,10 @@
 
     <script>
         $(document).ready(function() {
+            @if ($errors->has('force_location') || $errors->has('to_loc') || $errors->has('reason'))
+                $('#forceLocationOverrideModal').modal('show');
+            @endif
+
             // Initialize custom file input
             bsCustomFileInput.init();
 
