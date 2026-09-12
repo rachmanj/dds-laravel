@@ -237,6 +237,13 @@ class AdditionalDocument extends Model
             ->wherePivot('document_type', AdditionalDocument::class);
     }
 
+    public function locationOverrides(): HasMany
+    {
+        return $this->hasMany(DocumentLocationOverride::class, 'document_id')
+            ->where('document_type', self::class)
+            ->orderByDesc('created_at');
+    }
+
     /**
      * Get the date when this document was last received at its current location
      * This is used for accurate aging calculation per department

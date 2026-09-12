@@ -11,6 +11,8 @@ use App\Jobs\VerifyDocumentSignatureJob;
 use App\Models\AdditionalDocument;
 use App\Models\AdditionalDocumentType;
 use App\Models\Department;
+use App\Models\DistributionDocument;
+use App\Models\DocumentLocationOverride;
 use App\Models\Project;
 use App\Models\SignatureMatchResult;
 use App\Models\SignatureSpecimen;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -235,9 +238,78 @@ class AdditionalDocumentController extends Controller
         $documentTypes = AdditionalDocumentType::orderByName()->get();
         $projects = \App\Models\Project::active()->orderBy('code')->get();
         $departments = \App\Models\Department::active()->orderBy('location_code')->get();
-        $additionalDocument->load(['type', 'creator.department']);
+        $additionalDocument->load(['type', 'creator.department', 'locationOverrides.overriddenBy']);
 
         return view('additional_documents.edit', compact('additionalDocument', 'documentTypes', 'projects', 'departments'));
+    }
+
+    public function forceLocationOverride(Request $request, AdditionalDocument $additionalDocument)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if (! $user->can('override-document-location')) {
+            abort(403);
+        }
+
+        if (! filled($additionalDocument->grpo_no)) {
+            return redirect()->back()
+                ->withErrors([
+                    'force_location' => 'Koreksi lokasi hanya tersedia untuk dokumen hasil sinkronisasi GRPO.',
+                ])
+                ->withInput();
+        }
+
+        $validated = $request->validate([
+            'to_loc' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::exists('departments', 'location_code')->where(fn ($query) => $query->whereNotNull('name')),
+                Rule::notIn([$additionalDocument->cur_loc]),
+            ],
+            'reason' => ['required', 'string', 'min:10'],
+        ], [
+            'to_loc.not_in' => 'Lokasi tujuan harus berbeda dari lokasi saat ini.',
+            'reason.min' => 'Alasan koreksi minimal 10 karakter.',
+        ]);
+
+        $hasInTransitDistribution = DistributionDocument::query()
+            ->where('document_type', AdditionalDocument::class)
+            ->where('document_id', $additionalDocument->id)
+            ->whereHas('distribution', function ($query) {
+                $query->where('status', 'sent')->whereNull('received_at');
+            })
+            ->exists();
+
+        if ($hasInTransitDistribution) {
+            return redirect()->back()
+                ->withErrors([
+                    'force_location' => 'Dokumen masih dalam distribusi yang belum diterima. Batalkan distribusi terlebih dahulu sebelum mengoreksi lokasi.',
+                ])
+                ->withInput();
+        }
+
+        $fromLoc = $additionalDocument->cur_loc;
+
+        DB::transaction(function () use ($additionalDocument, $validated, $fromLoc, $user) {
+            $additionalDocument->update([
+                'cur_loc' => $validated['to_loc'],
+                'distribution_status' => 'available',
+            ]);
+
+            DocumentLocationOverride::create([
+                'document_type' => AdditionalDocument::class,
+                'document_id' => $additionalDocument->id,
+                'from_loc' => $fromLoc,
+                'to_loc' => $validated['to_loc'],
+                'reason' => $validated['reason'],
+                'overridden_by' => $user->id,
+            ]);
+        });
+
+        return redirect()->back()
+            ->with('success', 'Lokasi dokumen berhasil dikoreksi.');
     }
 
     public function update(Request $request, AdditionalDocument $additionalDocument)

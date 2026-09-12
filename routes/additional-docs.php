@@ -47,4 +47,5 @@ Route::prefix('additional-documents')->name('additional-documents.')->group(func
     Route::get('{additionalDocument}/signature-status', [\App\Http\Controllers\AdditionalDocumentController::class, 'signatureStatus'])->name('signature-status');
     Route::post('{additionalDocument}/signature-confirm', [\App\Http\Controllers\AdditionalDocumentController::class, 'signatureConfirm'])->name('signature-confirm');
     Route::post('{additionalDocument}/signature-override', [\App\Http\Controllers\AdditionalDocumentController::class, 'signatureOverride'])->name('signature-override');
+    Route::post('{additionalDocument}/force-location', [\App\Http\Controllers\AdditionalDocumentController::class, 'forceLocationOverride'])->name('force-location')->middleware('permission:override-document-location');
 });
