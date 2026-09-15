@@ -64,6 +64,11 @@
                     @include('layouts.partials.menu.additional-documents')
                 @endcan
 
+                <!-- Logistik Section -->
+                @can('view-logistics-summary')
+                    @include('layouts.partials.menu.logistics')
+                @endcan
+
                 <!-- Invoices Section -->
                 @can('view-invoices')
                     @include('layouts.partials.menu.invoices')
