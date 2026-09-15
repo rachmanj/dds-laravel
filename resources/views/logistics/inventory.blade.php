@@ -144,6 +144,43 @@
                 </div>
             </div>
 
+            <div class="card card-outline card-success mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Pivot Project × Category (Nilai)</h3>
+                </div>
+                <div class="card-body table-responsive p-0">
+                    @if (count($valuePivotMatrix['projects']) === 0)
+                        <p class="text-muted small p-3 mb-0">Belum ada data pivot.</p>
+                    @else
+                        <table class="table table-sm table-bordered table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Project</th>
+                                    @foreach ($valuePivotMatrix['categories'] as $category)
+                                        <th class="text-right">{{ $category }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($valuePivotMatrix['projects'] as $project)
+                                    <tr>
+                                        <td>{{ $project }}</td>
+                                        @foreach ($valuePivotMatrix['categories'] as $category)
+                                            @php
+                                                $cellValue = $valuePivotMatrix['values'][$project][$category] ?? null;
+                                            @endphp
+                                            <td class="text-right">
+                                                {{ $cellValue !== null ? \App\Support\CompactNumberFormatter::format($cellValue) : '-' }}
+                                            </td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @endif
+                </div>
+            </div>
+
             <div class="card card-outline card-info mb-3">
                 <div class="card-header">
                     <h3 class="card-title"><i class="fas fa-filter"></i> Filter Detail</h3>
@@ -227,8 +264,8 @@
                                 <th>Committed</th>
                                 <th>Ordered</th>
                                 <th>Currency</th>
-                                <th>Last Purchase Price</th>
-                                <th>Total</th>
+                                <th class="text-right">Last Purchase Price</th>
+                                <th class="text-right">Total</th>
                                 <th>WhsCode</th>
                                 <th>WhsName</th>
                                 <th>Project</th>
@@ -371,8 +408,8 @@
                     { data: 'formatted_committed', name: 'committed' },
                     { data: 'formatted_ordered', name: 'ordered' },
                     { data: 'currency', name: 'currency', defaultContent: '-' },
-                    { data: 'formatted_last_price', name: 'last_price' },
-                    { data: 'formatted_total_value', name: 'total_value' },
+                    { data: 'formatted_last_price', name: 'last_price', className: 'text-right' },
+                    { data: 'formatted_total_value', name: 'total_value', className: 'text-right' },
                     { data: 'whs_code', name: 'whs_code', defaultContent: '-' },
                     { data: 'whs_name', name: 'whs_name', defaultContent: '-' },
                     { data: 'project', name: 'project', defaultContent: '-' },

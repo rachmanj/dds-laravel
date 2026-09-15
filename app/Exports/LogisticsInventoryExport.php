@@ -7,12 +7,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class LogisticsInventoryExport implements FromQuery, WithColumnWidths, WithCustomChunkSize, WithHeadings, WithMapping, WithStyles
+class LogisticsInventoryExport implements FromQuery, WithColumnWidths, WithCustomChunkSize, WithEvents, WithHeadings, WithMapping, WithStyles
 {
     /**
      * @var list<string>
@@ -112,6 +115,22 @@ class LogisticsInventoryExport implements FromQuery, WithColumnWidths, WithCusto
     {
         return [
             1 => ['font' => ['bold' => true]],
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event): void {
+                $sheet = $event->sheet->getDelegate();
+                $highestRow = $sheet->getHighestRow();
+
+                foreach (['K', 'L'] as $column) {
+                    $sheet->getStyle("{$column}1:{$column}{$highestRow}")
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                }
+            },
         ];
     }
 

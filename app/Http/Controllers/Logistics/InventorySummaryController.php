@@ -38,6 +38,11 @@ class InventorySummaryController extends Controller
             'categories' => [],
             'values' => [],
         ];
+        $valuePivotMatrix = [
+            'projects' => [],
+            'categories' => [],
+            'values' => [],
+        ];
         $filterOptions = [
             'warehouses' => collect(),
             'projects' => collect(),
@@ -75,7 +80,8 @@ class InventorySummaryController extends Controller
                 'values' => $valueByCategory->values()->all(),
             ];
 
-            $pivotMatrix = $this->buildPivotMatrix($pivots);
+            $pivotMatrix = $this->buildPivotMatrix($pivots, 'sum_instock');
+            $valuePivotMatrix = $this->buildPivotMatrix($pivots, 'sum_value');
             $filterOptions = $this->buildFilterOptions($displaySnapshot->id);
         }
 
@@ -97,6 +103,7 @@ class InventorySummaryController extends Controller
             'instockByProjectChart' => $instockByProjectChart,
             'valueByCategoryChart' => $valueByCategoryChart,
             'pivotMatrix' => $pivotMatrix,
+            'valuePivotMatrix' => $valuePivotMatrix,
             'filterOptions' => $filterOptions,
             'recentSnapshots' => $recentSnapshots,
             'hasDisplayData' => $displaySnapshot !== null,
@@ -169,7 +176,7 @@ class InventorySummaryController extends Controller
     /**
      * @return array{projects: array<int, string>, categories: array<int, string>, values: array<string, array<string, float>>}
      */
-    private function buildPivotMatrix(Collection $pivots): array
+    private function buildPivotMatrix(Collection $pivots, string $valueField): array
     {
         $projects = $pivots
             ->pluck('project')
@@ -190,7 +197,7 @@ class InventorySummaryController extends Controller
 
         foreach ($pivots as $pivot) {
             $projectKey = $pivot->project ?? '(tanpa project)';
-            $values[$projectKey][$pivot->category] = (float) $pivot->sum_instock;
+            $values[$projectKey][$pivot->category] = (float) $pivot->{$valueField};
         }
 
         return [

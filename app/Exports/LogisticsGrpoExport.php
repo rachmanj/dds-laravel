@@ -5,11 +5,14 @@ namespace App\Exports;
 use Generator;
 use Maatwebsite\Excel\Concerns\FromGenerator;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class LogisticsGrpoExport implements FromGenerator, WithColumnWidths, WithHeadings, WithStyles
+class LogisticsGrpoExport implements FromGenerator, WithColumnWidths, WithEvents, WithHeadings, WithStyles
 {
     private const CHUNK_SIZE = 1000;
 
@@ -101,6 +104,22 @@ class LogisticsGrpoExport implements FromGenerator, WithColumnWidths, WithHeadin
     {
         return [
             1 => ['font' => ['bold' => true]],
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event): void {
+                $sheet = $event->sheet->getDelegate();
+                $highestRow = $sheet->getHighestRow();
+
+                foreach (['R', 'S'] as $column) {
+                    $sheet->getStyle("{$column}1:{$column}{$highestRow}")
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                }
+            },
         ];
     }
 

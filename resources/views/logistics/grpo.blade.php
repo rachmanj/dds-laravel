@@ -219,8 +219,8 @@
                                 <th>Quantity</th>
                                 <th>U_MIS_UnitNo</th>
                                 <th>Currency</th>
-                                <th>Price</th>
-                                <th>Total Price</th>
+                                <th class="text-right">Price</th>
+                                <th class="text-right">Total Price</th>
                                 <th>UoM</th>
                                 <th>Warehouse Code</th>
                                 <th>Warehouse Name</th>
@@ -287,8 +287,8 @@
                     { data: 'formatted_quantity', name: 'quantity' },
                     { data: 'u_mis_unitno', name: 'u_mis_unitno', defaultContent: '-' },
                     { data: 'currency', name: 'currency', defaultContent: '-' },
-                    { data: 'formatted_price', name: 'price' },
-                    { data: 'formatted_total_price', name: 'total_price' },
+                    { data: 'formatted_price', name: 'price', className: 'text-right' },
+                    { data: 'formatted_total_price', name: 'total_price', className: 'text-right' },
                     { data: 'uom', name: 'uom', defaultContent: '-' },
                     { data: 'warehouse_code', name: 'warehouse_code', defaultContent: '-' },
                     { data: 'warehouse_name', name: 'warehouse_name', defaultContent: '-' },

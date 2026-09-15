@@ -141,7 +141,7 @@
                                     <thead>
                                         <tr>
                                             <th>Project</th>
-                                            <th class="text-right">Jumlah Dokumen</th>
+                                            <th>Jumlah Dokumen</th>
                                             <th class="text-right">Total Nilai</th>
                                         </tr>
                                     </thead>
@@ -149,7 +149,7 @@
                                         @foreach ($summaryByProject as $summary)
                                             <tr>
                                                 <td>{{ $summary['label'] }}</td>
-                                                <td class="text-right">{{ number_format($summary['document_count'], 0, ',', '.') }}</td>
+                                                <td>{{ number_format($summary['document_count'], 0, ',', '.') }}</td>
                                                 <td class="text-right">{{ \App\Support\CompactNumberFormatter::format($summary['total_value']) }}</td>
                                             </tr>
                                         @endforeach
@@ -172,7 +172,7 @@
                                     <thead>
                                         <tr>
                                             <th>Kategori</th>
-                                            <th class="text-right">Jumlah Dokumen</th>
+                                            <th>Jumlah Dokumen</th>
                                             <th class="text-right">Total Nilai</th>
                                         </tr>
                                     </thead>
@@ -180,7 +180,7 @@
                                         @foreach ($summaryByCategory as $summary)
                                             <tr>
                                                 <td>{{ $summary['label'] }}</td>
-                                                <td class="text-right">{{ number_format($summary['document_count'], 0, ',', '.') }}</td>
+                                                <td>{{ number_format($summary['document_count'], 0, ',', '.') }}</td>
                                                 <td class="text-right">{{ \App\Support\CompactNumberFormatter::format($summary['total_value']) }}</td>
                                             </tr>
                                         @endforeach
@@ -218,8 +218,8 @@
                                 <th>ItemCode</th>
                                 <th>Dscription</th>
                                 <th>Quantity</th>
-                                <th>Stockprice</th>
-                                <th>Total</th>
+                                <th class="text-right">Stockprice</th>
+                                <th class="text-right">Total</th>
                                 <th>Project</th>
                                 <th>WhsName</th>
                                 <th>U_MIS_NoBA</th>
@@ -290,8 +290,8 @@
                     { data: 'item_code', name: 'item_code', defaultContent: '-' },
                     { data: 'dscription', name: 'dscription', defaultContent: '-' },
                     { data: 'formatted_quantity', name: 'quantity' },
-                    { data: 'formatted_stockprice', name: 'stockprice' },
-                    { data: 'formatted_total', name: 'total' },
+                    { data: 'formatted_stockprice', name: 'stockprice', className: 'text-right' },
+                    { data: 'formatted_total', name: 'total', className: 'text-right' },
                     { data: 'project', name: 'project', defaultContent: '-' },
                     { data: 'whs_name', name: 'whs_name', defaultContent: '-' },
                     { data: 'u_mis_no_ba', name: 'u_mis_no_ba', defaultContent: '-' },
