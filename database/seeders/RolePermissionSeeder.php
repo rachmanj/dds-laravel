@@ -111,6 +111,10 @@ class RolePermissionSeeder extends Seeder
 
             // ITO batch import
             'manage-ito-batch-import',
+
+            // Logistics summary
+            'view-logistics-summary',
+            'export-logistics-summary',
         ];
 
         foreach ($permissions as $permission) {
@@ -176,6 +180,8 @@ class RolePermissionSeeder extends Seeder
             'delete-solar-price-histories',
             'manage-signature-specimens',
             'manage-ito-batch-import',
+            'view-logistics-summary',
+            'export-logistics-summary',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);
@@ -189,6 +195,8 @@ class RolePermissionSeeder extends Seeder
             'edit-distributions',
             'delete-distributions',
             'view-document-report',
+            'view-logistics-summary',
+            'export-logistics-summary',
         ]);
 
         $accounting = Role::firstOrCreate(['name' => 'accounting']);
@@ -235,6 +243,8 @@ class RolePermissionSeeder extends Seeder
             'delete-solar-price-histories',
             'manage-signature-specimens',
             'manage-ito-batch-import',
+            'view-logistics-summary',
+            'export-logistics-summary',
         ]);
 
         $finance = Role::firstOrCreate(['name' => 'finance']);
