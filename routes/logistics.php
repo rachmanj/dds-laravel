@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Logistics\CategoryMapController;
 use App\Http\Controllers\Logistics\GrpoSummaryController;
 use App\Http\Controllers\Logistics\InventorySummaryController;
 use App\Http\Controllers\Logistics\UsageSummaryController;
@@ -36,4 +37,15 @@ Route::prefix('logistics/usage')
         Route::get('/export', [UsageSummaryController::class, 'export'])
             ->middleware('permission:export-logistics-summary')
             ->name('export');
+    });
+
+Route::prefix('logistics/categories')
+    ->name('logistics.categories.')
+    ->middleware(['auth', 'active.user', 'permission:manage-logistics-category-map'])
+    ->group(function () {
+        Route::get('/', [CategoryMapController::class, 'index'])->name('index');
+        Route::post('/', [CategoryMapController::class, 'store'])->name('store');
+        Route::put('/{logisticsItemCategory}', [CategoryMapController::class, 'update'])->name('update');
+        Route::patch('/{logisticsItemCategory}/toggle', [CategoryMapController::class, 'toggle'])->name('toggle');
+        Route::post('/recompute', [CategoryMapController::class, 'recompute'])->name('recompute');
     });

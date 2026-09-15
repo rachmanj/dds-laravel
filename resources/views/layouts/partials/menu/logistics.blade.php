@@ -29,5 +29,14 @@
                 <p>Pemakaian</p>
             </a>
         </li>
+        @can('manage-logistics-category-map')
+            <li class="nav-item">
+                <a href="{{ route('logistics.categories.index') }}"
+                    class="nav-link {{ request()->routeIs('logistics.categories.*') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>Kategori Item</p>
+                </a>
+            </li>
+        @endcan
     </ul>
 </li>

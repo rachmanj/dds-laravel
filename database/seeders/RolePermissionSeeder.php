@@ -115,6 +115,7 @@ class RolePermissionSeeder extends Seeder
             // Logistics summary
             'view-logistics-summary',
             'export-logistics-summary',
+            'manage-logistics-category-map',
         ];
 
         foreach ($permissions as $permission) {
@@ -182,6 +183,7 @@ class RolePermissionSeeder extends Seeder
             'manage-ito-batch-import',
             'view-logistics-summary',
             'export-logistics-summary',
+            'manage-logistics-category-map',
         ]);
 
         $logistic = Role::firstOrCreate(['name' => 'logistic']);
@@ -197,6 +199,7 @@ class RolePermissionSeeder extends Seeder
             'view-document-report',
             'view-logistics-summary',
             'export-logistics-summary',
+            'manage-logistics-category-map',
         ]);
 
         $accounting = Role::firstOrCreate(['name' => 'accounting']);
