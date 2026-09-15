@@ -162,6 +162,14 @@ class LogisticsUsagePageTest extends TestCase
         $this->mock(SapUsageRepository::class, function ($mock) use ($rows) {
             $mock->shouldReceive('fetch')
                 ->andReturn($rows);
+
+            $mock->shouldReceive('fetchBySource')
+                ->andReturnUsing(function (string $from, string $to, string $source) use ($rows): array {
+                    return array_values(array_filter(
+                        $rows,
+                        fn (array $row): bool => ($row['source'] ?? '') === $source
+                    ));
+                });
         });
     }
 

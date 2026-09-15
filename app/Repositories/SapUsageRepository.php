@@ -12,7 +12,7 @@ class SapUsageRepository
      */
     public function fetch(string $from, string $to): array
     {
-        $sql = $this->prepareSql($this->loadSql());
+        $sql = $this->loadSql();
         $rows = DB::connection('sap_sql')->select($sql, [$from, $to, $from, $to, $from, $to]);
 
         return array_map(
@@ -21,50 +21,22 @@ class SapUsageRepository
         );
     }
 
-    private function loadSql(): string
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function fetchBySource(string $from, string $to, string $source): array
     {
-        $path = base_path('docs/sap-queries/pemakaian.sql');
-
-        return trim((string) file_get_contents($path));
+        return array_values(array_filter(
+            $this->fetch($from, $to),
+            fn (array $row): bool => ($row['source'] ?? '') === $source
+        ));
     }
 
-    private function prepareSql(string $raw): string
+    private function loadSql(): string
     {
-        $sql = preg_replace('/^\s*\/\*.*?\*\/\s*$/m', '', $raw);
-        $sql = preg_replace('/DECLARE\s+@\w+\s+AS\s+DATE\s*/i', '', $sql ?? $raw);
-        $sql = preg_replace("/SET\s+@\w+\s*=\s*\/\*.*?\*\/\s*'?\[%\d\]'?\s*/i", '', $sql ?? $raw);
-        $sql = str_replace('@A', '?', $sql ?? $raw);
-        $sql = str_replace('@B', '?', $sql ?? $raw);
+        $path = base_path('docs/sap-queries/pemakaian-param.sql');
 
-        $sql = preg_replace(
-            '/^select\s+/i',
-            "SELECT 'Goods Issue' AS [Source], ",
-            $sql ?? $raw,
-            1
-        );
-
-        $sql = preg_replace(
-            '/UNION\s+select\s+/i',
-            "UNION SELECT 'Delivery' AS [Source], ",
-            $sql ?? $raw,
-            1
-        );
-
-        $sql = preg_replace(
-            '/UNION\s+select\s+/i',
-            "UNION SELECT 'AP Service' AS [Source], ",
-            $sql ?? $raw,
-            1
-        );
-
-        $sql = str_replace("NULL 'ItemCode'", 'NULL AS [Ret ItemCode]', $sql ?? $raw);
-        $sql = str_replace("NULL 'Dscription'", 'NULL AS [Ret Dscription]', $sql ?? $raw);
-        $sql = str_replace("NULL 'Quantity'", 'NULL AS [Ret Quantity]', $sql ?? $raw);
-        $sql = str_replace('i.ItemCode', 'i.ItemCode AS [Ret ItemCode]', $sql ?? $raw);
-        $sql = str_replace('i.Dscription', 'i.Dscription AS [Ret Dscription]', $sql ?? $raw);
-        $sql = str_replace('i.Quantity', 'i.Quantity AS [Ret Quantity]', $sql ?? $raw);
-
-        return trim($sql ?? $raw);
+        return trim((string) file_get_contents($path));
     }
 
     /**
@@ -113,9 +85,11 @@ class SapUsageRepository
             'Project' => 'project',
             'WhsName' => 'whs_name',
             'U_MIS_NoBA' => 'u_mis_no_ba',
+            'No BA' => 'u_mis_no_ba',
             'Order Type' => 'order_type',
             'Status GI' => 'status_doc',
             'Status Doc' => 'status_doc',
+            'Status' => 'status_doc',
             'GR No' => 'gr_no',
             'M Ret No' => 'm_ret_no',
             'Ret ItemCode' => 'return_item_code',

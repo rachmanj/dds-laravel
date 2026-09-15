@@ -12,7 +12,7 @@ class SapGrpoRepository
      */
     public function fetch(string $from, string $to): array
     {
-        $sql = $this->prepareSql($this->loadSql());
+        $sql = $this->loadSql();
         $rows = DB::connection('sap_sql')->select($sql, [$from, $to]);
 
         return array_map(
@@ -23,36 +23,9 @@ class SapGrpoRepository
 
     private function loadSql(): string
     {
-        $path = base_path('docs/sap-queries/grpo.sql');
+        $path = base_path('docs/sap-queries/grpo-param.sql');
 
         return trim((string) file_get_contents($path));
-    }
-
-    private function prepareSql(string $raw): string
-    {
-        $sql = preg_replace('/^\s*--.*$/m', '', $raw);
-        $sql = preg_replace('/DECLARE\s+@\w+\s+AS\s+DATETIME\s*/i', '', $sql);
-        $sql = preg_replace("/SET\s+@\w+\s*=\s*'?\[%\d\]'?\s*/i", '', $sql);
-        $sql = preg_replace('/\s*FOR\s+BROWSE\s*/i', '', $sql);
-        $sql = str_replace(
-            ['[OPDN].DocDate >= @A AND [OPDN].DocDate <= @B', '@A', '@B'],
-            ['[OPDN].DocDate >= ? AND [OPDN].DocDate <= ?', '?', '?'],
-            $sql
-        );
-
-        $sql = str_replace(
-            "[OPOR].Comments\nfrom [PDN1]",
-            "[OPOR].Comments,\n[OPDN].CardCode AS [Vendor Code],\nOCRD.CardName AS [Vendor Name]\nfrom [PDN1]",
-            $sql
-        );
-
-        $sql = str_replace(
-            'LEFT JOIN [OPOR] ON [PDN1].BaseRef = [OPOR].DocNum',
-            "LEFT JOIN [OPOR] ON [PDN1].BaseRef = [OPOR].DocNum\nLEFT JOIN OCRD ON OCRD.CardCode = [OPDN].CardCode",
-            $sql
-        );
-
-        return trim($sql);
     }
 
     /**
@@ -87,8 +60,11 @@ class SapGrpoRepository
             'Item Name' => 'item_name',
             'U_MIS_ConsRe1' => 'u_mis_consre1',
             'U_MIS_ConsRe2' => 'u_mis_consre2',
+            'U Cons Re1' => 'u_mis_consre1',
+            'U Cons Re2' => 'u_mis_consre2',
             'Quantity' => 'quantity',
             'U_MIS_UnitNo' => 'u_mis_unitno',
+            'Unit No' => 'u_mis_unitno',
             'Currency' => 'currency',
             'Price' => 'price',
             'Total Price' => 'total_price',

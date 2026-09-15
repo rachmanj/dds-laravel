@@ -19,6 +19,7 @@ class LogisticsUsageExport implements FromCollection, WithColumnWidths, WithHead
     public function collection(): Collection
     {
         return $this->rows->map(fn (array $row) => [
+            $this->sourceLabel($row['source'] ?? ''),
             $row['doc_num'] ?? null,
             $row['create_date'] ?? null,
             $row['doc_date'] ?? null,
@@ -55,6 +56,7 @@ class LogisticsUsageExport implements FromCollection, WithColumnWidths, WithHead
     public function headings(): array
     {
         return [
+            'Source',
             'DocNum',
             'createDate',
             'DocDate',
@@ -81,9 +83,9 @@ class LogisticsUsageExport implements FromCollection, WithColumnWidths, WithHead
             'Status',
             'GR No',
             'M Ret No',
-            'ItemCode',
-            'Dscription',
-            'Quantity',
+            'Ret ItemCode',
+            'Ret Dscription',
+            'Ret Quantity',
             'Comments',
         ];
     }
@@ -98,36 +100,47 @@ class LogisticsUsageExport implements FromCollection, WithColumnWidths, WithHead
     public function columnWidths(): array
     {
         return [
-            'A' => 12,
-            'B' => 18,
-            'C' => 14,
-            'D' => 12,
-            'E' => 20,
-            'F' => 14,
-            'G' => 8,
-            'H' => 16,
-            'I' => 14,
-            'J' => 18,
-            'K' => 12,
+            'A' => 14,
+            'B' => 12,
+            'C' => 18,
+            'D' => 14,
+            'E' => 12,
+            'F' => 20,
+            'G' => 14,
+            'H' => 8,
+            'I' => 16,
+            'J' => 14,
+            'K' => 18,
             'L' => 12,
             'M' => 12,
             'N' => 12,
-            'O' => 14,
-            'P' => 24,
-            'Q' => 10,
-            'R' => 12,
-            'S' => 14,
-            'T' => 12,
-            'U' => 18,
-            'V' => 12,
+            'O' => 12,
+            'P' => 14,
+            'Q' => 24,
+            'R' => 10,
+            'S' => 12,
+            'T' => 14,
+            'U' => 12,
+            'V' => 18,
             'W' => 12,
             'X' => 12,
             'Y' => 12,
             'Z' => 12,
-            'AA' => 14,
-            'AB' => 24,
-            'AC' => 10,
-            'AD' => 30,
+            'AA' => 12,
+            'AB' => 14,
+            'AC' => 24,
+            'AD' => 10,
+            'AE' => 30,
         ];
+    }
+
+    private function sourceLabel(string $source): string
+    {
+        return match ($source) {
+            'goods_issue' => 'Goods Issue',
+            'delivery' => 'Delivery',
+            'ap_service' => 'AP Service',
+            default => $source !== '' ? $source : '-',
+        };
     }
 }

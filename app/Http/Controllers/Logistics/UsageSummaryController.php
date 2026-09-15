@@ -37,9 +37,9 @@ class UsageSummaryController extends Controller
         $summaryByCategory = [];
 
         if ($dateRangeError === null) {
-            $rows = $this->usageRepository->fetch($fromDate, $toDate);
+            $rows = $this->fetchRows($fromDate, $toDate, $request);
             $filterOptions = $this->buildFilterOptions($rows);
-            $filteredRows = $this->applyFilters($rows, $request);
+            $filteredRows = $this->applyProjectFilter($rows, $request);
             $kpis = $this->buildKpis($filteredRows);
             $summaryByProject = $kpis['by_project'];
             $summaryByCategory = $kpis['by_category'];
@@ -66,8 +66,8 @@ class UsageSummaryController extends Controller
             return response()->json(['message' => $dateRangeError], 422);
         }
 
-        $rows = $this->applyFilters(
-            $this->usageRepository->fetch($fromDate, $toDate),
+        $rows = $this->applyProjectFilter(
+            $this->fetchRows($fromDate, $toDate, $request),
             $request
         );
 
@@ -90,8 +90,8 @@ class UsageSummaryController extends Controller
                 ->withErrors(['date_range' => $dateRangeError]);
         }
 
-        $rows = collect($this->applyFilters(
-            $this->usageRepository->fetch($fromDate, $toDate),
+        $rows = collect($this->applyProjectFilter(
+            $this->fetchRows($fromDate, $toDate, $request),
             $request
         ));
 
@@ -128,25 +128,35 @@ class UsageSummaryController extends Controller
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchRows(string $fromDate, string $toDate, Request $request): array
+    {
+        $source = $request->string('sumber')->toString();
+
+        if ($source !== '') {
+            return $this->usageRepository->fetchBySource($fromDate, $toDate, $source);
+        }
+
+        return $this->usageRepository->fetch($fromDate, $toDate);
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $rows
      * @return array<int, array<string, mixed>>
      */
-    private function applyFilters(array $rows, Request $request): array
+    private function applyProjectFilter(array $rows, Request $request): array
     {
         $project = $request->string('project')->toString();
-        $source = $request->string('sumber')->toString();
 
-        return array_values(array_filter($rows, function (array $row) use ($project, $source) {
-            if ($project !== '' && (string) ($row['project'] ?? '') !== $project) {
-                return false;
-            }
+        if ($project === '') {
+            return $rows;
+        }
 
-            if ($source !== '' && (string) ($row['source'] ?? '') !== $source) {
-                return false;
-            }
-
-            return true;
-        }));
+        return array_values(array_filter(
+            $rows,
+            fn (array $row): bool => (string) ($row['project'] ?? '') === $project
+        ));
     }
 
     /**
