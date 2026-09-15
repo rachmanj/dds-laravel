@@ -90,10 +90,10 @@ class UsageSummaryController extends Controller
                 ->withErrors(['date_range' => $dateRangeError]);
         }
 
-        $rows = collect($this->applyProjectFilter(
+        $rows = $this->applyProjectFilter(
             $this->fetchRows($fromDate, $toDate, $request),
             $request
-        ));
+        );
 
         $filename = 'logistics_usage_'.$fromDate.'_'.$toDate.'_'.now()->format('His').'.xlsx';
 

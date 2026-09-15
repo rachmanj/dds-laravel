@@ -128,13 +128,13 @@ class InventorySummaryController extends Controller
     {
         $displaySnapshot = $this->latestSuccessfulSnapshot();
 
-        $items = $displaySnapshot
-            ? $this->filteredItemsQuery($displaySnapshot->id, $request)->get()
-            : collect();
+        $query = $displaySnapshot
+            ? $this->filteredItemsQuery($displaySnapshot->id, $request)
+            : LogisticsInventoryItem::query()->whereRaw('0 = 1');
 
         $filename = 'logistics_inventory_'.now()->format('Y-m-d_His').'.xlsx';
 
-        return Excel::download(new LogisticsInventoryExport($items), $filename);
+        return Excel::download(new LogisticsInventoryExport($query), $filename);
     }
 
     private function latestSuccessfulSnapshot(): ?LogisticsInventorySnapshot

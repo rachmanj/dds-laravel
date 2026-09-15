@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Exports\LogisticsInventoryExport;
 use App\Models\LogisticsInventoryItem;
 use App\Models\LogisticsInventoryPivot;
 use App\Models\LogisticsInventorySnapshot;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Maatwebsite\Excel\Concerns\FromQuery;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 class LogisticsInventoryPageTest extends TestCase
@@ -127,6 +130,60 @@ class LogisticsInventoryPageTest extends TestCase
             'content-type',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         );
+    }
+
+    public function test_export_uses_query_builder_and_writes_all_items_from_latest_successful_snapshot(): void
+    {
+        $user = $this->createLogisticUser();
+        ['snapshot' => $snapshot] = $this->createSuccessfulSnapshot();
+
+        for ($index = 2; $index <= 4; $index++) {
+            LogisticsInventoryItem::query()->create([
+                'snapshot_id' => $snapshot->id,
+                'item_code' => 'SP-00'.$index,
+                'item_name' => 'Spare Part '.$index,
+                'category' => 'SPAREPART',
+                'instock' => 5,
+                'total_value' => 5000,
+                'whs_code' => 'WH01',
+            ]);
+        }
+
+        LogisticsInventorySnapshot::query()->create([
+            'snapshot_date' => '2026-09-16',
+            'status' => 'failed',
+            'row_count' => 0,
+            'total_value' => 0,
+            'error_message' => 'SAP connection failed',
+            'duration_ms' => 50,
+            'created_at' => now(),
+        ]);
+
+        $expectedItemCount = LogisticsInventoryItem::query()
+            ->where('snapshot_id', $snapshot->id)
+            ->count();
+
+        $query = LogisticsInventoryItem::query()
+            ->where('snapshot_id', $snapshot->id)
+            ->orderBy('item_code');
+
+        $export = new LogisticsInventoryExport($query);
+
+        $this->assertInstanceOf(FromQuery::class, $export);
+        $this->assertInstanceOf(\Illuminate\Database\Eloquent\Builder::class, $export->query());
+        $this->assertSame(LogisticsInventoryItem::class, $export->query()->getModel()::class);
+
+        $response = $this->actingAs($user)
+            ->get(route('logistics.inventory.export'));
+
+        $response->assertOk();
+
+        $spreadsheet = IOFactory::load($response->getFile()->getPathname());
+        $rows = $spreadsheet->getActiveSheet()->toArray();
+
+        $this->assertCount($expectedItemCount + 1, $rows);
+        $this->assertSame('Item No.', $rows[0][2]);
+        $this->assertSame('SP-001', $rows[1][2]);
     }
 
     public function test_warning_banner_shown_when_no_snapshot_exists(): void

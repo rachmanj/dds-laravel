@@ -2,23 +2,38 @@
 
 namespace App\Exports;
 
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Generator;
+use Maatwebsite\Excel\Concerns\FromGenerator;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class LogisticsGrpoExport implements FromCollection, WithColumnWidths, WithHeadings, WithStyles
+class LogisticsGrpoExport implements FromGenerator, WithColumnWidths, WithHeadings, WithStyles
 {
-    /**
-     * @param  Collection<int, array<string, mixed>>  $rows
-     */
-    public function __construct(private Collection $rows) {}
+    private const CHUNK_SIZE = 1000;
 
-    public function collection(): Collection
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    public function __construct(private array $rows) {}
+
+    public function generator(): Generator
     {
-        return $this->rows->map(fn (array $row) => [
+        foreach (array_chunk($this->rows, self::CHUNK_SIZE) as $chunk) {
+            foreach ($chunk as $row) {
+                yield $this->mapRow($row);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return list<mixed>
+     */
+    private function mapRow(array $row): array
+    {
+        return [
             $row['grpo_date'] ?? null,
             $row['grpo_created_date'] ?? null,
             $row['grpo_no'] ?? null,
@@ -46,7 +61,7 @@ class LogisticsGrpoExport implements FromCollection, WithColumnWidths, WithHeadi
             $row['project'] ?? null,
             $row['department'] ?? null,
             $row['comments'] ?? null,
-        ]);
+        ];
     }
 
     public function headings(): array

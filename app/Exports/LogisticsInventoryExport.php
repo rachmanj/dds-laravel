@@ -2,20 +2,67 @@
 
 namespace App\Exports;
 
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use App\Models\LogisticsInventoryItem;
+use Illuminate\Database\Eloquent\Builder;
+use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class LogisticsInventoryExport implements FromCollection, WithColumnWidths, WithHeadings, WithStyles
+class LogisticsInventoryExport implements FromQuery, WithColumnWidths, WithCustomChunkSize, WithHeadings, WithMapping, WithStyles
 {
-    public function __construct(private Collection $items) {}
+    /**
+     * @var list<string>
+     */
+    public const EXPORT_COLUMNS = [
+        'model_no',
+        'unit_no',
+        'item_code',
+        'item_name',
+        'category',
+        'uom',
+        'instock',
+        'committed',
+        'ordered',
+        'currency',
+        'last_price',
+        'total_value',
+        'whs_code',
+        'whs_name',
+        'project',
+        'status',
+        'last_mr_no',
+        'last_mi_no',
+    ];
 
-    public function collection(): Collection
+    /**
+     * @param  Builder<LogisticsInventoryItem>  $query
+     */
+    public function __construct(private Builder $query) {}
+
+    /**
+     * @return Builder<LogisticsInventoryItem>
+     */
+    public function query(): Builder
     {
-        return $this->items->map(fn ($item) => [
+        return (clone $this->query)->select(self::EXPORT_COLUMNS);
+    }
+
+    public function chunkSize(): int
+    {
+        return 1000;
+    }
+
+    /**
+     * @param  LogisticsInventoryItem  $item
+     * @return list<mixed>
+     */
+    public function map($item): array
+    {
+        return [
             $item->model_no,
             $item->unit_no,
             $item->item_code,
@@ -34,7 +81,7 @@ class LogisticsInventoryExport implements FromCollection, WithColumnWidths, With
             $item->status,
             $item->last_mr_no,
             $item->last_mi_no,
-        ]);
+        ];
     }
 
     public function headings(): array

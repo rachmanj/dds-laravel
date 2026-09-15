@@ -108,10 +108,10 @@ class GrpoSummaryController extends Controller
                 ->withErrors(['date_range' => $dateRangeError]);
         }
 
-        $rows = collect($this->applyFilters(
+        $rows = $this->applyFilters(
             $this->grpoRepository->fetch($fromDate, $toDate),
             $request
-        ));
+        );
 
         $filename = 'logistics_grpo_'.$fromDate.'_'.$toDate.'_'.now()->format('His').'.xlsx';
 
