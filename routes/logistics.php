@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Logistics\GrpoSummaryController;
 use App\Http\Controllers\Logistics\InventorySummaryController;
+use App\Http\Controllers\Logistics\UsageSummaryController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('logistics/inventory')
@@ -22,6 +23,17 @@ Route::prefix('logistics/grpo')
         Route::get('/', [GrpoSummaryController::class, 'index'])->name('index');
         Route::get('/data', [GrpoSummaryController::class, 'data'])->name('data');
         Route::get('/export', [GrpoSummaryController::class, 'export'])
+            ->middleware('permission:export-logistics-summary')
+            ->name('export');
+    });
+
+Route::prefix('logistics/usage')
+    ->name('logistics.usage.')
+    ->middleware(['auth', 'active.user', 'permission:view-logistics-summary'])
+    ->group(function () {
+        Route::get('/', [UsageSummaryController::class, 'index'])->name('index');
+        Route::get('/data', [UsageSummaryController::class, 'data'])->name('data');
+        Route::get('/export', [UsageSummaryController::class, 'export'])
             ->middleware('permission:export-logistics-summary')
             ->name('export');
     });
