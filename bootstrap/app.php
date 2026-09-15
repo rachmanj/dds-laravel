@@ -41,6 +41,16 @@ return Application::configure(basePath: dirname(__DIR__))
             ->dailyAt('07:30')
             ->timezone($wita)
             ->withoutOverlapping();
+
+        $schedule->command('logistics:snapshot-inventory')
+            ->dailyAt('06:00')
+            ->timezone($wita)
+            ->withoutOverlapping();
+
+        $schedule->command('logistics:prune-inventory')
+            ->weekly()
+            ->timezone($wita)
+            ->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: [
