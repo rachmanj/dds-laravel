@@ -289,6 +289,8 @@ class RolePermissionSeeder extends Seeder
             'create-solar-price-histories',
             'edit-solar-price-histories',
             'delete-solar-price-histories',
+            'view-logistics-summary',
+            'export-logistics-summary',
         ]);
 
         $cashierho = Role::firstOrCreate(['name' => 'cashierho']);
