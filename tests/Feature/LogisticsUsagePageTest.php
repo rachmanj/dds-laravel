@@ -7,6 +7,7 @@ use App\Repositories\SapUsageRepository;
 use Carbon\Carbon;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 class LogisticsUsagePageTest extends TestCase
@@ -290,6 +291,117 @@ class LogisticsUsagePageTest extends TestCase
         $response->assertJsonPath('recordsTotal', 1);
         $response->assertJsonFragment(['doc_num' => '2001']);
         $response->assertJsonMissing(['doc_num' => '1001']);
+    }
+
+    public function test_data_endpoint_filters_by_unit_no(): void
+    {
+        $user = $this->createLogisticUser();
+        $this->mockUsageRepository($this->sampleUsageRows());
+
+        $response = $this->actingAs($user)->getJson(route('logistics.usage.data', [
+            'draw' => 1,
+            'start' => 0,
+            'length' => 10,
+            'from_date' => '2026-09-01',
+            'to_date' => '2026-09-15',
+            'unit_no' => 'U-002',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('recordsTotal', 1);
+        $response->assertJsonFragment(['doc_num' => '2001']);
+        $response->assertJsonMissing(['doc_num' => '1001']);
+        $response->assertJsonMissing(['doc_num' => '3001']);
+    }
+
+    public function test_index_provides_unique_sorted_unit_options_from_fetch(): void
+    {
+        $user = $this->createLogisticUser();
+        $rows = $this->sampleUsageRows();
+        $rows[] = [
+            ...$rows[0],
+            'doc_num' => '1002',
+            'unit_no' => '',
+        ];
+        $this->mockUsageRepository($rows);
+
+        $response = $this->actingAs($user)
+            ->get(route('logistics.usage.index', [
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-15',
+            ]));
+
+        $response->assertOk();
+        $response->assertViewHas('filterOptions', function (array $filterOptions): bool {
+            return $filterOptions['units']->all() === ['U-001', 'U-002', 'U-003'];
+        });
+        $response->assertSee('Semua Unit', false);
+        $response->assertSee('value="U-001"', false);
+        $response->assertSee('value="U-002"', false);
+        $response->assertSee('value="U-003"', false);
+    }
+
+    public function test_index_kpis_reflect_unit_filter(): void
+    {
+        $user = $this->createLogisticUser();
+        $this->mockUsageRepository($this->sampleUsageRows());
+
+        $this->actingAs($user)
+            ->get(route('logistics.usage.index', [
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-15',
+                'unit_no' => 'U-001',
+            ]))
+            ->assertOk()
+            ->assertViewHas('selectedUnit', 'U-001')
+            ->assertViewHas('kpis', function (array $kpis): bool {
+                return $kpis['row_count'] === 1
+                    && $kpis['document_count'] === 1
+                    && $kpis['total_value'] === 10000.0;
+            });
+    }
+
+    public function test_export_respects_unit_no_filter(): void
+    {
+        $user = $this->createLogisticUser();
+        $this->mockUsageRepository($this->sampleUsageRows());
+
+        $response = $this->actingAs($user)
+            ->get(route('logistics.usage.export', [
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-15',
+                'unit_no' => 'U-002',
+            ]));
+
+        $response->assertOk();
+
+        $spreadsheet = IOFactory::load($response->getFile()->getPathname());
+        $rows = $spreadsheet->getActiveSheet()->toArray();
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('2001', (string) $rows[1][1]);
+    }
+
+    public function test_export_redirect_preserves_unit_no_on_date_range_error(): void
+    {
+        $user = $this->createLogisticUser();
+
+        $response = $this->actingAs($user)
+            ->get(route('logistics.usage.export', [
+                'from_date' => '2026-01-01',
+                'to_date' => '2026-09-15',
+                'unit_no' => 'U-001',
+                'project' => '022C',
+                'sumber' => 'goods_issue',
+            ]));
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors('date_range');
+
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('unit_no=U-001', $location);
+        $this->assertStringContainsString('project=022C', $location);
+        $this->assertStringContainsString('sumber=goods_issue', $location);
     }
 
     public function test_index_rejects_date_range_over_92_days(): void

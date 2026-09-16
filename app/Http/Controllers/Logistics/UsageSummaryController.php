@@ -32,6 +32,7 @@ class UsageSummaryController extends Controller
         $kpis = $this->emptyKpis();
         $filterOptions = [
             'projects' => collect(),
+            'units' => collect(),
         ];
         $summaryByProject = [];
         $summaryByCategory = [];
@@ -39,7 +40,7 @@ class UsageSummaryController extends Controller
         if ($dateRangeError === null) {
             $rows = $this->fetchRows($fromDate, $toDate, $request);
             $filterOptions = $this->buildFilterOptions($rows);
-            $filteredRows = $this->applyProjectFilter($rows, $request);
+            $filteredRows = $this->applyRowFilters($rows, $request);
             $kpis = $this->buildKpis($filteredRows);
             $summaryByProject = $kpis['by_project'];
             $summaryByCategory = $kpis['by_category'];
@@ -55,6 +56,7 @@ class UsageSummaryController extends Controller
             'filterOptions' => $filterOptions,
             'selectedProject' => $request->string('project')->toString(),
             'selectedSource' => $request->string('sumber')->toString(),
+            'selectedUnit' => $request->string('unit_no')->toString(),
         ]);
     }
 
@@ -66,7 +68,7 @@ class UsageSummaryController extends Controller
             return response()->json(['message' => $dateRangeError], 422);
         }
 
-        $rows = $this->applyProjectFilter(
+        $rows = $this->applyRowFilters(
             $this->fetchRows($fromDate, $toDate, $request),
             $request
         );
@@ -86,11 +88,11 @@ class UsageSummaryController extends Controller
 
         if ($dateRangeError !== null) {
             return redirect()
-                ->route('logistics.usage.index', $request->only(['from_date', 'to_date', 'project', 'sumber']))
+                ->route('logistics.usage.index', $request->only(['from_date', 'to_date', 'project', 'sumber', 'unit_no']))
                 ->withErrors(['date_range' => $dateRangeError]);
         }
 
-        $rows = $this->applyProjectFilter(
+        $rows = $this->applyRowFilters(
             $this->fetchRows($fromDate, $toDate, $request),
             $request
         );
@@ -145,17 +147,28 @@ class UsageSummaryController extends Controller
      * @param  array<int, array<string, mixed>>  $rows
      * @return array<int, array<string, mixed>>
      */
-    private function applyProjectFilter(array $rows, Request $request): array
+    private function applyRowFilters(array $rows, Request $request): array
     {
         $project = $request->string('project')->toString();
+        $unitNo = $request->string('unit_no')->toString();
 
-        if ($project === '') {
+        if ($project === '' && $unitNo === '') {
             return $rows;
         }
 
         return array_values(array_filter(
             $rows,
-            fn (array $row): bool => (string) ($row['project'] ?? '') === $project
+            function (array $row) use ($project, $unitNo): bool {
+                if ($project !== '' && (string) ($row['project'] ?? '') !== $project) {
+                    return false;
+                }
+
+                if ($unitNo !== '' && (string) ($row['unit_no'] ?? '') !== $unitNo) {
+                    return false;
+                }
+
+                return true;
+            }
         ));
     }
 
@@ -250,7 +263,7 @@ class UsageSummaryController extends Controller
 
     /**
      * @param  array<int, array<string, mixed>>  $rows
-     * @return array{projects: Collection<int, string>}
+     * @return array{projects: Collection<int, string>, units: Collection<int, string>}
      */
     private function buildFilterOptions(array $rows): array
     {
@@ -261,8 +274,16 @@ class UsageSummaryController extends Controller
             ->sort()
             ->values();
 
+        $units = collect($rows)
+            ->pluck('unit_no')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
         return [
             'projects' => $projects,
+            'units' => $units,
         ];
     }
 

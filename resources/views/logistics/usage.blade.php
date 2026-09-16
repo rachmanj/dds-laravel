@@ -12,6 +12,8 @@
 @section('styles')
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
     <link rel="stylesheet" href="{{ asset('adminlte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('adminlte/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
 @endsection
 
 @section('content')
@@ -57,7 +59,7 @@
                                         value="{{ $toDate }}">
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <div class="form-group">
                                     <label for="filter_project">Project</label>
                                     <select class="form-control" id="filter_project" name="project">
@@ -70,7 +72,20 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label for="filter_unit_no">Unit No</label>
+                                    <select class="form-control select2bs4" id="filter_unit_no" name="unit_no" data-placeholder="Semua Unit">
+                                        <option value="">Semua Unit</option>
+                                        @foreach ($filterOptions['units'] as $unit)
+                                            <option value="{{ $unit }}" @selected($selectedUnit === $unit)>
+                                                {{ $unit }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
                                 <div class="form-group">
                                     <label for="filter_sumber">Sumber</label>
                                     <select class="form-control" id="filter_sumber" name="sumber">
@@ -245,13 +260,17 @@
     <script src="{{ asset('adminlte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
     <script src="{{ asset('adminlte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
     <script src="{{ asset('adminlte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+    <script src="{{ asset('adminlte/plugins/select2/js/select2.full.min.js') }}"></script>
     <script>
         $(function() {
+            $('.select2bs4').select2({ theme: 'bootstrap4', width: '100%' });
+
             function usageFilterParams() {
                 return {
                     from_date: $('#from_date').val(),
                     to_date: $('#to_date').val(),
                     project: $('#filter_project').val(),
+                    unit_no: $('#filter_unit_no').val(),
                     sumber: $('#filter_sumber').val(),
                 };
             }
