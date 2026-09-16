@@ -447,4 +447,70 @@ class LogisticsUsagePageTest extends TestCase
             ]))
             ->assertSessionHasErrors('date_range');
     }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function sampleUsageRowsWithSapHoursMeter(): array
+    {
+        return [
+            [
+                ...$this->sampleUsageRows()[0],
+                'hours_meter' => '7235.000000',
+            ],
+            [
+                ...$this->sampleUsageRows()[1],
+                'hours_meter' => '38459.000000',
+            ],
+            [
+                ...$this->sampleUsageRows()[2],
+                'hours_meter' => null,
+            ],
+        ];
+    }
+
+    public function test_data_endpoint_returns_formatted_hours_meter_with_zero_decimals(): void
+    {
+        $user = $this->createLogisticUser();
+        $this->mockUsageRepository($this->sampleUsageRowsWithSapHoursMeter());
+
+        $response = $this->actingAs($user)->getJson(route('logistics.usage.data', [
+            'draw' => 1,
+            'start' => 0,
+            'length' => 10,
+            'from_date' => '2026-09-01',
+            'to_date' => '2026-09-15',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonFragment(['formatted_hours_meter' => '7.235']);
+        $response->assertJsonFragment(['formatted_hours_meter' => '38.459']);
+        $response->assertJsonFragment(['formatted_hours_meter' => '-']);
+    }
+
+    public function test_export_writes_hours_meter_as_integer(): void
+    {
+        $user = $this->createLogisticUser();
+        $this->mockUsageRepository($this->sampleUsageRowsWithSapHoursMeter());
+
+        $response = $this->actingAs($user)
+            ->get(route('logistics.usage.export', [
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-15',
+            ]));
+
+        $response->assertOk();
+
+        $spreadsheet = IOFactory::load($response->getFile()->getPathname());
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = $sheet->toArray();
+
+        $this->assertSame('Hours Meter', $rows[0][14]);
+        $this->assertSame(7235, (int) $rows[1][14]);
+        $this->assertSame(38459, (int) $rows[2][14]);
+        $this->assertNull($rows[3][14]);
+
+        $this->assertSame('0', $sheet->getStyle('O2')->getNumberFormat()->getFormatCode());
+        $this->assertSame('0', $sheet->getStyle('O3')->getNumberFormat()->getFormatCode());
+    }
 }

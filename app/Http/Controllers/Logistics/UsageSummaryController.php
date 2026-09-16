@@ -75,6 +75,7 @@ class UsageSummaryController extends Controller
 
         return DataTables::of(collect($rows))
             ->addColumn('source_label', fn (array $row) => $this->sourceLabel($row['source'] ?? ''))
+            ->addColumn('formatted_hours_meter', fn (array $row) => $this->formatNumber($row['hours_meter'] ?? null, 0))
             ->addColumn('formatted_quantity', fn (array $row) => $this->formatNumber($row['quantity'] ?? null, 2))
             ->addColumn('formatted_stockprice', fn (array $row) => $this->formatNumber($row['stockprice'] ?? null, 2))
             ->addColumn('formatted_total', fn (array $row) => $this->formatNumber($row['total'] ?? null, 2))

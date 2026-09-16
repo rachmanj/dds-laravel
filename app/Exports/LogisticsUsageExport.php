@@ -51,7 +51,7 @@ class LogisticsUsageExport implements FromGenerator, WithColumnWidths, WithEvent
             $row['unit_no'] ?? null,
             $row['model_no'] ?? null,
             $row['serial_no'] ?? null,
-            $row['hours_meter'] ?? null,
+            $this->formatHoursMeter($row['hours_meter'] ?? null),
             $row['item_code'] ?? null,
             $row['dscription'] ?? null,
             $row['quantity'] ?? null,
@@ -127,6 +127,12 @@ class LogisticsUsageExport implements FromGenerator, WithColumnWidths, WithEvent
                         ->getAlignment()
                         ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 }
+
+                if ($highestRow >= 2) {
+                    $sheet->getStyle("O2:O{$highestRow}")
+                        ->getNumberFormat()
+                        ->setFormatCode('0');
+                }
             },
         ];
     }
@@ -176,5 +182,14 @@ class LogisticsUsageExport implements FromGenerator, WithColumnWidths, WithEvent
             'ap_service' => 'AP Service',
             default => $source !== '' ? $source : '-',
         };
+    }
+
+    private function formatHoursMeter(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) round((float) $value, 0);
     }
 }

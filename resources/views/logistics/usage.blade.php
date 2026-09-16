@@ -305,7 +305,7 @@
                     { data: 'unit_no', name: 'unit_no', defaultContent: '-' },
                     { data: 'model_no', name: 'model_no', defaultContent: '-' },
                     { data: 'serial_no', name: 'serial_no', defaultContent: '-' },
-                    { data: 'hours_meter', name: 'hours_meter', defaultContent: '-' },
+                    { data: 'formatted_hours_meter', name: 'hours_meter', defaultContent: '-' },
                     { data: 'item_code', name: 'item_code', defaultContent: '-' },
                     { data: 'dscription', name: 'dscription', defaultContent: '-' },
                     { data: 'formatted_quantity', name: 'quantity' },
