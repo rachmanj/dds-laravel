@@ -229,7 +229,7 @@
                                 <th>Unit No</th>
                                 <th>Model No</th>
                                 <th>Serial No</th>
-                                <th>Hours Meter</th>
+                                <th class="text-right">Hours Meter</th>
                                 <th>ItemCode</th>
                                 <th>Dscription</th>
                                 <th>Quantity</th>
@@ -305,7 +305,7 @@
                     { data: 'unit_no', name: 'unit_no', defaultContent: '-' },
                     { data: 'model_no', name: 'model_no', defaultContent: '-' },
                     { data: 'serial_no', name: 'serial_no', defaultContent: '-' },
-                    { data: 'formatted_hours_meter', name: 'hours_meter', defaultContent: '-' },
+                    { data: 'formatted_hours_meter', name: 'hours_meter', defaultContent: '-', className: 'text-right' },
                     { data: 'item_code', name: 'item_code', defaultContent: '-' },
                     { data: 'dscription', name: 'dscription', defaultContent: '-' },
                     { data: 'formatted_quantity', name: 'quantity' },

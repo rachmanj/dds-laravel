@@ -483,9 +483,21 @@ class LogisticsUsagePageTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertJsonFragment(['formatted_hours_meter' => '7.235']);
-        $response->assertJsonFragment(['formatted_hours_meter' => '38.459']);
+        $response->assertJsonFragment(['formatted_hours_meter' => '7235']);
+        $response->assertJsonFragment(['formatted_hours_meter' => '38459']);
         $response->assertJsonFragment(['formatted_hours_meter' => '-']);
+    }
+
+    public function test_index_renders_hours_meter_column_with_text_right_alignment(): void
+    {
+        $user = $this->createLogisticUser();
+        $this->mockUsageRepository($this->sampleUsageRows());
+
+        $this->actingAs($user)
+            ->get(route('logistics.usage.index'))
+            ->assertOk()
+            ->assertSee('<th class="text-right">Hours Meter</th>', false)
+            ->assertSee("className: 'text-right'", false);
     }
 
     public function test_export_writes_hours_meter_as_integer(): void

@@ -75,7 +75,7 @@ class UsageSummaryController extends Controller
 
         return DataTables::of(collect($rows))
             ->addColumn('source_label', fn (array $row) => $this->sourceLabel($row['source'] ?? ''))
-            ->addColumn('formatted_hours_meter', fn (array $row) => $this->formatNumber($row['hours_meter'] ?? null, 0))
+            ->addColumn('formatted_hours_meter', fn (array $row) => $this->formatHoursMeterPlain($row['hours_meter'] ?? null))
             ->addColumn('formatted_quantity', fn (array $row) => $this->formatNumber($row['quantity'] ?? null, 2))
             ->addColumn('formatted_stockprice', fn (array $row) => $this->formatNumber($row['stockprice'] ?? null, 2))
             ->addColumn('formatted_total', fn (array $row) => $this->formatNumber($row['total'] ?? null, 2))
@@ -296,6 +296,15 @@ class UsageSummaryController extends Controller
             'ap_service' => 'AP Service',
             default => $source !== '' ? $source : '-',
         };
+    }
+
+    private function formatHoursMeterPlain(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '-';
+        }
+
+        return (string) (int) round((float) $value, 0);
     }
 
     private function formatNumber(mixed $value, int $decimals): string
