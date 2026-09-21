@@ -203,6 +203,63 @@
                 };
             }
 
+            const ddsInvoiceDateWarnMessage =
+                'Tanggal invoice lebih dari 6 bulan sebelum tanggal terima. Mohon periksa kembali tahun pada dokumen invoice.';
+
+            function ddsParseYmdDate(ymd) {
+                if (!ymd || typeof ymd !== 'string') {
+                    return null;
+                }
+                const parts = ymd.split('-');
+                if (parts.length !== 3) {
+                    return null;
+                }
+                const y = parseInt(parts[0], 10);
+                const m = parseInt(parts[1], 10) - 1;
+                const d = parseInt(parts[2], 10);
+                if (isNaN(y) || isNaN(m) || isNaN(d)) {
+                    return null;
+                }
+                return new Date(y, m, d);
+            }
+
+            function ddsSubtractMonths(date, months) {
+                return new Date(date.getFullYear(), date.getMonth() - months, date.getDate());
+            }
+
+            function ddsIsInvoiceMoreThanSixMonthsBeforeReceive(invoiceYmd, receiveYmd) {
+                const invoice = ddsParseYmdDate(invoiceYmd);
+                const receive = ddsParseYmdDate(receiveYmd);
+                if (!invoice || !receive) {
+                    return false;
+                }
+                const threshold = ddsSubtractMonths(receive, 6);
+                return invoice.getTime() < threshold.getTime();
+            }
+
+            function ddsUpdateInvoiceDateWarning($warningEl, invoiceYmd, receiveYmd) {
+                if (!$warningEl || !$warningEl.length) {
+                    return;
+                }
+                if (ddsIsInvoiceMoreThanSixMonthsBeforeReceive(invoiceYmd, receiveYmd)) {
+                    $warningEl.text(ddsInvoiceDateWarnMessage);
+                } else {
+                    $warningEl.text('');
+                }
+            }
+
+            function ddsRefreshBatchRowInvoiceDateWarning($reviewRow) {
+                const receiveYmd = ($('#batch_default_receive_date').val() || '').trim();
+                const invoiceYmd = ($reviewRow.find('.batch-invoice-date').val() || '').trim();
+                ddsUpdateInvoiceDateWarning($reviewRow.find('.dds-invoice-date-warning'), invoiceYmd, receiveYmd);
+            }
+
+            function ddsRefreshAllBatchInvoiceDateWarnings() {
+                $('#batch_review_tbody tr.batch-review-row').each(function() {
+                    ddsRefreshBatchRowInvoiceDateWarning($(this));
+                });
+            }
+
             function escapeHtml(s) {
                 return String(s ?? '').replace(/[&<>"']/g, function(c) {
                     return {
@@ -457,11 +514,34 @@
                 }).val(draft.invoice_number || '');
                 $tr.append($('<td>').append($inv));
 
+                const $idCell = $('<td>');
                 const $idt = $('<input>', {
                     type: 'date',
                     class: 'form-control form-control-sm batch-invoice-date'
                 }).val(draft.invoice_date || '');
-                $tr.append($('<td>').append($idt));
+                $idCell.append($idt);
+                $idCell.append($('<div>', {
+                    class: 'dds-invoice-date-warning text-warning small mt-1'
+                }));
+                if (Array.isArray(draft.warnings) && draft.warnings.length) {
+                    const $draftWarn = $('<div>', {
+                        class: 'batch-draft-warnings text-warning small mt-1'
+                    });
+                    draft.warnings.forEach(function(w) {
+                        $draftWarn.append($('<div>').text(w));
+                    });
+                    $idCell.append($draftWarn);
+                    if (typeof toastr !== 'undefined') {
+                        draft.warnings.forEach(function(w) {
+                            toastr.warning(w, 'Import');
+                        });
+                    }
+                }
+                const $saveErr = $('<div>', {
+                    class: 'batch-row-save-error text-danger small mt-1 d-none'
+                });
+                $idCell.append($saveErr);
+                $tr.append($idCell);
 
                 const defSupplier = ($('#batch_default_supplier_id').val() || '').trim();
                 const supplierIdForRow = draft.supplier_id || defSupplier || '';
@@ -515,7 +595,12 @@
                 $cb.on('change', updateSubmitCount);
                 $tr.find('input, select').on('change', updateSubmitCount);
 
+                $idt.on('change input', function() {
+                    ddsRefreshBatchRowInvoiceDateWarning($tr);
+                });
+
                 checkRowMismatch($tr);
+                ddsRefreshBatchRowInvoiceDateWarning($tr);
                 $('#batch_zone_c').removeClass('d-none');
                 updateSubmitCount();
             }
@@ -762,6 +847,7 @@
             });
             syncBatchConsignmentUi();
             $('#batch_default_supplier_id').on('change', updateSubmitCount);
+            $('#batch_default_receive_date').on('change input', ddsRefreshAllBatchInvoiceDateWarnings);
 
             $('#batch_apply_defaults_btn').on('click', function() {
                 const tid = $('#batch_default_type_id').val();
@@ -859,11 +945,14 @@
 
                 const invoices = [];
                 const rowLabels = [];
+                $('#batch_review_tbody tr.batch-review-row').removeAttr('data-batch-submit-index');
+                $('#batch_review_tbody tr.batch-review-row .batch-row-save-error').addClass('d-none').text('');
                 $('#batch_review_tbody tr.batch-review-row').each(function() {
                     const $tr = $(this);
                     if (!$tr.find('.batch-include').is(':checked')) {
                         return;
                     }
+                    $tr.attr('data-batch-submit-index', String(invoices.length));
                     const fileLabel = $tr.find('td').eq(1).text() || '';
                     const snap = $tr.data('draftSnapshot') || {};
                     const uuid = ($tr.attr('data-import-uuid') || '').trim();
@@ -913,9 +1002,46 @@
                     }),
                     headers: csrfHeaders(),
                 }).done(function(res) {
-                    $('#batch_zone_c').addClass('d-none');
-                    $('#batch_zone_a').addClass('d-none');
-                    $('#batch_zone_b').addClass('d-none');
+                    let hasValidationFailed = false;
+                    if (res.results && res.results.length) {
+                        res.results.forEach(function(r) {
+                            if (r.status !== 'validation_failed') {
+                                return;
+                            }
+                            hasValidationFailed = true;
+                            const idx = typeof r.index === 'number' ? r.index : -1;
+                            if (idx < 0) {
+                                return;
+                            }
+                            const $row = $('#batch_review_tbody tr.batch-review-row[data-batch-submit-index="' + idx + '"]');
+                            if (!$row.length) {
+                                return;
+                            }
+                            let detail = '';
+                            if (r.errors && r.errors.length) {
+                                detail = r.errors.join('; ');
+                            } else if (r.message) {
+                                detail = r.message;
+                            }
+                            if (detail) {
+                                const $err = $row.find('.batch-row-save-error');
+                                $err.removeClass('d-none').text(detail);
+                                $row.addClass('table-danger');
+                            }
+                        });
+                    }
+
+                    if (!hasValidationFailed) {
+                        $('#batch_zone_c').addClass('d-none');
+                        $('#batch_zone_a').addClass('d-none');
+                        $('#batch_zone_b').addClass('d-none');
+                    } else {
+                        $('#batch_submit_btn').prop('disabled', false);
+                        updateSubmitCount();
+                        if (typeof toastr !== 'undefined') {
+                            toastr.warning('Beberapa baris gagal disimpan. Periksa pesan pada baris yang bermasalah.');
+                        }
+                    }
                     const $rb = emptyResultsTable();
                     if (!res.results || !res.results.length) {
                         $rb.append($('<tr>').append($('<td>', {
@@ -944,7 +1070,7 @@
                             $rtr.append($('<td>').append($('<span>').addClass('badge badge-' + badge).text(st)));
                             let detail = '';
                             if (r.errors && r.errors.length) {
-                                detail = r.errors.join('; ');
+                                detail = Array.isArray(r.errors) ? r.errors.join('; ') : String(r.errors);
                             } else if (r.message) {
                                 detail = r.message;
                             }

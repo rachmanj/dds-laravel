@@ -333,6 +333,7 @@
                                                 class="form-control @error('invoice_date') is-invalid @enderror"
                                                 id="invoice_date" name="invoice_date" value="{{ old('invoice_date') }}"
                                                 required>
+                                            <div id="dds-invoice-date-warning" class="text-warning small mt-1"></div>
                                             @error('invoice_date')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
@@ -1359,6 +1360,9 @@
                         if (draft.faktur_no) $('#faktur_no').val(draft.faktur_no);
                         if (draft.invoice_date) $('#invoice_date').val(draft.invoice_date);
                         if (draft.receive_date) $('#receive_date').val(draft.receive_date);
+                        if (typeof ddsRefreshSingleInvoiceDateWarning === 'function') {
+                            ddsRefreshSingleInvoiceDateWarning();
+                        }
                         if (draft.po_no) $('#po_no').val(draft.po_no);
                         if (draft.currency) $('#currency').val(draft.currency).trigger('change');
                         if (draft.amount) {
@@ -1645,6 +1649,9 @@
                                 // Save and Close: Redirect to index
                                 if (typeof toastr !== 'undefined') {
                                     toastr.success('Invoice created successfully. Redirecting...');
+                                    if (response.warning) {
+                                        toastr.warning(response.warning);
+                                    }
                                     if (response.import_attachment_saved) {
                                         toastr.info('The imported PDF/image was saved as an invoice attachment.', 'Attachment');
                                     }
@@ -1656,6 +1663,9 @@
                                 // Save and New: Reset form
                                 if (typeof toastr !== 'undefined') {
                                     toastr.success('Invoice created successfully. Preparing new form...');
+                                    if (response.warning) {
+                                        toastr.warning(response.warning);
+                                    }
                                     if (response.import_attachment_saved) {
                                         toastr.info('The imported PDF/image was saved as an invoice attachment.', 'Attachment');
                                     }
@@ -1925,6 +1935,62 @@
 
             // Trigger SAP validation when sap_doc changes
             $('#sap_doc').on('input', validateSapDoc);
+
+            var ddsInvoiceDateWarnMessage =
+                'Tanggal invoice lebih dari 6 bulan sebelum tanggal terima. Mohon periksa kembali tahun pada dokumen invoice.';
+
+            function ddsParseYmdDate(ymd) {
+                if (!ymd || typeof ymd !== 'string') {
+                    return null;
+                }
+                var parts = ymd.split('-');
+                if (parts.length !== 3) {
+                    return null;
+                }
+                var y = parseInt(parts[0], 10);
+                var m = parseInt(parts[1], 10) - 1;
+                var d = parseInt(parts[2], 10);
+                if (isNaN(y) || isNaN(m) || isNaN(d)) {
+                    return null;
+                }
+                return new Date(y, m, d);
+            }
+
+            function ddsSubtractMonths(date, months) {
+                return new Date(date.getFullYear(), date.getMonth() - months, date.getDate());
+            }
+
+            function ddsIsInvoiceMoreThanSixMonthsBeforeReceive(invoiceYmd, receiveYmd) {
+                var invoice = ddsParseYmdDate(invoiceYmd);
+                var receive = ddsParseYmdDate(receiveYmd);
+                if (!invoice || !receive) {
+                    return false;
+                }
+                var threshold = ddsSubtractMonths(receive, 6);
+                return invoice.getTime() < threshold.getTime();
+            }
+
+            function ddsUpdateInvoiceDateWarning($warningEl, invoiceYmd, receiveYmd) {
+                if (!$warningEl || !$warningEl.length) {
+                    return;
+                }
+                if (ddsIsInvoiceMoreThanSixMonthsBeforeReceive(invoiceYmd, receiveYmd)) {
+                    $warningEl.text(ddsInvoiceDateWarnMessage);
+                } else {
+                    $warningEl.text('');
+                }
+            }
+
+            function ddsRefreshSingleInvoiceDateWarning() {
+                ddsUpdateInvoiceDateWarning(
+                    $('#dds-invoice-date-warning'),
+                    $('#invoice_date').val(),
+                    $('#receive_date').val()
+                );
+            }
+
+            $('#invoice_date, #receive_date').on('change input', ddsRefreshSingleInvoiceDateWarning);
+            ddsRefreshSingleInvoiceDateWarning();
 
             // ENHANCEMENT: Date Field Logical Validation
 
