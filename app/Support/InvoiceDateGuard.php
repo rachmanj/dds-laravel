@@ -99,26 +99,20 @@ class InvoiceDateGuard
 
     private static function describeMonthsBefore(CarbonInterface $invoice, CarbonInterface $receive): string
     {
-        $months = max(1, $invoice->diffInMonths($receive));
+        $months = (int) round(max(1, $invoice->diffInMonths($receive)));
 
         return self::describeDurationInIndonesian($months);
     }
 
     private static function describeMonthsAfter(CarbonInterface $invoice, CarbonInterface $receive): string
     {
-        $months = max(1, $receive->diffInMonths($invoice));
+        $months = (int) round(max(1, $receive->diffInMonths($invoice)));
 
         return self::describeDurationInIndonesian($months);
     }
 
     private static function describeDurationInIndonesian(int $months): string
     {
-        if ($months >= 24) {
-            $years = intdiv($months, 12);
-
-            return $years === 1 ? 'lebih dari 1 tahun' : "lebih dari {$years} tahun";
-        }
-
         if ($months >= 12) {
             $years = intdiv($months, 12);
 
