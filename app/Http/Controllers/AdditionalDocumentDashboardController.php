@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use App\Models\AdditionalDocument;
 use App\Models\AdditionalDocumentType;
 use App\Models\Department;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AdditionalDocumentDashboardController extends Controller
 {
@@ -16,10 +16,10 @@ class AdditionalDocumentDashboardController extends Controller
     {
         try {
             $user = Auth::user();
-            
+
             // Load relationships with null safety
             $user->loadMissing(['roles', 'department']);
-            
+
             $userDepartment = $user->department;
             $userLocationCode = $user->department_location_code;
             $userRoles = $user->roles ?? collect();
@@ -56,11 +56,11 @@ class AdditionalDocumentDashboardController extends Controller
                 'workflowMetrics'
             ));
         } catch (\Exception $e) {
-            Log::error('AdditionalDocumentDashboardController@index error: ' . $e->getMessage(), [
+            Log::error('AdditionalDocumentDashboardController@index error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'user_id' => Auth::id()
+                'user_id' => Auth::id(),
             ]);
-            
+
             // Return a safe fallback view or redirect
             return redirect()->route('additional-documents.index')->with('error', 'An error occurred while loading the dashboard. Please try again.');
         }
@@ -70,16 +70,19 @@ class AdditionalDocumentDashboardController extends Controller
     {
         $query = AdditionalDocument::query();
 
-        if (!$isAdmin && $userLocationCode) {
+        if (! $isAdmin && $userLocationCode) {
             $query->where('cur_loc', $userLocationCode);
         }
 
         $statuses = ['available', 'in_transit', 'distributed', 'unaccounted_for'];
-        $overview = [];
+        $counts = (clone $query)
+            ->selectRaw('distribution_status, COUNT(*) as aggregate_count')
+            ->groupBy('distribution_status')
+            ->pluck('aggregate_count', 'distribution_status');
 
+        $overview = [];
         foreach ($statuses as $status) {
-            $count = (clone $query)->where('distribution_status', $status)->count();
-            $overview[$status] = $count;
+            $overview[$status] = (int) ($counts[$status] ?? 0);
         }
 
         return $overview;
@@ -89,29 +92,38 @@ class AdditionalDocumentDashboardController extends Controller
     {
         $query = AdditionalDocument::query();
 
-        if (!$isAdmin && $userLocationCode) {
+        if (! $isAdmin && $userLocationCode) {
             $query->where('cur_loc', $userLocationCode);
         }
 
         $types = AdditionalDocumentType::all();
-        $analysis = [];
+        $typeCounts = (clone $query)
+            ->selectRaw('type_id, COUNT(*) as aggregate_count')
+            ->groupBy('type_id')
+            ->pluck('aggregate_count', 'type_id');
 
+        $analysis = [];
         foreach ($types as $type) {
-            $count = (clone $query)->where('type_id', $type->id)->count();
-            $analysis[$type->name] = $count;
+            $analysis[$type->name] = (int) ($typeCounts[$type->id] ?? 0);
         }
 
-        // Get documents by source (ITO, PO, etc.)
+        $sourceRow = (clone $query)->selectRaw('
+            SUM(CASE WHEN ito_creator IS NOT NULL THEN 1 ELSE 0 END) as ito_documents,
+            SUM(CASE WHEN po_no IS NOT NULL THEN 1 ELSE 0 END) as po_documents,
+            SUM(CASE WHEN grpo_no IS NOT NULL THEN 1 ELSE 0 END) as grpo_documents,
+            SUM(CASE WHEN ito_creator IS NULL AND po_no IS NULL AND grpo_no IS NULL THEN 1 ELSE 0 END) as other_documents
+        ')->first();
+
         $sourceAnalysis = [
-            'ito_documents' => (clone $query)->whereNotNull('ito_creator')->count(),
-            'po_documents' => (clone $query)->whereNotNull('po_no')->count(),
-            'grpo_documents' => (clone $query)->whereNotNull('grpo_no')->count(),
-            'other_documents' => (clone $query)->whereNull('ito_creator')->whereNull('po_no')->whereNull('grpo_no')->count()
+            'ito_documents' => (int) ($sourceRow->ito_documents ?? 0),
+            'po_documents' => (int) ($sourceRow->po_documents ?? 0),
+            'grpo_documents' => (int) ($sourceRow->grpo_documents ?? 0),
+            'other_documents' => (int) ($sourceRow->other_documents ?? 0),
         ];
 
         return [
             'type_breakdown' => $analysis,
-            'source_breakdown' => $sourceAnalysis
+            'source_breakdown' => $sourceAnalysis,
         ];
     }
 
@@ -120,24 +132,26 @@ class AdditionalDocumentDashboardController extends Controller
         try {
             $query = AdditionalDocument::query();
 
-            if (!$isAdmin && $userLocationCode) {
+            if (! $isAdmin && $userLocationCode) {
                 $query->where('cur_loc', $userLocationCode);
             }
 
-            $documents = (clone $query)->get();
+            $documents = (clone $query)->get(['id', 'distribution_status', 'receive_date', 'created_at']);
+
+            AdditionalDocument::preloadLocationArrivals($documents->pluck('id'));
 
             $ageBreakdown = [
                 '0-7_days' => 0,
                 '8-14_days' => 0,
                 '15-30_days' => 0,
-                '30_plus_days' => 0
+                '30_plus_days' => 0,
             ];
 
             $statusByAge = [
                 '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
                 '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
                 '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0]
+                '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
             ];
 
             foreach ($documents as $document) {
@@ -147,12 +161,12 @@ class AdditionalDocumentDashboardController extends Controller
                     $status = $document->distribution_status ?? 'available';
 
                     // Validate age category exists in breakdown
-                    if (!isset($ageBreakdown[$ageCategory])) {
+                    if (! isset($ageBreakdown[$ageCategory])) {
                         $ageCategory = '0-7_days'; // Safe fallback
                     }
 
                     $ageBreakdown[$ageCategory]++;
-                    
+
                     // Validate status exists in statusByAge
                     if (isset($statusByAge[$ageCategory][$status])) {
                         $statusByAge[$ageCategory][$status]++;
@@ -160,7 +174,7 @@ class AdditionalDocumentDashboardController extends Controller
                 } catch (\Exception $e) {
                     Log::warning('Error calculating age category for document', [
                         'document_id' => $document->id ?? 'unknown',
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
                     // Continue processing other documents
                     $ageBreakdown['0-7_days']++; // Safe fallback
@@ -169,28 +183,28 @@ class AdditionalDocumentDashboardController extends Controller
 
             return [
                 'age_breakdown' => $ageBreakdown,
-                'status_by_age' => $statusByAge
+                'status_by_age' => $statusByAge,
             ];
         } catch (\Exception $e) {
             Log::error('Error in getAgeAndStatusMetrics', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Return safe defaults
             return [
                 'age_breakdown' => [
                     '0-7_days' => 0,
                     '8-14_days' => 0,
                     '15-30_days' => 0,
-                    '30_plus_days' => 0
+                    '30_plus_days' => 0,
                 ],
                 'status_by_age' => [
                     '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
                     '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
                     '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                    '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0]
-                ]
+                    '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                ],
             ];
         }
     }
@@ -203,17 +217,19 @@ class AdditionalDocumentDashboardController extends Controller
         try {
             $query = AdditionalDocument::query();
 
-            if (!$isAdmin && $userLocationCode) {
+            if (! $isAdmin && $userLocationCode) {
                 $query->where('cur_loc', $userLocationCode);
             }
 
-            $documents = (clone $query)->get();
+            $documents = (clone $query)->get(['id', 'distribution_status', 'receive_date', 'created_at']);
+
+            AdditionalDocument::preloadLocationArrivals($documents->pluck('id'));
 
             $alerts = [
                 'overdue_critical' => 0,
                 'overdue_warning' => 0,
                 'stuck_documents' => 0,
-                'recently_arrived' => 0
+                'recently_arrived' => 0,
             ];
 
             foreach ($documents as $document) {
@@ -233,7 +249,7 @@ class AdditionalDocumentDashboardController extends Controller
                 } catch (\Exception $e) {
                     Log::warning('Error calculating alerts for document', [
                         'document_id' => $document->id ?? 'unknown',
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
                     // Continue processing other documents
                 }
@@ -243,15 +259,15 @@ class AdditionalDocumentDashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Error in getDepartmentSpecificAgingAlerts', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Return safe defaults
             return [
                 'overdue_critical' => 0,
                 'overdue_warning' => 0,
                 'stuck_documents' => 0,
-                'recently_arrived' => 0
+                'recently_arrived' => 0,
             ];
         }
     }
@@ -260,7 +276,7 @@ class AdditionalDocumentDashboardController extends Controller
     {
         $query = AdditionalDocument::query();
 
-        if (!$isAdmin && $userLocationCode) {
+        if (! $isAdmin && $userLocationCode) {
             $query->where('cur_loc', $userLocationCode);
         }
 
@@ -293,7 +309,7 @@ class AdditionalDocumentDashboardController extends Controller
         return [
             'current_location' => $locationBreakdown,
             'origin_warehouse' => $originBreakdown,
-            'destination' => $destinationBreakdown
+            'destination' => $destinationBreakdown,
         ];
     }
 
@@ -301,17 +317,17 @@ class AdditionalDocumentDashboardController extends Controller
     {
         $query = AdditionalDocument::query();
 
-        if (!$isAdmin && $userLocationCode) {
+        if (! $isAdmin && $userLocationCode) {
             $query->where('cur_loc', $userLocationCode);
         }
 
         // Get documents with PO numbers
-        $poDocuments = (clone $query)->whereNotNull('po_no')->get();
+        $poDocuments = (clone $query)->whereNotNull('po_no')->get(['po_no']);
 
         $poAnalysis = [
             'total_with_po' => $poDocuments->count(),
             'unique_po_count' => $poDocuments->pluck('po_no')->unique()->count(),
-            'po_distribution' => $poDocuments->groupBy('po_no')->map->count()->sortDesc()->take(10)
+            'po_distribution' => $poDocuments->groupBy('po_no')->map->count()->sortDesc()->take(10),
         ];
 
         // Get documents linked to invoices
@@ -320,7 +336,7 @@ class AdditionalDocumentDashboardController extends Controller
             $unlinkedDocuments = (clone $query)->whereDoesntHave('invoices')->count();
         } catch (\Exception $e) {
             Log::warning('Error counting linked/unlinked documents', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             $linkedDocuments = 0;
             $unlinkedDocuments = 0;
@@ -337,7 +353,7 @@ class AdditionalDocumentDashboardController extends Controller
     {
         $query = AdditionalDocument::query();
 
-        if (!$isAdmin && $userLocationCode) {
+        if (! $isAdmin && $userLocationCode) {
             $query->where('cur_loc', $userLocationCode);
         }
 
@@ -350,19 +366,7 @@ class AdditionalDocumentDashboardController extends Controller
         // Calculate distribution efficiency
         $distributionEfficiency = $totalDocuments > 0 ? round(($distributedDocuments / $totalDocuments) * 100, 2) : 0;
 
-        // Get documents by month (last 6 months)
-        $monthlyBreakdown = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $month = Carbon::now()->subMonths($i);
-            $monthStart = $month->copy()->startOfMonth();
-            $monthEnd = $month->copy()->endOfMonth();
-
-            $count = (clone $query)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->count();
-
-            $monthlyBreakdown[$month->format('M Y')] = $count;
-        }
+        $monthlyBreakdown = $this->buildMonthlyDocumentBreakdown($query);
 
         return [
             'total_documents' => $totalDocuments,
@@ -370,8 +374,46 @@ class AdditionalDocumentDashboardController extends Controller
             'in_transit_documents' => $inTransitDocuments,
             'unaccounted_documents' => $unaccountedDocuments,
             'distribution_efficiency' => $distributionEfficiency,
-            'monthly_breakdown' => $monthlyBreakdown
+            'monthly_breakdown' => $monthlyBreakdown,
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<AdditionalDocument>  $query
+     * @return array<string, int>
+     */
+    private function buildMonthlyDocumentBreakdown($query): array
+    {
+        $rangeStart = Carbon::now()->subMonths(5)->startOfMonth();
+        $driver = $query->getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $rows = (clone $query)
+                ->where('created_at', '>=', $rangeStart)
+                ->selectRaw("cast(strftime('%Y', created_at) as integer) as year, cast(strftime('%m', created_at) as integer) as month, COUNT(*) as aggregate_count")
+                ->groupBy(DB::raw("strftime('%Y', created_at), strftime('%m', created_at)"))
+                ->get();
+        } else {
+            $rows = (clone $query)
+                ->where('created_at', '>=', $rangeStart)
+                ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as aggregate_count')
+                ->groupBy(DB::raw('YEAR(created_at), MONTH(created_at)'))
+                ->get();
+        }
+
+        $countsByMonth = [];
+        foreach ($rows as $row) {
+            $key = Carbon::createFromDate((int) $row->year, (int) $row->month, 1)->format('M Y');
+            $countsByMonth[$key] = (int) $row->aggregate_count;
+        }
+
+        $monthlyBreakdown = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $month = Carbon::now()->subMonths($i);
+            $monthlyBreakdown[$month->format('M Y')] = $countsByMonth[$month->format('M Y')] ?? 0;
+        }
+
+        return $monthlyBreakdown;
     }
 
     public function getStatusColor($status)

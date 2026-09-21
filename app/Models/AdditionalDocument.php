@@ -2,13 +2,24 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class AdditionalDocument extends Model
 {
+    /** @var array<int, true> */
+    protected static array $preloadedLocationArrivalDocumentIds = [];
+
+    /** @var array<int, true> */
+    protected static array $documentsWithDistributionPivot = [];
+
+    /** @var array<int, string> */
+    protected static array $maxVerifiedReceivedAtByDocumentId = [];
+
     protected $fillable = [
         'type_id',
         'document_number',
@@ -250,6 +261,18 @@ class AdditionalDocument extends Model
      */
     public function getCurrentLocationArrivalDateAttribute()
     {
+        if (isset(static::$preloadedLocationArrivalDocumentIds[$this->id])) {
+            if ($this->distribution_status === 'available' && ! isset(static::$documentsWithDistributionPivot[$this->id])) {
+                return $this->receive_date ?: $this->created_at;
+            }
+
+            if (isset(static::$maxVerifiedReceivedAtByDocumentId[$this->id])) {
+                return Carbon::parse(static::$maxVerifiedReceivedAtByDocumentId[$this->id]);
+            }
+
+            return $this->receive_date ?: $this->created_at;
+        }
+
         // If document has never been distributed, use original receive_date
         if ($this->distribution_status === 'available' && ! $this->hasBeenDistributed()) {
             return $this->receive_date ?: $this->created_at;
@@ -307,7 +330,55 @@ class AdditionalDocument extends Model
      */
     public function hasBeenDistributed()
     {
+        if (isset(static::$preloadedLocationArrivalDocumentIds[$this->id])) {
+            return isset(static::$documentsWithDistributionPivot[$this->id]);
+        }
+
         return $this->distributions()->exists();
+    }
+
+    public static function preloadLocationArrivals(iterable $documentIds): void
+    {
+        $ids = collect($documentIds)->filter()->unique()->values()->all();
+
+        if ($ids === []) {
+            return;
+        }
+
+        $distributedIds = DB::table('distribution_documents')
+            ->where('document_type', self::class)
+            ->whereIn('document_id', $ids)
+            ->distinct()
+            ->pluck('document_id');
+
+        foreach ($distributedIds as $documentId) {
+            static::$documentsWithDistributionPivot[(int) $documentId] = true;
+        }
+
+        $maxReceivedRows = DB::table('distribution_documents')
+            ->join('distributions', 'distributions.id', '=', 'distribution_documents.distribution_id')
+            ->where('distribution_documents.document_type', self::class)
+            ->whereIn('distribution_documents.document_id', $ids)
+            ->where('distribution_documents.receiver_verification_status', 'verified')
+            ->whereNotNull('distributions.received_at')
+            ->groupBy('distribution_documents.document_id')
+            ->selectRaw('distribution_documents.document_id, MAX(distributions.received_at) as max_received_at')
+            ->get();
+
+        foreach ($maxReceivedRows as $row) {
+            static::$maxVerifiedReceivedAtByDocumentId[(int) $row->document_id] = $row->max_received_at;
+        }
+
+        foreach ($ids as $id) {
+            static::$preloadedLocationArrivalDocumentIds[(int) $id] = true;
+        }
+    }
+
+    public static function clearLocationArrivalPreloadCache(): void
+    {
+        static::$preloadedLocationArrivalDocumentIds = [];
+        static::$documentsWithDistributionPivot = [];
+        static::$maxVerifiedReceivedAtByDocumentId = [];
     }
 
     /**
