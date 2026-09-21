@@ -47,6 +47,11 @@ class InvoiceDateGuardTest extends TestCase
         $this->assertStringContainsString('20-08-2020', $messages[0]);
         $this->assertStringContainsString('01-09-2026', $messages[0]);
         $this->assertStringContainsString('Mohon periksa kembali tahun pada dokumen invoice', $messages[0]);
+        $this->assertStringNotContainsString('sebelum sebelum', $messages[0]);
+        $this->assertStringContainsString(
+            'lebih dari 6 tahun sebelum tanggal terima (01-09-2026)',
+            $messages[0]
+        );
     }
 
     public function test_check_rejects_invoice_date_far_after_receive_date(): void
@@ -56,6 +61,7 @@ class InvoiceDateGuardTest extends TestCase
         $this->assertCount(1, $messages);
         $this->assertStringContainsString('01-10-2028', $messages[0]);
         $this->assertStringContainsString('sesudah tanggal terima', $messages[0]);
+        $this->assertStringNotContainsString('sesudah sesudah', $messages[0]);
     }
 
     public function test_warn_flags_invoice_date_more_than_six_months_before_receive(): void
@@ -67,6 +73,7 @@ class InvoiceDateGuardTest extends TestCase
         $this->assertCount(1, $warnings);
         $this->assertStringContainsString('15-01-2026', $warnings[0]);
         $this->assertStringContainsString('Mohon periksa kembali tahun pada dokumen invoice', $warnings[0]);
+        $this->assertStringNotContainsString('sebelum sebelum', $warnings[0]);
     }
 
     public function test_store_rejects_invoice_date_that_violates_hard_rules(): void
