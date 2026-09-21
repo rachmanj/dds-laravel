@@ -8,6 +8,7 @@ use App\Models\LogisticsInventoryItem;
 use App\Models\LogisticsInventoryPivot;
 use App\Models\LogisticsInventorySnapshot;
 use App\Support\CompactNumberFormatter;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -33,6 +34,8 @@ class InventorySummaryController extends Controller
 
         $instockByProjectChart = ['labels' => [], 'values' => []];
         $valueByCategoryChart = ['labels' => [], 'values' => []];
+        $valueByWarehouseChart = ['labels' => [], 'values' => []];
+        $monthlyValueChart = $this->buildMonthlyValueChart();
         $pivotMatrix = [
             'projects' => [],
             'categories' => [],
@@ -80,6 +83,8 @@ class InventorySummaryController extends Controller
                 'values' => $valueByCategory->values()->all(),
             ];
 
+            $valueByWarehouseChart = $this->buildValueByWarehouseChart($displaySnapshot->id);
+
             $pivotMatrix = $this->buildPivotMatrix($pivots, 'sum_instock');
             $valuePivotMatrix = $this->buildPivotMatrix($pivots, 'sum_value');
             $filterOptions = $this->buildFilterOptions($displaySnapshot->id);
@@ -102,6 +107,8 @@ class InventorySummaryController extends Controller
             'snapshotDate' => $snapshotDate,
             'instockByProjectChart' => $instockByProjectChart,
             'valueByCategoryChart' => $valueByCategoryChart,
+            'valueByWarehouseChart' => $valueByWarehouseChart,
+            'monthlyValueChart' => $monthlyValueChart,
             'pivotMatrix' => $pivotMatrix,
             'valuePivotMatrix' => $valuePivotMatrix,
             'filterOptions' => $filterOptions,
@@ -171,6 +178,111 @@ class InventorySummaryController extends Controller
         }
 
         return 'Snapshot terakhir gagal: '.$errorMessage.'. Belum ada data inventory yang dapat ditampilkan.';
+    }
+
+    /**
+     * @return array{labels: array<int, string>, values: array<int, float>}
+     */
+    private function buildValueByWarehouseChart(int $snapshotId): array
+    {
+        $items = LogisticsInventoryItem::query()
+            ->where('snapshot_id', $snapshotId)
+            ->get(['whs_code', 'whs_name', 'total_value']);
+
+        $warehouseRows = $items
+            ->groupBy(fn ($item) => $item->whs_code ?? '')
+            ->filter(fn (Collection $rows, string $whsCode) => $whsCode !== '')
+            ->map(function (Collection $rows, string $whsCode) {
+                $whsName = $rows->first()->whs_name;
+
+                return [
+                    'label' => filled($whsName) ? $whsName : $whsCode,
+                    'value' => round((float) $rows->sum('total_value'), 2),
+                ];
+            })
+            ->sortByDesc('value')
+            ->values();
+
+        if ($warehouseRows->isEmpty()) {
+            return ['labels' => [], 'values' => []];
+        }
+
+        if ($warehouseRows->count() > 12) {
+            $topRows = $warehouseRows->take(12);
+            $otherTotal = round((float) $warehouseRows->skip(12)->sum('value'), 2);
+
+            return [
+                'labels' => $topRows->pluck('label')->push('Lainnya')->all(),
+                'values' => $topRows->pluck('value')->push($otherTotal)->all(),
+            ];
+        }
+
+        return [
+            'labels' => $warehouseRows->pluck('label')->all(),
+            'values' => $warehouseRows->pluck('value')->all(),
+        ];
+    }
+
+    /**
+     * @return array{labels: array<int, string>, values: array<int, float|null>}
+     */
+    private function buildMonthlyValueChart(): array
+    {
+        $monthStart = now()->copy()->subMonths(11)->startOfMonth();
+        $rangeEnd = now()->copy()->endOfMonth();
+
+        $snapshots = LogisticsInventorySnapshot::query()
+            ->where('status', 'success')
+            ->whereBetween('snapshot_date', [$monthStart->toDateString(), $rangeEnd->toDateString()])
+            ->orderByDesc('snapshot_date')
+            ->orderByDesc('id')
+            ->get(['snapshot_date', 'total_value']);
+
+        $valueByMonth = [];
+
+        foreach ($snapshots as $snapshot) {
+            $monthKey = $snapshot->snapshot_date->format('Y-m');
+
+            if (! array_key_exists($monthKey, $valueByMonth)) {
+                $valueByMonth[$monthKey] = (float) $snapshot->total_value;
+            }
+        }
+
+        $labels = [];
+        $values = [];
+
+        for ($offset = 11; $offset >= 0; $offset--) {
+            $month = now()->copy()->subMonths($offset)->startOfMonth();
+            $monthKey = $month->format('Y-m');
+
+            $labels[] = $this->formatIndonesianMonthYearLabel($month);
+            $values[] = $valueByMonth[$monthKey] ?? null;
+        }
+
+        return [
+            'labels' => $labels,
+            'values' => $values,
+        ];
+    }
+
+    private function formatIndonesianMonthYearLabel(Carbon $date): string
+    {
+        $months = [
+            1 => 'Jan',
+            2 => 'Feb',
+            3 => 'Mar',
+            4 => 'Apr',
+            5 => 'Mei',
+            6 => 'Jun',
+            7 => 'Jul',
+            8 => 'Agu',
+            9 => 'Sep',
+            10 => 'Okt',
+            11 => 'Nov',
+            12 => 'Des',
+        ];
+
+        return $months[$date->month].' '.$date->year;
     }
 
     /**

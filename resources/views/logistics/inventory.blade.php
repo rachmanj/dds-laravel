@@ -76,6 +76,41 @@
                 <div class="col-lg-6">
                     <div class="card card-outline card-secondary">
                         <div class="card-header py-2">
+                            <h3 class="card-title text-sm">Nilai Inventory per Warehouse</h3>
+                        </div>
+                        <div class="card-body py-2">
+                            @if (count($valueByWarehouseChart['labels']) === 0)
+                                <p class="text-muted small mb-0">Belum ada data chart.</p>
+                            @else
+                                <div style="height: 12rem; position: relative;">
+                                    <canvas id="valueByWarehouseChart"></canvas>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card card-outline card-secondary">
+                        <div class="card-header py-2">
+                            <h3 class="card-title text-sm">Total Nilai Inventory Bulanan (12 Bulan Terakhir)</h3>
+                        </div>
+                        <div class="card-body py-2">
+                            @if (count($monthlyValueChart['labels']) === 0)
+                                <p class="text-muted small mb-0">Belum ada data chart.</p>
+                            @else
+                                <div style="height: 12rem; position: relative;">
+                                    <canvas id="monthlyValueChart"></canvas>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card card-outline card-secondary">
+                        <div class="card-header py-2">
                             <h3 class="card-title text-sm">Instock per Project</h3>
                         </div>
                         <div class="card-body py-2">
@@ -333,6 +368,8 @@
         $(function() {
             const instockChartData = @json($instockByProjectChart);
             const valueChartData = @json($valueByCategoryChart);
+            const valueByWarehouseChartData = @json($valueByWarehouseChart);
+            const monthlyValueChartData = @json($monthlyValueChart);
 
             function buildBarChart(canvasId, chartData, label) {
                 const canvas = document.getElementById(canvasId);
@@ -376,6 +413,65 @@
                 });
             }
 
+            function buildLineChart(canvasId, chartData, label) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas || typeof Chart === 'undefined' || !chartData.labels || !chartData.labels.length) {
+                    return;
+                }
+
+                new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [{
+                            label: label,
+                            data: chartData.values,
+                            backgroundColor: 'rgba(0, 123, 255, 0.15)',
+                            borderColor: 'rgba(0, 123, 255, 1)',
+                            borderWidth: 2,
+                            fill: true,
+                            spanGaps: false,
+                            pointRadius: 3,
+                            pointHoverRadius: 4,
+                        }]
+                    },
+                    options: {
+                        legend: { display: false },
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: true,
+                                    callback: function(value) {
+                                        if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + ' jt';
+                                        }
+                                        if (value >= 1000) {
+                                            return (value / 1000).toFixed(1) + ' rb';
+                                        }
+                                        return value;
+                                    }
+                                }
+                            }]
+                        },
+                        tooltips: {
+                            callbacks: {
+                                label: function(tooltipItem, data) {
+                                    const value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                                    if (value === null || value === undefined) {
+                                        return 'Belum ada data';
+                                    }
+                                    return label + ': ' + value;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            buildBarChart('valueByWarehouseChart', valueByWarehouseChartData, 'Nilai');
+            buildLineChart('monthlyValueChart', monthlyValueChartData, 'Total Nilai');
             buildBarChart('instockByProjectChart', instockChartData, 'Instock');
             buildBarChart('valueByCategoryChart', valueChartData, 'Nilai');
 
