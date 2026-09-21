@@ -337,6 +337,50 @@ class AdditionalDocument extends Model
         return $this->distributions()->exists();
     }
 
+    /**
+     * @return array{0: array<int, true>, 1: array<int, string>}
+     */
+    public static function bulkLocationArrivalMaps(?iterable $documentIds = null): array
+    {
+        $documentsWithDistributionPivot = [];
+        $maxVerifiedReceivedAtByDocumentId = [];
+
+        $distributedQuery = DB::table('distribution_documents')
+            ->where('document_type', self::class);
+
+        $maxReceivedQuery = DB::table('distribution_documents')
+            ->join('distributions', 'distributions.id', '=', 'distribution_documents.distribution_id')
+            ->where('distribution_documents.document_type', self::class)
+            ->where('distribution_documents.receiver_verification_status', 'verified')
+            ->whereNotNull('distributions.received_at');
+
+        if ($documentIds !== null) {
+            $ids = collect($documentIds)->filter()->unique()->values()->all();
+
+            if ($ids === []) {
+                return [$documentsWithDistributionPivot, $maxVerifiedReceivedAtByDocumentId];
+            }
+
+            $distributedQuery->whereIn('document_id', $ids);
+            $maxReceivedQuery->whereIn('distribution_documents.document_id', $ids);
+        }
+
+        foreach ($distributedQuery->distinct()->pluck('document_id') as $documentId) {
+            $documentsWithDistributionPivot[(int) $documentId] = true;
+        }
+
+        $maxReceivedRows = $maxReceivedQuery
+            ->groupBy('distribution_documents.document_id')
+            ->selectRaw('distribution_documents.document_id, MAX(distributions.received_at) as max_received_at')
+            ->get();
+
+        foreach ($maxReceivedRows as $row) {
+            $maxVerifiedReceivedAtByDocumentId[(int) $row->document_id] = $row->max_received_at;
+        }
+
+        return [$documentsWithDistributionPivot, $maxVerifiedReceivedAtByDocumentId];
+    }
+
     public static function preloadLocationArrivals(iterable $documentIds): void
     {
         $ids = collect($documentIds)->filter()->unique()->values()->all();
@@ -345,28 +389,14 @@ class AdditionalDocument extends Model
             return;
         }
 
-        $distributedIds = DB::table('distribution_documents')
-            ->where('document_type', self::class)
-            ->whereIn('document_id', $ids)
-            ->distinct()
-            ->pluck('document_id');
+        [$documentsWithPivot, $maxReceivedAtByDocumentId] = static::bulkLocationArrivalMaps($ids);
 
-        foreach ($distributedIds as $documentId) {
-            static::$documentsWithDistributionPivot[(int) $documentId] = true;
+        foreach ($documentsWithPivot as $documentId => $_) {
+            static::$documentsWithDistributionPivot[$documentId] = true;
         }
 
-        $maxReceivedRows = DB::table('distribution_documents')
-            ->join('distributions', 'distributions.id', '=', 'distribution_documents.distribution_id')
-            ->where('distribution_documents.document_type', self::class)
-            ->whereIn('distribution_documents.document_id', $ids)
-            ->where('distribution_documents.receiver_verification_status', 'verified')
-            ->whereNotNull('distributions.received_at')
-            ->groupBy('distribution_documents.document_id')
-            ->selectRaw('distribution_documents.document_id, MAX(distributions.received_at) as max_received_at')
-            ->get();
-
-        foreach ($maxReceivedRows as $row) {
-            static::$maxVerifiedReceivedAtByDocumentId[(int) $row->document_id] = $row->max_received_at;
+        foreach ($maxReceivedAtByDocumentId as $documentId => $maxReceivedAt) {
+            static::$maxVerifiedReceivedAtByDocumentId[$documentId] = $maxReceivedAt;
         }
 
         foreach ($ids as $id) {

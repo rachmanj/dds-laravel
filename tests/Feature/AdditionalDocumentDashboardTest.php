@@ -276,6 +276,49 @@ class AdditionalDocumentDashboardTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_aging_metrics_methods_share_single_document_fetch_per_request(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-15 12:00:00'));
+
+        $user = $this->createAdminUser();
+
+        $this->createAdditionalDocument($user, [
+            'receive_date' => '2026-03-01',
+            'distribution_status' => 'available',
+        ]);
+        $this->createAdditionalDocument($user, [
+            'receive_date' => '2026-02-01',
+            'distribution_status' => 'in_transit',
+        ]);
+
+        AdditionalDocument::clearLocationArrivalPreloadCache();
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $controller = app(\App\Http\Controllers\AdditionalDocumentDashboardController::class);
+        $isAdmin = ['admin'];
+
+        $invoke = function (string $method) use ($controller, $user, $isAdmin): void {
+            $reflection = new \ReflectionMethod($controller, $method);
+            $reflection->setAccessible(true);
+            $reflection->invoke($controller, $user, $user->department_location_code, $isAdmin);
+        };
+
+        $invoke('getAgeAndStatusMetrics');
+        $queriesAfterFirstMethod = count(DB::getQueryLog());
+
+        $invoke('getDepartmentSpecificAgingAlerts');
+        $queriesAfterSecondMethod = count(DB::getQueryLog());
+
+        $this->assertSame(
+            $queriesAfterFirstMethod,
+            $queriesAfterSecondMethod,
+            'Second aging metrics method should not run additional database queries.',
+        );
+
+        Carbon::setTestNow();
+    }
+
     public function test_dashboard_query_count_does_not_scale_with_document_volume(): void
     {
         $user = $this->createAdminUser();

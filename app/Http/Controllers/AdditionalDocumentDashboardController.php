@@ -12,6 +12,12 @@ use Illuminate\Support\Facades\Log;
 
 class AdditionalDocumentDashboardController extends Controller
 {
+    /** @var array<string, mixed>|null */
+    private ?array $documentAgingMetricsCache = null;
+
+    /** @var array{is_admin: mixed, location: string|null}|null */
+    private ?array $documentAgingMetricsScope = null;
+
     public function index()
     {
         try {
@@ -130,60 +136,11 @@ class AdditionalDocumentDashboardController extends Controller
     private function getAgeAndStatusMetrics($user, $userLocationCode, $isAdmin)
     {
         try {
-            $query = AdditionalDocument::query();
-
-            if (! $isAdmin && $userLocationCode) {
-                $query->where('cur_loc', $userLocationCode);
-            }
-
-            $documents = (clone $query)->get(['id', 'distribution_status', 'receive_date', 'created_at']);
-
-            AdditionalDocument::preloadLocationArrivals($documents->pluck('id'));
-
-            $ageBreakdown = [
-                '0-7_days' => 0,
-                '8-14_days' => 0,
-                '15-30_days' => 0,
-                '30_plus_days' => 0,
-            ];
-
-            $statusByAge = [
-                '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-            ];
-
-            foreach ($documents as $document) {
-                try {
-                    // Use the new department-specific aging calculation
-                    $ageCategory = $document->current_location_age_category;
-                    $status = $document->distribution_status ?? 'available';
-
-                    // Validate age category exists in breakdown
-                    if (! isset($ageBreakdown[$ageCategory])) {
-                        $ageCategory = '0-7_days'; // Safe fallback
-                    }
-
-                    $ageBreakdown[$ageCategory]++;
-
-                    // Validate status exists in statusByAge
-                    if (isset($statusByAge[$ageCategory][$status])) {
-                        $statusByAge[$ageCategory][$status]++;
-                    }
-                } catch (\Exception $e) {
-                    Log::warning('Error calculating age category for document', [
-                        'document_id' => $document->id ?? 'unknown',
-                        'error' => $e->getMessage(),
-                    ]);
-                    // Continue processing other documents
-                    $ageBreakdown['0-7_days']++; // Safe fallback
-                }
-            }
+            $metrics = $this->resolveDocumentAgingMetrics($userLocationCode, $isAdmin);
 
             return [
-                'age_breakdown' => $ageBreakdown,
-                'status_by_age' => $statusByAge,
+                'age_breakdown' => $metrics['age_breakdown'],
+                'status_by_age' => $metrics['status_by_age'],
             ];
         } catch (\Exception $e) {
             Log::error('Error in getAgeAndStatusMetrics', [
@@ -191,21 +148,7 @@ class AdditionalDocumentDashboardController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // Return safe defaults
-            return [
-                'age_breakdown' => [
-                    '0-7_days' => 0,
-                    '8-14_days' => 0,
-                    '15-30_days' => 0,
-                    '30_plus_days' => 0,
-                ],
-                'status_by_age' => [
-                    '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                    '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                    '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                    '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
-                ],
-            ];
+            return $this->emptyAgeAndStatusMetrics();
         }
     }
 
@@ -215,61 +158,192 @@ class AdditionalDocumentDashboardController extends Controller
     private function getDepartmentSpecificAgingAlerts($user, $userLocationCode, $isAdmin)
     {
         try {
-            $query = AdditionalDocument::query();
+            $metrics = $this->resolveDocumentAgingMetrics($userLocationCode, $isAdmin);
 
-            if (! $isAdmin && $userLocationCode) {
-                $query->where('cur_loc', $userLocationCode);
-            }
-
-            $documents = (clone $query)->get(['id', 'distribution_status', 'receive_date', 'created_at']);
-
-            AdditionalDocument::preloadLocationArrivals($documents->pluck('id'));
-
-            $alerts = [
-                'overdue_critical' => 0,
-                'overdue_warning' => 0,
-                'stuck_documents' => 0,
-                'recently_arrived' => 0,
-            ];
-
-            foreach ($documents as $document) {
-                try {
-                    $daysInCurrentLocation = $document->days_in_current_location;
-                    $status = $document->distribution_status ?? 'available';
-
-                    if ($daysInCurrentLocation > 30 && in_array($status, ['available', 'in_transit'])) {
-                        $alerts['overdue_critical']++;
-                    } elseif ($daysInCurrentLocation > 14 && $daysInCurrentLocation <= 30 && in_array($status, ['available', 'in_transit'])) {
-                        $alerts['overdue_warning']++;
-                    } elseif ($daysInCurrentLocation > 7 && $status === 'available') {
-                        $alerts['stuck_documents']++;
-                    } elseif ($daysInCurrentLocation <= 3) {
-                        $alerts['recently_arrived']++;
-                    }
-                } catch (\Exception $e) {
-                    Log::warning('Error calculating alerts for document', [
-                        'document_id' => $document->id ?? 'unknown',
-                        'error' => $e->getMessage(),
-                    ]);
-                    // Continue processing other documents
-                }
-            }
-
-            return $alerts;
+            return $metrics['alerts'];
         } catch (\Exception $e) {
             Log::error('Error in getDepartmentSpecificAgingAlerts', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // Return safe defaults
-            return [
-                'overdue_critical' => 0,
-                'overdue_warning' => 0,
-                'stuck_documents' => 0,
-                'recently_arrived' => 0,
-            ];
+            return $this->emptyDepartmentAgingAlerts();
         }
+    }
+
+    /**
+     * @return array{age_breakdown: array<string, int>, status_by_age: array<string, array<string, int>>, alerts: array<string, int>}
+     */
+    private function resolveDocumentAgingMetrics($userLocationCode, $isAdmin): array
+    {
+        $scope = [
+            'is_admin' => $isAdmin,
+            'location' => $userLocationCode,
+        ];
+
+        if ($this->documentAgingMetricsCache !== null && $this->documentAgingMetricsScope === $scope) {
+            return $this->documentAgingMetricsCache;
+        }
+
+        $query = DB::table('additional_documents');
+
+        if (! $isAdmin && $userLocationCode) {
+            $query->where('cur_loc', $userLocationCode);
+        }
+
+        $rows = $query->get(['id', 'distribution_status', 'receive_date', 'created_at']);
+
+        [$documentsWithDistributionPivot, $maxVerifiedReceivedAtByDocumentId] = AdditionalDocument::bulkLocationArrivalMaps();
+
+        $ageBreakdown = [
+            '0-7_days' => 0,
+            '8-14_days' => 0,
+            '15-30_days' => 0,
+            '30_plus_days' => 0,
+        ];
+
+        $statusByAge = [
+            '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+            '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+            '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+            '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+        ];
+
+        $alerts = [
+            'overdue_critical' => 0,
+            'overdue_warning' => 0,
+            'stuck_documents' => 0,
+            'recently_arrived' => 0,
+        ];
+
+        $now = now();
+
+        foreach ($rows as $row) {
+            try {
+                $status = $row->distribution_status ?? 'available';
+                $daysInCurrentLocation = $this->daysInCurrentLocationForRow(
+                    $row,
+                    $documentsWithDistributionPivot,
+                    $maxVerifiedReceivedAtByDocumentId,
+                    $now,
+                );
+                $ageCategory = $this->ageCategoryForDays($daysInCurrentLocation);
+
+                if (! isset($ageBreakdown[$ageCategory])) {
+                    $ageCategory = '0-7_days';
+                }
+
+                $ageBreakdown[$ageCategory]++;
+
+                if (isset($statusByAge[$ageCategory][$status])) {
+                    $statusByAge[$ageCategory][$status]++;
+                }
+
+                if ($daysInCurrentLocation > 30 && in_array($status, ['available', 'in_transit'], true)) {
+                    $alerts['overdue_critical']++;
+                } elseif ($daysInCurrentLocation > 14 && $daysInCurrentLocation <= 30 && in_array($status, ['available', 'in_transit'], true)) {
+                    $alerts['overdue_warning']++;
+                } elseif ($daysInCurrentLocation > 7 && $status === 'available') {
+                    $alerts['stuck_documents']++;
+                } elseif ($daysInCurrentLocation <= 3) {
+                    $alerts['recently_arrived']++;
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error calculating age category for document', [
+                    'document_id' => $row->id ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ]);
+                $ageBreakdown['0-7_days']++;
+            }
+        }
+
+        $this->documentAgingMetricsScope = $scope;
+        $this->documentAgingMetricsCache = [
+            'age_breakdown' => $ageBreakdown,
+            'status_by_age' => $statusByAge,
+            'alerts' => $alerts,
+        ];
+
+        return $this->documentAgingMetricsCache;
+    }
+
+    /**
+     * @param  array<int, true>  $documentsWithDistributionPivot
+     * @param  array<int, string>  $maxVerifiedReceivedAtByDocumentId
+     */
+    private function daysInCurrentLocationForRow(
+        object $row,
+        array $documentsWithDistributionPivot,
+        array $maxVerifiedReceivedAtByDocumentId,
+        Carbon $now,
+    ): float|int {
+        $documentId = (int) $row->id;
+        $distributionStatus = $row->distribution_status ?? 'available';
+
+        if ($distributionStatus === 'available' && ! isset($documentsWithDistributionPivot[$documentId])) {
+            $arrivalDate = $row->receive_date ?? $row->created_at;
+        } elseif (isset($maxVerifiedReceivedAtByDocumentId[$documentId])) {
+            $arrivalDate = $maxVerifiedReceivedAtByDocumentId[$documentId];
+        } else {
+            $arrivalDate = $row->receive_date ?? $row->created_at;
+        }
+
+        if ($arrivalDate === null) {
+            return 0;
+        }
+
+        return Carbon::parse($arrivalDate)->diffInDays($now);
+    }
+
+    private function ageCategoryForDays(float|int $days): string
+    {
+        if ($days <= 7) {
+            return '0-7_days';
+        }
+
+        if ($days <= 14) {
+            return '8-14_days';
+        }
+
+        if ($days <= 30) {
+            return '15-30_days';
+        }
+
+        return '30_plus_days';
+    }
+
+    /**
+     * @return array{age_breakdown: array<string, int>, status_by_age: array<string, array<string, int>>}
+     */
+    private function emptyAgeAndStatusMetrics(): array
+    {
+        return [
+            'age_breakdown' => [
+                '0-7_days' => 0,
+                '8-14_days' => 0,
+                '15-30_days' => 0,
+                '30_plus_days' => 0,
+            ],
+            'status_by_age' => [
+                '0-7_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                '8-14_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                '15-30_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+                '30_plus_days' => ['available' => 0, 'in_transit' => 0, 'distributed' => 0, 'unaccounted_for' => 0],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function emptyDepartmentAgingAlerts(): array
+    {
+        return [
+            'overdue_critical' => 0,
+            'overdue_warning' => 0,
+            'stuck_documents' => 0,
+            'recently_arrived' => 0,
+        ];
     }
 
     private function getLocationAnalysis($user, $userLocationCode, $isAdmin)
