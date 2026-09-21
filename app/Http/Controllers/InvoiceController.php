@@ -16,6 +16,7 @@ use App\Services\InvoiceCreatorService;
 use App\Services\InvoiceImportLineDetailsPersister;
 use App\Services\SapApInvoicePayloadBuilder;
 use App\Services\SapService;
+use App\Support\InvoiceDateGuard;
 use App\Support\InvoiceListFilters;
 use App\Support\InvoiceListScope;
 use Illuminate\Http\Request;
@@ -162,6 +163,24 @@ class InvoiceController extends Controller
             'import_line_items.*.amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $invoiceDateErrors = InvoiceDateGuard::check(
+            $request->input('invoice_date'),
+            $request->input('receive_date')
+        );
+        if ($invoiceDateErrors !== []) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => implode(' ', $invoiceDateErrors),
+                    'errors' => ['invoice_date' => $invoiceDateErrors],
+                ], 422);
+            }
+
+            return back()
+                ->withErrors(['invoice_date' => $invoiceDateErrors])
+                ->withInput();
+        }
+
         /** @var User|null $authUser */
         $authUser = Auth::user();
 
@@ -179,6 +198,11 @@ class InvoiceController extends Controller
                 'message' => 'Authentication error. Please refresh the page and try again.',
             ], 401);
         }
+
+        $invoiceDateWarnings = InvoiceDateGuard::warn(
+            $request->input('invoice_date'),
+            $request->input('receive_date')
+        );
 
         $creatorPayload = $request->only([
             'invoice_number',
@@ -233,11 +257,18 @@ class InvoiceController extends Controller
                 'message' => 'Invoice created successfully.',
                 'invoice_id' => $invoice->id,
                 'import_attachment_saved' => $importAttachmentSaved,
+                'warning' => $invoiceDateWarnings !== [] ? implode(' ', $invoiceDateWarnings) : null,
             ]);
         }
 
-        return redirect()->route('invoices.index')
+        $redirect = redirect()->route('invoices.index')
             ->with('success', 'Invoice created successfully.');
+
+        if ($invoiceDateWarnings !== []) {
+            $redirect->with('warning', implode(' ', $invoiceDateWarnings));
+        }
+
+        return $redirect;
     }
 
     public function show(Invoice $invoice)
@@ -401,6 +432,29 @@ class InvoiceController extends Controller
             'import_line_items.*.amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $invoiceDateErrors = InvoiceDateGuard::check(
+            $request->input('invoice_date'),
+            $request->input('receive_date')
+        );
+        if ($invoiceDateErrors !== []) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => implode(' ', $invoiceDateErrors),
+                    'errors' => ['invoice_date' => $invoiceDateErrors],
+                ], 422);
+            }
+
+            return back()
+                ->withErrors(['invoice_date' => $invoiceDateErrors])
+                ->withInput();
+        }
+
+        $invoiceDateWarnings = InvoiceDateGuard::warn(
+            $request->input('invoice_date'),
+            $request->input('receive_date')
+        );
+
         $userImportLines = $request->input('import_line_items');
         $hasSubmittedLines = is_array($userImportLines) && count($userImportLines) > 0;
         if (InvoiceType::isConsignmentTypeId($request->input('type_id'))
@@ -444,11 +498,18 @@ class InvoiceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Invoice updated successfully.',
+                'warning' => $invoiceDateWarnings !== [] ? implode(' ', $invoiceDateWarnings) : null,
             ]);
         }
 
-        return redirect()->route('invoices.index')
+        $redirect = redirect()->route('invoices.index')
             ->with('success', 'Invoice updated successfully.');
+
+        if ($invoiceDateWarnings !== []) {
+            $redirect->with('warning', implode(' ', $invoiceDateWarnings));
+        }
+
+        return $redirect;
     }
 
     public function destroy(Invoice $invoice)
@@ -837,6 +898,16 @@ class InvoiceController extends Controller
                 ->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
         }
 
+        $invoiceDateErrors = InvoiceDateGuard::check(
+            $invoice->invoice_date?->format('Y-m-d'),
+            $invoice->receive_date?->format('Y-m-d')
+        );
+        if ($invoiceDateErrors !== []) {
+            return redirect()
+                ->route('invoices.show', $invoice)
+                ->withErrors(['sap_sync' => implode(' ', $invoiceDateErrors)]);
+        }
+
         if (in_array($invoice->sap_status, ['pending', 'posted', 'cancelling'], true)) {
             return redirect()
                 ->route('invoices.show', $invoice)
@@ -903,6 +974,14 @@ class InvoiceController extends Controller
         $validationErrors = $invoice->canSyncToSap();
         if (! empty($validationErrors)) {
             return back()->withErrors(['sap_sync' => implode(', ', $validationErrors)]);
+        }
+
+        $invoiceDateErrors = InvoiceDateGuard::check(
+            $invoice->invoice_date?->format('Y-m-d'),
+            $invoice->receive_date?->format('Y-m-d')
+        );
+        if ($invoiceDateErrors !== []) {
+            return back()->withErrors(['sap_sync' => implode(' ', $invoiceDateErrors)]);
         }
 
         if (in_array($invoice->sap_status, ['pending', 'posted', 'cancelling'], true)) {

@@ -7,6 +7,8 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Rules\UniqueInvoicePerSupplier;
 use App\Services\InvoiceCreatorService;
+use App\Support\InvoiceDateGuard;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -211,7 +213,29 @@ class InvoiceBatchImportController extends Controller
         return [
             'invoice_number' => ['required', 'string', 'max:255', new UniqueInvoicePerSupplier],
             'faktur_no' => ['nullable', 'string', 'max:255'],
-            'invoice_date' => ['required', 'date'],
+            'invoice_date' => [
+                'required',
+                'date',
+                function (string $attribute, mixed $value, Closure $fail) use ($row): void {
+                    $messages = InvoiceDateGuard::check(
+                        is_string($value) ? $value : (is_scalar($value) ? (string) $value : null),
+                        isset($row['receive_date']) && is_scalar($row['receive_date'])
+                            ? (string) $row['receive_date']
+                            : null
+                    );
+                    $invoiceNumber = isset($row['invoice_number']) && is_scalar($row['invoice_number'])
+                        ? (string) $row['invoice_number']
+                        : '';
+
+                    foreach ($messages as $message) {
+                        if ($invoiceNumber !== '') {
+                            $fail("Invoice {$invoiceNumber}: {$message}");
+                        } else {
+                            $fail($message);
+                        }
+                    }
+                },
+            ],
             'receive_date' => ['required', 'date'],
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'po_no' => ['nullable', 'string', 'max:30'],

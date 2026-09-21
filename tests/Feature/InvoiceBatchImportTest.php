@@ -266,6 +266,35 @@ class InvoiceBatchImportTest extends TestCase
         $this->assertTrue(collect($results)->contains(fn (array $r): bool => $r['status'] === 'created'));
     }
 
+    public function test_batch_store_rejects_invalid_invoice_date_for_row(): void
+    {
+        Config::set('services.openrouter.enabled', true);
+        Config::set('services.openrouter.key', 'test-key');
+
+        $user = User::factory()->create(['is_active' => true]);
+        [$typeId, $supplier] = $this->seedBasics($user);
+
+        $uuid = (string) Str::uuid();
+        $this->seedImportCache($user, $uuid, 'BATCH-BAD-DATE');
+
+        $payload = $this->invoicePayload($typeId, $supplier->id, 'BATCH-BAD-DATE', $uuid);
+        $payload['invoice_date'] = '2020-08-20';
+        $payload['receive_date'] = '2026-09-01';
+
+        $response = $this->actingAs($user)->postJson(route('invoices.import-batch.store'), [
+            'invoices' => [$payload],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('created_count', 0);
+        $response->assertJsonPath('results.0.status', 'validation_failed');
+        $errors = $response->json('results.0.errors');
+        $this->assertIsArray($errors);
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('BATCH-BAD-DATE', implode(' ', $errors));
+        $this->assertDatabaseMissing('invoices', ['invoice_number' => 'BATCH-BAD-DATE']);
+    }
+
     public function test_batch_store_rejects_more_than_max_invoices(): void
     {
         Config::set('services.openrouter.enabled', true);

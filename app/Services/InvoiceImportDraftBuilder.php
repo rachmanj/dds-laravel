@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Data\InvoiceExtractionResult;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\InvoiceDateGuard;
 use Carbon\Carbon;
 
 class InvoiceImportDraftBuilder
@@ -45,6 +46,8 @@ class InvoiceImportDraftBuilder
         }
         $low = array_values(array_unique(array_filter($low)));
 
+        $dateWarnings = InvoiceDateGuard::warn($invoiceDate, $receiveDate);
+
         return [
             'invoice_number' => $extraction->invoiceNumber ?? '',
             'faktur_no' => $extraction->fakturNo ?? '',
@@ -58,7 +61,7 @@ class InvoiceImportDraftBuilder
             'supplier_candidates' => $supplierMatch['candidates'],
             'supplier_name_raw' => $extraction->supplierNameRaw,
             'remarks' => implode("\n", array_filter($remarksParts)),
-            'warnings' => $extraction->warnings,
+            'warnings' => array_values(array_merge($extraction->warnings, $dateWarnings)),
             'low_confidence_fields' => $low,
             'receive_project' => $user->project ?? '',
             'invoice_project' => $invoiceProject ?? '',
