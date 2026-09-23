@@ -86,7 +86,7 @@ class LogisticsOnlyRoleTest extends TestCase
         $this->actingAs($user)->get('/logistics/categories')->assertForbidden();
         $this->actingAs($user)->get('/invoices')->assertForbidden();
         $this->actingAs($user)->get('/additional-documents')->assertForbidden();
-        $this->actingAs($user)->get('/users')->assertForbidden();
+        $this->actingAs($user)->get('/admin/users')->assertForbidden();
     }
 
     public function test_logistics_only_user_can_export_logistics_summaries(): void
