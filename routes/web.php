@@ -61,6 +61,9 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     // Include Distribution Routes
     require __DIR__.'/distributions.php';
 
+    Route::get('/users', [\App\Http\Controllers\Admin\UserController::class, 'index'])
+        ->middleware('permission:view-users');
+
     // Include Admin Routes
     require __DIR__.'/admin.php';
 

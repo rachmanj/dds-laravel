@@ -36,6 +36,8 @@ class InvoiceController extends Controller
 
     public function index()
     {
+        $this->authorize('view-invoices');
+
         $invoiceTypes = InvoiceType::orderBy('type_name')->get();
         $suppliers = Supplier::active()->orderBy('name')->get();
         $projects = Project::active()->orderBy('code')->get();

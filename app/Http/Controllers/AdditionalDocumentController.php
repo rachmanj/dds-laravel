@@ -36,6 +36,8 @@ class AdditionalDocumentController extends Controller
 
     public function index()
     {
+        $this->authorize('view-additional-documents');
+
         $documentTypes = AdditionalDocumentType::orderByName()->get();
         $vendorCodes = AdditionalDocument::whereNotNull('vendor_code')
             ->distinct()
