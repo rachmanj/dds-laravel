@@ -117,6 +117,8 @@ class CreateSapApInvoiceJob implements ShouldQueue
                 ? $this->parseSapErrorMessage($e)
                 : $e->getMessage();
 
+            $sapErrorMessage = $this->sanitizeSapErrorMessage($sapErrorMessage);
+
             if ($invoice->sap_status === 'posted' && $invoice->sap_doc_num) {
                 Log::channel('sap')->warning('CreateSapApInvoiceJob: Duplicate post attempt failed but invoice is already posted.', [
                     'invoice_id' => $invoice->id,
@@ -180,12 +182,19 @@ class CreateSapApInvoiceJob implements ShouldQueue
         try {
             $vendor = $sapService->getBusinessPartner($cardCode);
         } catch (RequestException $exception) {
+            $response = $exception->getResponse();
+            $statusCode = $response?->getStatusCode();
+
+            if ($statusCode === 404) {
+                throw new \Exception("SAP vendor {$cardCode} tidak ditemukan di SAP.");
+            }
+
             $parsedMessage = $this->parseSapErrorMessage($exception);
-            throw new \Exception("SAP vendor {$cardCode} not found. {$parsedMessage}");
+            throw new \Exception("Gagal memverifikasi vendor {$cardCode} ke SAP: {$parsedMessage}");
         }
 
         if (! $vendor || empty($vendor['CardCode'])) {
-            throw new \Exception("SAP vendor {$cardCode} not found.");
+            throw new \Exception("SAP vendor {$cardCode} tidak ditemukan di SAP.");
         }
 
         $cardType = strtolower($vendor['CardType'] ?? '');
@@ -300,16 +309,45 @@ class CreateSapApInvoiceJob implements ShouldQueue
         $response = $exception->getResponse();
 
         if (! $response) {
-            return $exception->getMessage();
+            return $this->sanitizeSapErrorMessage(
+                'Tidak dapat terhubung ke SAP Service Layer. Permintaan akan dicoba ulang otomatis.'
+            );
         }
 
         $body = (string) $response->getBody();
         $decoded = json_decode($body, true);
 
-        if (isset($decoded['error']['message']['value'])) {
-            return $decoded['error']['message']['value'];
+        if (is_array($decoded)) {
+            if (isset($decoded['error']['message']['value'])) {
+                return $this->sanitizeSapErrorMessage((string) $decoded['error']['message']['value']);
+            }
+
+            if (isset($decoded['error']['message']) && is_string($decoded['error']['message'])) {
+                return $this->sanitizeSapErrorMessage($decoded['error']['message']);
+            }
         }
 
-        return $body ?: $exception->getMessage();
+        $statusCode = $response->getStatusCode();
+        $reasonPhrase = trim((string) $response->getReasonPhrase());
+        $httpLabel = $reasonPhrase !== ''
+            ? "HTTP {$statusCode} {$reasonPhrase}"
+            : "HTTP {$statusCode}";
+
+        return $this->sanitizeSapErrorMessage(
+            "SAP Service Layer gagal merespons ({$httpLabel}). Permintaan akan dicoba ulang otomatis."
+        );
+    }
+
+    protected function sanitizeSapErrorMessage(string $message): string
+    {
+        $message = strip_tags($message);
+        $message = preg_replace('/\s+/u', ' ', $message) ?? $message;
+        $message = trim($message);
+
+        if (mb_strlen($message) > 300) {
+            return mb_substr($message, 0, 297).'...';
+        }
+
+        return $message;
     }
 }
