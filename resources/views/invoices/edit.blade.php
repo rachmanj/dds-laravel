@@ -1167,7 +1167,7 @@
             }
 
             // Handle form submission
-            $('form').on('submit', function(e) {
+            $('#invoice-edit-form').on('submit', function(e) {
                 e.preventDefault();
                 console.log('Form submission started');
                 checkSessionAndSubmitForm(this);

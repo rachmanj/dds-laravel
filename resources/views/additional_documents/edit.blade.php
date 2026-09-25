@@ -187,7 +187,8 @@
                                 <i class="fas fa-arrow-left"></i> Back to List
                             </a>
                         </div>
-                        <form action="{{ route('additional-documents.update', $additionalDocument) }}" method="POST"
+                        <form id="additionalDocumentEditForm"
+                            action="{{ route('additional-documents.update', $additionalDocument) }}" method="POST"
                             enctype="multipart/form-data" data-document-id="{{ $additionalDocument->id }}">
                             @csrf
                             @method('PUT')
@@ -1044,7 +1045,8 @@
             }
 
             // ===== FORM SUBMISSION =====
-            $('form').on('submit', function(e) {
+            $('#additionalDocumentEditForm').on('submit', function(e) {
+                const form = this;
                 const changes = [];
 
                 $('input, select, textarea').each(function() {
@@ -1076,7 +1078,8 @@
                         cancelButtonText: 'Cancel'
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            $('form').off('submit').submit();
+                            $(form).off('submit');
+                            form.submit();
                         }
                     });
                 }
@@ -1172,7 +1175,7 @@
             });
 
             // Form submission validation
-            $('form').on('submit', function(e) {
+            $('#additionalDocumentEditForm').on('submit', function(e) {
                 if (!validateFormBeforeSubmit()) {
                     e.preventDefault();
                     showValidationSummary();

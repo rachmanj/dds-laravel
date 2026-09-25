@@ -183,7 +183,7 @@
                             </a>
                         </div>
 
-                        <form action="{{ route('additional-documents.store') }}" method="POST"
+                        <form id="additionalDocumentCreateForm" action="{{ route('additional-documents.store') }}" method="POST"
                             enctype="multipart/form-data">
                             @csrf
                             <div class="card-body">
@@ -778,7 +778,7 @@
             });
 
             // Form submission validation
-            $('form').on('submit', function(e) {
+            $('#additionalDocumentCreateForm').on('submit', function(e) {
                 if (!validateFormBeforeSubmit()) {
                     e.preventDefault();
                     showValidationSummary();
