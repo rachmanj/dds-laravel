@@ -93,6 +93,11 @@ class SapApInvoicePayloadBuilder
             $fields['U_MIS_Created'] = $submittedByName;
         }
 
+        $submittedByUdf = $this->mapSubmittedByUdf();
+        if ($submittedByUdf !== null) {
+            $fields['U_MIS_Submitted'] = $submittedByUdf;
+        }
+
         return $fields;
     }
 
@@ -104,6 +109,26 @@ class SapApInvoicePayloadBuilder
         $name = trim((string) ($this->invoice->sapSubmitter?->name ?? ''));
 
         return $name !== '' ? $name : null;
+    }
+
+    protected function mapSubmittedByUdf(): ?string
+    {
+        $username = trim((string) ($this->invoice->sapSubmitter?->username ?? ''));
+        if ($username === '') {
+            return null;
+        }
+
+        $submittedAt = $this->invoice->sap_submitted_at
+            ? $this->invoice->sap_submitted_at->copy()->timezone(config('app.timezone'))
+            : now(config('app.timezone'));
+
+        $suffix = ' '.$submittedAt->format('d/m/Y H:i');
+        $maxUsernameLength = 30 - strlen($suffix);
+        if ($maxUsernameLength < strlen($username)) {
+            $username = substr($username, 0, $maxUsernameLength);
+        }
+
+        return $username.$suffix;
     }
 
     /**
