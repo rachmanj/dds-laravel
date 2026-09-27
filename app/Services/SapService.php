@@ -454,6 +454,34 @@ class SapService
     /**
      * @return array{DocEntry: int, DocNum: int|string, CardCode?: string, DocumentStatus?: string, Cancelled?: string, NumAtCard?: string}|null
      */
+    /**
+     * @return array{DocEntry: int, DocNum: int|string, U_MIS_Submitted?: string|null}|null
+     */
+    public function getPurchaseInvoiceSubmittedUdf(string|int $docEntry): ?array
+    {
+        $this->ensureSession();
+
+        $docEntry = trim((string) $docEntry);
+        if ($docEntry === '') {
+            return null;
+        }
+
+        $result = $this->get('PurchaseInvoices', [
+            'query' => [
+                '$filter' => "DocEntry eq {$docEntry}",
+                '$select' => 'DocEntry,DocNum,U_MIS_Submitted',
+                '$top' => 1,
+            ],
+        ]);
+
+        $rows = $result['value'] ?? [];
+
+        return ! empty($rows) ? $rows[0] : null;
+    }
+
+    /**
+     * @return array{DocEntry: int, DocNum: int|string, CardCode?: string, DocumentStatus?: string, Cancelled?: string, NumAtCard?: string}|null
+     */
     public function getPurchaseInvoiceByDocEntry(string|int $docEntry): ?array
     {
         $this->ensureSession();

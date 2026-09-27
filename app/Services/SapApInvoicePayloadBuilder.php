@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceLineDetail;
 use App\Models\SapDepartment;
 use App\Models\SapProject;
+use App\Support\SapSubmittedByStamp;
 
 class SapApInvoicePayloadBuilder
 {
@@ -113,22 +114,9 @@ class SapApInvoicePayloadBuilder
 
     protected function mapSubmittedByUdf(): ?string
     {
-        $username = trim((string) ($this->invoice->sapSubmitter?->username ?? ''));
-        if ($username === '') {
-            return null;
-        }
+        $username = (string) ($this->invoice->sapSubmitter?->username ?? '');
 
-        $submittedAt = $this->invoice->sap_submitted_at
-            ? $this->invoice->sap_submitted_at->copy()->timezone(config('app.timezone'))
-            : now(config('app.timezone'));
-
-        $suffix = ' '.$submittedAt->format('d/m/Y H:i');
-        $maxUsernameLength = 30 - strlen($suffix);
-        if ($maxUsernameLength < strlen($username)) {
-            $username = substr($username, 0, $maxUsernameLength);
-        }
-
-        return $username.$suffix;
+        return SapSubmittedByStamp::make($username, $this->invoice->sap_submitted_at);
     }
 
     /**
