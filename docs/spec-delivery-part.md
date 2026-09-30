@@ -59,7 +59,8 @@ Service Layer instalasi ini **tidak** menyediakan aksi cancel untuk dokumen tran
 
 - DDS mencatat permintaan cancel (`delivery_part_ito_cancels`, status `requested`) + alasan + user.
 - Helper **DI API (SAPbobsCOM) di Windows** mengambil permintaan lewat endpoint DDS, memanggil `StockTransfer.GetByKey(docEntry)` + `Cancel()`, lalu melaporkan hasil (sukses/gagal + pesan SAP).
-- **Catatan penting:** DI API SAP hanya berjalan di Windows, sedangkan DDS berjalan di saphire-two (Linux). Jadi helper **tidak bisa** ditaruh di saphire-two — perlu mesin Windows yang punya SAP B1 client/DI (kandidat: ns15 `192.168.32.15` atau `.17`). DDS hanya menyediakan endpoint permintaan/hasil; keputusan host final menyusul di fase 7.
+- **Catatan penting:** DI API SAP hanya berjalan di Windows, sedangkan DDS berjalan di saphire-two (Linux). Jadi helper **tidak bisa** ditaruh di saphire-two — perlu mesin Windows yang punya SAP B1 client/DI.
+- **Status 30 Sep 2026 — fase 7 DITAHAN** sampai host helper jelas. Hasil pemeriksaan langsung: `ns15` (192.168.32.15) dan `.17` (192.168.32.17) **tidak** punya folder SAP, `SAPbobsCOM*.dll`, maupun kunci registry SAP (DI API tidak terpasang); WinRM di `arkasrv2` (192.168.32.26, server SAP) terbuka tetapi kredensial admin standar ARKA ditolak. Iwan akan menanyakan host-nya ke tim SAP; keputusan 30 Sep 2026: fase 7a dikerjakan sekaligus setelah host jelas (tidak dicicil).
 - DDS memverifikasi dengan membaca ulang `OWTR.CANCELED`; status baru `cancelled` kalau SAP benar-benar `Y`.
 - **Dilarang** mengubah `CANCELED` lewat SQL langsung (melewati logika SAP, berisiko merusak stok).
 - Kalau SAP menolak (mis. stok sudah terpakai), pesan SAP ditampilkan apa adanya; DDS tidak boleh mengklaim berhasil.
