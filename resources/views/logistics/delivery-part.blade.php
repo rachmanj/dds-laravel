@@ -40,6 +40,20 @@
                 </div>
             @endif
 
+            <ul class="nav nav-tabs mb-3" id="delivery-part-tabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="tab-delivery-part-link" data-toggle="tab" href="#tab-delivery-part"
+                        role="tab">Delivery Part</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="tab-spb-link" data-toggle="tab" href="#tab-spb" role="tab">Input SPB
+                        Pengiriman</a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="tab-delivery-part" role="tabpanel">
+
             <div class="card card-outline card-info mb-3">
                 <div class="card-header">
                     <h3 class="card-title"><i class="fas fa-filter"></i> Filter</h3>
@@ -125,6 +139,157 @@
                             </tr>
                         </thead>
                     </table>
+                </div>
+            </div>
+
+                </div>
+
+                <div class="tab-pane fade" id="tab-spb" role="tabpanel">
+                    <div class="card card-outline card-info mb-3">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-filter"></i> Filter Daftar SPB</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="spb_filter_project">Site</label>
+                                        <select class="form-control" id="spb_filter_project">
+                                            <option value="">— Semua site —</option>
+                                            @foreach ($sites as $site)
+                                                <option value="{{ $site['id'] }}">{{ $site['code'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="spb_from_date">Dari Tanggal</label>
+                                        <input type="date" class="form-control" id="spb_from_date">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="spb_to_date">Sampai Tanggal</label>
+                                        <input type="date" class="form-control" id="spb_to_date">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button type="button" class="btn btn-primary btn-sm mb-3" id="spb_filter_apply">
+                                        <i class="fas fa-search"></i> Terapkan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @can('edit-delivery-part')
+                        <div class="card card-primary mb-3">
+                            <div class="card-header">
+                                <h3 class="card-title" id="spb-form-title">Input SPB Pengiriman</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="spb-form">
+                                    <input type="hidden" id="spb_id" value="">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="spb_project_id">Site</label>
+                                                <select class="form-control" id="spb_project_id" name="project_id">
+                                                    <option value="">— Pilih site —</option>
+                                                    @foreach ($sites as $site)
+                                                        <option value="{{ $site['id'] }}">{{ $site['code'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="spb_no_spb">No. SPB <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" id="spb_no_spb" name="no_spb"
+                                                    required maxlength="100">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="spb_tanggal">Tanggal</label>
+                                                <input type="date" class="form-control" id="spb_tanggal" name="tanggal">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label for="spb_remarks">Keterangan</label>
+                                                <input type="text" class="form-control" id="spb_remarks" name="remarks">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <h6 class="mt-2">Barang</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered" id="spb-items-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Part Number</th>
+                                                    <th>Description</th>
+                                                    <th>QTY</th>
+                                                    <th>UOM</th>
+                                                    <th>Remarks</th>
+                                                    <th width="50"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="spb-items-body"></tbody>
+                                        </table>
+                                    </div>
+                                    <button type="button" class="btn btn-default btn-sm" id="spb-add-row">
+                                        <i class="fas fa-plus"></i> Tambah Baris
+                                    </button>
+                                    <div class="mt-3">
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-save"></i> Simpan SPB
+                                        </button>
+                                        <button type="button" class="btn btn-default btn-sm d-none" id="spb-cancel-edit">
+                                            Batal Edit
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    @endcan
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Daftar SPB</h3>
+                        </div>
+                        <div class="card-body table-responsive">
+                            <table id="spb-list-table" class="table table-bordered table-striped table-sm" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th>Site</th>
+                                        <th>No. SPB</th>
+                                        <th>Tanggal</th>
+                                        <th>Jumlah Baris</th>
+                                        <th>Keterangan</th>
+                                        <th>Dibuat Oleh</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="spb-detail-modal" tabindex="-1" role="dialog" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Detail SPB</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body" id="spb-detail-body"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -367,6 +532,201 @@
                     }
                 });
             @endcan
+
+            let spbTable = null;
+
+            function spbFilterParams() {
+                return {
+                    project_id: $('#spb_filter_project').val(),
+                    from_date: $('#spb_from_date').val(),
+                    to_date: $('#spb_to_date').val(),
+                };
+            }
+
+            function initSpbTable() {
+                if (spbTable) {
+                    spbTable.ajax.reload();
+                    return;
+                }
+                spbTable = $('#spb-list-table').DataTable({
+                    processing: true,
+                    serverSide: true,
+                    ajax: {
+                        url: "{{ route('logistics.delivery-part.spb.data') }}",
+                        data: function(d) {
+                            Object.assign(d, spbFilterParams());
+                        },
+                    },
+                    columns: [
+                        { data: 'project_code', name: 'project_code', defaultContent: '-' },
+                        { data: 'no_spb', name: 'no_spb' },
+                        { data: 'tanggal_display', name: 'tanggal' },
+                        { data: 'items_count', name: 'items_count', searchable: false },
+                        { data: 'remarks', name: 'remarks', defaultContent: '-' },
+                        { data: 'created_by_name', name: 'created_by_name', orderable: false },
+                        { data: 'actions', name: 'actions', orderable: false, searchable: false },
+                    ],
+                    order: [[2, 'desc']],
+                    pageLength: 25,
+                });
+            }
+
+            $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+                if ($(e.target).attr('href') === '#tab-spb') {
+                    initSpbTable();
+                }
+            });
+
+            $('#spb_filter_apply').on('click', function() {
+                if (spbTable) {
+                    spbTable.ajax.reload();
+                } else {
+                    initSpbTable();
+                }
+            });
+
+            function spbItemRowHtml(data) {
+                data = data || {};
+                return '<tr class="spb-item-row">' +
+                    '<td><input type="text" class="form-control form-control-sm spb-part" value="' + (data.part_number || '') + '"></td>' +
+                    '<td><input type="text" class="form-control form-control-sm spb-desc" value="' + (data.description || '') + '"></td>' +
+                    '<td><input type="number" step="any" min="0" class="form-control form-control-sm spb-qty" value="' + (data.qty ?? '') + '"></td>' +
+                    '<td><input type="text" class="form-control form-control-sm spb-uom" value="' + (data.uom || '') + '"></td>' +
+                    '<td><input type="text" class="form-control form-control-sm spb-item-remarks" value="' + (data.remarks || '') + '"></td>' +
+                    '<td><button type="button" class="btn btn-xs btn-danger spb-remove-row"><i class="fas fa-times"></i></button></td>' +
+                    '</tr>';
+            }
+
+            function resetSpbForm() {
+                $('#spb_id').val('');
+                $('#spb-form-title').text('Input SPB Pengiriman');
+                $('#spb-cancel-edit').addClass('d-none');
+                $('#spb-form')[0].reset();
+                $('#spb-items-body').empty();
+                $('#spb-items-body').append(spbItemRowHtml({}));
+            }
+
+            @can('edit-delivery-part')
+                $('#spb-add-row').on('click', function() {
+                    $('#spb-items-body').append(spbItemRowHtml({}));
+                });
+
+                $(document).on('click', '.spb-remove-row', function() {
+                    if ($('#spb-items-body tr').length > 1) {
+                        $(this).closest('tr').remove();
+                    }
+                });
+
+                resetSpbForm();
+
+                $('#spb-cancel-edit').on('click', function() {
+                    resetSpbForm();
+                });
+
+                $('#spb-form').on('submit', function(e) {
+                    e.preventDefault();
+                    const items = [];
+                    $('#spb-items-body tr').each(function() {
+                        items.push({
+                            part_number: $(this).find('.spb-part').val(),
+                            description: $(this).find('.spb-desc').val(),
+                            qty: $(this).find('.spb-qty').val(),
+                            uom: $(this).find('.spb-uom').val(),
+                            remarks: $(this).find('.spb-item-remarks').val(),
+                        });
+                    });
+
+                    const payload = {
+                        _token: csrfToken,
+                        project_id: $('#spb_project_id').val() || null,
+                        no_spb: $('#spb_no_spb').val(),
+                        tanggal: $('#spb_tanggal').val(),
+                        remarks: $('#spb_remarks').val(),
+                        items: items,
+                    };
+
+                    const spbId = $('#spb_id').val();
+                    let url = "{{ route('logistics.delivery-part.spb.store') }}";
+                    let method = 'POST';
+                    if (spbId) {
+                        url = "{{ url('logistics/delivery-part/spb') }}/" + spbId;
+                        method = 'PUT';
+                    }
+
+                    $.ajax({ url: url, method: method, data: payload })
+                        .done(function() {
+                            resetSpbForm();
+                            if (spbTable) spbTable.ajax.reload(null, false);
+                            alert('SPB berhasil disimpan.');
+                        })
+                        .fail(function(xhr) {
+                            const errors = xhr.responseJSON?.errors;
+                            if (errors) {
+                                alert(Object.values(errors).flat().join('\n'));
+                            } else {
+                                alert(xhr.responseJSON?.message || 'Gagal menyimpan SPB.');
+                            }
+                        });
+                });
+
+                $(document).on('click', '.btn-spb-edit', function() {
+                    const id = $(this).data('id');
+                    $.get("{{ url('logistics/delivery-part/spb') }}/" + id)
+                        .done(function(data) {
+                            $('#spb_id').val(data.id);
+                            $('#spb-form-title').text('Ubah SPB');
+                            $('#spb-cancel-edit').removeClass('d-none');
+                            $('#spb_project_id').val(data.project_id || '');
+                            $('#spb_no_spb').val(data.no_spb);
+                            $('#spb_tanggal').val(data.tanggal || '');
+                            $('#spb_remarks').val(data.remarks || '');
+                            $('#spb-items-body').empty();
+                            (data.items || []).forEach(function(item) {
+                                $('#spb-items-body').append(spbItemRowHtml(item));
+                            });
+                            if ((data.items || []).length === 0) {
+                                $('#spb-items-body').append(spbItemRowHtml({}));
+                            }
+                            $('a[href="#tab-spb"]').tab('show');
+                        });
+                });
+
+                $(document).on('click', '.btn-spb-delete', function() {
+                    if (!confirm('Hapus SPB ini?')) return;
+                    const id = $(this).data('id');
+                    $.ajax({
+                        url: "{{ url('logistics/delivery-part/spb') }}/" + id,
+                        method: 'DELETE',
+                        data: { _token: csrfToken },
+                    })
+                        .done(function() {
+                            if (spbTable) spbTable.ajax.reload(null, false);
+                        })
+                        .fail(function(xhr) {
+                            alert(xhr.responseJSON?.message || 'Gagal menghapus.');
+                        });
+                });
+            @endcan
+
+            $(document).on('click', '.btn-spb-detail', function() {
+                const id = $(this).data('id');
+                $.get("{{ url('logistics/delivery-part/spb') }}/" + id)
+                    .done(function(data) {
+                        let html = '<p><strong>Site:</strong> ' + (data.project_code || '-') + '</p>';
+                        html += '<p><strong>No. SPB:</strong> ' + data.no_spb + '</p>';
+                        html += '<p><strong>Tanggal:</strong> ' + (data.tanggal || '-') + '</p>';
+                        html += '<p><strong>Keterangan:</strong> ' + (data.remarks || '-') + '</p>';
+                        html += '<table class="table table-sm table-bordered"><thead><tr><th>Part</th><th>Description</th><th>QTY</th><th>UOM</th><th>Remarks</th></tr></thead><tbody>';
+                        (data.items || []).forEach(function(item) {
+                            html += '<tr><td>' + (item.part_number || '-') + '</td><td>' + (item.description || '-') +
+                                '</td><td>' + (item.qty ?? '-') + '</td><td>' + (item.uom || '-') + '</td><td>' +
+                                (item.remarks || '-') + '</td></tr>';
+                        });
+                        html += '</tbody></table>';
+                        $('#spb-detail-body').html(html);
+                        $('#spb-detail-modal').modal('show');
+                    });
+            });
         });
     </script>
 @endsection

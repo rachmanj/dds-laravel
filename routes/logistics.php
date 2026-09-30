@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Logistics\CategoryMapController;
 use App\Http\Controllers\Logistics\DeliveryPartController;
+use App\Http\Controllers\Logistics\DeliveryPartSpbController;
 use App\Http\Controllers\Logistics\GrpoSummaryController;
 use App\Http\Controllers\Logistics\InventorySummaryController;
 use App\Http\Controllers\Logistics\UsageSummaryController;
@@ -57,6 +58,18 @@ Route::prefix('logistics/delivery-part')
         Route::get('/export', [DeliveryPartController::class, 'export'])
             ->middleware('permission:export-delivery-part')
             ->name('export');
+
+        Route::get('/spb/data', [DeliveryPartSpbController::class, 'data'])->name('spb.data');
+        Route::get('/spb/{spb}', [DeliveryPartSpbController::class, 'show'])->name('spb.show');
+        Route::post('/spb', [DeliveryPartSpbController::class, 'store'])
+            ->middleware('permission:edit-delivery-part')
+            ->name('spb.store');
+        Route::put('/spb/{spb}', [DeliveryPartSpbController::class, 'update'])
+            ->middleware('permission:edit-delivery-part')
+            ->name('spb.update');
+        Route::delete('/spb/{spb}', [DeliveryPartSpbController::class, 'destroy'])
+            ->middleware('permission:edit-delivery-part')
+            ->name('spb.destroy');
     });
 
 Route::prefix('logistics/warehouse-projects')
