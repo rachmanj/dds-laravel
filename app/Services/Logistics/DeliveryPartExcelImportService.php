@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Throwable;
 
@@ -74,7 +75,7 @@ class DeliveryPartExcelImportService
      */
     public function import(string $filePath, bool $write): array
     {
-        $spreadsheet = IOFactory::load($filePath);
+        $spreadsheet = $this->loadSpreadsheet($filePath);
         $globalInserts = 0;
         $globalUpdates = 0;
         $sheetSummaries = [];
@@ -175,6 +176,9 @@ class DeliveryPartExcelImportService
                 $matchKey = $this->matchKey($ito, $item, $unit);
 
                 $manualFromExcel = $this->extractManualFields($rowData);
+                foreach ($manualFromExcel['_row_notes'] ?? [] as $note) {
+                    $summary['notes'][] = 'Baris '.$row.': '.$note;
+                }
                 $entry = $entries->get($matchKey);
 
                 if ($entry !== null) {
@@ -252,6 +256,20 @@ class DeliveryPartExcelImportService
             'total_updates' => $globalUpdates,
             'dry_run' => ! $write,
         ];
+    }
+
+    private function loadSpreadsheet(string $filePath): \PhpOffice\PhpSpreadsheet\Spreadsheet
+    {
+        // PhpSpreadsheet may emit E_WARNING on empty XML parts (common in Google Sheets exports);
+        // Laravel promotes warnings to exceptions — mask warnings only for this load.
+        $previous = error_reporting();
+        error_reporting($previous & ~E_WARNING);
+
+        try {
+            return IOFactory::load($filePath);
+        } finally {
+            error_reporting($previous);
+        }
     }
 
     /**
@@ -401,12 +419,39 @@ class DeliveryPartExcelImportService
     private function readRow(Worksheet $worksheet, array $headerMap, int $row): array
     {
         $data = [];
+        $importNotes = [];
+
         foreach ($headerMap as $field => $col) {
             $letter = Coordinate::stringFromColumnIndex($col);
-            $data[$field] = $worksheet->getCell($letter.$row)->getCalculatedValue();
+            $raw = $worksheet->getCell($letter.$row)->getCalculatedValue();
+            [$sanitized, $note] = $this->sanitizeImportedCellValue($raw, $field);
+            $data[$field] = $sanitized;
+            if ($note !== null) {
+                $importNotes[] = $note;
+            }
+        }
+
+        if ($importNotes !== []) {
+            $data['_import_notes'] = $importNotes;
         }
 
         return $data;
+    }
+
+    /**
+     * @return array{0: mixed, 1: ?string}
+     */
+    private function sanitizeImportedCellValue(mixed $value, string $field): array
+    {
+        if ($value === null || $value === '') {
+            return [$value, null];
+        }
+
+        if (is_string($value) && str_starts_with(ltrim($value), '=')) {
+            return [null, 'Kolom '.$field.' berisi rumus, dianggap kosong.'];
+        }
+
+        return [$value, null];
     }
 
     /**
@@ -428,17 +473,27 @@ class DeliveryPartExcelImportService
      */
     private function extractManualFields(array $rowData): array
     {
+        $rowNotes = $rowData['_import_notes'] ?? [];
+
         $ekspedisiRaw = $rowData['ekspedisi'] ?? null;
         [$ekspedisi, $ekspedisiNote] = $this->normalizeEkspedisi($ekspedisiRaw);
+        if ($ekspedisiNote !== null) {
+            $rowNotes[] = $ekspedisiNote;
+        }
+
+        [$tglDelivery, $dateNote] = $this->parseDeliveryDate($rowData['tgl_delivery'] ?? null);
+        if ($dateNote !== null) {
+            $rowNotes[] = $dateNote;
+        }
 
         return [
             'no_spb' => $this->stringOrNull($rowData['no_spb'] ?? null),
             'remarks_barang' => $this->stringOrNull($rowData['remarks_barang'] ?? null),
-            'tgl_delivery' => $this->parseDeliveryDate($rowData['tgl_delivery'] ?? null),
+            'tgl_delivery' => $tglDelivery,
             'transporter' => $this->stringOrNull($rowData['transporter'] ?? null),
             'unit_kendaraan' => $this->stringOrNull($rowData['unit_kendaraan'] ?? null),
             'ekspedisi' => $ekspedisi,
-            '_ekspedisi_note' => $ekspedisiNote,
+            '_row_notes' => $rowNotes,
         ];
     }
 
@@ -466,33 +521,71 @@ class DeliveryPartExcelImportService
         return [null, 'Ekspedisi tidak dikenali: '.$raw];
     }
 
-    private function parseDeliveryDate(mixed $value): ?Carbon
+    /**
+     * @return array{0: ?Carbon, 1: ?string}
+     */
+    private function parseDeliveryDate(mixed $value): array
     {
         if ($value === null || $value === '') {
-            return null;
+            return [null, null];
+        }
+
+        if (is_string($value) && str_starts_with(ltrim($value), '=')) {
+            return [null, null];
         }
 
         if ($value instanceof \DateTimeInterface) {
-            return Carbon::instance($value)->startOfDay();
+            return [
+                Carbon::instance($value)->timezone(config('app.timezone'))->startOfDay(),
+                null,
+            ];
         }
 
         if (is_numeric($value)) {
-            return Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value))->startOfDay();
+            $serial = (float) $value;
+            if ($serial <= 0) {
+                return [null, 'Tgl Delivery tidak dapat dikonversi: '.$value];
+            }
+
+            return [
+                Carbon::instance(ExcelDate::excelToDateTimeObject($serial))
+                    ->timezone(config('app.timezone'))
+                    ->startOfDay(),
+                null,
+            ];
         }
 
         $string = trim((string) $value);
         if ($string === '') {
-            return null;
+            return [null, null];
         }
 
         if (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{4})/', $string, $m)) {
-            return Carbon::createFromDate((int) $m[3], (int) $m[2], (int) $m[1])->startOfDay();
+            return [
+                Carbon::createFromDate((int) $m[3], (int) $m[2], (int) $m[1])->startOfDay(),
+                null,
+            ];
+        }
+
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})/', $string, $m)) {
+            return [
+                Carbon::createFromDate((int) $m[3], (int) $m[2], (int) $m[1])->startOfDay(),
+                null,
+            ];
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $string)) {
+            try {
+                return [Carbon::parse($string)->timezone(config('app.timezone'))->startOfDay(), null];
+            } catch (Throwable) {
+                return [null, 'Tgl Delivery tidak dapat dikonversi: '.$string];
+            }
         }
 
         try {
-            return Carbon::parse($string)->startOfDay();
+            return [Carbon::parse($string)->timezone(config('app.timezone'))->startOfDay(), null];
         } catch (Throwable) {
-            return null;
+            return [null, 'Tgl Delivery tidak dapat dikonversi: '.$string];
         }
     }
 
@@ -656,7 +749,10 @@ class DeliveryPartExcelImportService
         }
 
         $string = trim((string) $value);
+        if ($string === '' || str_starts_with($string, '=')) {
+            return null;
+        }
 
-        return $string === '' ? null : $string;
+        return $string;
     }
 }

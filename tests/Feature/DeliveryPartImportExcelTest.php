@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\DeliveryPartEntry;
 use App\Models\LogisticsWarehouseProject;
 use App\Models\Project;
+use App\Services\Logistics\DeliveryPartExcelImportService;
 use App\Services\Logistics\DeliveryPartQueryService;
 use Carbon\Carbon;
 use Database\Seeders\DeliveryPartPermissionSeeder;
@@ -271,6 +272,96 @@ class DeliveryPartImportExcelTest extends TestCase
         $this->assertNotNull($entry);
         $this->assertSame(DeliveryPartEntry::SOURCE_SAP, $entry->source);
         $this->assertSame('SPB-SAP', $entry->no_spb);
+
+        @unlink($path);
+    }
+
+    public function test_excel_serial_date_converts_to_calendar_date(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-serial-date.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => 'ITO-DATE',
+                'item_code' => 'PART-D',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-D',
+                'tgl_delivery' => 46031,
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $entry = DeliveryPartEntry::query()->where('ito_no', 'ITO-DATE')->first();
+        $this->assertNotNull($entry);
+        $this->assertSame('2026-01-09', $entry->tgl_delivery?->toDateString());
+
+        @unlink($path);
+    }
+
+    public function test_formula_cell_is_treated_as_empty(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-FORM',
+            'item_code' => 'PART-F',
+            'unit_no' => 'U1',
+            'source' => DeliveryPartEntry::SOURCE_SAP,
+            'no_spb' => null,
+            'remarks_barang' => 'Sudah ada',
+        ]);
+
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-formula.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => 'ITO-FORM',
+                'item_code' => 'PART-F',
+                'unit_no' => 'U1',
+                'no_spb' => '=IF(OR(R7="",R7=0),"",R7)',
+                'remarks_barang' => '=IF(1=1,"formula","x")',
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $entry = DeliveryPartEntry::query()->where('ito_no', 'ITO-FORM')->first();
+        $this->assertNotNull($entry);
+        $this->assertNull($entry->no_spb);
+        $this->assertSame('Sudah ada', $entry->remarks_barang);
+
+        @unlink($path);
+    }
+
+    public function test_import_restores_error_reporting_after_load(): void
+    {
+        $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-error-reporting.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => 'ITO-ER',
+                'item_code' => 'PART-ER',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-ER',
+            ],
+        ]);
+
+        $expected = E_ALL & ~E_DEPRECATED;
+        error_reporting($expected);
+
+        $service = $this->app->make(DeliveryPartExcelImportService::class);
+        $service->import($path, false);
+
+        $this->assertSame($expected, error_reporting());
 
         @unlink($path);
     }
