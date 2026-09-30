@@ -5,6 +5,7 @@ use App\Http\Controllers\Logistics\DeliveryPartController;
 use App\Http\Controllers\Logistics\GrpoSummaryController;
 use App\Http\Controllers\Logistics\InventorySummaryController;
 use App\Http\Controllers\Logistics\UsageSummaryController;
+use App\Http\Controllers\Logistics\WarehouseProjectMappingController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('logistics/inventory')
@@ -56,6 +57,16 @@ Route::prefix('logistics/delivery-part')
         Route::get('/export', [DeliveryPartController::class, 'export'])
             ->middleware('permission:export-delivery-part')
             ->name('export');
+    });
+
+Route::prefix('logistics/warehouse-projects')
+    ->name('logistics.warehouse-projects.')
+    ->middleware(['auth', 'active.user', 'permission:manage-delivery-part-mapping'])
+    ->group(function () {
+        Route::get('/', [WarehouseProjectMappingController::class, 'index'])->name('index');
+        Route::post('/', [WarehouseProjectMappingController::class, 'store'])->name('store');
+        Route::put('/{mapping}', [WarehouseProjectMappingController::class, 'update'])->name('update');
+        Route::patch('/{mapping}/toggle', [WarehouseProjectMappingController::class, 'toggle'])->name('toggle');
     });
 
 Route::prefix('logistics/categories')

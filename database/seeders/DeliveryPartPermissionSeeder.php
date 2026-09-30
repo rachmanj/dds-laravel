@@ -27,14 +27,23 @@ class DeliveryPartPermissionSeeder extends Seeder
             'edit-delivery-part',
             'export-delivery-part',
             'cancel-ito',
+            'manage-delivery-part-mapping',
         ] as $permissionName) {
             Permission::firstOrCreate(['name' => $permissionName]);
         }
 
         $rolesGranted = [];
+        $mappingRolesGranted = [];
 
-        Role::query()->each(function (Role $role) use (&$rolesGranted): void {
+        Role::query()->each(function (Role $role) use (&$rolesGranted, &$mappingRolesGranted): void {
             if (! $role->hasPermissionTo('view-logistics-summary')) {
+                if ($role->hasPermissionTo('view-delivery-part')) {
+                    if (! $role->hasPermissionTo('manage-delivery-part-mapping')) {
+                        $role->givePermissionTo('manage-delivery-part-mapping');
+                    }
+                    $mappingRolesGranted[] = $role->name;
+                }
+
                 return;
             }
 
@@ -44,12 +53,20 @@ class DeliveryPartPermissionSeeder extends Seeder
                 }
             }
 
+            if (! $role->hasPermissionTo('manage-delivery-part-mapping')) {
+                $role->givePermissionTo('manage-delivery-part-mapping');
+            }
+
             $rolesGranted[] = $role->name;
+            $mappingRolesGranted[] = $role->name;
         });
 
         sort($rolesGranted);
+        sort($mappingRolesGranted);
 
         Log::info('DeliveryPartPermissionSeeder: view/edit/export-delivery-part granted to roles: '.implode(', ', $rolesGranted));
         $this->command?->info('Delivery Part permissions granted to roles: '.implode(', ', $rolesGranted));
+        Log::info('DeliveryPartPermissionSeeder: manage-delivery-part-mapping granted to roles: '.implode(', ', $mappingRolesGranted));
+        $this->command?->info('manage-delivery-part-mapping granted to roles: '.implode(', ', $mappingRolesGranted));
     }
 }

@@ -11,6 +11,7 @@ class LogisticsWarehouseProject extends Model
         'whs_code',
         'project_id',
         'is_active',
+        'updated_by',
     ];
 
     protected function casts(): array
@@ -23,5 +24,10 @@ class LogisticsWarehouseProject extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 }

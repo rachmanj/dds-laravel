@@ -38,6 +38,15 @@
                 </a>
             </li>
         @endcan
+        @can('manage-delivery-part-mapping')
+            <li class="nav-item">
+                <a href="{{ route('logistics.warehouse-projects.index') }}"
+                    class="nav-link {{ request()->routeIs('logistics.warehouse-projects.*') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>Mapping Warehouse</p>
+                </a>
+            </li>
+        @endcan
         @can('manage-logistics-category-map')
             <li class="nav-item">
                 <a href="{{ route('logistics.categories.index') }}"

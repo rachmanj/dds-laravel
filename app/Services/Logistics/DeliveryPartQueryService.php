@@ -14,6 +14,8 @@ class DeliveryPartQueryService
 {
     private const CACHE_TTL_SECONDS = 300;
 
+    private const DISTINCT_WAREHOUSE_CACHE_TTL_SECONDS = 600;
+
     public function rows(Carbon $fromDate, Carbon $toDate): Collection
     {
         $cacheKey = $this->cacheKey($fromDate, $toDate);
@@ -37,11 +39,80 @@ class DeliveryPartQueryService
     public function bustForRange(Carbon $fromDate, Carbon $toDate): void
     {
         Cache::forget($this->cacheKey($fromDate, $toDate));
+        Cache::forget($this->distinctWarehouseCacheKey($fromDate, $toDate));
+    }
+
+    /**
+     * @return list<array{whs_code: string, row_count: int, document_count: int}>
+     */
+    public function distinctToWarehouses(Carbon $fromDate, Carbon $toDate): array
+    {
+        $cacheKey = $this->distinctWarehouseCacheKey($fromDate, $toDate);
+
+        return Cache::remember($cacheKey, self::DISTINCT_WAREHOUSE_CACHE_TTL_SECONDS, function () use ($fromDate, $toDate) {
+            return $this->fetchDistinctToWarehouses($fromDate, $toDate);
+        });
     }
 
     private function cacheKey(Carbon $fromDate, Carbon $toDate): string
     {
         return 'delivery_part_sap_rows:'.$fromDate->toDateString().'|'.$toDate->toDateString();
+    }
+
+    private function distinctWarehouseCacheKey(Carbon $fromDate, Carbon $toDate): string
+    {
+        return 'delivery_part_distinct_to_wh:'.$fromDate->toDateString().'|'.$toDate->toDateString();
+    }
+
+    /**
+     * @return list<array{whs_code: string, row_count: int, document_count: int}>
+     */
+    private function fetchDistinctToWarehouses(Carbon $fromDate, Carbon $toDate): array
+    {
+        $from = $fromDate->toDateString();
+        $to = $toDate->toDateString();
+
+        $sql = <<<'SQL'
+            SELECT
+                T0.U_MIS_ToWarehouse AS to_warehouse,
+                COUNT(*) AS row_count,
+                COUNT(DISTINCT T0.DocNum) AS document_count
+            FROM OWTR T0
+            INNER JOIN WTR1 T1 ON T0.DocEntry = T1.DocEntry
+            INNER JOIN OITW T2 ON T1.ItemCode = T2.ItemCode
+            WHERE T0.DocDate >= ?
+                AND T0.DocDate <= ?
+                AND T2.WhsCode = T0.Filler
+                AND T0.U_MIS_TransferType = 'OUT'
+            GROUP BY T0.U_MIS_ToWarehouse
+            ORDER BY row_count DESC
+            SQL;
+
+        try {
+            $results = DB::connection('sap_sql')->select($sql, [$from, $to]);
+        } catch (Throwable $e) {
+            Log::channel('sap')->error('Delivery Part distinct warehouse query failed: '.$e->getMessage());
+            throw SapSqlQueryException::connectionFailed($e->getMessage());
+        }
+
+        $rows = [];
+
+        foreach ($results as $result) {
+            $row = (array) $result;
+            $whsCode = $this->normalizeString($row['to_warehouse'] ?? null);
+
+            if ($whsCode === null) {
+                continue;
+            }
+
+            $rows[] = [
+                'whs_code' => $whsCode,
+                'row_count' => (int) ($row['row_count'] ?? 0),
+                'document_count' => (int) ($row['document_count'] ?? 0),
+            ];
+        }
+
+        return $rows;
     }
 
     private function fetchRows(Carbon $fromDate, Carbon $toDate): Collection

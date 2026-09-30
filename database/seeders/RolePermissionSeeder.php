@@ -122,6 +122,7 @@ class RolePermissionSeeder extends Seeder
             'edit-delivery-part',
             'export-delivery-part',
             'cancel-ito',
+            'manage-delivery-part-mapping',
         ];
 
         foreach ($permissions as $permission) {
