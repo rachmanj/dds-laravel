@@ -55,15 +55,20 @@ Query SAP hanya mengembalikan kode warehouse (`02-SPT`, `08-SPT`, `17-SPT`, `02-
 
 ### 3.3 Cancel ITO
 
-Service Layer instalasi ini **tidak** menyediakan aksi cancel untuk dokumen transfer (hanya `..._Cancel2` untuk Invoices/CreditNotes/DeliveryNotes/PurchaseInvoices/PurchaseCreditNotes/PurchaseDeliveryNotes/PurchaseReturns/Returns/Assets; entity `StockTransfer` tidak punya field `Canceled`). Karena itu:
+**Dikoreksi 30 Sep 2026 (kesimpulan pertama Dea salah).** Service Layer instalasi ini **menyediakan** aksi cancel untuk dokumen transfer:
 
-- DDS mencatat permintaan cancel (`delivery_part_ito_cancels`, status `requested`) + alasan + user.
-- Helper **DI API (SAPbobsCOM) di Windows** mengambil permintaan lewat endpoint DDS, memanggil `StockTransfer.GetByKey(docEntry)` + `Cancel()`, lalu melaporkan hasil (sukses/gagal + pesan SAP).
-- **Catatan penting:** DI API SAP hanya berjalan di Windows, sedangkan DDS berjalan di saphire-two (Linux). Jadi helper **tidak bisa** ditaruh di saphire-two — perlu mesin Windows yang punya SAP B1 client/DI.
-- **Status 30 Sep 2026 — fase 7 DITAHAN** sampai host helper jelas. Hasil pemeriksaan langsung: `ns15` (192.168.32.15) dan `.17` (192.168.32.17) **tidak** punya folder SAP, `SAPbobsCOM*.dll`, maupun kunci registry SAP (DI API tidak terpasang); WinRM di `arkasrv2` (192.168.32.26, server SAP) terbuka tetapi kredensial admin standar ARKA ditolak. Iwan akan menanyakan host-nya ke tim SAP; keputusan 30 Sep 2026: fase 7a dikerjakan sekaligus setelah host jelas (tidak dicicil).
-- DDS memverifikasi dengan membaca ulang `OWTR.CANCELED`; status baru `cancelled` kalau SAP benar-benar `Y`.
-- **Dilarang** mengubah `CANCELED` lewat SQL langsung (melewati logika SAP, berisiko merusak stok).
-- Kalau SAP menolak (mis. stok sudah terpakai), pesan SAP ditampilkan apa adanya; DDS tidak boleh mengklaim berhasil.
+- `POST /b1s/v1/StockTransfers(<DocEntry>)/Cancel` — bound action `Cancel` dengan parameter bertipe `SAPB1.StockTransfer` (ditemukan di `$metadata`; uji aman dengan DocEntry tidak ada menjawab `-2028 No existen registros coincidentes`, sama seperti cancel AP Invoice lewat `PurchaseInvoicesService_Cancel2`).
+- Aksi serupa juga ada untuk `SAPB1.Payment` (cancel Outgoing/Incoming Payment) dan `SAPB1.Document` (dokumen jual-beli). `InventoryTransferRequests` (OWTQ) **tidak** punya.
+- **Konsekuensi: helper DI API Windows TIDAK diperlukan.** Cancel dikerjakan DDS langsung lewat Service Layer, satu jalur dengan cancel AP Invoice yang sudah berjalan.
+
+Alurnya:
+
+- DDS mencatat permintaan cancel di `delivery_part_ito_cancels` (status `requested`) + alasan + user.
+- DDS memanggil Service Layer untuk ITO yang bersangkutan; hanya untuk ITO yang **belum punya ITI**.
+- DDS memverifikasi hasilnya dengan membaca ulang `OWTR.CANCELED`; status baru `cancelled` kalau SAP benar-benar `Y`, dan pesan SAP asli disimpan/ditampilkan bila gagal.
+- **Dilarang** mengubah `CANCELED` lewat SQL langsung (melewati logika stok SAP).
+- **Sudah diuji tuntas 30 Sep 2026 di DB lab `LAB_SBO_20260924`** (bukan produksi): dokumen transfer uji dibuat (DocEntry 41261 / DocNum 261006045), stok `08-OIL` 426 → 425, lalu `POST /StockTransfers(41261)/Cancel` → HTTP 204 dan stok kembali **426** dengan `OWTR.CANCELED='Y'`. Jadi jalur ini terbukti membalik stok dengan benar; DDS tetap wajib memverifikasi hasilnya per dokumen (`CANCELED='Y'`) sebelum menandai "dibatalkan".
+- Konfirmasi nyata di produksi tetap dilakukan pada satu dokumen yang memang diminta tim logistik, setelah persetujuan Iwan.
 
 ### 3.4 Arsitektur penyimpanan
 
@@ -105,9 +110,6 @@ POST   /logistics/delivery-part/cancel                 ajukan cancel ITO (cancel
 GET    /logistics/delivery-part/cancel/{cancel}        status cancel
 GET    /logistics/warehouse-projects                   mapping (admin)
 POST   /logistics/warehouse-projects                   simpan mapping
-# endpoint untuk helper Windows (auth token khusus, hanya jaringan internal)
-GET    /api/sap-cancel/next                            ambil 1 permintaan cancel
-POST   /api/sap-cancel/{cancel}/result                 lapor hasil eksekusi
 ```
 
 Artisan:
@@ -119,13 +121,23 @@ delivery-part:verify-cancels                           verifikasi ulang status C
 
 ## 7. Risks
 
-1. **Helper Windows = komponen baru** di luar Laravel. Kalau helper mati, cancel tertunda; halaman harus jujur menampilkan status, tidak pernah "sukses" tanpa verifikasi `CANCELED='Y'`.
-2. Helper memakai kredensial SAP (user `manager`) → kredensial disimpan di konfigurasi helper di mesin Windows, tidak di repo DDS.
-3. Performa query: 6.520 dokumen ITO (OUT) di 2026; wajib filter tanggal + cache 5 menit; perlu uji rentang 1 tahun (target < 5 detik).
-4. Import Excel: kunci `(ITO, Part, Unit)` bisa tidak unik; dry-run + laporan cocok/tidak cocok sebelum menulis; baris tak cocok dibuat sebagai baris manual bertanda.
-5. SAP bisa menolak cancel (stok sudah terpakai/berpindah) — pesan SAP ditampilkan apa adanya.
-6. Kolom manual tidak terlihat di SAP (keputusan sadar) → bila nanti tim SAP butuh, fase 2 menulis `U_MIS_DeliveryTime`/`U_ARK_DelivStat`.
+1. **Cancel ITO mengubah stok SAP** — sebelum dipakai ke data nyata, wajib uji pada satu dokumen uji bersama tim SAP dan pastikan dampak stoknya disetujui.
+2. SAP bisa menolak cancel (mis. stok sudah dipakai/berpindah, dokumen sudah punya ITI) — pesan SAP ditampilkan apa adanya, dan status di DDS tidak pernah ditulis "berhasil" tanpa verifikasi `CANCELED='Y'`.
+3. Kredensial SAP untuk cancel memakai user yang sama dengan integrasi DDS (`.env` prod) — tidak disimpan di kode/repo.
+4. Performa query: 6.520 dokumen ITO (OUT) di 2026; wajib filter tanggal + cache 5 menit; perlu uji rentang 1 tahun (target < 5 detik).
+5. Import Excel: kunci `(ITO, Part, Unit)` bisa tidak unik; dry-run + laporan cocok/tidak cocok sebelum menulis; baris tak cocok dibuat sebagai baris manual bertanda.
+6. Kolom manual tidak terlihat di SAP (keputusan sadar) → bila nanti tim SAP butuh, fase lanjutan menulis `U_MIS_DeliveryTime`/`U_ARK_DelivStat`.
 7. Mapping warehouse→project harus diisi manusia; kalau kosong, baris tidak muncul di site mana pun — karena itu daftar "belum dipetakan" ditampilkan.
+
+## 8. Urutan pengerjaan (status per 30 Sep 2026)
+
+1. ✅ Migrasi + seeder permission + tabel mapping.
+2. ✅ Service query SAP (versi DDS dari query tim) + cache.
+3. ✅ Halaman index + kolom manual + riwayat.
+4. ✅ Export Excel per site.
+5. ✅ Tab Input SPB.
+6. ✅ Perintah import Excel 2026 (dry-run terbukti; penulisan menunggu persetujuan Iwan).
+7. ⏳ Cancel ITO lewat Service Layer (`POST /b1s/v1/StockTransfers(<DocEntry>)/Cancel`) + tabel permintaan + UI + verifikasi `CANCELED`. **Tidak butuh helper Windows/DI API** (koreksi 30 Sep 2026). Sebelum dipakai: uji satu dokumen uji bersama tim SAP.
 
 ## 8. Urutan pengerjaan
 
