@@ -29,6 +29,15 @@
                 <p>Pemakaian</p>
             </a>
         </li>
+        @can('view-delivery-part')
+            <li class="nav-item">
+                <a href="{{ route('logistics.delivery-part.index') }}"
+                    class="nav-link {{ request()->routeIs('logistics.delivery-part.*') ? 'active' : '' }}">
+                    <i class="far fa-circle nav-icon"></i>
+                    <p>Delivery Part</p>
+                </a>
+            </li>
+        @endcan
         @can('manage-logistics-category-map')
             <li class="nav-item">
                 <a href="{{ route('logistics.categories.index') }}"

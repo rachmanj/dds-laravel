@@ -116,6 +116,12 @@ class RolePermissionSeeder extends Seeder
             'view-logistics-summary',
             'export-logistics-summary',
             'manage-logistics-category-map',
+
+            // Delivery Part
+            'view-delivery-part',
+            'edit-delivery-part',
+            'export-delivery-part',
+            'cancel-ito',
         ];
 
         foreach ($permissions as $permission) {

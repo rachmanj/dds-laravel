@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Logistics\CategoryMapController;
+use App\Http\Controllers\Logistics\DeliveryPartController;
 use App\Http\Controllers\Logistics\GrpoSummaryController;
 use App\Http\Controllers\Logistics\InventorySummaryController;
 use App\Http\Controllers\Logistics\UsageSummaryController;
@@ -36,6 +37,24 @@ Route::prefix('logistics/usage')
         Route::get('/data', [UsageSummaryController::class, 'data'])->name('data');
         Route::get('/export', [UsageSummaryController::class, 'export'])
             ->middleware('permission:export-logistics-summary')
+            ->name('export');
+    });
+
+Route::prefix('logistics/delivery-part')
+    ->name('logistics.delivery-part.')
+    ->middleware(['auth', 'active.user', 'permission:view-delivery-part'])
+    ->group(function () {
+        Route::get('/', [DeliveryPartController::class, 'index'])->name('index');
+        Route::get('/data', [DeliveryPartController::class, 'data'])->name('data');
+        Route::post('/entry', [DeliveryPartController::class, 'storeEntry'])
+            ->middleware('permission:edit-delivery-part')
+            ->name('entry.store');
+        Route::patch('/entry/{entry}', [DeliveryPartController::class, 'updateEntry'])
+            ->middleware('permission:edit-delivery-part')
+            ->name('entry.update');
+        Route::post('/refresh', [DeliveryPartController::class, 'refresh'])->name('refresh');
+        Route::get('/export', [DeliveryPartController::class, 'export'])
+            ->middleware('permission:export-delivery-part')
             ->name('export');
     });
 
