@@ -55,50 +55,61 @@ class DeliveryPartImportExcelTest extends TestCase
     }
 
     /**
+     * @param  array<string, list<string>>  $headerOverrides  Kolom B..S baris 5 (opsional)
      * @param  array<int, array<string, mixed>>  $dataRows
      */
-    private function buildSampleExcel(string $path, array $dataRows, bool $includeFullHeaders = true): void
-    {
+    private function buildSampleExcel(
+        string $path,
+        array $dataRows,
+        array $headerOverrides = [],
+        string $sheetTitle = '017C',
+    ): void {
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('017C');
+        $sheet->setTitle($sheetTitle);
 
-        $sheet->setCellValue('A2', 'Delivery Part 017C - M');
-        $sheet->setCellValue('A5', 'NO ITO');
-        $sheet->mergeCells('B5:B6');
-        $sheet->setCellValue('B5', 'Parts Number');
-        $sheet->setCellValue('C5', 'No Unit');
-        $sheet->setCellValue('D5', 'No. SPB');
-        $sheet->setCellValue('E5', 'Remarks Barang');
-        $sheet->setCellValue('F5', 'Tgl Delivery');
-        $sheet->setCellValue('G5', 'Transporter');
-        $sheet->setCellValue('H5', 'Unit & No Kendaraan');
-        $sheet->mergeCells('I5:I6');
-        $sheet->setCellValue('I5', 'Ekspedisi Pengirim');
+        $defaultHeaders = [
+            'B' => 'TANGGAL RECEIVED',
+            'C' => 'Supplier',
+            'D' => 'PO Number',
+            'E' => 'No. SPB',
+            'F' => 'NO ITO',
+            'G' => 'No Unit',
+            'H' => 'Parts Number',
+            'I' => 'Descriptions',
+            'J' => 'QTY',
+            'K' => 'UOM',
+            'L' => 'Remarks Barang',
+            'M' => 'Tgl Delivery',
+            'N' => 'Transporter',
+            'O' => 'Unit & No Kendaraan',
+            'P' => 'Ekspedisi',
+            'Q' => 'Tgl ITI',
+            'R' => 'NO. ITI',
+            'S' => 'Keterangan',
+        ];
 
-        if (! $includeFullHeaders) {
-            $sheet->setCellValue('A5', 'NO ITO');
-            $sheet->setCellValue('B5', 'Parts Number');
+        $headers = array_merge($defaultHeaders, $headerOverrides);
+        foreach ($headers as $col => $label) {
+            $sheet->setCellValue($col.'5', $label);
         }
 
         $rowNum = 7;
         foreach ($dataRows as $row) {
-            $sheet->setCellValue('A'.$rowNum, $row['ito_no'] ?? '');
-            $sheet->setCellValue('B'.$rowNum, $row['item_code'] ?? '');
-            $sheet->setCellValue('C'.$rowNum, $row['unit_no'] ?? '');
-            $sheet->setCellValue('D'.$rowNum, $row['no_spb'] ?? '');
-            $sheet->setCellValue('E'.$rowNum, $row['remarks_barang'] ?? '');
-            $sheet->setCellValue('F'.$rowNum, $row['tgl_delivery'] ?? '');
-            $sheet->setCellValue('G'.$rowNum, $row['transporter'] ?? '');
-            $sheet->setCellValue('H'.$rowNum, $row['unit_kendaraan'] ?? '');
-            $sheet->setCellValue('I'.$rowNum, $row['ekspedisi'] ?? '');
+            $sheet->setCellValue('E'.$rowNum, $row['no_spb'] ?? '');
+            $sheet->setCellValue('F'.$rowNum, $row['ito_no'] ?? '');
+            $sheet->setCellValue('G'.$rowNum, $row['unit_no'] ?? '');
+            $sheet->setCellValue('H'.$rowNum, $row['item_code'] ?? '');
+            $sheet->setCellValue('I'.$rowNum, $row['description'] ?? ($row['item_code'] ?? 'Deskripsi'));
+            $sheet->setCellValue('L'.$rowNum, $row['remarks_barang'] ?? '');
+            $sheet->setCellValue('M'.$rowNum, $row['tgl_delivery'] ?? '');
+            $sheet->setCellValue('N'.$rowNum, $row['transporter'] ?? '');
+            $sheet->setCellValue('O'.$rowNum, $row['unit_kendaraan'] ?? '');
+            if (array_key_exists('ekspedisi', $row)) {
+                $sheet->setCellValue('P'.$rowNum, $row['ekspedisi']);
+            }
             $rowNum++;
         }
-
-        $badSheet = $spreadsheet->createSheet();
-        $badSheet->setTitle('022C');
-        $badSheet->setCellValue('A5', 'NO ITO');
-        $badSheet->setCellValue('B5', 'Parts Number');
 
         $writer = new Xlsx($spreadsheet);
         $writer->save($path);
@@ -208,18 +219,98 @@ class DeliveryPartImportExcelTest extends TestCase
         @unlink($path);
     }
 
-    public function test_sheet_without_required_headers_is_skipped(): void
+    public function test_sheet_with_misspelled_headers_still_imports_columns_by_position(): void
     {
-        $this->createProject('017C', '02-SPT');
-        $this->createProject('022C', '08-SPT');
+        $project = $this->createProject('022C', '08-SPT');
         $this->bindEmptySap();
 
-        $path = storage_path('app/testing-delivery-part-skip.xlsx');
-        $this->buildSampleExcel($path, [], false);
+        $path = storage_path('app/testing-delivery-part-typo-headers.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => '251008078',
+                'item_code' => 'CE-BUCKET150',
+                'unit_no' => 'NON_UNIT',
+                'tgl_delivery' => 46024,
+                'transporter' => 'RUSEP',
+                'unit_kendaraan' => 'TRUCK PS NAMARA',
+                'ekspedisi' => 'EKSPEDISI NAMARA',
+            ],
+        ], [
+            'M' => 'Tgl Deivery',
+            'L' => 'Remaks Barang',
+            'P' => 'Expedisi',
+        ], '022C');
 
-        $this->artisan('delivery-part:import-excel', ['--file' => $path])
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
             ->assertExitCode(0)
-            ->expectsOutputToContain('Dilewati');
+            ->doesntExpectOutputToContain('Kolom wajib');
+
+        $entry = DeliveryPartEntry::query()->where('project_id', $project->id)->where('ito_no', '251008078')->first();
+        $this->assertNotNull($entry);
+        $this->assertSame('CE-BUCKET150', $entry->item_code);
+        $this->assertSame('EKSPEDISI NAMARA', $entry->ekspedisi);
+        $this->assertSame('2026-01-02', $entry->tgl_delivery?->toDateString());
+
+        @unlink($path);
+    }
+
+    public function test_sheet_without_ekspedisi_column_data_still_imports_with_null_ekspedisi(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-no-ekspedisi.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => 'ITO-NO-EKS',
+                'item_code' => 'PART-E',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-E',
+                'ekspedisi' => '',
+            ],
+        ], [
+            'P' => 'Kolom Lain',
+        ]);
+
+        Artisan::call('delivery-part:import-excel', ['--file' => $path, '--write' => true]);
+        $output = Artisan::output();
+        $this->assertStringNotContainsString('Kolom wajib', $output);
+
+        $entry = DeliveryPartEntry::query()->where('project_id', $project->id)->where('ito_no', 'ITO-NO-EKS')->first();
+        $this->assertNotNull($entry);
+        $this->assertNull($entry->ekspedisi);
+
+        @unlink($path);
+    }
+
+    public function test_row_without_ito_parts_or_description_is_skipped_as_empty(): void
+    {
+        $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-empty-row.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => '',
+                'item_code' => '',
+                'unit_no' => 'U-ONLY',
+                'no_spb' => 'SPB-ONLY',
+                'description' => '',
+            ],
+            [
+                'ito_no' => 'ITO-OK',
+                'item_code' => 'PART-OK',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-OK',
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0)
+            ->expectsOutputToContain('Baris kosong dilewati: 1');
+
+        $this->assertDatabaseCount('delivery_part_entries', 1);
+        $this->assertNotNull(DeliveryPartEntry::query()->where('ito_no', 'ITO-OK')->first());
 
         @unlink($path);
     }
@@ -326,6 +417,7 @@ class DeliveryPartImportExcelTest extends TestCase
                 'unit_no' => 'U1',
                 'no_spb' => '=IF(OR(R7="",R7=0),"",R7)',
                 'remarks_barang' => '=IF(1=1,"formula","x")',
+                'description' => 'Deskripsi',
             ],
         ]);
 

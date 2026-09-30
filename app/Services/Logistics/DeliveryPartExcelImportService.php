@@ -37,33 +37,55 @@ class DeliveryPartExcelImportService
     ];
 
     /**
-     * @var array<string, list<string>>
+     * Kolom data tetap B..S (kolom A kosong). Pembacaan baris memakai posisi ini, bukan teks header.
+     *
+     * @var array<string, int>
      */
-    private const HEADER_ALIASES = [
-        'ito_no' => ['NO ITO', 'NO. ITO', 'ITO NO'],
-        'item_code' => ['PARTS NUMBER', 'PART NUMBER', 'PARTS NO', 'ITEM CODE'],
-        'unit_no' => ['NO UNIT', 'NO. UNIT', 'UNIT NO'],
-        'no_spb' => ['NO. SPB', 'NO SPB'],
-        'remarks_barang' => ['REMARKS BARANG', 'REMARK BARANG'],
-        'tgl_delivery' => ['TGL DELIVERY', 'TANGGAL DELIVERY'],
-        'transporter' => ['TRANSPORTER'],
-        'unit_kendaraan' => ['UNIT & NO KENDARAAN', 'UNIT AND NO KENDARAAN', 'UNIT NO KENDARAAN'],
-        'ekspedisi' => ['EKSPEDISI', 'EKSPEDISI PENGIRIM', 'EXPEDISI', 'EXPEDISI PENGIRIM'],
+    private const COLUMN_POSITION_MAP = [
+        'tanggal_received' => 2,
+        'supplier' => 3,
+        'po_number' => 4,
+        'no_spb' => 5,
+        'ito_no' => 6,
+        'unit_no' => 7,
+        'item_code' => 8,
+        'description' => 9,
+        'qty' => 10,
+        'uom' => 11,
+        'remarks_barang' => 12,
+        'tgl_delivery' => 13,
+        'transporter' => 14,
+        'unit_kendaraan' => 15,
+        'ekspedisi' => 16,
+        'tgl_iti' => 17,
+        'no_iti' => 18,
+        'keterangan' => 19,
     ];
 
     /**
-     * @var list<string>
+     * Label header yang diharapkan (baris 5/6 digabung) — hanya untuk catatan kewajaran.
+     *
+     * @var array<string, list<string>>
      */
-    private const REQUIRED_HEADER_KEYS = [
-        'ito_no',
-        'item_code',
-        'unit_no',
-        'no_spb',
-        'remarks_barang',
-        'tgl_delivery',
-        'transporter',
-        'unit_kendaraan',
-        'ekspedisi',
+    private const EXPECTED_HEADER_ALIASES = [
+        'tanggal_received' => ['TANGGAL RECEIVED', 'TGL RECEIVED'],
+        'supplier' => ['SUPPLIER'],
+        'po_number' => ['PO NUMBER', 'PO NO'],
+        'no_spb' => ['NO. SPB', 'NO SPB'],
+        'ito_no' => ['NO ITO', 'NO. ITO', 'ITO NO'],
+        'unit_no' => ['NO UNIT', 'NO. UNIT', 'UNIT NO'],
+        'item_code' => ['PARTS NUMBER', 'PART NUMBER', 'PARTS NO', 'ITEM CODE'],
+        'description' => ['DESCRIPTIONS', 'DESCRIPTION', 'DESC'],
+        'qty' => ['QTY', 'QUANTITY'],
+        'uom' => ['UOM'],
+        'remarks_barang' => ['REMARKS BARANG', 'REMARK BARANG', 'REMARKS', 'REMAKS'],
+        'tgl_delivery' => ['TGL DELIVERY', 'TANGGAL DELIVERY', 'DEIVERY', 'DELIVERY'],
+        'transporter' => ['TRANSPORTER'],
+        'unit_kendaraan' => ['UNIT & NO KENDARAAN', 'UNIT AND NO KENDARAAN', 'UNIT NO KENDARAAN'],
+        'ekspedisi' => ['EKSPEDISI', 'EKSPEDISI PENGIRIM', 'EXPEDISI', 'EXPEDISI PENGIRIM'],
+        'tgl_iti' => ['TGL ITI', 'TANGGAL ITI'],
+        'no_iti' => ['NO. ITI', 'NO ITI'],
+        'keterangan' => ['KETERANGAN'],
     ];
 
     public function __construct(
@@ -104,16 +126,17 @@ class DeliveryPartExcelImportService
                 continue;
             }
 
-            $headerMap = $this->buildHeaderMap($worksheet);
-            $missing = $this->missingRequiredHeaders($headerMap);
-            if ($missing !== []) {
+            $highestRow = $worksheet->getHighestDataRow();
+            if ($highestRow < self::DATA_START_ROW) {
                 $sheetSummaries[$sheetName] = [
                     'skipped' => true,
-                    'skip_reason' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missing),
+                    'skip_reason' => 'Sheet tidak memiliki baris data.',
                 ];
 
                 continue;
             }
+
+            $columnMap = self::COLUMN_POSITION_MAP;
 
             $isPratasaba = $sheetName === 'PRATASABA';
             $sapKeyIndex = collect();
@@ -158,10 +181,12 @@ class DeliveryPartExcelImportService
                 $summary['notes'][] = 'Koneksi SAP tidak tersedia; baris baru tanpa match DDS akan dibuat sebagai manual.';
             }
 
-            $highestRow = $worksheet->getHighestDataRow();
+            foreach ($this->headerSanityNotes($worksheet) as $headerNote) {
+                $summary['notes'][] = $headerNote;
+            }
 
             for ($row = self::DATA_START_ROW; $row <= $highestRow; $row++) {
-                $rowData = $this->readRow($worksheet, $headerMap, $row);
+                $rowData = $this->readRow($worksheet, $columnMap, $row);
                 $summary['rows_read']++;
 
                 if ($this->isEmptyDataRow($rowData)) {
@@ -319,35 +344,44 @@ class DeliveryPartExcelImportService
     }
 
     /**
-     * @return array<string, int>
+     * @return list<string>
      */
-    private function buildHeaderMap(Worksheet $worksheet): array
+    private function headerSanityNotes(Worksheet $worksheet): array
     {
         $highestColumn = $worksheet->getHighestDataColumn();
-        $highestIndex = Coordinate::columnIndexFromString($highestColumn);
+        $highestIndex = max(
+            Coordinate::columnIndexFromString($highestColumn),
+            max(self::COLUMN_POSITION_MAP),
+        );
 
         $row5 = $this->forwardFillRow($worksheet, self::HEADER_ROW_PRIMARY, $highestIndex);
         $row6 = $this->forwardFillRow($worksheet, self::HEADER_ROW_SECONDARY, $highestIndex);
 
-        $map = [];
+        $notes = [];
 
-        for ($col = 1; $col <= $highestIndex; $col++) {
-            $combined = $this->normalizeHeaderLabel(trim($row5[$col].' '.$row6[$col]));
-            $single5 = $this->normalizeHeaderLabel($row5[$col]);
-            $single6 = $this->normalizeHeaderLabel($row6[$col]);
+        foreach (self::COLUMN_POSITION_MAP as $field => $col) {
+            $combined = $this->normalizeHeaderLabel(trim(($row5[$col] ?? '').' '.($row6[$col] ?? '')));
+            $single5 = $this->normalizeHeaderLabel($row5[$col] ?? '');
+            $single6 = $this->normalizeHeaderLabel($row6[$col] ?? '');
+            $aliases = self::EXPECTED_HEADER_ALIASES[$field] ?? [];
 
-            foreach (self::HEADER_ALIASES as $field => $aliases) {
-                if ($this->labelMatches($combined, $aliases)
-                    || $this->labelMatches($single5, $aliases)
-                    || $this->labelMatches($single6, $aliases)) {
-                    if (! isset($map[$field])) {
-                        $map[$field] = $col;
-                    }
-                }
+            if ($combined === '' && $single5 === '' && $single6 === '') {
+                $notes[] = 'Header kolom '.Coordinate::stringFromColumnIndex($col).' ('.$field.') kosong; data tetap dibaca dari posisi kolom.';
+
+                continue;
             }
+
+            if ($this->labelMatches($combined, $aliases)
+                || $this->labelMatches($single5, $aliases)
+                || $this->labelMatches($single6, $aliases)) {
+                continue;
+            }
+
+            $labelShown = trim($row5[$col].' '.$row6[$col]);
+            $notes[] = 'Header kolom '.Coordinate::stringFromColumnIndex($col).' tidak dikenali ('.$labelShown.'); data tetap dibaca dari posisi kolom.';
         }
 
-        return $map;
+        return $notes;
     }
 
     /**
@@ -397,31 +431,15 @@ class DeliveryPartExcelImportService
     }
 
     /**
-     * @param  array<string, int>  $headerMap
-     * @return list<string>
-     */
-    private function missingRequiredHeaders(array $headerMap): array
-    {
-        $missing = [];
-        foreach (self::REQUIRED_HEADER_KEYS as $key) {
-            if (! isset($headerMap[$key])) {
-                $missing[] = $key;
-            }
-        }
-
-        return $missing;
-    }
-
-    /**
-     * @param  array<string, int>  $headerMap
+     * @param  array<string, int>  $columnMap
      * @return array<string, mixed>
      */
-    private function readRow(Worksheet $worksheet, array $headerMap, int $row): array
+    private function readRow(Worksheet $worksheet, array $columnMap, int $row): array
     {
         $data = [];
         $importNotes = [];
 
-        foreach ($headerMap as $field => $col) {
+        foreach ($columnMap as $field => $col) {
             $letter = Coordinate::stringFromColumnIndex($col);
             $raw = $worksheet->getCell($letter.$row)->getCalculatedValue();
             [$sanitized, $note] = $this->sanitizeImportedCellValue($raw, $field);
@@ -461,10 +479,18 @@ class DeliveryPartExcelImportService
     {
         $ito = trim((string) ($rowData['ito_no'] ?? ''));
         $item = trim((string) ($rowData['item_code'] ?? ''));
-        $unit = trim((string) ($rowData['unit_no'] ?? ''));
-        $spb = trim((string) ($rowData['no_spb'] ?? ''));
+        $description = trim((string) ($rowData['description'] ?? ''));
+        if (is_string($rowData['ito_no'] ?? null) && str_starts_with(ltrim((string) $rowData['ito_no']), '=')) {
+            $ito = '';
+        }
+        if (is_string($rowData['item_code'] ?? null) && str_starts_with(ltrim((string) $rowData['item_code']), '=')) {
+            $item = '';
+        }
+        if (is_string($rowData['description'] ?? null) && str_starts_with(ltrim((string) $rowData['description']), '=')) {
+            $description = '';
+        }
 
-        return $ito === '' && $item === '' && $unit === '' && $spb === '';
+        return $ito === '' && $item === '' && $description === '';
     }
 
     /**
