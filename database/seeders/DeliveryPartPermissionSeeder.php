@@ -16,6 +16,7 @@ class DeliveryPartPermissionSeeder extends Seeder
         'view-delivery-part',
         'edit-delivery-part',
         'export-delivery-part',
+        'cancel-ito',
     ];
 
     public function run(): void

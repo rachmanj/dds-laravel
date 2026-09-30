@@ -123,6 +123,7 @@ class DeliveryPartQueryService
         $sql = <<<'SQL'
             SELECT DISTINCT
                 T10.DocNum AS grpo_no,
+                T0.DocEntry AS doc_entry,
                 T0.DocNum AS ito_no,
                 T0.DocDate AS ito_date,
                 T0.CreateDate AS ito_created_date,
@@ -177,6 +178,7 @@ class DeliveryPartQueryService
     {
         return [
             'grpo_no' => $this->normalizeString($row['grpo_no'] ?? null),
+            'doc_entry' => isset($row['doc_entry']) ? (int) $row['doc_entry'] : null,
             'ito_no' => $this->normalizeString($row['ito_no'] ?? null),
             'ito_date' => $this->normalizeDate($row['ito_date'] ?? null),
             'ito_created_date' => $this->normalizeDateTime($row['ito_created_date'] ?? null),

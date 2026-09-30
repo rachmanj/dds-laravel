@@ -9,6 +9,7 @@ use App\Http\Requests\StoreDeliveryPartEntryRequest;
 use App\Http\Requests\UpdateDeliveryPartEntryRequest;
 use App\Models\DeliveryPartEntry;
 use App\Models\DeliveryPartEntryHistory;
+use App\Models\DeliveryPartItoCancel;
 use App\Models\LogisticsWarehouseProject;
 use App\Models\Project;
 use App\Services\Logistics\DeliveryPartAssembler;
@@ -72,6 +73,8 @@ class DeliveryPartController extends Controller
         }
 
         $canEdit = $request->user()?->can('edit-delivery-part') ?? false;
+        $canCancel = $request->user()?->can('cancel-ito') ?? false;
+        $cancelByDocEntry = $this->latestCancelsByDocEntry($rows);
 
         return DataTables::of($rows)
             ->addColumn('qty_display', fn (array $row) => $this->formatQty($row['qty'] ?? null))
@@ -82,23 +85,34 @@ class DeliveryPartController extends Controller
 
                 return '';
             })
-            ->addColumn('no_ito_display', function (array $row) {
+            ->addColumn('no_ito_display', function (array $row) use ($cancelByDocEntry) {
                 $display = e((string) ($row['no_ito'] ?? '-'));
                 $sap = $row['ito_no_sap'] ?? null;
                 if ($sap !== null && ($row['ito_no_override'] ?? null) !== null && (string) $row['ito_no_override'] !== (string) $sap) {
-                    return $display.' <small class="text-muted">(SAP: '.e((string) $sap).')</small>';
+                    $display = $display.' <small class="text-muted">(SAP: '.e((string) $sap).')</small>';
+                }
+
+                $badge = $this->cancelBadgeForRow($row, $cancelByDocEntry);
+                if ($badge !== '') {
+                    $display .= ' '.$badge;
                 }
 
                 return $display;
             })
-            ->addColumn('actions', function (array $row) use ($canEdit) {
-                if (! $canEdit) {
-                    return '';
+            ->addColumn('actions', function (array $row) use ($canEdit, $canCancel, $cancelByDocEntry) {
+                $buttons = [];
+
+                if ($canEdit) {
+                    $payload = htmlspecialchars(json_encode($row, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+                    $buttons[] = '<button type="button" class="btn btn-xs btn-primary btn-edit-entry" data-row="'.$payload.'"><i class="fas fa-edit"></i> Edit</button>';
                 }
 
-                $payload = htmlspecialchars(json_encode($row, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+                if ($canCancel && $this->rowEligibleForCancel($row, $cancelByDocEntry)) {
+                    $payload = htmlspecialchars(json_encode($row, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+                    $buttons[] = '<button type="button" class="btn btn-xs btn-danger btn-cancel-ito" data-row="'.$payload.'"><i class="fas fa-ban"></i> Batalkan</button>';
+                }
 
-                return '<button type="button" class="btn btn-xs btn-primary btn-edit-entry" data-row="'.$payload.'"><i class="fas fa-edit"></i> Edit</button>';
+                return implode(' ', $buttons);
             })
             ->rawColumns(['keterangan_display', 'no_ito_display', 'actions'])
             ->make(true);
@@ -309,5 +323,103 @@ class DeliveryPartController extends Controller
         }
 
         return CompactNumberFormatter::format((float) $qty, 2);
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array<int, DeliveryPartItoCancel>
+     */
+    private function latestCancelsByDocEntry(Collection $rows): array
+    {
+        $docEntries = $rows
+            ->pluck('doc_entry')
+            ->filter(fn ($value) => $value !== null && $value !== '')
+            ->map(fn ($value) => (int) $value)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($docEntries === []) {
+            return [];
+        }
+
+        $cancels = DeliveryPartItoCancel::query()
+            ->whereIn('doc_entry', $docEntries)
+            ->orderByDesc('requested_at')
+            ->get()
+            ->groupBy('doc_entry');
+
+        $latest = [];
+        foreach ($cancels as $docEntry => $group) {
+            $latest[(int) $docEntry] = $group->first();
+        }
+
+        return $latest;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array<int, DeliveryPartItoCancel>  $cancelByDocEntry
+     */
+    private function cancelBadgeForRow(array $row, array $cancelByDocEntry): string
+    {
+        $docEntry = $row['doc_entry'] ?? null;
+        if ($docEntry === null) {
+            return '';
+        }
+
+        $cancel = $cancelByDocEntry[(int) $docEntry] ?? null;
+        if ($cancel === null) {
+            return '';
+        }
+
+        if ($cancel->status === DeliveryPartItoCancel::STATUS_CANCELLED && $cancel->verified_at !== null) {
+            $date = $cancel->verified_at->format('d-m-Y');
+
+            return '<span class="badge badge-secondary">dibatalkan '.$date.'</span>';
+        }
+
+        if ($cancel->status === DeliveryPartItoCancel::STATUS_REQUESTED) {
+            return '<span class="badge badge-warning">menunggu verifikasi</span>';
+        }
+
+        if ($cancel->status === DeliveryPartItoCancel::STATUS_FAILED) {
+            return '<span class="badge badge-danger">gagal batalkan</span>';
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array<int, DeliveryPartItoCancel>  $cancelByDocEntry
+     */
+    private function rowEligibleForCancel(array $row, array $cancelByDocEntry): bool
+    {
+        if (($row['source'] ?? null) !== DeliveryPartEntry::SOURCE_SAP) {
+            return false;
+        }
+
+        if (filled($row['no_iti'] ?? null)) {
+            return false;
+        }
+
+        $docEntry = $row['doc_entry'] ?? null;
+        if ($docEntry === null) {
+            return false;
+        }
+
+        $cancel = $cancelByDocEntry[(int) $docEntry] ?? null;
+        if ($cancel !== null) {
+            if ($cancel->status === DeliveryPartItoCancel::STATUS_CANCELLED && $cancel->verified_at !== null) {
+                return false;
+            }
+
+            if ($cancel->status === DeliveryPartItoCancel::STATUS_REQUESTED) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

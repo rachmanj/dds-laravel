@@ -49,6 +49,10 @@
                     <a class="nav-link" id="tab-spb-link" data-toggle="tab" href="#tab-spb" role="tab">Input SPB
                         Pengiriman</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="tab-cancel-history-link" data-toggle="tab" href="#tab-cancel-history"
+                        role="tab">Riwayat pembatalan</a>
+                </li>
             </ul>
 
             <div class="tab-content">
@@ -67,7 +71,8 @@
                                     <select class="form-control" id="project" name="project" required>
                                         <option value="">— Pilih site —</option>
                                         @foreach ($sites as $site)
-                                            <option value="{{ $site['code'] }}" @selected($selectedProject === $site['code'])>
+                                            <option value="{{ $site['code'] }}" data-project-id="{{ $site['id'] }}"
+                                                @selected($selectedProject === $site['code'])>
                                                 {{ $site['code'] }}
                                             </option>
                                         @endforeach
@@ -133,9 +138,9 @@
                                 <th>Tgl ITI</th>
                                 <th>NO. ITI</th>
                                 <th>Keterangan</th>
-                                @can('edit-delivery-part')
+                                @if (auth()->user()?->can('edit-delivery-part') || auth()->user()?->can('cancel-ito'))
                                     <th>Aksi</th>
-                                @endcan
+                                @endif
                             </tr>
                         </thead>
                     </table>
@@ -291,9 +296,87 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="tab-pane fade" id="tab-cancel-history" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Riwayat pembatalan ITO</h3>
+                        </div>
+                        <div class="card-body table-responsive">
+                            <table id="cancel-history-table" class="table table-bordered table-striped table-sm"
+                                style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th>Waktu</th>
+                                        <th>User</th>
+                                        <th>Site</th>
+                                        <th>ITO</th>
+                                        <th>Alasan</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
+
+    @can('cancel-ito')
+        <div class="modal fade" id="cancel-ito-modal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">Batalkan ITO</h5>
+                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Tutup">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <form id="cancel-ito-form">
+                        <div class="modal-body">
+                            <input type="hidden" id="cancel_doc_entry" name="doc_entry">
+                            <input type="hidden" id="cancel_ito_no" name="ito_no">
+                            <input type="hidden" id="cancel_project_id" name="project_id">
+                            <input type="hidden" id="cancel_item_code" name="item_code">
+                            <input type="hidden" id="cancel_unit_no" name="unit_no">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Pembatalan akan membalik pergerakan stok di SAP. Hanya ITO yang belum memiliki ITI yang
+                                dapat dibatalkan.
+                            </div>
+                            <dl class="row small mb-3">
+                                <dt class="col-sm-4">No ITO</dt>
+                                <dd class="col-sm-8" id="cancel_summary_ito">-</dd>
+                                <dt class="col-sm-4">Parts Number</dt>
+                                <dd class="col-sm-8" id="cancel_summary_part">-</dd>
+                                <dt class="col-sm-4">Description</dt>
+                                <dd class="col-sm-8" id="cancel_summary_desc">-</dd>
+                                <dt class="col-sm-4">QTY / UOM</dt>
+                                <dd class="col-sm-8" id="cancel_summary_qty">-</dd>
+                                <dt class="col-sm-4">No Unit</dt>
+                                <dd class="col-sm-8" id="cancel_summary_unit">-</dd>
+                                <dt class="col-sm-4">Tujuan (warehouse)</dt>
+                                <dd class="col-sm-8" id="cancel_summary_dest">-</dd>
+                            </dl>
+                            <div class="form-group">
+                                <label for="cancel_reason">Alasan pembatalan <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="cancel_reason" name="reason" rows="3" required
+                                    minlength="10" placeholder="Minimal 10 karakter"></textarea>
+                            </div>
+                            <div id="cancel-result-alert" class="alert d-none" role="alert"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-default" data-dismiss="modal">Tutup</button>
+                            <button type="submit" class="btn btn-danger" id="cancel-ito-submit">
+                                <i class="fas fa-ban"></i> Konfirmasi pembatalan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endcan
 
     @can('edit-delivery-part')
         <div class="modal fade" id="edit-entry-modal" tabindex="-1" role="dialog" aria-hidden="true">
@@ -366,6 +449,7 @@
         $(function() {
             const csrfToken = $('meta[name="csrf-token"]').attr('content');
             const canEdit = @json(auth()->user()?->can('edit-delivery-part') ?? false);
+            const canCancel = @json(auth()->user()?->can('cancel-ito') ?? false);
 
             function filterParams() {
                 return {
@@ -396,7 +480,7 @@
                 { data: 'keterangan_display', name: 'keterangan', orderable: false, searchable: false, defaultContent: '' },
             ];
 
-            if (canEdit) {
+            if (canEdit || canCancel) {
                 columns.push({ data: 'actions', name: 'actions', orderable: false, searchable: false });
             }
 
@@ -704,6 +788,112 @@
                         })
                         .fail(function(xhr) {
                             alert(xhr.responseJSON?.message || 'Gagal menghapus.');
+                        });
+                });
+            @endcan
+
+            let cancelHistoryTable = null;
+
+            function initCancelHistoryTable() {
+                if (cancelHistoryTable) {
+                    return;
+                }
+                cancelHistoryTable = $('#cancel-history-table').DataTable({
+                    processing: true,
+                    serverSide: true,
+                    ajax: {
+                        url: "{{ route('logistics.delivery-part.cancel.data') }}",
+                        data: function(d) {
+                            const projectSelect = $('#project option:selected');
+                            const projectId = projectSelect.data('project-id');
+                            if (projectId) {
+                                d.project_id = projectId;
+                            }
+                        },
+                    },
+                    columns: [
+                        { data: 'requested_at_display', name: 'requested_at' },
+                        { data: 'user_name', name: 'user_name', orderable: false },
+                        { data: 'project_code', name: 'project_code' },
+                        { data: 'ito_no', name: 'ito_no' },
+                        { data: 'reason', name: 'reason' },
+                        { data: 'status_label', name: 'status' },
+                    ],
+                    order: [[0, 'desc']],
+                    pageLength: 25,
+                });
+            }
+
+            $('a[href="#tab-cancel-history"]').on('shown.bs.tab', function() {
+                initCancelHistoryTable();
+                if (cancelHistoryTable) {
+                    cancelHistoryTable.ajax.reload();
+                }
+            });
+
+            @can('cancel-ito')
+                $(document).on('click', '.btn-cancel-ito', function() {
+                    const row = $(this).data('row');
+                    $('#cancel_doc_entry').val(row.doc_entry || '');
+                    $('#cancel_ito_no').val(row.ito_no || '');
+                    $('#cancel_project_id').val(row.project_id || '');
+                    $('#cancel_item_code').val(row.item_code || '');
+                    $('#cancel_unit_no').val(row.unit_no || '');
+                    $('#cancel_summary_ito').text(row.no_ito || row.ito_no || '-');
+                    $('#cancel_summary_part').text(row.parts_number || '-');
+                    $('#cancel_summary_desc').text(row.descriptions || '-');
+                    $('#cancel_summary_qty').text((row.qty != null ? row.qty : '-') + ' / ' + (row.uom || '-'));
+                    $('#cancel_summary_unit').text(row.no_unit || '-');
+                    $('#cancel_summary_dest').text(row.to_warehouse || '-');
+                    $('#cancel_reason').val('');
+                    $('#cancel-result-alert').addClass('d-none').removeClass('alert-success alert-danger');
+                    $('#cancel-ito-submit').prop('disabled', false);
+                    $('#cancel-ito-modal').modal('show');
+                });
+
+                $('#cancel-ito-form').on('submit', function(e) {
+                    e.preventDefault();
+                    const reason = $('#cancel_reason').val().trim();
+                    if (reason.length < 10) {
+                        alert('Alasan pembatalan wajib minimal 10 karakter.');
+                        return;
+                    }
+                    $('#cancel-ito-submit').prop('disabled', true);
+                    $.post("{{ route('logistics.delivery-part.cancel.store') }}", {
+                        _token: csrfToken,
+                        doc_entry: $('#cancel_doc_entry').val(),
+                        ito_no: $('#cancel_ito_no').val(),
+                        project_id: $('#cancel_project_id').val() || null,
+                        item_code: $('#cancel_item_code').val(),
+                        unit_no: $('#cancel_unit_no').val(),
+                        reason: reason,
+                    })
+                        .done(function(res) {
+                            const $alert = $('#cancel-result-alert');
+                            $alert.removeClass('d-none alert-danger').addClass('alert-success');
+                            $alert.text(res.message || 'Permintaan diproses.');
+                            if (table) {
+                                table.ajax.reload(null, false);
+                            }
+                            if (cancelHistoryTable) {
+                                cancelHistoryTable.ajax.reload(null, false);
+                            }
+                        })
+                        .fail(function(xhr) {
+                            const $alert = $('#cancel-result-alert');
+                            $alert.removeClass('d-none alert-success').addClass('alert-danger');
+                            const msg = xhr.responseJSON?.message || 'Pembatalan gagal.';
+                            const sap = xhr.responseJSON?.cancel?.sap_message;
+                            $alert.text(sap ? msg + ' ' + sap : msg);
+                            if (table) {
+                                table.ajax.reload(null, false);
+                            }
+                            if (cancelHistoryTable) {
+                                cancelHistoryTable.ajax.reload(null, false);
+                            }
+                        })
+                        .always(function() {
+                            $('#cancel-ito-submit').prop('disabled', false);
                         });
                 });
             @endcan

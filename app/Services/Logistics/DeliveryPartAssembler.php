@@ -79,6 +79,8 @@ class DeliveryPartAssembler
         return [
             'project_id' => $projectId,
             'entry_id' => $entry?->id,
+            'doc_entry' => $sapRow['doc_entry'] ?? null,
+            'to_warehouse' => $sapRow['to_warehouse'] ?? null,
             'source' => DeliveryPartEntry::SOURCE_SAP,
             'tanggal_received' => $this->formatDate($sapRow['ito_date'] ?? null),
             'supplier' => $sapRow['vendor'] ?? null,
@@ -116,6 +118,8 @@ class DeliveryPartAssembler
         return [
             'project_id' => $entry->project_id,
             'entry_id' => $entry->id,
+            'doc_entry' => null,
+            'to_warehouse' => null,
             'source' => DeliveryPartEntry::SOURCE_MANUAL,
             'tanggal_received' => null,
             'supplier' => null,

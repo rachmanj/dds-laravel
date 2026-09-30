@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Logistics\CategoryMapController;
+use App\Http\Controllers\Logistics\DeliveryPartCancelController;
 use App\Http\Controllers\Logistics\DeliveryPartController;
 use App\Http\Controllers\Logistics\DeliveryPartSpbController;
 use App\Http\Controllers\Logistics\GrpoSummaryController;
@@ -70,6 +71,11 @@ Route::prefix('logistics/delivery-part')
         Route::delete('/spb/{spb}', [DeliveryPartSpbController::class, 'destroy'])
             ->middleware('permission:edit-delivery-part')
             ->name('spb.destroy');
+
+        Route::post('/cancel', [DeliveryPartCancelController::class, 'store'])
+            ->middleware('permission:cancel-ito')
+            ->name('cancel.store');
+        Route::get('/cancel/data', [DeliveryPartCancelController::class, 'data'])->name('cancel.data');
     });
 
 Route::prefix('logistics/warehouse-projects')

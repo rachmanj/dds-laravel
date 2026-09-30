@@ -647,6 +647,138 @@ class SapService
     }
 
     /**
+     * Cancel a posted stock transfer (ITO) via Service Layer bound action Cancel.
+     *
+     * @return array{ok: bool, http_status: int, message: string}
+     */
+    public function cancelStockTransfer(int $docEntry): array
+    {
+        $this->ensureSession();
+
+        try {
+            $response = $this->client->post("StockTransfers({$docEntry})/Cancel");
+
+            $statusCode = $response->getStatusCode();
+            if ($statusCode === 204) {
+                return [
+                    'ok' => true,
+                    'http_status' => $statusCode,
+                    'message' => 'Pembatalan diterima SAP (HTTP 204).',
+                ];
+            }
+
+            $body = $response->getBody()->getContents();
+
+            return [
+                'ok' => false,
+                'http_status' => $statusCode,
+                'message' => $this->sanitizeSapUserMessage($body !== '' ? $body : 'Respons SAP tidak dikenali.'),
+            ];
+        } catch (RequestException $e) {
+            Log::channel('sap')->error('SAP Stock Transfer cancellation failed: '.$e->getMessage());
+
+            $statusCode = $e->getResponse()?->getStatusCode() ?? 0;
+
+            return [
+                'ok' => false,
+                'http_status' => $statusCode,
+                'message' => $this->sanitizeSapUserMessage($this->parseSapErrorMessage($e)),
+            ];
+        }
+    }
+
+    public function isStockTransferCancelled(int $docEntry): ?bool
+    {
+        try {
+            $rows = DB::connection('sap_sql')->select(
+                'SELECT CANCELED FROM OWTR WHERE DocEntry = ?',
+                [$docEntry]
+            );
+        } catch (\Throwable $e) {
+            Log::channel('sap')->error('SAP SQL CANCELED check failed: '.$e->getMessage());
+
+            return null;
+        }
+
+        if ($rows === []) {
+            return null;
+        }
+
+        $canceled = (string) (($rows[0])->CANCELED ?? ($rows[0])->canceled ?? '');
+
+        return strtoupper(trim($canceled)) === 'Y';
+    }
+
+    public function stockTransferExists(int $docEntry): bool
+    {
+        try {
+            $rows = DB::connection('sap_sql')->select(
+                'SELECT TOP 1 DocEntry FROM OWTR WHERE DocEntry = ?',
+                [$docEntry]
+            );
+        } catch (\Throwable $e) {
+            Log::channel('sap')->error('SAP SQL stock transfer lookup failed: '.$e->getMessage());
+
+            return false;
+        }
+
+        return $rows !== [];
+    }
+
+    public function hasItiForIto(string $itoDocNum): bool
+    {
+        $itoDocNum = trim($itoDocNum);
+        if ($itoDocNum === '') {
+            return false;
+        }
+
+        try {
+            $rows = DB::connection('sap_sql')->select(
+                'SELECT TOP 1 DocEntry FROM OWTR WHERE U_MIS_DocRefNo = ?',
+                [$itoDocNum]
+            );
+        } catch (\Throwable $e) {
+            Log::channel('sap')->error('SAP SQL ITI check failed: '.$e->getMessage());
+
+            return true;
+        }
+
+        return $rows !== [];
+    }
+
+    protected function parseSapErrorMessage(RequestException $exception): string
+    {
+        $response = $exception->getResponse();
+
+        if (! $response) {
+            return $exception->getMessage();
+        }
+
+        $body = (string) $response->getBody();
+        $decoded = json_decode($body, true);
+
+        if (isset($decoded['error']['message']['value'])) {
+            return (string) $decoded['error']['message']['value'];
+        }
+
+        return $body !== '' ? $body : $exception->getMessage();
+    }
+
+    protected function sanitizeSapUserMessage(string $message): string
+    {
+        $message = strip_tags($message);
+        $message = html_entity_decode($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $message = preg_replace('/\s+/u', ' ', $message) ?? $message;
+        $message = trim($message);
+
+        if (mb_strlen($message) > 300) {
+            return mb_substr($message, 0, 297).'...';
+        }
+
+        return $message;
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */

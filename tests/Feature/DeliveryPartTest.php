@@ -62,6 +62,7 @@ class DeliveryPartTest extends TestCase
     {
         return [
             'grpo_no' => 'GRPO-1',
+            'doc_entry' => 10001,
             'ito_no' => 'ITO-100',
             'ito_date' => Carbon::parse('2026-09-10'),
             'ito_created_date' => Carbon::parse('2026-09-10 08:00:00'),
