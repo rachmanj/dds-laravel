@@ -118,7 +118,7 @@ class DeliveryPartImportExcelTest extends TestCase
     private function bindEmptySap(): void
     {
         $fake = Mockery::mock(DeliveryPartQueryService::class);
-        $fake->shouldReceive('rows')->andReturn(collect());
+        $fake->shouldReceive('fetchRowsWithoutCache')->andReturn(collect());
         $this->app->instance(DeliveryPartQueryService::class, $fake);
     }
 
@@ -343,7 +343,7 @@ class DeliveryPartImportExcelTest extends TestCase
         ];
 
         $fake = Mockery::mock(DeliveryPartQueryService::class);
-        $fake->shouldReceive('rows')->andReturn(Collection::make([$sapRow]));
+        $fake->shouldReceive('fetchRowsWithoutCache')->andReturn(Collection::make([$sapRow]));
         $this->app->instance(DeliveryPartQueryService::class, $fake);
 
         $path = storage_path('app/testing-delivery-part-sap.xlsx');
@@ -428,6 +428,158 @@ class DeliveryPartImportExcelTest extends TestCase
         $this->assertNotNull($entry);
         $this->assertNull($entry->no_spb);
         $this->assertSame('Sudah ada', $entry->remarks_barang);
+
+        @unlink($path);
+    }
+
+    public function test_import_splits_sap_fetch_into_multiple_chunks_for_wide_received_dates(): void
+    {
+        $this->createProject('017C', '02-SPT');
+
+        $fake = Mockery::mock(DeliveryPartQueryService::class);
+        $fake->shouldReceive('fetchRowsWithoutCache')
+            ->times(3)
+            ->andReturn(collect());
+        $this->app->instance(DeliveryPartQueryService::class, $fake);
+
+        $path = storage_path('app/testing-delivery-part-chunks.xlsx');
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('017C');
+        $sheet->setCellValue('B5', 'TANGGAL RECEIVED');
+        $sheet->setCellValue('F5', 'NO ITO');
+        $sheet->setCellValue('H5', 'Parts Number');
+        $sheet->setCellValue('B7', '2026-01-01');
+        $sheet->setCellValue('F7', 'ITO-CHUNK');
+        $sheet->setCellValue('H7', 'PART-C');
+        $sheet->setCellValue('I7', 'Deskripsi');
+        $sheet->setCellValue('B8', '2026-03-15');
+        $sheet->setCellValue('F8', 'ITO-CHUNK-2');
+        $sheet->setCellValue('H8', 'PART-D');
+        $sheet->setCellValue('I8', 'Deskripsi');
+        (new Xlsx($spreadsheet))->save($path);
+
+        $service = $this->app->make(DeliveryPartExcelImportService::class);
+        $result = $service->import($path, false);
+
+        $this->assertSame(3, $result['sheets']['017C']['sap_chunks_loaded'] ?? 0);
+
+        @unlink($path);
+    }
+
+    public function test_import_aborts_when_sap_chunk_fails_after_first_successful_chunk(): void
+    {
+        $this->createProject('017C', '02-SPT');
+
+        $fake = Mockery::mock(DeliveryPartQueryService::class);
+        $fake->shouldReceive('fetchRowsWithoutCache')
+            ->once()
+            ->andReturn(collect());
+        $fake->shouldReceive('fetchRowsWithoutCache')
+            ->once()
+            ->andThrow(new \App\Exceptions\SapSqlQueryException('SAP timeout'));
+        $this->app->instance(DeliveryPartQueryService::class, $fake);
+
+        $path = storage_path('app/testing-delivery-part-chunk-fail.xlsx');
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('017C');
+        $sheet->setCellValue('B5', 'TANGGAL RECEIVED');
+        $sheet->setCellValue('F5', 'NO ITO');
+        $sheet->setCellValue('H5', 'Parts Number');
+        $sheet->setCellValue('B7', '2026-01-01');
+        $sheet->setCellValue('F7', 'ITO-FAIL');
+        $sheet->setCellValue('H7', 'PART-F');
+        $sheet->setCellValue('I7', 'Deskripsi');
+        $sheet->setCellValue('B8', '2026-03-15');
+        $sheet->setCellValue('F8', 'ITO-FAIL-2');
+        $sheet->setCellValue('H8', 'PART-G');
+        $sheet->setCellValue('I8', 'Deskripsi');
+        (new Xlsx($spreadsheet))->save($path);
+
+        $service = $this->app->make(DeliveryPartExcelImportService::class);
+
+        $this->expectException(\App\Exceptions\SapSqlQueryException::class);
+        $this->expectExceptionMessage('Gagal membaca data SAP untuk periode');
+
+        $service->import($path, false);
+
+        @unlink($path);
+    }
+
+    public function test_chunked_sap_matching_matches_single_range_results(): void
+    {
+        $this->createProject('017C', '02-SPT');
+
+        $sapRowJanuary = [
+            'grpo_no' => 'G1',
+            'ito_no' => 'ITO-JAN',
+            'ito_date' => Carbon::parse('2026-01-10'),
+            'ito_created_date' => Carbon::parse('2026-01-10'),
+            'iti_no' => null,
+            'iti_date' => null,
+            'item_code' => 'PART-JAN',
+            'description' => 'Desc',
+            'uom' => 'PCS',
+            'qty' => 1.0,
+            'po_no' => 'PO',
+            'pr_no' => null,
+            'mr_no' => null,
+            'unit_no' => 'U1',
+            'vendor' => 'V',
+            'from_warehouse' => '01',
+            'to_warehouse' => '02-SPT',
+            'delivery_status' => 'Not Delivered',
+            'delivery_date' => null,
+            'remarks' => null,
+        ];
+
+        $sapRowMarch = array_merge($sapRowJanuary, [
+            'ito_no' => 'ITO-MAR',
+            'item_code' => 'PART-MAR',
+            'ito_date' => Carbon::parse('2026-03-04'),
+        ]);
+
+        $allRows = collect([$sapRowJanuary, $sapRowMarch]);
+
+        $fake = Mockery::mock(DeliveryPartQueryService::class);
+        $fake->shouldReceive('fetchRowsWithoutCache')
+            ->andReturnUsing(function (Carbon $from, Carbon $to) use ($allRows) {
+                return $allRows->filter(function (array $row) use ($from, $to) {
+                    $date = $row['ito_date'];
+                    if (! $date instanceof Carbon) {
+                        return false;
+                    }
+
+                    return $date->betweenIncluded($from->copy()->startOfDay(), $to->copy()->endOfDay());
+                })->values();
+            });
+        $this->app->instance(DeliveryPartQueryService::class, $fake);
+
+        $path = storage_path('app/testing-delivery-part-parity.xlsx');
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('017C');
+        $sheet->setCellValue('B5', 'TANGGAL RECEIVED');
+        $sheet->setCellValue('F5', 'NO ITO');
+        $sheet->setCellValue('H5', 'Parts Number');
+        $sheet->setCellValue('B7', '2026-01-05');
+        $sheet->setCellValue('F7', 'ITO-JAN');
+        $sheet->setCellValue('H7', 'PART-JAN');
+        $sheet->setCellValue('I7', 'Deskripsi');
+        $sheet->setCellValue('G7', 'U1');
+        $sheet->setCellValue('B8', '2026-03-05');
+        $sheet->setCellValue('F8', 'ITO-MAR');
+        $sheet->setCellValue('H8', 'PART-MAR');
+        $sheet->setCellValue('I8', 'Deskripsi');
+        $sheet->setCellValue('G8', 'U1');
+        (new Xlsx($spreadsheet))->save($path);
+
+        $service = $this->app->make(DeliveryPartExcelImportService::class);
+        $chunked = $service->import($path, false);
+
+        $this->assertSame(2, $chunked['sheets']['017C']['will_create_sap']);
+        $this->assertSame(0, $chunked['sheets']['017C']['will_create_manual']);
 
         @unlink($path);
     }

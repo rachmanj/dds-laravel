@@ -27,6 +27,8 @@ use Yajra\DataTables\Facades\DataTables;
 
 class DeliveryPartController extends Controller
 {
+    private const DATE_RANGE_ERROR = DeliveryPartQueryService::PAGE_DATE_RANGE_ERROR;
+
     public function __construct(
         private DeliveryPartQueryService $queryService,
         private DeliveryPartAssembler $assembler,
@@ -35,11 +37,11 @@ class DeliveryPartController extends Controller
     public function index(Request $request): View
     {
         $sites = $this->loadSiteOptions();
-        [$fromDate, $toDate] = $this->defaultDateRange($request);
+        [$fromDate, $toDate, $dateRangeError] = $this->resolveDateRange($request);
         $selectedProjectCode = $request->string('project')->toString();
         $sapError = null;
 
-        if ($selectedProjectCode !== '' && $sites->contains('code', $selectedProjectCode)) {
+        if ($dateRangeError === null && $selectedProjectCode !== '' && $sites->contains('code', $selectedProjectCode)) {
             try {
                 $this->queryService->rows(Carbon::parse($fromDate), Carbon::parse($toDate));
             } catch (SapSqlQueryException $e) {
@@ -53,13 +55,19 @@ class DeliveryPartController extends Controller
             'toDate' => $toDate,
             'selectedProject' => $selectedProjectCode,
             'sapError' => $sapError,
+            'dateRangeError' => $dateRangeError,
             'ekspedisiOptions' => DeliveryPartEntry::EKSPEDISI_OPTIONS,
         ]);
     }
 
     public function data(Request $request): JsonResponse
     {
-        [$fromDate, $toDate] = $this->resolveDateRange($request);
+        [$fromDate, $toDate, $dateRangeError] = $this->resolveDateRange($request);
+
+        if ($dateRangeError !== null) {
+            return response()->json(['message' => $dateRangeError], 422);
+        }
+
         $project = $this->resolveProject($request);
 
         if ($project === null) {
@@ -152,7 +160,12 @@ class DeliveryPartController extends Controller
 
     public function refresh(Request $request): JsonResponse
     {
-        [$fromDate, $toDate] = $this->resolveDateRange($request);
+        [$fromDate, $toDate, $dateRangeError] = $this->resolveDateRange($request);
+
+        if ($dateRangeError !== null) {
+            return response()->json(['message' => $dateRangeError], 422);
+        }
+
         $this->queryService->bustForRange(Carbon::parse($fromDate), Carbon::parse($toDate));
 
         return response()->json(['message' => 'Cache SAP dibersihkan.']);
@@ -160,7 +173,14 @@ class DeliveryPartController extends Controller
 
     public function export(Request $request): BinaryFileResponse|RedirectResponse
     {
-        [$fromDate, $toDate] = $this->resolveDateRange($request);
+        [$fromDate, $toDate, $dateRangeError] = $this->resolveDateRange($request);
+
+        if ($dateRangeError !== null) {
+            return redirect()
+                ->route('logistics.delivery-part.index', $request->only(['from_date', 'to_date', 'project']))
+                ->withErrors(['date_range' => $dateRangeError]);
+        }
+
         $project = $this->resolveProject($request);
 
         if ($project === null) {
@@ -222,11 +242,17 @@ class DeliveryPartController extends Controller
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: string|null}
      */
     private function resolveDateRange(Request $request): array
     {
-        return $this->defaultDateRange($request);
+        [$fromDate, $toDate] = $this->defaultDateRange($request);
+        $dateRangeError = $this->queryService->validatePageDateRange(
+            Carbon::parse($fromDate),
+            Carbon::parse($toDate),
+        );
+
+        return [$fromDate, $toDate, $dateRangeError];
     }
 
     private function resolveProject(Request $request): ?Project

@@ -106,6 +106,20 @@ class DeliveryPartTest extends TestCase
         $fake = Mockery::mock(DeliveryPartQueryService::class);
         $fake->shouldReceive('rows')->andReturn($rows);
         $fake->shouldReceive('bustForRange')->andReturnNull();
+        $fake->shouldReceive('validatePageDateRange')->andReturnUsing(
+            function (Carbon $from, Carbon $to): ?string {
+                $fromDay = $from->copy()->startOfDay();
+                $toDay = $to->copy()->startOfDay();
+                if ($fromDay->gt($toDay)) {
+                    return DeliveryPartQueryService::PAGE_DATE_RANGE_ERROR;
+                }
+                if ($fromDay->diffInDays($toDay) > DeliveryPartQueryService::MAX_PAGE_DATE_RANGE_DAYS) {
+                    return DeliveryPartQueryService::PAGE_DATE_RANGE_ERROR;
+                }
+
+                return null;
+            },
+        );
         $this->app->instance(DeliveryPartQueryService::class, $fake);
     }
 
@@ -261,6 +275,7 @@ class DeliveryPartTest extends TestCase
         $this->createProjectWithMapping('017C', '02-SPT');
 
         $fake = Mockery::mock(DeliveryPartQueryService::class);
+        $fake->shouldReceive('validatePageDateRange')->andReturn(null);
         $fake->shouldReceive('bustForRange')
             ->once()
             ->with(
@@ -282,6 +297,7 @@ class DeliveryPartTest extends TestCase
         $this->createProjectWithMapping('017C', '02-SPT');
 
         $fake = Mockery::mock(DeliveryPartQueryService::class);
+        $fake->shouldReceive('validatePageDateRange')->andReturn(null);
         $fake->shouldReceive('rows')->andThrow(new \App\Exceptions\SapSqlQueryException('Gagal koneksi'));
         $this->app->instance(DeliveryPartQueryService::class, $fake);
 
@@ -292,6 +308,53 @@ class DeliveryPartTest extends TestCase
                 'to_date' => '2026-09-30',
             ]))
             ->assertStatus(503);
+    }
+
+    public function test_index_rejects_date_range_over_92_days(): void
+    {
+        $this->createProjectWithMapping('017C', '02-SPT');
+        $this->bindFakeSapRows(collect());
+
+        $this->actingAs($this->userWithViewPermission())
+            ->get(route('logistics.delivery-part.index', [
+                'project' => '017C',
+                'from_date' => '2026-01-01',
+                'to_date' => '2026-09-15',
+            ]))
+            ->assertOk()
+            ->assertSee('Rentang tanggal tidak boleh lebih dari 92 hari', false);
+    }
+
+    public function test_data_endpoint_rejects_date_range_over_92_days(): void
+    {
+        $this->createProjectWithMapping('017C', '02-SPT');
+
+        $this->actingAs($this->userWithViewPermission())
+            ->getJson(route('logistics.delivery-part.data', [
+                'project' => '017C',
+                'from_date' => '2026-01-01',
+                'to_date' => '2026-09-15',
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonFragment([
+                'message' => 'Rentang tanggal tidak boleh lebih dari 92 hari.',
+            ]);
+    }
+
+    public function test_export_rejects_date_range_over_92_days(): void
+    {
+        $this->createProjectWithMapping('017C', '02-SPT');
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->givePermissionTo(['view-delivery-part', 'export-delivery-part']);
+
+        $this->actingAs($user)
+            ->get(route('logistics.delivery-part.export', [
+                'project' => '017C',
+                'from_date' => '2026-01-01',
+                'to_date' => '2026-09-15',
+            ]))
+            ->assertSessionHasErrors('date_range');
     }
 
     public function test_permission_seeder_grants_delivery_part_to_logistics_summary_roles(): void

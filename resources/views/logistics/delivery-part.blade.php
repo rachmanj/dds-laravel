@@ -24,6 +24,12 @@
                 </div>
             </div>
 
+            @if ($dateRangeError ?? null)
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-circle mr-1"></i> {{ $dateRangeError }}
+                </div>
+            @endif
+
             @if ($sapError)
                 <div class="alert alert-danger" role="alert">
                     <i class="fas fa-exclamation-circle mr-1"></i> {{ $sapError }}

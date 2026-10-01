@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\SapSqlQueryException;
 use App\Services\Logistics\DeliveryPartExcelImportService;
 use Illuminate\Console\Command;
 
@@ -42,42 +43,20 @@ class DeliveryPartImportExcelCommand extends Command
         $this->newLine();
 
         try {
-            $result = $importService->import($file, $write);
+            $result = $importService->import($file, $write, function (string $sheetName, array $summary): void {
+                $this->printSheetSummary($sheetName, $summary);
+                if (function_exists('flush')) {
+                    flush();
+                }
+            });
+        } catch (SapSqlQueryException $e) {
+            $this->error('Import dibatalkan: '.$e->getMessage());
+
+            return self::FAILURE;
         } catch (\Throwable $e) {
             $this->error('Gagal membaca file: '.$e->getMessage());
 
             return self::FAILURE;
-        }
-
-        foreach ($result['sheets'] as $sheetName => $summary) {
-            $this->info('=== Sheet: '.$sheetName.' ===');
-            if (! empty($summary['skipped'])) {
-                $this->warn('  Dilewati: '.($summary['skip_reason'] ?? 'tidak diketahui'));
-                $this->newLine();
-
-                continue;
-            }
-
-            $this->line('  Baris dibaca: '.($summary['rows_read'] ?? 0));
-            $this->line('  Baris kosong dilewati: '.($summary['rows_empty_skipped'] ?? 0));
-            $this->line('  Cocok dengan DDS: '.($summary['matched'] ?? 0));
-            $this->line('  Akan dibuat (SAP): '.($summary['will_create_sap'] ?? 0));
-            $this->line('  Akan dibuat (manual): '.($summary['will_create_manual'] ?? 0));
-            $this->line('  Akan diisi (kolom kosong): '.($summary['will_fill'] ?? 0));
-            $this->line('  Konflik (sudah terisi): '.($summary['conflicts'] ?? 0));
-            $this->line('  Gagal tulis: '.($summary['write_failures'] ?? 0));
-
-            if (! empty($summary['notes'])) {
-                $this->line('  Catatan:');
-                foreach (array_slice($summary['notes'], 0, 10) as $note) {
-                    $this->line('    - '.$note);
-                }
-                if (count($summary['notes']) > 10) {
-                    $this->line('    ... dan '.(count($summary['notes']) - 10).' catatan lainnya');
-                }
-            }
-
-            $this->newLine();
         }
 
         if ($write) {
@@ -88,6 +67,60 @@ class DeliveryPartImportExcelCommand extends Command
             ));
         }
 
+        $peakBytes = (int) ($result['peak_memory_bytes'] ?? memory_get_peak_usage(true));
+        $this->line(sprintf('Memori puncak: %s', $this->formatBytes($peakBytes)));
+
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary
+     */
+    private function printSheetSummary(string $sheetName, array $summary): void
+    {
+        $this->info('=== Sheet: '.$sheetName.' ===');
+        if (! empty($summary['skipped'])) {
+            $this->warn('  Dilewati: '.($summary['skip_reason'] ?? 'tidak diketahui'));
+            $this->newLine();
+
+            return;
+        }
+
+        $this->line('  Baris dibaca: '.($summary['rows_read'] ?? 0));
+        $this->line('  Baris kosong dilewati: '.($summary['rows_empty_skipped'] ?? 0));
+        $this->line('  Cocok dengan DDS: '.($summary['matched'] ?? 0));
+        $this->line('  Akan dibuat (SAP): '.($summary['will_create_sap'] ?? 0));
+        $this->line('  Akan dibuat (manual): '.($summary['will_create_manual'] ?? 0));
+        $this->line('  Akan diisi (kolom kosong): '.($summary['will_fill'] ?? 0));
+        $this->line('  Konflik (sudah terisi): '.($summary['conflicts'] ?? 0));
+        $this->line('  Gagal tulis: '.($summary['write_failures'] ?? 0));
+        if (isset($summary['sap_chunks_loaded'])) {
+            $this->line('  Chunk SAP dimuat: '.($summary['sap_chunks_loaded'] ?? 0));
+        }
+
+        if (! empty($summary['notes'])) {
+            $this->line('  Catatan:');
+            foreach (array_slice($summary['notes'], 0, 10) as $note) {
+                $this->line('    - '.$note);
+            }
+            if (count($summary['notes']) > 10) {
+                $this->line('    ... dan '.(count($summary['notes']) - 10).' catatan lainnya');
+            }
+        }
+
+        $this->newLine();
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes.' B';
+        }
+
+        if ($bytes < 1024 * 1024) {
+            return round($bytes / 1024, 1).' KB';
+        }
+
+        return round($bytes / (1024 * 1024), 1).' MB';
     }
 }

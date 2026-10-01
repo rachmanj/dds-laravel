@@ -18,6 +18,10 @@ class DeliveryPartExcelImportService
 {
     public const SHEETS = ['017C', '022C', '026C', 'PRATASABA'];
 
+    public const SAP_IMPORT_CHUNK_DAYS = 31;
+
+    private const SAP_IMPORT_FALLBACK_FROM = '2020-01-01';
+
     private const HEADER_ROW_PRIMARY = 5;
 
     private const HEADER_ROW_SECONDARY = 6;
@@ -93,17 +97,15 @@ class DeliveryPartExcelImportService
     ) {}
 
     /**
+     * @param  null|callable(string, array<string, mixed>): void  $onSheetComplete
      * @return array<string, mixed>
      */
-    public function import(string $filePath, bool $write): array
+    public function import(string $filePath, bool $write, ?callable $onSheetComplete = null): array
     {
         $spreadsheet = $this->loadSpreadsheet($filePath);
         $globalInserts = 0;
         $globalUpdates = 0;
         $sheetSummaries = [];
-
-        $sapRowsByKey = null;
-        $sapUnavailable = false;
 
         foreach (self::SHEETS as $sheetName) {
             $worksheet = $spreadsheet->getSheetByName($sheetName);
@@ -139,20 +141,13 @@ class DeliveryPartExcelImportService
             $columnMap = self::COLUMN_POSITION_MAP;
 
             $isPratasaba = $sheetName === 'PRATASABA';
-            $sapKeyIndex = collect();
 
-            if (! $isPratasaba) {
-                if ($sapRowsByKey === null) {
-                    [$sapRowsByKey, $sapUnavailable] = $this->loadSapIndex();
-                }
-
-                $warehouseCodes = LogisticsWarehouseProject::query()
+            $warehouseCodes = $isPratasaba
+                ? collect()
+                : LogisticsWarehouseProject::query()
                     ->where('project_id', $project->id)
                     ->where('is_active', true)
                     ->pluck('whs_code');
-
-                $sapKeyIndex = $this->buildProjectSapKeyIndex($sapRowsByKey, $warehouseCodes);
-            }
 
             $entries = DeliveryPartEntry::query()
                 ->where('project_id', $project->id)
@@ -175,15 +170,15 @@ class DeliveryPartExcelImportService
                 'write_failures' => 0,
                 'notes' => [],
                 'failure_messages' => [],
+                'sap_chunks_loaded' => 0,
             ];
-
-            if ($sapUnavailable && ! $isPratasaba) {
-                $summary['notes'][] = 'Koneksi SAP tidak tersedia; baris baru tanpa match DDS akan dibuat sebagai manual.';
-            }
 
             foreach ($this->headerSanityNotes($worksheet) as $headerNote) {
                 $summary['notes'][] = $headerNote;
             }
+
+            /** @var list<array{row: int, ito: string, item: string, unit: string, match_key: string, manual: array<string, mixed>, received_date: ?Carbon}> $pendingSapRows */
+            $pendingSapRows = [];
 
             for ($row = self::DATA_START_ROW; $row <= $highestRow; $row++) {
                 $rowData = $this->readRow($worksheet, $columnMap, $row);
@@ -240,39 +235,74 @@ class DeliveryPartExcelImportService
                     continue;
                 }
 
-                $sapRow = $sapKeyIndex->get($matchKey);
-                if ($sapRow !== null) {
-                    $summary['will_create_sap']++;
-                    if ($write) {
-                        $created = $this->createSapEntry($project->id, $sapRow, $manualFromExcel);
-                        if ($created) {
-                            $globalInserts++;
-                            $entries->put($matchKey, $created);
-                        } else {
-                            $summary['write_failures']++;
-                        }
-                    }
-                } else {
-                    $summary['will_create_manual']++;
-                    if ($sapUnavailable) {
-                        $summary['notes'][] = 'Baris '.$row.': tidak dicocokkan ke SAP (koneksi tidak tersedia).';
-                    } else {
-                        $summary['notes'][] = 'Baris '.$row.': tidak dicocokkan ke SAP.';
-                    }
+                $pendingSapRows[] = [
+                    'row' => $row,
+                    'ito' => $ito,
+                    'item' => $item,
+                    'unit' => $unit,
+                    'match_key' => $matchKey,
+                    'manual' => $manualFromExcel,
+                    'received_date' => $this->parseReceivedDate($rowData['tanggal_received'] ?? null),
+                ];
+            }
 
-                    if ($write) {
-                        $created = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel);
-                        if ($created) {
-                            $globalInserts++;
-                            $entries->put($matchKey, $created);
+            if ($pendingSapRows !== []) {
+                [$sapMatches, $sapUnavailable, $chunksLoaded] = $this->loadSapMatchesForPendingRows(
+                    $pendingSapRows,
+                    $warehouseCodes,
+                );
+                $summary['sap_chunks_loaded'] = $chunksLoaded;
+
+                if ($sapUnavailable) {
+                    $summary['notes'][] = 'Koneksi SAP tidak tersedia; baris baru tanpa match DDS akan dibuat sebagai manual.';
+                }
+
+                foreach ($pendingSapRows as $pending) {
+                    $row = $pending['row'];
+                    $matchKey = $pending['match_key'];
+                    $manualFromExcel = $pending['manual'];
+                    $ito = $pending['ito'];
+                    $item = $pending['item'];
+                    $unit = $pending['unit'];
+
+                    $sapRow = $sapMatches[$matchKey] ?? null;
+                    if ($sapRow !== null) {
+                        $summary['will_create_sap']++;
+                        if ($write) {
+                            $created = $this->createSapEntry($project->id, $sapRow, $manualFromExcel);
+                            if ($created) {
+                                $globalInserts++;
+                                $entries->put($matchKey, $created);
+                            } else {
+                                $summary['write_failures']++;
+                            }
+                        }
+                    } else {
+                        $summary['will_create_manual']++;
+                        if ($sapUnavailable) {
+                            $summary['notes'][] = 'Baris '.$row.': tidak dicocokkan ke SAP (koneksi tidak tersedia).';
                         } else {
-                            $summary['write_failures']++;
+                            $summary['notes'][] = 'Baris '.$row.': tidak dicocokkan ke SAP.';
+                        }
+
+                        if ($write) {
+                            $created = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel);
+                            if ($created) {
+                                $globalInserts++;
+                                $entries->put($matchKey, $created);
+                            } else {
+                                $summary['write_failures']++;
+                            }
                         }
                     }
                 }
             }
 
             $sheetSummaries[$sheetName] = $summary;
+
+            if ($onSheetComplete !== null) {
+                $onSheetComplete($sheetName, $summary);
+            }
         }
 
         return [
@@ -280,6 +310,7 @@ class DeliveryPartExcelImportService
             'total_inserts' => $globalInserts,
             'total_updates' => $globalUpdates,
             'dry_run' => ! $write,
+            'peak_memory_bytes' => memory_get_peak_usage(true),
         ];
     }
 
@@ -298,49 +329,135 @@ class DeliveryPartExcelImportService
     }
 
     /**
-     * @return array{0: Collection<string, array<string, mixed>>, 1: bool}
+     * @param  list<array{row: int, ito: string, item: string, unit: string, match_key: string, manual: array<string, mixed>, received_date: ?Carbon}>  $pendingSapRows
+     * @param  Collection<int, string>  $warehouseCodes
+     * @return array{0: array<string, array<string, mixed>>, 1: bool, 2: int}
      */
-    private function loadSapIndex(): array
+    private function loadSapMatchesForPendingRows(array $pendingSapRows, Collection $warehouseCodes): array
     {
-        try {
-            $from = Carbon::parse('2020-01-01');
-            $to = Carbon::now()->addYear();
-            $rows = $this->queryService->rows($from, $to);
+        [$minDate, $maxDate] = $this->resolveSapDateBoundsFromPendingRows($pendingSapRows);
+        $chunks = $this->sapDateChunks($minDate, $maxDate);
+        $sapMatches = [];
+        $sapUnavailable = false;
+        $chunksLoaded = 0;
+        $warehouseSet = $warehouseCodes->flip();
 
-            $index = collect();
+        foreach ($chunks as $chunkIndex => [$chunkFrom, $chunkTo]) {
+            try {
+                $rows = $this->queryService->fetchRowsWithoutCache($chunkFrom, $chunkTo);
+            } catch (SapSqlQueryException $e) {
+                if ($chunkIndex === 0) {
+                    $sapUnavailable = true;
+
+                    return [[], true, 0];
+                }
+
+                throw SapSqlQueryException::connectionFailed(
+                    'Gagal membaca data SAP untuk periode '.$chunkFrom->toDateString()
+                    .' s/d '.$chunkTo->toDateString().': '.$e->getMessage()
+                );
+            }
+
+            $chunksLoaded++;
+
+            $chunkIndexByKey = [];
             foreach ($rows as $row) {
+                $toWarehouse = $row['to_warehouse'] ?? null;
+                if ($toWarehouse === null || ! $warehouseSet->has($toWarehouse)) {
+                    continue;
+                }
+
                 $key = $this->matchKey(
                     $this->normalizeKeyPart($row['ito_no'] ?? null),
                     $this->normalizeKeyPart($row['item_code'] ?? null),
                     $this->normalizeUnitNo($row['unit_no'] ?? null),
                 );
-                $index->put($key, $row);
+                $chunkIndexByKey[$key] = $row;
             }
 
-            return [$index, false];
-        } catch (SapSqlQueryException|Throwable) {
-            return [collect(), true];
+            unset($rows);
+
+            foreach ($pendingSapRows as $pending) {
+                $receivedDate = $pending['received_date'];
+                if ($receivedDate !== null && ($receivedDate->lt($chunkFrom) || $receivedDate->gt($chunkTo))) {
+                    continue;
+                }
+
+                $matchKey = $pending['match_key'];
+                if (isset($chunkIndexByKey[$matchKey])) {
+                    $sapMatches[$matchKey] = $chunkIndexByKey[$matchKey];
+                }
+            }
+
+            unset($chunkIndexByKey);
         }
+
+        return [$sapMatches, $sapUnavailable, $chunksLoaded];
     }
 
     /**
-     * @param  Collection<string, array<string, mixed>>  $sapRowsByKey
-     * @param  Collection<int, string>  $warehouseCodes
-     * @return Collection<string, array<string, mixed>>
+     * @param  list<array{row: int, ito: string, item: string, unit: string, match_key: string, manual: array<string, mixed>, received_date: ?Carbon}>  $pendingSapRows
+     * @return array{0: Carbon, 1: Carbon}
      */
-    private function buildProjectSapKeyIndex(Collection $sapRowsByKey, Collection $warehouseCodes): Collection
+    private function resolveSapDateBoundsFromPendingRows(array $pendingSapRows): array
     {
-        $warehouseSet = $warehouseCodes->flip();
-        $filtered = collect();
+        $min = null;
+        $max = null;
 
-        foreach ($sapRowsByKey as $key => $row) {
-            $toWarehouse = $row['to_warehouse'] ?? null;
-            if ($toWarehouse !== null && $warehouseSet->has($toWarehouse)) {
-                $filtered->put($key, $row);
+        foreach ($pendingSapRows as $pending) {
+            $date = $pending['received_date'];
+            if ($date === null) {
+                continue;
+            }
+
+            if ($min === null || $date->lt($min)) {
+                $min = $date->copy();
+            }
+            if ($max === null || $date->gt($max)) {
+                $max = $date->copy();
             }
         }
 
-        return $filtered;
+        if ($min === null || $max === null) {
+            return [
+                Carbon::parse(self::SAP_IMPORT_FALLBACK_FROM)->startOfDay(),
+                Carbon::now()->addYear()->endOfDay(),
+            ];
+        }
+
+        return [$min->copy()->startOfDay(), $max->copy()->startOfDay()];
+    }
+
+    /**
+     * @return list<array{0: Carbon, 1: Carbon}>
+     */
+    private function sapDateChunks(Carbon $minDate, Carbon $maxDate, int $chunkDays = self::SAP_IMPORT_CHUNK_DAYS): array
+    {
+        $chunks = [];
+        $cursor = $minDate->copy()->startOfDay();
+        $end = $maxDate->copy()->startOfDay();
+
+        while ($cursor->lte($end)) {
+            $chunkEnd = $cursor->copy()->addDays($chunkDays - 1);
+            if ($chunkEnd->gt($end)) {
+                $chunkEnd = $end->copy();
+            }
+
+            $chunks[] = [$cursor->copy(), $chunkEnd->copy()];
+            $cursor = $chunkEnd->copy()->addDay();
+        }
+
+        return $chunks;
+    }
+
+    private function parseReceivedDate(mixed $value): ?Carbon
+    {
+        [$date, $note] = $this->parseDeliveryDate($value);
+        if ($note !== null) {
+            return null;
+        }
+
+        return $date;
     }
 
     /**

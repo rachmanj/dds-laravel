@@ -12,6 +12,12 @@ use Throwable;
 
 class DeliveryPartQueryService
 {
+    public const MAX_CACHE_PAYLOAD_BYTES = 262144;
+
+    public const MAX_PAGE_DATE_RANGE_DAYS = 92;
+
+    public const PAGE_DATE_RANGE_ERROR = 'Rentang tanggal tidak boleh lebih dari 92 hari.';
+
     private const CACHE_TTL_SECONDS = 300;
 
     private const DISTINCT_WAREHOUSE_CACHE_TTL_SECONDS = 600;
@@ -20,15 +26,42 @@ class DeliveryPartQueryService
     {
         $cacheKey = $this->cacheKey($fromDate, $toDate);
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($fromDate, $toDate) {
-            return $this->fetchRows($fromDate, $toDate);
-        });
+        $cached = $this->cacheGet($cacheKey);
+        if ($cached instanceof Collection) {
+            return $cached;
+        }
+
+        $rows = $this->fetchRows($fromDate, $toDate);
+        $this->cachePutIfSmall($cacheKey, $rows, self::CACHE_TTL_SECONDS, 'delivery_part_sap_rows');
+
+        return $rows;
+    }
+
+    public function fetchRowsWithoutCache(Carbon $fromDate, Carbon $toDate): Collection
+    {
+        return $this->fetchRows($fromDate, $toDate);
+    }
+
+    public function validatePageDateRange(Carbon $fromDate, Carbon $toDate): ?string
+    {
+        $from = $fromDate->copy()->startOfDay();
+        $to = $toDate->copy()->startOfDay();
+
+        if ($from->gt($to)) {
+            return self::PAGE_DATE_RANGE_ERROR;
+        }
+
+        if ($from->diffInDays($to) > self::MAX_PAGE_DATE_RANGE_DAYS) {
+            return self::PAGE_DATE_RANGE_ERROR;
+        }
+
+        return null;
     }
 
     public function bust(?Carbon $fromDate = null, ?Carbon $toDate = null): void
     {
         if ($fromDate !== null && $toDate !== null) {
-            Cache::forget($this->cacheKey($fromDate, $toDate));
+            $this->cacheForget($this->cacheKey($fromDate, $toDate));
 
             return;
         }
@@ -38,8 +71,8 @@ class DeliveryPartQueryService
 
     public function bustForRange(Carbon $fromDate, Carbon $toDate): void
     {
-        Cache::forget($this->cacheKey($fromDate, $toDate));
-        Cache::forget($this->distinctWarehouseCacheKey($fromDate, $toDate));
+        $this->cacheForget($this->cacheKey($fromDate, $toDate));
+        $this->cacheForget($this->distinctWarehouseCacheKey($fromDate, $toDate));
     }
 
     /**
@@ -49,9 +82,15 @@ class DeliveryPartQueryService
     {
         $cacheKey = $this->distinctWarehouseCacheKey($fromDate, $toDate);
 
-        return Cache::remember($cacheKey, self::DISTINCT_WAREHOUSE_CACHE_TTL_SECONDS, function () use ($fromDate, $toDate) {
-            return $this->fetchDistinctToWarehouses($fromDate, $toDate);
-        });
+        $cached = $this->cacheGet($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $rows = $this->fetchDistinctToWarehouses($fromDate, $toDate);
+        $this->cachePutIfSmall($cacheKey, $rows, self::DISTINCT_WAREHOUSE_CACHE_TTL_SECONDS, 'delivery_part_distinct_to_wh');
+
+        return $rows;
     }
 
     private function cacheKey(Carbon $fromDate, Carbon $toDate): string
@@ -62,6 +101,53 @@ class DeliveryPartQueryService
     private function distinctWarehouseCacheKey(Carbon $fromDate, Carbon $toDate): string
     {
         return 'delivery_part_distinct_to_wh:'.$fromDate->toDateString().'|'.$toDate->toDateString();
+    }
+
+    private function cacheGet(string $key): mixed
+    {
+        try {
+            return Cache::get($key);
+        } catch (Throwable $e) {
+            Log::warning('Delivery Part cache get failed: '.$e->getMessage(), ['key' => $key]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>|list<array{whs_code: string, row_count: int, document_count: int}>  $payload
+     */
+    private function cachePutIfSmall(string $key, Collection|array $payload, int $ttlSeconds, string $context): void
+    {
+        try {
+            $serialized = serialize($payload instanceof Collection ? $payload->all() : $payload);
+            if (strlen($serialized) > self::MAX_CACHE_PAYLOAD_BYTES) {
+                Log::debug('Delivery Part cache skipped: payload exceeds safe size', [
+                    'context' => $context,
+                    'key' => $key,
+                    'bytes' => strlen($serialized),
+                    'max_bytes' => self::MAX_CACHE_PAYLOAD_BYTES,
+                ]);
+
+                return;
+            }
+
+            Cache::put($key, $payload, $ttlSeconds);
+        } catch (Throwable $e) {
+            Log::warning('Delivery Part cache put failed: '.$e->getMessage(), [
+                'context' => $context,
+                'key' => $key,
+            ]);
+        }
+    }
+
+    private function cacheForget(string $key): void
+    {
+        try {
+            Cache::forget($key);
+        } catch (Throwable $e) {
+            Log::warning('Delivery Part cache forget failed: '.$e->getMessage(), ['key' => $key]);
+        }
     }
 
     /**
