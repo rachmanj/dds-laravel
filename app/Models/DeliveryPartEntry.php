@@ -41,6 +41,7 @@ class DeliveryPartEntry extends Model
         'item_code',
         'unit_no',
         'source',
+        'tanggal_received',
         'source_ref',
         'no_spb',
         'remarks_barang',
@@ -55,6 +56,7 @@ class DeliveryPartEntry extends Model
     protected function casts(): array
     {
         return [
+            'tanggal_received' => 'date',
             'tgl_delivery' => 'date',
         ];
     }

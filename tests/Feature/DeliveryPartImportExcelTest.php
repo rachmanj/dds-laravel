@@ -96,6 +96,9 @@ class DeliveryPartImportExcelTest extends TestCase
 
         $rowNum = 7;
         foreach ($dataRows as $row) {
+            if (array_key_exists('tanggal_received', $row)) {
+                $sheet->setCellValue('B'.$rowNum, $row['tanggal_received']);
+            }
             $sheet->setCellValue('E'.$rowNum, $row['no_spb'] ?? '');
             $sheet->setCellValue('F'.$rowNum, $row['ito_no'] ?? '');
             $sheet->setCellValue('G'.$rowNum, $row['unit_no'] ?? '');
@@ -875,6 +878,94 @@ class DeliveryPartImportExcelTest extends TestCase
 
         $this->assertSame(2, DeliveryPartEntry::query()->where('project_id', $project->id)->count());
         $this->assertStringContainsString('Ringkasan akhir: 0 insert', $output);
+
+        @unlink($path);
+    }
+
+    public function test_import_sets_tanggal_received_from_excel_serial(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-received-serial.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'tanggal_received' => 46031,
+                'ito_no' => 'ITO-RCV-SERIAL',
+                'item_code' => 'PART-RCV',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-RCV',
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $entry = DeliveryPartEntry::query()->where('project_id', $project->id)->where('ito_no', 'ITO-RCV-SERIAL')->first();
+        $this->assertNotNull($entry);
+        $this->assertSame('2026-01-09', $entry->tanggal_received?->toDateString());
+
+        @unlink($path);
+    }
+
+    public function test_import_sets_tanggal_received_from_dd_mm_yyyy_string(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-received-dotted.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'tanggal_received' => '09.01.2026',
+                'ito_no' => 'ITO-RCV-DOT',
+                'item_code' => 'PART-DOT',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-DOT',
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $entry = DeliveryPartEntry::query()->where('project_id', $project->id)->where('ito_no', 'ITO-RCV-DOT')->first();
+        $this->assertNotNull($entry);
+        $this->assertSame('2026-01-09', $entry->tanggal_received?->toDateString());
+
+        @unlink($path);
+    }
+
+    public function test_import_does_not_overwrite_existing_tanggal_received(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-RCV-KEEP',
+            'item_code' => 'PART-KEEP',
+            'unit_no' => 'U1',
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'tanggal_received' => '2026-08-15',
+            'no_spb' => 'SPB-OLD',
+        ]);
+
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-received-no-overwrite.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'tanggal_received' => 46031,
+                'ito_no' => 'ITO-RCV-KEEP',
+                'item_code' => 'PART-KEEP',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-NEW',
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $entry = DeliveryPartEntry::query()->where('project_id', $project->id)->where('ito_no', 'ITO-RCV-KEEP')->first();
+        $this->assertSame('2026-08-15', $entry->tanggal_received?->toDateString());
 
         @unlink($path);
     }

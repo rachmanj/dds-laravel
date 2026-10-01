@@ -19,6 +19,8 @@ class DeliveryPartAssembler
         Collection $warehouseCodes,
         Collection $entries,
         int $projectId,
+        ?Carbon $fromDate = null,
+        ?Carbon $toDate = null,
     ): Collection {
         $warehouseSet = $warehouseCodes->flip();
         $entriesByKey = $entries->keyBy(fn (DeliveryPartEntry $entry) => $this->lineKey(
@@ -58,6 +60,10 @@ class DeliveryPartAssembler
             }
 
             if ((int) $entry->project_id !== $projectId) {
+                continue;
+            }
+
+            if (! $this->manualEntryInDateRange($entry, $fromDate, $toDate)) {
                 continue;
             }
 
@@ -121,7 +127,7 @@ class DeliveryPartAssembler
             'doc_entry' => null,
             'to_warehouse' => null,
             'source' => DeliveryPartEntry::SOURCE_MANUAL,
-            'tanggal_received' => null,
+            'tanggal_received' => $this->formatDate($entry->tanggal_received),
             'supplier' => null,
             'po_number' => null,
             'no_spb' => $entry->no_spb,
@@ -150,6 +156,30 @@ class DeliveryPartAssembler
     public function lineKey(?string $itoNo, ?string $itemCode, ?string $unitNo): string
     {
         return implode("\0", [$itoNo ?? '', $itemCode ?? '', $unitNo ?? '']);
+    }
+
+    private function manualEntryInDateRange(
+        DeliveryPartEntry $entry,
+        ?Carbon $fromDate,
+        ?Carbon $toDate,
+    ): bool {
+        if ($fromDate === null || $toDate === null) {
+            return true;
+        }
+
+        $effective = $entry->tanggal_received ?? $entry->tgl_delivery;
+        if ($effective === null) {
+            return true;
+        }
+
+        $day = $effective instanceof Carbon
+            ? $effective->copy()->startOfDay()
+            : Carbon::parse((string) $effective)->startOfDay();
+
+        $from = $fromDate->copy()->startOfDay();
+        $to = $toDate->copy()->startOfDay();
+
+        return $day->betweenIncluded($from, $to);
     }
 
     private function formatDate(mixed $value): ?string

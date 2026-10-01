@@ -219,6 +219,8 @@ class DeliveryPartExcelImportService
                     $summary['notes'][] = 'Baris '.$row.': '.$note;
                 }
 
+                $receivedDate = $this->parseReceivedDate($rowData['tanggal_received'] ?? null);
+
                 $sourceRef = $this->buildSourceRef($sheetName, $row);
 
                 if ($this->isEligibleMatchKey($ito, $item) && isset($firstRowByMatchKey[$matchKey])) {
@@ -239,7 +241,7 @@ class DeliveryPartExcelImportService
 
                 if ($entry !== null) {
                     $summary['matched']++;
-                    $result = $this->applyToExistingEntry($entry, $manualFromExcel, $write, $sourceRef, $entriesBySourceRef);
+                    $result = $this->applyToExistingEntry($entry, $manualFromExcel, $write, $sourceRef, $entriesBySourceRef, $receivedDate);
                     if ($result['conflict']) {
                         $summary['conflicts']++;
                     }
@@ -268,7 +270,7 @@ class DeliveryPartExcelImportService
                 if ($isPratasaba) {
                     $summary['will_create_manual']++;
                     if ($write) {
-                        $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel, $sourceRef);
+                        $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel, $sourceRef, $receivedDate);
                         if ($createResult['entry'] !== null) {
                             $globalInserts++;
                             $this->registerCreatedEntry($entries, $entriesBySourceRef, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
@@ -295,7 +297,7 @@ class DeliveryPartExcelImportService
                     'unit' => $unit,
                     'match_key' => $matchKey,
                     'manual' => $manualFromExcel,
-                    'received_date' => $this->parseReceivedDate($rowData['tanggal_received'] ?? null),
+                    'received_date' => $receivedDate,
                 ];
             }
 
@@ -334,9 +336,11 @@ class DeliveryPartExcelImportService
                     }
 
                     $entry = $this->resolveExistingEntry($sourceRef, $ito, $item, $unit, $entriesBySourceRef, $entries);
+                    $receivedDate = $pending['received_date'] ?? null;
+
                     if ($entry !== null) {
                         $summary['matched']++;
-                        $result = $this->applyToExistingEntry($entry, $manualFromExcel, $write, $sourceRef, $entriesBySourceRef);
+                        $result = $this->applyToExistingEntry($entry, $manualFromExcel, $write, $sourceRef, $entriesBySourceRef, $receivedDate);
                         if ($result['conflict']) {
                             $summary['conflicts']++;
                         }
@@ -366,7 +370,7 @@ class DeliveryPartExcelImportService
                     if ($sapRow !== null) {
                         $summary['will_create_sap']++;
                         if ($write) {
-                            $createResult = $this->createSapEntry($project->id, $sapRow, $manualFromExcel, $sourceRef);
+                            $createResult = $this->createSapEntry($project->id, $sapRow, $manualFromExcel, $sourceRef, $receivedDate);
                             if ($createResult['entry'] !== null) {
                                 $globalInserts++;
                                 $this->registerCreatedEntry($entries, $entriesBySourceRef, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
@@ -390,7 +394,7 @@ class DeliveryPartExcelImportService
                         }
 
                         if ($write) {
-                            $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel, $sourceRef);
+                            $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel, $sourceRef, $receivedDate);
                             if ($createResult['entry'] !== null) {
                                 $globalInserts++;
                                 $this->registerCreatedEntry($entries, $entriesBySourceRef, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
@@ -916,6 +920,7 @@ class DeliveryPartExcelImportService
         bool $write,
         string $sourceRef,
         Collection $entriesBySourceRef,
+        ?Carbon $receivedDate = null,
     ): array {
         $hasConflict = false;
         $hasFill = false;
@@ -923,6 +928,11 @@ class DeliveryPartExcelImportService
 
         if ($entry->source_ref === null || $entry->source_ref === '') {
             $updates['source_ref'] = $sourceRef;
+            $hasFill = true;
+        }
+
+        if ($receivedDate !== null && ! $this->fieldIsFilled('tanggal_received', $entry->tanggal_received)) {
+            $updates['tanggal_received'] = $receivedDate;
             $hasFill = true;
         }
 
@@ -1003,8 +1013,13 @@ class DeliveryPartExcelImportService
      * @param  array<string, mixed>  $manualFromExcel
      * @return array{entry: ?DeliveryPartEntry, error: ?string}
      */
-    private function createSapEntry(int $projectId, array $sapRow, array $manualFromExcel, string $sourceRef): array
-    {
+    private function createSapEntry(
+        int $projectId,
+        array $sapRow,
+        array $manualFromExcel,
+        string $sourceRef,
+        ?Carbon $receivedDate = null,
+    ): array {
         try {
             return [
                 'entry' => DeliveryPartEntry::query()->create([
@@ -1013,6 +1028,7 @@ class DeliveryPartExcelImportService
                     'item_code' => $sapRow['item_code'] ?? null,
                     'unit_no' => $sapRow['unit_no'] ?? null,
                     'source' => DeliveryPartEntry::SOURCE_SAP,
+                    'tanggal_received' => $receivedDate,
                     'source_ref' => $sourceRef,
                     'no_spb' => $manualFromExcel['no_spb'] ?? null,
                     'remarks_barang' => $manualFromExcel['remarks_barang'] ?? null,
@@ -1042,6 +1058,7 @@ class DeliveryPartExcelImportService
         string $unit,
         array $manualFromExcel,
         string $sourceRef,
+        ?Carbon $receivedDate = null,
     ): array {
         try {
             return [
@@ -1051,6 +1068,7 @@ class DeliveryPartExcelImportService
                     'item_code' => $item !== '' ? $item : null,
                     'unit_no' => $unit !== '' ? $unit : null,
                     'source' => DeliveryPartEntry::SOURCE_MANUAL,
+                    'tanggal_received' => $receivedDate,
                     'source_ref' => $sourceRef,
                     'no_spb' => $manualFromExcel['no_spb'] ?? null,
                     'remarks_barang' => $manualFromExcel['remarks_barang'] ?? null,

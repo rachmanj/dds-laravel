@@ -281,7 +281,14 @@ class DeliveryPartController extends Controller
             ->where('project_id', $project->id)
             ->get();
 
-        return $this->assembler->assemble($sapRows, $warehouseCodes, $entries, $project->id);
+        return $this->assembler->assemble(
+            $sapRows,
+            $warehouseCodes,
+            $entries,
+            $project->id,
+            Carbon::parse($fromDate),
+            Carbon::parse($toDate),
+        );
     }
 
     /**

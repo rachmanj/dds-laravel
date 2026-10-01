@@ -7,6 +7,7 @@ use App\Models\DeliveryPartEntry;
 use App\Models\LogisticsWarehouseProject;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Logistics\DeliveryPartAssembler;
 use App\Services\Logistics\DeliveryPartQueryService;
 use Carbon\Carbon;
 use Database\Seeders\DeliveryPartPermissionSeeder;
@@ -355,6 +356,183 @@ class DeliveryPartTest extends TestCase
                 'to_date' => '2026-09-15',
             ]))
             ->assertSessionHasErrors('date_range');
+    }
+
+    public function test_manual_entry_outside_period_is_excluded_from_data(): void
+    {
+        $project = $this->createProjectWithMapping('017C', '02-SPT');
+        $this->bindFakeSapRows(collect());
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-AUG',
+            'item_code' => 'PART-AUG',
+            'unit_no' => 'U-AUG',
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'tanggal_received' => '2026-08-20',
+            'no_spb' => 'SPB-AUG',
+        ]);
+
+        $response = $this->actingAs($this->userWithViewPermission())
+            ->getJson(route('logistics.delivery-part.data', [
+                'project' => '017C',
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-30',
+            ]));
+
+        $response->assertOk();
+        $html = json_encode($response->json('data'));
+        $this->assertStringNotContainsString('SPB-AUG', $html);
+        $this->assertSame(0, (int) $response->json('recordsTotal'));
+    }
+
+    public function test_manual_entry_inside_period_is_included_in_data(): void
+    {
+        $project = $this->createProjectWithMapping('017C', '02-SPT');
+        $this->bindFakeSapRows(collect());
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-SEP',
+            'item_code' => 'PART-SEP',
+            'unit_no' => 'U-SEP',
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'tanggal_received' => '2026-09-12',
+            'no_spb' => 'SPB-SEP',
+        ]);
+
+        $response = $this->actingAs($this->userWithViewPermission())
+            ->getJson(route('logistics.delivery-part.data', [
+                'project' => '017C',
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-30',
+            ]));
+
+        $response->assertOk();
+        $this->assertSame(1, (int) $response->json('recordsTotal'));
+        $this->assertStringContainsString('SPB-SEP', json_encode($response->json('data')));
+    }
+
+    public function test_manual_entry_without_dates_always_shown_in_period_filter(): void
+    {
+        $project = $this->createProjectWithMapping('017C', '02-SPT');
+        $this->bindFakeSapRows(collect());
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-NODATE',
+            'item_code' => 'PART-NODATE',
+            'unit_no' => 'U-ND',
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'no_spb' => 'SPB-NODATE',
+        ]);
+
+        $response = $this->actingAs($this->userWithViewPermission())
+            ->getJson(route('logistics.delivery-part.data', [
+                'project' => '017C',
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-30',
+            ]));
+
+        $response->assertOk();
+        $this->assertSame(1, (int) $response->json('recordsTotal'));
+        $this->assertStringContainsString('SPB-NODATE', json_encode($response->json('data')));
+    }
+
+    public function test_manual_entry_uses_tgl_delivery_when_tanggal_received_missing(): void
+    {
+        $project = $this->createProjectWithMapping('017C', '02-SPT');
+        $this->bindFakeSapRows(collect());
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-DEL',
+            'item_code' => 'PART-DEL',
+            'unit_no' => 'U-DEL',
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'tgl_delivery' => '2026-09-05',
+            'no_spb' => 'SPB-DEL',
+        ]);
+
+        $response = $this->actingAs($this->userWithViewPermission())
+            ->getJson(route('logistics.delivery-part.data', [
+                'project' => '017C',
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-30',
+            ]));
+
+        $response->assertOk();
+        $this->assertSame(1, (int) $response->json('recordsTotal'));
+
+        $responseOut = $this->actingAs($this->userWithViewPermission())
+            ->getJson(route('logistics.delivery-part.data', [
+                'project' => '017C',
+                'from_date' => '2026-08-01',
+                'to_date' => '2026-08-31',
+            ]));
+
+        $responseOut->assertOk();
+        $this->assertSame(0, (int) $responseOut->json('recordsTotal'));
+    }
+
+    public function test_manual_matching_sap_key_is_not_duplicated_as_manual_row(): void
+    {
+        $project = $this->createProjectWithMapping('017C', '02-SPT');
+        $this->bindFakeSapRows(collect([$this->sampleSapRow()]));
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-100',
+            'item_code' => 'PART-001',
+            'unit_no' => 'U-77',
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'tanggal_received' => '2026-08-01',
+            'no_spb' => 'SPB-SHOULD-NOT-SHOW-ALONE',
+        ]);
+
+        $response = $this->actingAs($this->userWithViewPermission())
+            ->getJson(route('logistics.delivery-part.data', [
+                'project' => '017C',
+                'from_date' => '2026-09-01',
+                'to_date' => '2026-09-30',
+            ]));
+
+        $response->assertOk();
+        $this->assertSame(1, (int) $response->json('recordsTotal'));
+        $this->assertStringContainsString('ITO-100', json_encode($response->json('data')));
+    }
+
+    public function test_export_excludes_manual_entries_outside_period(): void
+    {
+        $project = $this->createProjectWithMapping('017C', '02-SPT');
+        $this->bindFakeSapRows(collect());
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-EXP-OUT',
+            'item_code' => 'PART-EXP',
+            'unit_no' => 'U-EXP',
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'tanggal_received' => '2026-07-01',
+            'no_spb' => 'SPB-EXPORT-OUT',
+        ]);
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->givePermissionTo(['view-delivery-part', 'export-delivery-part']);
+
+        $export = new DeliveryPartExport(
+            app(DeliveryPartAssembler::class)->assemble(
+                collect(),
+                LogisticsWarehouseProject::query()->where('project_id', $project->id)->pluck('whs_code'),
+                DeliveryPartEntry::query()->where('project_id', $project->id)->get(),
+                $project->id,
+                Carbon::parse('2026-09-01'),
+                Carbon::parse('2026-09-30'),
+            ),
+        );
+
+        $rows = iterator_to_array($export->generator());
+        $this->assertCount(0, $rows);
     }
 
     public function test_permission_seeder_grants_delivery_part_to_logistics_summary_roles(): void
