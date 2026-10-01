@@ -149,9 +149,17 @@ class DeliveryPartExcelImportService
                     ->where('is_active', true)
                     ->pluck('whs_code');
 
-            $entries = DeliveryPartEntry::query()
+            $projectEntries = DeliveryPartEntry::query()
                 ->where('project_id', $project->id)
-                ->get()
+                ->get();
+
+            /** @var Collection<string, DeliveryPartEntry> $entriesBySourceRef */
+            $entriesBySourceRef = $projectEntries
+                ->filter(fn (DeliveryPartEntry $entry): bool => $entry->source_ref !== null && $entry->source_ref !== '')
+                ->keyBy(fn (DeliveryPartEntry $entry) => (string) $entry->source_ref);
+
+            /** @var Collection<string, DeliveryPartEntry> $entries */
+            $entries = $projectEntries
                 ->filter(function (DeliveryPartEntry $entry): bool {
                     return $this->isEligibleMatchKey(
                         $this->normalizeKeyPart($entry->ito_no),
@@ -188,7 +196,7 @@ class DeliveryPartExcelImportService
                 $summary['notes'][] = $headerNote;
             }
 
-            /** @var list<array{row: int, ito: string, item: string, unit: string, match_key: string, manual: array<string, mixed>, received_date: ?Carbon}> $pendingSapRows */
+            /** @var list<array{row: int, source_ref: string, ito: string, item: string, unit: string, match_key: string, manual: array<string, mixed>, received_date: ?Carbon}> $pendingSapRows */
             $pendingSapRows = [];
 
             for ($row = self::DATA_START_ROW; $row <= $highestRow; $row++) {
@@ -211,6 +219,8 @@ class DeliveryPartExcelImportService
                     $summary['notes'][] = 'Baris '.$row.': '.$note;
                 }
 
+                $sourceRef = $this->buildSourceRef($sheetName, $row);
+
                 if ($this->isEligibleMatchKey($ito, $item) && isset($firstRowByMatchKey[$matchKey])) {
                     $summary['duplikat_dilewati']++;
                     $summary['duplicate_messages'][] = $this->formatDuplicateMessage(
@@ -225,13 +235,11 @@ class DeliveryPartExcelImportService
                     continue;
                 }
 
-                $entry = $this->isEligibleMatchKey($ito, $item)
-                    ? $entries->get($matchKey)
-                    : null;
+                $entry = $this->resolveExistingEntry($sourceRef, $ito, $item, $unit, $entriesBySourceRef, $entries);
 
                 if ($entry !== null) {
                     $summary['matched']++;
-                    $result = $this->applyToExistingEntry($entry, $manualFromExcel, $write);
+                    $result = $this->applyToExistingEntry($entry, $manualFromExcel, $write, $sourceRef, $entriesBySourceRef);
                     if ($result['conflict']) {
                         $summary['conflicts']++;
                     }
@@ -260,10 +268,10 @@ class DeliveryPartExcelImportService
                 if ($isPratasaba) {
                     $summary['will_create_manual']++;
                     if ($write) {
-                        $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel);
+                        $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel, $sourceRef);
                         if ($createResult['entry'] !== null) {
                             $globalInserts++;
-                            $this->registerCreatedEntry($entries, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
+                            $this->registerCreatedEntry($entries, $entriesBySourceRef, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
                         } else {
                             $summary['write_failures']++;
                             $summary['failure_messages'][] = $this->formatRowFailureMessage(
@@ -281,6 +289,7 @@ class DeliveryPartExcelImportService
 
                 $pendingSapRows[] = [
                     'row' => $row,
+                    'source_ref' => $sourceRef,
                     'ito' => $ito,
                     'item' => $item,
                     'unit' => $unit,
@@ -303,6 +312,7 @@ class DeliveryPartExcelImportService
 
                 foreach ($pendingSapRows as $pending) {
                     $row = $pending['row'];
+                    $sourceRef = $pending['source_ref'];
                     $matchKey = $pending['match_key'];
                     $manualFromExcel = $pending['manual'];
                     $ito = $pending['ito'];
@@ -323,14 +333,43 @@ class DeliveryPartExcelImportService
                         continue;
                     }
 
+                    $entry = $this->resolveExistingEntry($sourceRef, $ito, $item, $unit, $entriesBySourceRef, $entries);
+                    if ($entry !== null) {
+                        $summary['matched']++;
+                        $result = $this->applyToExistingEntry($entry, $manualFromExcel, $write, $sourceRef, $entriesBySourceRef);
+                        if ($result['conflict']) {
+                            $summary['conflicts']++;
+                        }
+                        if ($result['filled']) {
+                            $summary['will_fill']++;
+                            if ($write) {
+                                $globalUpdates++;
+                            }
+                        }
+                        if ($result['failure']) {
+                            $summary['write_failures']++;
+                            $summary['failure_messages'][] = $this->formatRowFailureMessage(
+                                $sheetName,
+                                $row,
+                                $result['failure_reason'] ?? 'Gagal memperbarui baris DDS.',
+                            );
+                        }
+
+                        if ($this->isEligibleMatchKey($ito, $item)) {
+                            $firstRowByMatchKey[$matchKey] = $row;
+                        }
+
+                        continue;
+                    }
+
                     $sapRow = $sapMatches[$matchKey] ?? null;
                     if ($sapRow !== null) {
                         $summary['will_create_sap']++;
                         if ($write) {
-                            $createResult = $this->createSapEntry($project->id, $sapRow, $manualFromExcel);
+                            $createResult = $this->createSapEntry($project->id, $sapRow, $manualFromExcel, $sourceRef);
                             if ($createResult['entry'] !== null) {
                                 $globalInserts++;
-                                $this->registerCreatedEntry($entries, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
+                                $this->registerCreatedEntry($entries, $entriesBySourceRef, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
                             } else {
                                 $summary['write_failures']++;
                                 $summary['failure_messages'][] = $this->formatRowFailureMessage(
@@ -351,10 +390,10 @@ class DeliveryPartExcelImportService
                         }
 
                         if ($write) {
-                            $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel);
+                            $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel, $sourceRef);
                             if ($createResult['entry'] !== null) {
                                 $globalInserts++;
-                                $this->registerCreatedEntry($entries, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
+                                $this->registerCreatedEntry($entries, $entriesBySourceRef, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
                             } else {
                                 $summary['write_failures']++;
                                 $summary['failure_messages'][] = $this->formatRowFailureMessage(
@@ -867,14 +906,25 @@ class DeliveryPartExcelImportService
     }
 
     /**
+     * @param  Collection<string, DeliveryPartEntry>  $entriesBySourceRef
      * @param  array<string, mixed>  $manualFromExcel
      * @return array{filled: bool, conflict: bool, failure: bool, failure_reason: ?string}
      */
-    private function applyToExistingEntry(DeliveryPartEntry $entry, array $manualFromExcel, bool $write): array
-    {
+    private function applyToExistingEntry(
+        DeliveryPartEntry $entry,
+        array $manualFromExcel,
+        bool $write,
+        string $sourceRef,
+        Collection $entriesBySourceRef,
+    ): array {
         $hasConflict = false;
         $hasFill = false;
         $updates = [];
+
+        if ($entry->source_ref === null || $entry->source_ref === '') {
+            $updates['source_ref'] = $sourceRef;
+            $hasFill = true;
+        }
 
         foreach (self::MANUAL_FIELDS as $field) {
             $incoming = $manualFromExcel[$field] ?? null;
@@ -917,6 +967,9 @@ class DeliveryPartExcelImportService
 
         try {
             $entry->save();
+            if (isset($updates['source_ref'])) {
+                $entriesBySourceRef->put($sourceRef, $entry);
+            }
 
             return [
                 'filled' => true,
@@ -950,7 +1003,7 @@ class DeliveryPartExcelImportService
      * @param  array<string, mixed>  $manualFromExcel
      * @return array{entry: ?DeliveryPartEntry, error: ?string}
      */
-    private function createSapEntry(int $projectId, array $sapRow, array $manualFromExcel): array
+    private function createSapEntry(int $projectId, array $sapRow, array $manualFromExcel, string $sourceRef): array
     {
         try {
             return [
@@ -960,6 +1013,7 @@ class DeliveryPartExcelImportService
                     'item_code' => $sapRow['item_code'] ?? null,
                     'unit_no' => $sapRow['unit_no'] ?? null,
                     'source' => DeliveryPartEntry::SOURCE_SAP,
+                    'source_ref' => $sourceRef,
                     'no_spb' => $manualFromExcel['no_spb'] ?? null,
                     'remarks_barang' => $manualFromExcel['remarks_barang'] ?? null,
                     'tgl_delivery' => $manualFromExcel['tgl_delivery'] ?? null,
@@ -987,6 +1041,7 @@ class DeliveryPartExcelImportService
         string $item,
         string $unit,
         array $manualFromExcel,
+        string $sourceRef,
     ): array {
         try {
             return [
@@ -996,6 +1051,7 @@ class DeliveryPartExcelImportService
                     'item_code' => $item !== '' ? $item : null,
                     'unit_no' => $unit !== '' ? $unit : null,
                     'source' => DeliveryPartEntry::SOURCE_MANUAL,
+                    'source_ref' => $sourceRef,
                     'no_spb' => $manualFromExcel['no_spb'] ?? null,
                     'remarks_barang' => $manualFromExcel['remarks_barang'] ?? null,
                     'tgl_delivery' => $manualFromExcel['tgl_delivery'] ?? null,
@@ -1015,10 +1071,12 @@ class DeliveryPartExcelImportService
 
     /**
      * @param  Collection<string, DeliveryPartEntry>  $entries
+     * @param  Collection<string, DeliveryPartEntry>  $entriesBySourceRef
      * @param  array<string, int>  $firstRowByMatchKey
      */
     private function registerCreatedEntry(
         Collection $entries,
+        Collection $entriesBySourceRef,
         array &$firstRowByMatchKey,
         string $matchKey,
         int $row,
@@ -1026,10 +1084,43 @@ class DeliveryPartExcelImportService
         string $item,
         DeliveryPartEntry $created,
     ): void {
+        if ($created->source_ref !== null && $created->source_ref !== '') {
+            $entriesBySourceRef->put((string) $created->source_ref, $created);
+        }
+
         if ($this->isEligibleMatchKey($ito, $item)) {
             $firstRowByMatchKey[$matchKey] = $row;
             $entries->put($matchKey, $created);
         }
+    }
+
+    /**
+     * @param  Collection<string, DeliveryPartEntry>  $entriesBySourceRef
+     * @param  Collection<string, DeliveryPartEntry>  $entries
+     */
+    private function resolveExistingEntry(
+        string $sourceRef,
+        string $ito,
+        string $item,
+        string $unit,
+        Collection $entriesBySourceRef,
+        Collection $entries,
+    ): ?DeliveryPartEntry {
+        $bySourceRef = $entriesBySourceRef->get($sourceRef);
+        if ($bySourceRef !== null) {
+            return $bySourceRef;
+        }
+
+        if (! $this->isEligibleMatchKey($ito, $item)) {
+            return null;
+        }
+
+        return $entries->get($this->matchKey($ito, $item, $unit));
+    }
+
+    private function buildSourceRef(string $sheetName, int $row): string
+    {
+        return $sheetName.':'.$row;
     }
 
     private function isEligibleMatchKey(string $ito, string $item): bool

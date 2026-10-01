@@ -41,6 +41,7 @@ class DeliveryPartEntry extends Model
         'item_code',
         'unit_no',
         'source',
+        'source_ref',
         'no_spb',
         'remarks_barang',
         'tgl_delivery',

@@ -834,4 +834,84 @@ class DeliveryPartImportExcelTest extends TestCase
 
         @unlink($path);
     }
+
+    public function test_second_import_run_is_idempotent_for_empty_key_rows(): void
+    {
+        $project = Project::query()->create([
+            'code' => 'PRATASABA',
+            'owner' => 'Test',
+            'location' => 'Test',
+            'is_active' => true,
+        ]);
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-idempotent-empty-key.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => '',
+                'item_code' => '',
+                'unit_no' => '',
+                'description' => 'Baris tanpa kunci A',
+                'no_spb' => 'SPB-IDEM-A',
+            ],
+            [
+                'ito_no' => '',
+                'item_code' => '',
+                'unit_no' => '',
+                'description' => 'Baris tanpa kunci B',
+                'no_spb' => 'SPB-IDEM-B',
+            ],
+        ], [], 'PRATASABA');
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $this->assertSame(2, DeliveryPartEntry::query()->where('project_id', $project->id)->count());
+        $this->assertSame('PRATASABA:7', DeliveryPartEntry::query()->where('no_spb', 'SPB-IDEM-A')->value('source_ref'));
+        $this->assertSame('PRATASABA:8', DeliveryPartEntry::query()->where('no_spb', 'SPB-IDEM-B')->value('source_ref'));
+
+        Artisan::call('delivery-part:import-excel', ['--file' => $path, '--write' => true]);
+        $output = Artisan::output();
+
+        $this->assertSame(2, DeliveryPartEntry::query()->where('project_id', $project->id)->count());
+        $this->assertStringContainsString('Ringkasan akhir: 0 insert', $output);
+
+        @unlink($path);
+    }
+
+    public function test_legacy_entry_without_source_ref_still_matches_by_key_on_import(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => 'ITO-LEGACY',
+            'item_code' => 'PART-LEGACY',
+            'unit_no' => 'U-LEGACY',
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'source_ref' => null,
+            'no_spb' => null,
+        ]);
+
+        $path = storage_path('app/testing-delivery-part-legacy-key.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => 'ITO-LEGACY',
+                'item_code' => 'PART-LEGACY',
+                'unit_no' => 'U-LEGACY',
+                'no_spb' => 'SPB-LEGACY',
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $this->assertDatabaseCount('delivery_part_entries', 1);
+        $entry = DeliveryPartEntry::query()->where('project_id', $project->id)->first();
+        $this->assertSame('SPB-LEGACY', $entry->no_spb);
+        $this->assertSame('017C:7', $entry->source_ref);
+
+        @unlink($path);
+    }
 }
