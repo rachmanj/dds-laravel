@@ -609,4 +609,229 @@ class DeliveryPartImportExcelTest extends TestCase
 
         @unlink($path);
     }
+
+    public function test_empty_match_key_rows_always_create_manual_even_when_other_empty_key_rows_exist(): void
+    {
+        $project = Project::query()->create([
+            'code' => 'PRATASABA',
+            'owner' => 'Test',
+            'location' => 'Test',
+            'is_active' => true,
+        ]);
+
+        DeliveryPartEntry::query()->create([
+            'project_id' => $project->id,
+            'ito_no' => null,
+            'item_code' => null,
+            'unit_no' => null,
+            'source' => DeliveryPartEntry::SOURCE_MANUAL,
+            'no_spb' => 'SPB-EXISTING-EMPTY-KEY',
+        ]);
+
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-empty-key-pratasaba.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => '',
+                'item_code' => '',
+                'unit_no' => '',
+                'description' => 'Baris PRATASABA A',
+                'no_spb' => 'SPB-A',
+            ],
+            [
+                'ito_no' => '',
+                'item_code' => '',
+                'unit_no' => '',
+                'description' => 'Baris PRATASABA B',
+                'no_spb' => 'SPB-B',
+            ],
+        ], [], 'PRATASABA');
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0)
+            ->expectsOutputToContain('Akan dibuat (manual): 2');
+
+        $this->assertSame(3, DeliveryPartEntry::query()->where('project_id', $project->id)->count());
+        $this->assertSame(2, DeliveryPartEntry::query()->where('project_id', $project->id)->whereIn('no_spb', ['SPB-A', 'SPB-B'])->count());
+
+        @unlink($path);
+    }
+
+    public function test_duplicate_rows_with_identical_keys_are_reported_as_duplikat_dilewati_not_write_failures(): void
+    {
+        $project = $this->createProject('022C', '08-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-duplicates.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => 'ITO-DUP',
+                'item_code' => 'PART-DUP',
+                'unit_no' => 'UNIT-1',
+                'no_spb' => 'SPB-FIRST',
+            ],
+            [
+                'ito_no' => 'ITO-DUP',
+                'item_code' => 'PART-DUP',
+                'unit_no' => 'UNIT-1',
+                'no_spb' => 'SPB-SECOND',
+            ],
+        ], [], '022C');
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0)
+            ->expectsOutputToContain('Duplikat dilewati: 1')
+            ->expectsOutputToContain('Gagal tulis: 0');
+
+        $this->assertDatabaseCount('delivery_part_entries', 1);
+        $entry = DeliveryPartEntry::query()->where('project_id', $project->id)->first();
+        $this->assertSame('SPB-FIRST', $entry->no_spb);
+
+        @unlink($path);
+    }
+
+    public function test_unrecognized_ekspedisi_is_stored_trimmed_and_official_values_still_normalize(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-ekspedisi-unknown.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => 'ITO-LV',
+                'item_code' => 'PART-LV',
+                'unit_no' => 'U1',
+                'ekspedisi' => 'LV  ARKA',
+            ],
+            [
+                'ito_no' => 'ITO-NAM',
+                'item_code' => 'PART-NAM',
+                'unit_no' => 'U2',
+                'ekspedisi' => 'NAMARA JAYA',
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $lv = DeliveryPartEntry::query()->where('ito_no', 'ITO-LV')->first();
+        $this->assertNotNull($lv);
+        $this->assertSame('LV ARKA', $lv->ekspedisi);
+
+        $nam = DeliveryPartEntry::query()->where('ito_no', 'ITO-NAM')->first();
+        $this->assertSame('EKSPEDISI NAMARA', $nam->ekspedisi);
+
+        @unlink($path);
+    }
+
+    public function test_duplicate_and_failure_lists_are_not_truncated_in_console_output(): void
+    {
+        $this->createProject('022C', '08-SPT');
+        $this->bindEmptySap();
+
+        $rows = [
+            [
+                'ito_no' => 'ITO-SEED',
+                'item_code' => 'PART-SEED',
+                'unit_no' => 'U-SEED',
+                'no_spb' => 'SPB-SEED',
+            ],
+        ];
+
+        for ($i = 1; $i <= 5; $i++) {
+            $rows[] = [
+                'ito_no' => 'ITO-SEED',
+                'item_code' => 'PART-SEED',
+                'unit_no' => 'U-SEED',
+                'no_spb' => 'SPB-DUP-'.$i,
+            ];
+        }
+
+        $path = storage_path('app/testing-delivery-part-many-dups.xlsx');
+        $this->buildSampleExcel($path, $rows, [], '022C');
+
+        Artisan::call('delivery-part:import-excel', ['--file' => $path]);
+        $output = Artisan::output();
+
+        $this->assertSame(5, substr_count($output, 'duplikat dalam file'));
+        $this->assertStringNotContainsString('duplikat lainnya', $output);
+
+        @unlink($path);
+    }
+
+    public function test_report_option_writes_all_duplicate_lines(): void
+    {
+        $this->createProject('022C', '08-SPT');
+        $this->bindEmptySap();
+
+        $rows = [
+            [
+                'ito_no' => 'ITO-RPT',
+                'item_code' => 'PART-RPT',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-1',
+            ],
+        ];
+        for ($i = 0; $i < 3; $i++) {
+            $rows[] = [
+                'ito_no' => 'ITO-RPT',
+                'item_code' => 'PART-RPT',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-DUP',
+            ];
+        }
+
+        $path = storage_path('app/testing-delivery-part-report.xlsx');
+        $reportPath = storage_path('app/testing-delivery-part-report.csv');
+        $this->buildSampleExcel($path, $rows, [], '022C');
+
+        $this->artisan('delivery-part:import-excel', [
+            '--file' => $path,
+            '--report' => $reportPath,
+        ])->assertExitCode(0);
+
+        $this->assertFileExists($reportPath);
+        $csv = file_get_contents($reportPath);
+        $this->assertNotFalse($csv);
+        $this->assertSame(3, substr_count($csv, 'duplicate'));
+
+        @unlink($path);
+        @unlink($reportPath);
+    }
+
+    public function test_second_import_run_is_idempotent_for_same_data(): void
+    {
+        $project = $this->createProject('017C', '02-SPT');
+        $this->bindEmptySap();
+
+        $path = storage_path('app/testing-delivery-part-idempotent.xlsx');
+        $this->buildSampleExcel($path, [
+            [
+                'ito_no' => 'ITO-IDEM',
+                'item_code' => 'PART-IDEM',
+                'unit_no' => 'U1',
+                'no_spb' => 'SPB-IDEM',
+                'transporter' => 'Kurir',
+            ],
+        ]);
+
+        $this->artisan('delivery-part:import-excel', ['--file' => $path, '--write' => true])
+            ->assertExitCode(0);
+
+        $this->assertDatabaseCount('delivery_part_entries', 1);
+
+        Artisan::call('delivery-part:import-excel', ['--file' => $path, '--write' => true]);
+        $output = Artisan::output();
+
+        $this->assertDatabaseCount('delivery_part_entries', 1);
+        $this->assertStringContainsString('Cocok dengan DDS: 1', $output);
+        $this->assertStringContainsString('Konflik (sudah terisi): 1', $output);
+
+        $entry = DeliveryPartEntry::query()->where('project_id', $project->id)->first();
+        $this->assertSame('SPB-IDEM', $entry->no_spb);
+        $this->assertSame('Kurir', $entry->transporter);
+
+        @unlink($path);
+    }
 }

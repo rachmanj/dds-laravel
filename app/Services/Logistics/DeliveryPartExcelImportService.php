@@ -152,11 +152,20 @@ class DeliveryPartExcelImportService
             $entries = DeliveryPartEntry::query()
                 ->where('project_id', $project->id)
                 ->get()
+                ->filter(function (DeliveryPartEntry $entry): bool {
+                    return $this->isEligibleMatchKey(
+                        $this->normalizeKeyPart($entry->ito_no),
+                        $this->normalizeKeyPart($entry->item_code),
+                    );
+                })
                 ->keyBy(fn (DeliveryPartEntry $entry) => $this->matchKey(
                     $this->normalizeKeyPart($entry->ito_no),
                     $this->normalizeKeyPart($entry->item_code),
                     $this->normalizeUnitNo($entry->unit_no),
                 ));
+
+            /** @var array<string, int> $firstRowByMatchKey */
+            $firstRowByMatchKey = [];
 
             $summary = [
                 'skipped' => false,
@@ -168,8 +177,10 @@ class DeliveryPartExcelImportService
                 'will_fill' => 0,
                 'conflicts' => 0,
                 'write_failures' => 0,
+                'duplikat_dilewati' => 0,
                 'notes' => [],
                 'failure_messages' => [],
+                'duplicate_messages' => [],
                 'sap_chunks_loaded' => 0,
             ];
 
@@ -199,7 +210,24 @@ class DeliveryPartExcelImportService
                 foreach ($manualFromExcel['_row_notes'] ?? [] as $note) {
                     $summary['notes'][] = 'Baris '.$row.': '.$note;
                 }
-                $entry = $entries->get($matchKey);
+
+                if ($this->isEligibleMatchKey($ito, $item) && isset($firstRowByMatchKey[$matchKey])) {
+                    $summary['duplikat_dilewati']++;
+                    $summary['duplicate_messages'][] = $this->formatDuplicateMessage(
+                        $sheetName,
+                        $row,
+                        $firstRowByMatchKey[$matchKey],
+                        $ito,
+                        $item,
+                        $unit,
+                    );
+
+                    continue;
+                }
+
+                $entry = $this->isEligibleMatchKey($ito, $item)
+                    ? $entries->get($matchKey)
+                    : null;
 
                 if ($entry !== null) {
                     $summary['matched']++;
@@ -215,6 +243,15 @@ class DeliveryPartExcelImportService
                     }
                     if ($result['failure']) {
                         $summary['write_failures']++;
+                        $summary['failure_messages'][] = $this->formatRowFailureMessage(
+                            $sheetName,
+                            $row,
+                            $result['failure_reason'] ?? 'Gagal memperbarui baris DDS.',
+                        );
+                    }
+
+                    if ($this->isEligibleMatchKey($ito, $item)) {
+                        $firstRowByMatchKey[$matchKey] = $row;
                     }
 
                     continue;
@@ -223,13 +260,20 @@ class DeliveryPartExcelImportService
                 if ($isPratasaba) {
                     $summary['will_create_manual']++;
                     if ($write) {
-                        $created = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel);
-                        if ($created) {
+                        $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel);
+                        if ($createResult['entry'] !== null) {
                             $globalInserts++;
-                            $entries->put($matchKey, $created);
+                            $this->registerCreatedEntry($entries, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
                         } else {
                             $summary['write_failures']++;
+                            $summary['failure_messages'][] = $this->formatRowFailureMessage(
+                                $sheetName,
+                                $row,
+                                $createResult['error'] ?? 'Gagal membuat baris manual.',
+                            );
                         }
+                    } elseif ($this->isEligibleMatchKey($ito, $item)) {
+                        $firstRowByMatchKey[$matchKey] = $row;
                     }
 
                     continue;
@@ -265,17 +309,38 @@ class DeliveryPartExcelImportService
                     $item = $pending['item'];
                     $unit = $pending['unit'];
 
+                    if ($this->isEligibleMatchKey($ito, $item) && isset($firstRowByMatchKey[$matchKey])) {
+                        $summary['duplikat_dilewati']++;
+                        $summary['duplicate_messages'][] = $this->formatDuplicateMessage(
+                            $sheetName,
+                            $row,
+                            $firstRowByMatchKey[$matchKey],
+                            $ito,
+                            $item,
+                            $unit,
+                        );
+
+                        continue;
+                    }
+
                     $sapRow = $sapMatches[$matchKey] ?? null;
                     if ($sapRow !== null) {
                         $summary['will_create_sap']++;
                         if ($write) {
-                            $created = $this->createSapEntry($project->id, $sapRow, $manualFromExcel);
-                            if ($created) {
+                            $createResult = $this->createSapEntry($project->id, $sapRow, $manualFromExcel);
+                            if ($createResult['entry'] !== null) {
                                 $globalInserts++;
-                                $entries->put($matchKey, $created);
+                                $this->registerCreatedEntry($entries, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
                             } else {
                                 $summary['write_failures']++;
+                                $summary['failure_messages'][] = $this->formatRowFailureMessage(
+                                    $sheetName,
+                                    $row,
+                                    $createResult['error'] ?? 'Gagal membuat baris SAP.',
+                                );
                             }
+                        } elseif ($this->isEligibleMatchKey($ito, $item)) {
+                            $firstRowByMatchKey[$matchKey] = $row;
                         }
                     } else {
                         $summary['will_create_manual']++;
@@ -286,13 +351,20 @@ class DeliveryPartExcelImportService
                         }
 
                         if ($write) {
-                            $created = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel);
-                            if ($created) {
+                            $createResult = $this->createManualEntry($project->id, $ito, $item, $unit, $manualFromExcel);
+                            if ($createResult['entry'] !== null) {
                                 $globalInserts++;
-                                $entries->put($matchKey, $created);
+                                $this->registerCreatedEntry($entries, $firstRowByMatchKey, $matchKey, $row, $ito, $item, $createResult['entry']);
                             } else {
                                 $summary['write_failures']++;
+                                $summary['failure_messages'][] = $this->formatRowFailureMessage(
+                                    $sheetName,
+                                    $row,
+                                    $createResult['error'] ?? 'Gagal membuat baris manual.',
+                                );
                             }
+                        } elseif ($this->isEligibleMatchKey($ito, $item)) {
+                            $firstRowByMatchKey[$matchKey] = $row;
                         }
                     }
                 }
@@ -312,6 +384,66 @@ class DeliveryPartExcelImportService
             'dry_run' => ! $write,
             'peak_memory_bytes' => memory_get_peak_usage(true),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $importResult
+     * @return list<array{type: string, sheet: string, message: string}>
+     */
+    public function buildReportRows(array $importResult): array
+    {
+        $rows = [];
+
+        foreach ($importResult['sheets'] ?? [] as $sheetName => $summary) {
+            if (! is_array($summary)) {
+                continue;
+            }
+
+            foreach ($summary['failure_messages'] ?? [] as $message) {
+                $rows[] = [
+                    'type' => 'failure',
+                    'sheet' => (string) $sheetName,
+                    'message' => (string) $message,
+                ];
+            }
+
+            foreach ($summary['duplicate_messages'] ?? [] as $message) {
+                $rows[] = [
+                    'type' => 'duplicate',
+                    'sheet' => (string) $sheetName,
+                    'message' => (string) $message,
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<string, mixed>  $importResult
+     */
+    public function writeReportFile(string $path, array $importResult): void
+    {
+        $rows = $this->buildReportRows($importResult);
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        if ($extension === 'json') {
+            file_put_contents($path, json_encode($rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+            return;
+        }
+
+        $handle = fopen($path, 'w');
+        if ($handle === false) {
+            throw new \RuntimeException('Tidak dapat menulis laporan ke: '.$path);
+        }
+
+        fputcsv($handle, ['type', 'sheet', 'message']);
+        foreach ($rows as $row) {
+            fputcsv($handle, [$row['type'], $row['sheet'], $row['message']]);
+        }
+
+        fclose($handle);
     }
 
     private function loadSpreadsheet(string $filePath): \PhpOffice\PhpSpreadsheet\Spreadsheet
@@ -661,7 +793,9 @@ class DeliveryPartExcelImportService
             return [DeliveryPartEntry::EKSPEDISI_OPTIONS[0], null];
         }
 
-        return [null, 'Ekspedisi tidak dikenali: '.$raw];
+        $stored = preg_replace('/\s+/u', ' ', trim($raw)) ?? trim($raw);
+
+        return [$stored, 'Ekspedisi tidak dikenali (disimpan apa adanya): '.$stored];
     }
 
     /**
@@ -734,10 +868,7 @@ class DeliveryPartExcelImportService
 
     /**
      * @param  array<string, mixed>  $manualFromExcel
-     */
-    /**
-     * @param  array<string, mixed>  $manualFromExcel
-     * @return array{filled: bool, conflict: bool, failure: bool}
+     * @return array{filled: bool, conflict: bool, failure: bool, failure_reason: ?string}
      */
     private function applyToExistingEntry(DeliveryPartEntry $entry, array $manualFromExcel, bool $write): array
     {
@@ -767,6 +898,7 @@ class DeliveryPartExcelImportService
                 'filled' => false,
                 'conflict' => $hasConflict,
                 'failure' => false,
+                'failure_reason' => null,
             ];
         }
 
@@ -775,6 +907,7 @@ class DeliveryPartExcelImportService
                 'filled' => true,
                 'conflict' => $hasConflict,
                 'failure' => false,
+                'failure_reason' => null,
             ];
         }
 
@@ -789,12 +922,14 @@ class DeliveryPartExcelImportService
                 'filled' => true,
                 'conflict' => $hasConflict,
                 'failure' => false,
+                'failure_reason' => null,
             ];
-        } catch (Throwable) {
+        } catch (Throwable $e) {
             return [
                 'filled' => false,
                 'conflict' => $hasConflict,
                 'failure' => true,
+                'failure_reason' => $e->getMessage(),
             ];
         }
     }
@@ -811,29 +946,40 @@ class DeliveryPartExcelImportService
     /**
      * @param  array<string, mixed>  $manualFromExcel
      */
-    private function createSapEntry(int $projectId, array $sapRow, array $manualFromExcel): ?DeliveryPartEntry
+    /**
+     * @param  array<string, mixed>  $manualFromExcel
+     * @return array{entry: ?DeliveryPartEntry, error: ?string}
+     */
+    private function createSapEntry(int $projectId, array $sapRow, array $manualFromExcel): array
     {
         try {
-            return DeliveryPartEntry::query()->create([
-                'project_id' => $projectId,
-                'ito_no' => $sapRow['ito_no'] ?? null,
-                'item_code' => $sapRow['item_code'] ?? null,
-                'unit_no' => $sapRow['unit_no'] ?? null,
-                'source' => DeliveryPartEntry::SOURCE_SAP,
-                'no_spb' => $manualFromExcel['no_spb'] ?? null,
-                'remarks_barang' => $manualFromExcel['remarks_barang'] ?? null,
-                'tgl_delivery' => $manualFromExcel['tgl_delivery'] ?? null,
-                'transporter' => $manualFromExcel['transporter'] ?? null,
-                'unit_kendaraan' => $manualFromExcel['unit_kendaraan'] ?? null,
-                'ekspedisi' => $manualFromExcel['ekspedisi'] ?? null,
-            ]);
-        } catch (Throwable) {
-            return null;
+            return [
+                'entry' => DeliveryPartEntry::query()->create([
+                    'project_id' => $projectId,
+                    'ito_no' => $sapRow['ito_no'] ?? null,
+                    'item_code' => $sapRow['item_code'] ?? null,
+                    'unit_no' => $sapRow['unit_no'] ?? null,
+                    'source' => DeliveryPartEntry::SOURCE_SAP,
+                    'no_spb' => $manualFromExcel['no_spb'] ?? null,
+                    'remarks_barang' => $manualFromExcel['remarks_barang'] ?? null,
+                    'tgl_delivery' => $manualFromExcel['tgl_delivery'] ?? null,
+                    'transporter' => $manualFromExcel['transporter'] ?? null,
+                    'unit_kendaraan' => $manualFromExcel['unit_kendaraan'] ?? null,
+                    'ekspedisi' => $manualFromExcel['ekspedisi'] ?? null,
+                ]),
+                'error' => null,
+            ];
+        } catch (Throwable $e) {
+            return [
+                'entry' => null,
+                'error' => $e->getMessage(),
+            ];
         }
     }
 
     /**
      * @param  array<string, mixed>  $manualFromExcel
+     * @return array{entry: ?DeliveryPartEntry, error: ?string}
      */
     private function createManualEntry(
         int $projectId,
@@ -841,24 +987,78 @@ class DeliveryPartExcelImportService
         string $item,
         string $unit,
         array $manualFromExcel,
-    ): ?DeliveryPartEntry {
+    ): array {
         try {
-            return DeliveryPartEntry::query()->create([
-                'project_id' => $projectId,
-                'ito_no' => $ito !== '' ? $ito : null,
-                'item_code' => $item !== '' ? $item : null,
-                'unit_no' => $unit !== '' ? $unit : null,
-                'source' => DeliveryPartEntry::SOURCE_MANUAL,
-                'no_spb' => $manualFromExcel['no_spb'] ?? null,
-                'remarks_barang' => $manualFromExcel['remarks_barang'] ?? null,
-                'tgl_delivery' => $manualFromExcel['tgl_delivery'] ?? null,
-                'transporter' => $manualFromExcel['transporter'] ?? null,
-                'unit_kendaraan' => $manualFromExcel['unit_kendaraan'] ?? null,
-                'ekspedisi' => $manualFromExcel['ekspedisi'] ?? null,
-            ]);
-        } catch (Throwable) {
-            return null;
+            return [
+                'entry' => DeliveryPartEntry::query()->create([
+                    'project_id' => $projectId,
+                    'ito_no' => $ito !== '' ? $ito : null,
+                    'item_code' => $item !== '' ? $item : null,
+                    'unit_no' => $unit !== '' ? $unit : null,
+                    'source' => DeliveryPartEntry::SOURCE_MANUAL,
+                    'no_spb' => $manualFromExcel['no_spb'] ?? null,
+                    'remarks_barang' => $manualFromExcel['remarks_barang'] ?? null,
+                    'tgl_delivery' => $manualFromExcel['tgl_delivery'] ?? null,
+                    'transporter' => $manualFromExcel['transporter'] ?? null,
+                    'unit_kendaraan' => $manualFromExcel['unit_kendaraan'] ?? null,
+                    'ekspedisi' => $manualFromExcel['ekspedisi'] ?? null,
+                ]),
+                'error' => null,
+            ];
+        } catch (Throwable $e) {
+            return [
+                'entry' => null,
+                'error' => $e->getMessage(),
+            ];
         }
+    }
+
+    /**
+     * @param  Collection<string, DeliveryPartEntry>  $entries
+     * @param  array<string, int>  $firstRowByMatchKey
+     */
+    private function registerCreatedEntry(
+        Collection $entries,
+        array &$firstRowByMatchKey,
+        string $matchKey,
+        int $row,
+        string $ito,
+        string $item,
+        DeliveryPartEntry $created,
+    ): void {
+        if ($this->isEligibleMatchKey($ito, $item)) {
+            $firstRowByMatchKey[$matchKey] = $row;
+            $entries->put($matchKey, $created);
+        }
+    }
+
+    private function isEligibleMatchKey(string $ito, string $item): bool
+    {
+        return $ito !== '' || $item !== '';
+    }
+
+    private function formatDuplicateMessage(
+        string $sheetName,
+        int $row,
+        int $firstRow,
+        string $ito,
+        string $item,
+        string $unit,
+    ): string {
+        return sprintf(
+            '%s baris %d: duplikat dalam file (baris pertama %d) — ITO=%s, Part=%s, Unit=%s',
+            $sheetName,
+            $row,
+            $firstRow,
+            $ito !== '' ? $ito : '(kosong)',
+            $item !== '' ? $item : '(kosong)',
+            $unit !== '' ? $unit : '(kosong)',
+        );
+    }
+
+    private function formatRowFailureMessage(string $sheetName, int $row, string $reason): string
+    {
+        return sprintf('%s baris %d: %s', $sheetName, $row, $reason);
     }
 
     private function normalizeKeyPart(?string $value): string

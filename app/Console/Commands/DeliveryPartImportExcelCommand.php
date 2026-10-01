@@ -10,7 +10,8 @@ class DeliveryPartImportExcelCommand extends Command
 {
     protected $signature = 'delivery-part:import-excel
                             {--file= : Path ke file Excel (.xlsx)}
-                            {--write : Tulis perubahan ke database (default: dry-run)}';
+                            {--write : Tulis perubahan ke database (default: dry-run)}
+                            {--report= : Path berkas laporan kegagalan/duplikat (CSV atau .json)}';
 
     protected $description = 'Import kolom manual Delivery Part dari Excel 2026 (default dry-run; gunakan --write untuk menulis)';
 
@@ -59,6 +60,18 @@ class DeliveryPartImportExcelCommand extends Command
             return self::FAILURE;
         }
 
+        $reportPath = $this->option('report');
+        if (is_string($reportPath) && $reportPath !== '') {
+            try {
+                $importService->writeReportFile($reportPath, $result);
+                $this->info('Laporan kegagalan/duplikat ditulis ke: '.$reportPath);
+            } catch (\Throwable $e) {
+                $this->error('Gagal menulis laporan: '.$e->getMessage());
+
+                return self::FAILURE;
+            }
+        }
+
         if ($write) {
             $this->info(sprintf(
                 'Ringkasan akhir: %d insert, %d update.',
@@ -93,9 +106,26 @@ class DeliveryPartImportExcelCommand extends Command
         $this->line('  Akan dibuat (manual): '.($summary['will_create_manual'] ?? 0));
         $this->line('  Akan diisi (kolom kosong): '.($summary['will_fill'] ?? 0));
         $this->line('  Konflik (sudah terisi): '.($summary['conflicts'] ?? 0));
+        $this->line('  Duplikat dilewati: '.($summary['duplikat_dilewati'] ?? 0));
         $this->line('  Gagal tulis: '.($summary['write_failures'] ?? 0));
         if (isset($summary['sap_chunks_loaded'])) {
             $this->line('  Chunk SAP dimuat: '.($summary['sap_chunks_loaded'] ?? 0));
+        }
+
+        $duplicateMessages = $summary['duplicate_messages'] ?? [];
+        if ($duplicateMessages !== []) {
+            $this->line('  Duplikat (detail):');
+            foreach ($duplicateMessages as $message) {
+                $this->line('    - '.$message);
+            }
+        }
+
+        $failureMessages = $summary['failure_messages'] ?? [];
+        if ($failureMessages !== []) {
+            $this->line('  Kegagalan (detail):');
+            foreach ($failureMessages as $message) {
+                $this->line('    - '.$message);
+            }
         }
 
         if (! empty($summary['notes'])) {
