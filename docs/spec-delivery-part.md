@@ -85,7 +85,8 @@ Alurnya:
 | `delivery_part_entry_histories` | `entry_id`, `field`, `old_value`, `new_value`, `user_id`, `created_at` (riwayat perubahan kolom manual) |
 | `delivery_part_spb` + `delivery_part_spb_items` | header SPB (project, no_spb, tanggal, remarks) + barisnya (part number, description, qty, uom, remarks) |
 | `delivery_part_ito_cancels` | `ito_no`, `doc_entry`, `project_id`, `reason`, `status` (`requested`/`processing`/`cancelled`/`failed`), `requested_by`, `requested_at`, `executed_at`, `sap_message`, `attempts` |
-| permissions | `view-delivery-part`, `edit-delivery-part`, `cancel-ito` (seeder, ditautkan ke role yang sudah ada sesuai pola Logistics) |
+| permissions | `view-delivery-part`, `edit-delivery-part`, `export-delivery-part` (seeder `DeliveryPartPermissionSeeder`, ditautkan ke role yang sudah ada sesuai pola Logistics) |
+| permission khusus cancel ITO | `cancel-ito` **berdiri sendiri** lewat seeder `ItoCancelPermissionSeeder`: hanya user **marlov** (izin langsung) dan role **admin** + **superadmin**. Role logistic/accounting/finance/logistics-only TIDAK boleh — seeder mencabutnya bila pernah menempel (keputusan Iwan, 1 Okt 2026). |
 
 ## 5. UI/UX
 
