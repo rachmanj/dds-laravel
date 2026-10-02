@@ -16,8 +16,17 @@ class DeliveryPartPermissionSeeder extends Seeder
         'view-delivery-part',
         'edit-delivery-part',
         'export-delivery-part',
-        'cancel-ito',
     ];
+
+    /**
+     * Permission yang dibuat seeder ini tapi TIDAK diberikan ke role mana pun di sini.
+     *
+     * `cancel-ito` sengaja dipisah: hanya user marlov (permission langsung) dan role
+     * admin/superadmin yang memilikinya — diatur `ItoCancelPermissionSeeder`.
+     *
+     * @var list<string>
+     */
+    private const CANCEL_PERMISSION = 'cancel-ito';
 
     public function run(): void
     {
@@ -27,7 +36,7 @@ class DeliveryPartPermissionSeeder extends Seeder
             'view-delivery-part',
             'edit-delivery-part',
             'export-delivery-part',
-            'cancel-ito',
+            self::CANCEL_PERMISSION,
             'manage-delivery-part-mapping',
         ] as $permissionName) {
             Permission::firstOrCreate(['name' => $permissionName]);
