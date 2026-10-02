@@ -78,6 +78,17 @@ class ItoCancelPermissionSeederTest extends TestCase
         $this->assertSame(1, Permission::where('name', 'cancel-ito')->count());
     }
 
+    public function test_user_admin_tetap_punya_izin_lewat_role_tanpa_izin_langsung(): void
+    {
+        $adminUser = User::factory()->create(['username' => 'adminuser', 'is_active' => true]);
+        $adminUser->assignRole('admin');
+
+        $this->seed(ItoCancelPermissionSeeder::class);
+
+        $this->assertTrue($adminUser->fresh()->can('cancel-ito'));
+        $this->assertFalse($adminUser->fresh()->hasDirectPermission('cancel-ito'));
+    }
+
     public function test_user_ber_role_logistik_tidak_boleh_membatalkan_ito(): void
     {
         $petugas = User::factory()->create(['username' => 'petugas', 'is_active' => true]);

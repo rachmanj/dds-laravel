@@ -102,8 +102,15 @@ class ItoCancelPermissionSeeder extends Seeder
                 continue;
             }
 
+            // Hanya izin LANGSUNG yang dicabut di sini. Izin yang datang dari role
+            // (mis. user admin/superadmin) bukan urusan seeder ini — dan mencetak
+            // "dicabut" untuk mereka akan menyesatkan.
+            if (! $user->hasDirectPermission($permission)) {
+                continue;
+            }
+
             $user->revokePermissionTo($permission);
-            $this->command?->line("Permission ".self::PERMISSION." dicabut dari user {$user->username}.");
+            $this->command?->line("Permission ".self::PERMISSION." dicabut dari user {$user->username} (izin langsung).");
         }
     }
 
